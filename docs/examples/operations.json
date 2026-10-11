@@ -1,0 +1,15 @@
+{
+  "protocol": 1,
+  "id": "example.operations",
+  "version": "1.0.0",
+  "name": "Operations",
+  "description": "常用只读运维命令",
+  "descriptionEn": "Common read-only operations commands",
+  "publisher": "Example",
+  "provider": "snippets",
+  "permissions": ["terminal.input"],
+  "commands": [
+    { "label": "查看监听端口", "text": "ss -tulnp" },
+    { "label": "查看磁盘容量", "text": "df -h" }
+  ]
+}

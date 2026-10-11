@@ -1,0 +1,117 @@
+{
+  "protocol": 1,
+  "plugins": [
+    {
+      "manifest": {
+        "protocol": 1,
+        "id": "cshell.vim",
+        "version": "1.0.0",
+        "name": "Vim",
+        "description": "模式切换、定位、搜索、保存与退出。",
+        "descriptionEn": "Navigate, search, edit, save and exit Vim.",
+        "publisher": "CShell",
+        "provider": "vim",
+        "permissions": [
+          "terminal.input"
+        ],
+        "commands": []
+      },
+      "url": "https://raw.githubusercontent.com/Yeqi99/CShell/v0.3.0/marketplace/plugins/cshell.vim.json",
+      "sha256": "738df7f29d67b22365ce50605055f6d992befa970bd716667578322c1331b796"
+    },
+    {
+      "manifest": {
+        "protocol": 1,
+        "id": "cshell.nano",
+        "version": "1.0.0",
+        "name": "Nano",
+        "description": "定位、搜索、保存与退出。",
+        "descriptionEn": "Navigate, search, save and exit Nano.",
+        "publisher": "CShell",
+        "provider": "nano",
+        "permissions": [
+          "terminal.input"
+        ],
+        "commands": []
+      },
+      "url": "https://raw.githubusercontent.com/Yeqi99/CShell/v0.3.0/marketplace/plugins/cshell.nano.json",
+      "sha256": "17c9e4e8b97b042722788337c178c3403f55a9212bd14fd512dec42ae25ceea9"
+    },
+    {
+      "manifest": {
+        "protocol": 1,
+        "id": "cshell.commands",
+        "version": "1.0.0",
+        "name": "Shell",
+        "description": "Linux 常用命令联想，只补全，不自动执行。",
+        "descriptionEn": "Complete common Linux commands without executing them.",
+        "publisher": "CShell",
+        "provider": "commands",
+        "permissions": [
+          "terminal.input"
+        ],
+        "commands": []
+      },
+      "url": "https://raw.githubusercontent.com/Yeqi99/CShell/v0.3.0/marketplace/plugins/cshell.commands.json",
+      "sha256": "454f9f581b1bee29f09672ecbb70957b0059c713119b95c2cf52b4cc4dc78da2"
+    },
+    {
+      "manifest": {
+        "protocol": 1,
+        "id": "cshell.docker",
+        "version": "1.0.0",
+        "name": "Docker",
+        "description": "容器、镜像、端口映射与实时资源。",
+        "descriptionEn": "Containers, images, port mappings and live resources.",
+        "publisher": "CShell",
+        "provider": "docker",
+        "permissions": [
+          "remote.read",
+          "remote.execute"
+        ],
+        "commands": []
+      },
+      "url": "https://raw.githubusercontent.com/Yeqi99/CShell/v0.3.0/marketplace/plugins/cshell.docker.json",
+      "sha256": "5d78ee94988f9f2ad72f1d58f16b44c80c07d075104b9bb332a0226f2c414856"
+    },
+    {
+      "manifest": {
+        "protocol": 1,
+        "id": "cshell.conda",
+        "version": "1.0.0",
+        "name": "Anaconda",
+        "description": "识别 Conda 环境，管理依赖，打开环境终端与 Jupyter。",
+        "descriptionEn": "Manage Conda environments, packages, terminals and Jupyter.",
+        "publisher": "CShell",
+        "provider": "conda",
+        "permissions": [
+          "remote.read",
+          "remote.execute",
+          "remote.forward"
+        ],
+        "commands": []
+      },
+      "url": "https://raw.githubusercontent.com/Yeqi99/CShell/v0.3.0/marketplace/plugins/cshell.conda.json",
+      "sha256": "a681da77df0c4e42ba59cc1c45de3562f64e8a51b0f92803735876c833a9b59b"
+    },
+    {
+      "manifest": {
+        "protocol": 1,
+        "id": "cshell.python",
+        "version": "1.0.0",
+        "name": "Python",
+        "description": "基于当前解释器的补全、签名与语法诊断。",
+        "descriptionEn": "Interpreter-aware completion, signatures and syntax diagnostics.",
+        "publisher": "CShell",
+        "provider": "python",
+        "permissions": [
+          "remote.read",
+          "remote.execute"
+        ],
+        "commands": []
+      },
+      "url": "https://raw.githubusercontent.com/Yeqi99/CShell/v0.3.0/marketplace/plugins/cshell.python.json",
+      "sha256": "eb5f496344235ddf125942c6631b01f66357fb744f5a53459ea6e7c3806b010c"
+    }
+  ]
+}

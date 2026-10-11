@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:"
+    />
+    <title>CShell</title>
+    <link rel="stylesheet" href="app.css" />
+  </head>
+  <body>
+    <header>
+      <strong>CShell</strong><span></span><button id="theme" aria-label="切换明暗">◐</button
+      ><button id="minimal" aria-label="极简模式">↗</button
+      ><button id="new" aria-label="新建连接">＋</button>
+    </header>
+    <nav id="tabs" aria-label="会话标签"></nav>
+    <main id="workspace">
+      <form id="connect">
+        <h2>SSH 连接</h2>
+        <label
+          >主机地址<input name="host" required autocomplete="off" autocapitalize="none"
+        /></label>
+        <div class="row">
+          <label>用户名<input name="username" value="root" required autocapitalize="none" /></label
+          ><label
+            >端口<input name="port" value="22" type="number" min="1" max="65535" required
+          /></label>
+        </div>
+        <label>密码<input name="password" type="password" autocomplete="off" /></label>
+        <details>
+          <summary>私钥认证</summary>
+          <label
+            >私钥内容<textarea
+              name="privateKey"
+              spellcheck="false"
+              autocapitalize="none"
+            ></textarea></label
+          ><label>私钥口令<input name="passphrase" type="password" autocomplete="off" /></label>
+        </details>
+        <button class="primary">连接</button
+        ><small>凭据仅用于本次连接，不保存。首次连接需核对主机指纹。</small>
+      </form>
+      <div id="terminals"></div>
+    </main>
+    <footer>
+      <button data-key="\u001b">Esc</button><button id="ctrl">Ctrl</button
+      ><button data-key="\t">Tab</button><button data-key="\u001b[A">↑</button
+      ><button data-key="\u001b[B">↓</button><button data-key="\u001b[D">←</button
+      ><button data-key="\u001b[C">→</button><span id="status">就绪</span>
+    </footer>
+    <script src="app.js"></script>
+  </body>
+</html>

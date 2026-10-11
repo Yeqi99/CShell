@@ -1,0 +1,206 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { createServer } from 'node:http';
+import { randomUUID, createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { AiService, commandNeedsReview } from '../src/core/ai';
+import { Store } from '../src/core/store';
+import { SshService } from '../src/core/ssh';
+import { fixture } from './fixture';
+import { initialWindowBounds } from '../src/desktop/window-bounds';
+const until = async (fn: () => boolean) => {
+  const deadline = Date.now() + 10000;
+  while (!fn()) {
+    if (Date.now() > deadline) throw new Error('Timeout');
+    await new Promise((r) => setTimeout(r, 20));
+  }
+};
+test('initial window fits work area including small/high-DPI and secondary screens', () => {
+  for (const area of [
+    { x: 0, y: 0, width: 1280, height: 680 },
+    { x: -1920, y: 30, width: 1920, height: 1050 },
+    { x: 0, y: 0, width: 700, height: 500 },
+  ]) {
+    const w = initialWindowBounds(area);
+    assert.ok(w.x >= area.x && w.y >= area.y);
+    assert.ok(w.x + w.width <= area.x + area.width && w.y + w.height <= area.y + area.height);
+    assert.ok(w.minWidth <= area.width && w.minHeight <= area.height);
+  }
+});
+test('agent enforces target/capability, review, revocation, stop and encrypted persistence', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'cshell-ai-')),
+    secret = randomBytes(32);
+  const codec = {
+    encrypt: async (s: string) => {
+      const iv = randomBytes(12),
+        cipher = createCipheriv('aes-256-gcm', secret, iv);
+      return Buffer.concat([iv, cipher.update(s), cipher.final(), cipher.getAuthTag()]).toString(
+        'base64',
+      );
+    },
+    decrypt: async (s: string) => {
+      const b = Buffer.from(s, 'base64'),
+        c = createDecipheriv('aes-256-gcm', secret, b.subarray(0, 12));
+      c.setAuthTag(b.subarray(-16));
+      return Buffer.concat([c.update(b.subarray(12, -16)), c.final()]).toString();
+    },
+  };
+  const store = new Store(directory, codec),
+    remote = await fixture(),
+    ssh = new SshService(
+      () => {},
+      async () => true,
+    );
+  const requests: any[] = [];
+  let requestedCommand = 'pwd';
+  const api = createServer(async (req, res) => {
+    let data = '';
+    for await (const c of req) data += c;
+    const input = JSON.parse(data);
+    requests.push(input);
+    const last = input.messages.at(-1);
+    res.setHeader('Content-Type', 'application/json');
+    res.end(
+      JSON.stringify({
+        choices: [
+          {
+            message:
+              last.role === 'tool'
+                ? { content: 'Done' }
+                : {
+                    content: null,
+                    tool_calls: [
+                      {
+                        id: randomUUID(),
+                        type: 'function',
+                        function: {
+                          name: 'execute_command',
+                          arguments: JSON.stringify({ command: requestedCommand }),
+                        },
+                      },
+                    ],
+                  },
+          },
+        ],
+      }),
+    );
+  });
+  await new Promise<void>((r) => api.listen(0, '127.0.0.1', r));
+  try {
+    const profile = {
+      id: randomUUID(),
+      name: 'test',
+      host: '127.0.0.1',
+      port: remote.port,
+      username: 'tester',
+      auth: 'password' as const,
+      group: 'Dev',
+      favorite: false,
+    };
+    await store.saveProfile(profile);
+    const { sessionId } = await ssh.connect(profile, { password: remote.password });
+    const ai = new AiService(directory, store, ssh);
+    await ai.load();
+    const provider = {
+      id: randomUUID(),
+      name: 'fixture',
+      url: `http://127.0.0.1:${(api.address() as any).port}/v1`,
+      model: 'fixture',
+    };
+    await ai.saveProvider(provider, 'private-test-key');
+    assert.equal(JSON.stringify(ai.snapshot()).includes('private-test-key'), false);
+    await assert.rejects(
+      ai.saveProvider({ ...provider, url: 'https://different.example/v1' }),
+      /key again/,
+    );
+    const permission = {
+      location: 'terminal' as const,
+      providerId: provider.id,
+      groups: ['Dev'],
+      profiles: [],
+      capabilities: ['commands.execute' as const],
+    };
+    await ai.permission(permission);
+    const thread = await ai.create('terminal', provider.id, 'review', sessionId);
+    await ai.send(thread.id, 'show directory');
+    await until(() => ai.snapshot().threads[0].state === 'approval');
+    assert.equal(requests[0].tools.length, 1);
+    await ai.permission({ ...permission, capabilities: [] });
+    ai.approve(thread.id, ai.snapshot().threads[0].pending!.id, true);
+    await until(() => ai.snapshot().threads[0].state === 'idle');
+    assert.match(
+      ai.snapshot().threads[0].messages.find((m) => m.role === 'tool')!.content,
+      /revoked/,
+    );
+    await ai.permission(permission);
+    requestedCommand = 'rm -rf /test-only-not-executed';
+    await ai.mode(thread.id, 'restricted');
+    await ai.send(thread.id, 'dangerous operation');
+    await until(() => ai.snapshot().threads[0].state === 'approval');
+    ai.stop(thread.id);
+    await until(() => ai.snapshot().threads[0].state === 'error');
+    await until(() => !ai.snapshot().threads[0].pending);
+    const outside = await ai.create('files', provider.id, 'allow', sessionId);
+    await ai.send(outside.id, 'try bypass');
+    await until(() => ai.snapshot().threads[0].state === 'idle');
+    assert.match(
+      ai.snapshot().threads[0].messages.find((m) => m.role === 'tool')!.content,
+      /denied/,
+    );
+    assert.equal(commandNeedsReview('ls -la'), false);
+    assert.equal(commandNeedsReview('echo x; rm a'), true);
+    assert.equal(commandNeedsReview('python3 -c x'), true);
+    requestedCommand = 'pwd';
+    await ai.mode(thread.id, 'restricted');
+    await ai.send(thread.id, 'read with restricted execution');
+    await until(() => ai.snapshot().threads.find((t) => t.id === thread.id)!.state === 'idle');
+    assert.match(
+      ai
+        .snapshot()
+        .threads.find((t) => t.id === thread.id)!
+        .messages.filter((m) => m.role === 'tool')
+        .at(-1)!.content,
+      /__CPU__/,
+    );
+    await ai.mode(thread.id, 'review');
+    await ai.send(thread.id, 'review and allow once');
+    await until(() => ai.snapshot().threads.find((t) => t.id === thread.id)!.state === 'approval');
+    ai.approve(thread.id, ai.snapshot().threads.find((t) => t.id === thread.id)!.pending!.id, true);
+    await until(() => ai.snapshot().threads.find((t) => t.id === thread.id)!.state === 'idle');
+    assert.match(
+      ai
+        .snapshot()
+        .threads.find((t) => t.id === thread.id)!
+        .messages.filter((m) => m.role === 'tool')
+        .at(-1)!.content,
+      /__CPU__/,
+    );
+    await ai.mode(thread.id, 'allow');
+    await ai.send(thread.id, 'allow permitted execution');
+    await until(() => ai.snapshot().threads.find((t) => t.id === thread.id)!.state === 'idle');
+    assert.match(
+      ai
+        .snapshot()
+        .threads.find((t) => t.id === thread.id)!
+        .messages.filter((m) => m.role === 'tool')
+        .at(-1)!.content,
+      /__CPU__/,
+    );
+    // Ensure pending writes completed before reading/reopening.
+    await ai.permission(permission);
+    const stored = await readFile(join(directory, 'ai.enc'), 'utf8');
+    assert.equal(stored.includes('private-test-key'), false);
+    assert.equal(stored.includes('show directory'), false);
+    const reloaded = new AiService(directory, store, ssh);
+    await reloaded.load();
+    assert.equal(reloaded.snapshot().providers[0].hasKey, true);
+    assert.equal(reloaded.snapshot().threads.length, 2);
+  } finally {
+    ssh.dispose();
+    await remote.close();
+    await new Promise<void>((r) => api.close(() => r()));
+    await rm(directory, { recursive: true, force: true });
+  }
+});

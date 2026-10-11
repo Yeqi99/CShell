@@ -1,0 +1,22 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'org.canpshell.mobile'
+    compileSdk 36
+    defaultConfig { applicationId 'org.canpshell.mobile'; minSdk 26; targetSdk 36; versionCode 3; versionName '0.3.0' }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    signingConfigs {
+        release {
+            if (System.getenv('ANDROID_KEYSTORE')) {
+                storeFile file(System.getenv('ANDROID_KEYSTORE'))
+                storePassword System.getenv('ANDROID_STORE_PASSWORD')
+                keyAlias System.getenv('ANDROID_KEY_ALIAS')
+                keyPassword System.getenv('ANDROID_KEY_PASSWORD')
+            }
+        }
+    }
+    buildTypes { release { signingConfig signingConfigs.release; minifyEnabled false } }
+}
+dependencies {
+    implementation 'com.github.mwiede:jsch:2.28.8'
+    implementation 'org.bouncycastle:bcprov-jdk18on:1.86'
+}

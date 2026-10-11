@@ -1,0 +1,14 @@
+{
+  "protocol": 1,
+  "id": "cshell.vim",
+  "version": "1.0.0",
+  "name": "Vim",
+  "description": "模式切换、定位、搜索、保存与退出。",
+  "descriptionEn": "Navigate, search, edit, save and exit Vim.",
+  "publisher": "CShell",
+  "provider": "vim",
+  "permissions": [
+    "terminal.input"
+  ],
+  "commands": []
+}

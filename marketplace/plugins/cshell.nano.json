@@ -1,0 +1,14 @@
+{
+  "protocol": 1,
+  "id": "cshell.nano",
+  "version": "1.0.0",
+  "name": "Nano",
+  "description": "定位、搜索、保存与退出。",
+  "descriptionEn": "Navigate, search, save and exit Nano.",
+  "publisher": "CShell",
+  "provider": "nano",
+  "permissions": [
+    "terminal.input"
+  ],
+  "commands": []
+}

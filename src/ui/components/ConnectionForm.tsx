@@ -1,0 +1,445 @@
+import { useId, useRef, useState } from 'react';
+import {
+  ArrowRight,
+  Eye,
+  EyeOff,
+  FileKey2,
+  LoaderCircle,
+  KeyRound,
+  LockKeyhole,
+  ClipboardPaste,
+} from 'lucide-react';
+import type { Profile, Credentials } from '../../shared/contracts';
+import { parseSshCommand } from '../../shared/ssh-command';
+import { useI18n } from '../i18n';
+
+type Field = 'name' | 'host' | 'port' | 'username';
+
+export function ConnectionForm({
+  profile,
+  groups,
+  initialPersist = !!profile,
+  saved,
+  onClose,
+  onSave,
+  onConnect,
+}: {
+  profile?: Profile;
+  groups: string[];
+  initialPersist?: boolean;
+  saved: boolean;
+  onClose: () => void;
+  onSave: (p: Profile) => Promise<void>;
+  onConnect: (p: Profile, c: Credentials, persist: boolean) => Promise<void>;
+}) {
+  const { t } = useI18n();
+  const id = useId();
+  const form = useRef<HTMLFormElement>(null);
+  const [value, setValue] = useState<Profile>(
+    profile ?? {
+      id: crypto.randomUUID(),
+      name: '',
+      host: '',
+      port: 22,
+      username: 'root',
+      group: '',
+      auth: 'password',
+      favorite: false,
+    },
+  );
+  const [persist, setPersist] = useState(initialPersist);
+  const [port, setPort] = useState(String(value.port));
+  const [password, setPassword] = useState('');
+  const [passphrase, setPassphrase] = useState('');
+  const [key, setKey] = useState<{ token: string; name: string } | null>(null);
+  const [remember, setRemember] = useState(saved);
+  const [showPassword, setShowPassword] = useState(false);
+  const [busy, setBusy] = useState<'save' | 'connect' | null>(null);
+  const [error, setError] = useState('');
+  const [extracting, setExtracting] = useState(false);
+  const [extraction, setExtraction] = useState<'done' | 'invalid' | 'unavailable' | null>(null);
+  const [invalid, setInvalid] = useState<Partial<Record<Field, boolean>>>({});
+  const canReuse = persist && saved && profile?.auth === value.auth;
+  const update = (field: keyof Profile, next: string | number | boolean) => {
+    setExtraction(null);
+    setValue((v) => ({ ...v, [field]: next }));
+    setInvalid((v) => ({ ...v, [field]: false }));
+  };
+  const fieldProps = (field: Field) => ({
+    id: id + '-' + field,
+    name: field,
+    'aria-invalid': !!invalid[field],
+    'aria-describedby': invalid[field] ? id + '-' + field + '-error' : undefined,
+  });
+  const fieldError = (field: Field) =>
+    invalid[field] && (
+      <span className="connection-field-error" id={id + '-' + field + '-error'}>
+        {t(
+          field === 'port'
+            ? 'invalidPort'
+            : field === 'host' && value.host.trim()
+              ? 'invalidHost'
+              : 'requiredField',
+        )}
+      </span>
+    );
+  async function submit(connect: boolean) {
+    if (busy || extracting) return;
+    const host = value.host.trim();
+    const username = value.username.trim();
+    const connectionPort = port;
+    const nextInvalid = {
+      name: false,
+      host: !host || /\s/.test(host),
+      username: !username,
+      port:
+        !/^\d+$/.test(connectionPort) ||
+        Number(connectionPort) < 1 ||
+        Number(connectionPort) > 65535,
+    };
+    setInvalid(nextInvalid);
+    setError('');
+    const first = (['name', 'host', 'port', 'username'] as const).find((f) => nextInvalid[f]);
+    if (first) {
+      form.current?.querySelector<HTMLInputElement>('[name="' + first + '"]')?.focus();
+      return;
+    }
+    if (connect && value.auth === 'key' && !key && !canReuse) {
+      setError(t('keyRequired'));
+      form.current?.querySelector<HTMLButtonElement>('.connection-key-picker')?.focus();
+      return;
+    }
+    setBusy(connect ? 'connect' : 'save');
+    let connectionStarted = false;
+    try {
+      const next = {
+        ...value,
+        name: value.name.trim() || host,
+        host,
+        username,
+        group: value.group.trim(),
+        port: Number(connectionPort),
+      };
+      if (!connect || persist) await onSave(next);
+      if (connect) {
+        connectionStarted = true;
+        await onConnect(
+          next,
+          {
+            password: value.auth === 'password' ? password || undefined : undefined,
+            passphrase: value.auth === 'key' ? passphrase || undefined : undefined,
+            keyToken: value.auth === 'key' ? key?.token : undefined,
+            remember: persist && remember,
+          },
+          persist,
+        );
+      }
+      onClose();
+    } catch (e) {
+      setError((e as Error).message.replace(/^Error invoking remote method '[^']+': Error: /, ''));
+      // The backend consumes a selected key token when a connection is attempted.
+      if (connectionStarted) setKey(null);
+    } finally {
+      setBusy(null);
+    }
+  }
+  const extractCommand = async () => {
+    if (busy || extracting) return;
+    setExtracting(true);
+    setExtraction(null);
+    let text: string;
+    try {
+      text = await window.cshell.pasteText();
+    } catch {
+      setExtraction('unavailable');
+      setExtracting(false);
+      return;
+    }
+    try {
+      const parsed = parseSshCommand(text);
+      if (!parsed) throw new Error('No SSH command');
+      setValue((v) => ({ ...v, host: parsed.host, username: parsed.username || v.username }));
+      setPort(String(parsed.port));
+      setInvalid({});
+      setError('');
+      setExtraction('done');
+    } catch {
+      setExtraction('invalid');
+    } finally {
+      setExtracting(false);
+    }
+  };
+  return (
+    <section
+      className="editor-page connection-editor compact-connection"
+      aria-labelledby={id + '-title'}
+    >
+      <header className="connection-heading">
+        <h1 id={id + '-title'}>{profile ? t('editConnection') : t('sshConnection')}</h1>
+        <button
+          type="button"
+          className="connection-extract"
+          disabled={!!busy || extracting}
+          title={t('extractCommandHint')}
+          onClick={() => void extractCommand()}
+        >
+          <ClipboardPaste size={14} aria-hidden="true" />
+          {t('extractCommand')}
+        </button>
+      </header>
+      {extraction && (
+        <p
+          className={`connection-extraction ${extraction === 'done' ? '' : 'danger'}`}
+          role="status"
+        >
+          {t(
+            extraction === 'done'
+              ? 'commandExtracted'
+              : extraction === 'invalid'
+                ? 'sshCommandInvalid'
+                : 'clipboardUnavailable',
+          )}
+        </p>
+      )}
+      <form
+        ref={form}
+        noValidate
+        aria-busy={!!busy || extracting}
+        onSubmit={(e) => {
+          e.preventDefault();
+          void submit(true);
+        }}
+      >
+        <fieldset className="connection-fields" disabled={!!busy || extracting}>
+          <legend className="sr-only">{t('connectionConfig')}</legend>
+          <div className="connection-row connection-address-row">
+            <div className="connection-field">
+              <label htmlFor={id + '-host'}>{t('host')}</label>
+              <input
+                {...fieldProps('host')}
+                required
+                maxLength={255}
+                value={value.host}
+                spellCheck={false}
+                autoFocus
+                placeholder={t('hostQuickHint')}
+                onChange={(e) => update('host', e.target.value)}
+              />
+              {fieldError('host')}
+            </div>
+            <div className="connection-field">
+              <label htmlFor={id + '-port'}>{t('port')}</label>
+              <input
+                {...fieldProps('port')}
+                type="number"
+                required
+                min={1}
+                max={65535}
+                value={port}
+                onChange={(e) => {
+                  setPort(e.target.value);
+                  setInvalid((v) => ({ ...v, port: false }));
+                }}
+              />
+              {fieldError('port')}
+            </div>
+          </div>
+          <fieldset className="connection-auth">
+            <legend>{t('auth')}</legend>
+            <div className="connection-auth-options">
+              {(['password', 'key'] as const).map((auth) => (
+                <label key={auth}>
+                  <input
+                    type="radio"
+                    name={id + '-auth'}
+                    value={auth}
+                    checked={value.auth === auth}
+                    onChange={() => {
+                      update('auth', auth);
+                      setShowPassword(false);
+                      setError('');
+                    }}
+                  />
+                  <span>
+                    {auth === 'password' ? (
+                      <LockKeyhole size={14} aria-hidden="true" />
+                    ) : (
+                      <KeyRound size={14} aria-hidden="true" />
+                    )}
+                    {t(auth)}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          <div className="connection-row">
+            <div className="connection-field">
+              <label htmlFor={id + '-username'}>{t('username')}</label>
+              <input
+                {...fieldProps('username')}
+                required
+                maxLength={255}
+                autoComplete="off"
+                spellCheck={false}
+                value={value.username}
+                onChange={(e) => update('username', e.target.value)}
+              />
+              {fieldError('username')}
+            </div>
+            <div className="connection-field">
+              <label htmlFor={id + '-secret'}>
+                {t(value.auth === 'password' ? 'password' : 'passphrase')}
+              </label>
+              <div className="connection-secret">
+                <input
+                  id={id + '-secret'}
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="off"
+                  aria-describedby={canReuse ? id + '-saved' : undefined}
+                  placeholder={
+                    canReuse
+                      ? t('reuseSecret')
+                      : value.auth === 'key'
+                        ? t('optionalField')
+                        : t('passwordHint')
+                  }
+                  value={value.auth === 'password' ? password : passphrase}
+                  onChange={(e) =>
+                    value.auth === 'password'
+                      ? setPassword(e.target.value)
+                      : setPassphrase(e.target.value)
+                  }
+                />
+                <button
+                  type="button"
+                  aria-label={t(showPassword ? 'hideSecret' : 'showSecret')}
+                  title={t(showPassword ? 'hideSecret' : 'showSecret')}
+                  aria-pressed={showPassword}
+                  onClick={() => setShowPassword((v) => !v)}
+                >
+                  {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+            </div>
+          </div>
+          {value.auth === 'key' && (
+            <button
+              type="button"
+              className="connection-key-picker"
+              onClick={() => {
+                void window.cshell
+                  .pickKey()
+                  .then((selected) => {
+                    if (selected) {
+                      setKey(selected);
+                      setError('');
+                    }
+                  })
+                  .catch((e) => setError(e.message));
+              }}
+            >
+              <FileKey2 size={17} aria-hidden="true" />
+              <span>{key?.name || (canReuse ? t('savedKey') : t('chooseKey'))}</span>
+              <span className="connection-browse">{t('browse')}</span>
+            </button>
+          )}
+          {canReuse && (
+            <p id={id + '-saved'} className="connection-saved">
+              {t('savedSecret')}
+            </p>
+          )}
+          <div className="connection-save-options">
+            <label className="connection-check">
+              <input
+                type="checkbox"
+                checked={persist}
+                onChange={(e) => setPersist(e.target.checked)}
+              />
+              {t('saveConnection')}
+            </label>
+            {persist && (
+              <>
+                <div className="connection-row">
+                  <div className="connection-field">
+                    <label htmlFor={id + '-name'}>
+                      {t('name')}
+                      <span aria-hidden="true">{t('optionalField')}</span>
+                    </label>
+                    <input
+                      {...fieldProps('name')}
+                      aria-label={t('name')}
+                      maxLength={255}
+                      value={value.name}
+                      onChange={(e) => update('name', e.target.value)}
+                      placeholder={value.host || t('autoConnectionName')}
+                    />
+                  </div>
+                  <div className="connection-field">
+                    <label htmlFor={id + '-group'}>
+                      {t('group')}
+                      <span aria-hidden="true">{t('optionalField')}</span>
+                    </label>
+                    <input
+                      id={id + '-group'}
+                      aria-label={t('group')}
+                      list={id + '-groups'}
+                      maxLength={100}
+                      value={value.group}
+                      onChange={(e) => update('group', e.target.value)}
+                      placeholder={t('ungrouped')}
+                    />
+                    <datalist id={id + '-groups'}>
+                      {groups.map((group) => (
+                        <option key={group} value={group} />
+                      ))}
+                    </datalist>
+                  </div>
+                </div>
+                <label className="connection-check">
+                  <input
+                    type="checkbox"
+                    checked={remember}
+                    onChange={(e) => setRemember(e.target.checked)}
+                  />
+                  {t('remember')}
+                </label>
+              </>
+            )}
+          </div>
+        </fieldset>
+        {error && (
+          <p className="form-error connection-error" role="alert">
+            {error}
+          </p>
+        )}
+        <footer className="connection-footer">
+          <div className="connection-actions">
+            <button type="submit" className="primary" disabled={!!busy}>
+              {busy === 'connect' ? (
+                <LoaderCircle size={15} className="connection-spinner" aria-hidden="true" />
+              ) : (
+                <ArrowRight size={15} aria-hidden="true" />
+              )}
+              {t(persist ? 'saveAndConnect' : 'connect')}
+            </button>
+            {persist && (
+              <button
+                type="button"
+                className="secondary"
+                disabled={!!busy}
+                onClick={() => void submit(false)}
+              >
+                {busy === 'save' ? t('saving') : t('saveOnly')}
+              </button>
+            )}
+          </div>
+          <span className="connection-action-hint" role="status">
+            {busy
+              ? t(busy === 'save' ? 'saving' : 'connecting')
+              : t(persist ? 'saveBeforeConnectHint' : 'temporaryConnectionHint')}
+          </span>
+        </footer>
+      </form>
+    </section>
+  );
+}

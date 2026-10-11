@@ -1,0 +1,15 @@
+node_modules/
+dist/
+release/
+test-results/
+*.log
+.env*
+*.pem
+*.key
+.local/
+android/.gradle/
+android/**/build/
+android/local.properties
+android/app/src/main/assets/
+*.jks
+*.keystore

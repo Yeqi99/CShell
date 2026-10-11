@@ -1,0 +1,93 @@
+import { contextBridge, ipcRenderer, webUtils } from 'electron';
+import type { Bridge, SessionEvent } from '../shared/contracts';
+const bridge: Bridge = {
+  applicationCatalog: () => ipcRenderer.invoke('applications:catalog'),
+  aiSnapshot: () => ipcRenderer.invoke('ai:snapshot'),
+  aiProviderSave: (p, key) => ipcRenderer.invoke('ai:provider-save', p, key),
+  aiProviderDelete: (id) => ipcRenderer.invoke('ai:provider-delete', id),
+  aiPermissionSave: (p) => ipcRenderer.invoke('ai:permission', p),
+  aiThreadCreate: (location, provider, mode, session) =>
+    ipcRenderer.invoke('ai:create', location, provider, mode, session),
+  aiThreadDelete: (id) => ipcRenderer.invoke('ai:delete', id),
+  aiSend: (id, text) => ipcRenderer.invoke('ai:send', id, text),
+  aiApprove: (id, request, allow) => ipcRenderer.invoke('ai:approve', id, request, allow),
+  aiStop: (id) => ipcRenderer.invoke('ai:stop', id),
+  aiMode: (id, mode) => ipcRenderer.invoke('ai:mode', id, mode),
+  pythonReadFile: (id, path) => ipcRenderer.invoke('python:read', id, path),
+  pythonSaveFile: (id, path, code, revision) =>
+    ipcRenderer.invoke('python:save', id, path, code, revision),
+  plugins: () => ipcRenderer.invoke('plugins:list'),
+  pluginInstall: (id) => ipcRenderer.invoke('plugins:install', id),
+  pluginToggle: (id, enabled) => ipcRenderer.invoke('plugins:toggle', id, enabled),
+  pluginRemove: (id) => ipcRenderer.invoke('plugins:remove', id),
+  pluginSource: () => ipcRenderer.invoke('plugins:source'),
+  pluginCatalog: (url) => ipcRenderer.invoke('plugins:catalog', url),
+  pluginDownload: (entry) => ipcRenderer.invoke('plugins:download', entry),
+  environments: (id) => ipcRenderer.invoke('environments:list', id),
+  environmentAction: (id, action) => ipcRenderer.invoke('environments:action', id, action),
+  environmentTerminal: (id, conda, prefix) =>
+    ipcRenderer.invoke('environments:terminal', id, conda, prefix),
+  environmentPackages: (id, python) => ipcRenderer.invoke('environments:packages', id, python),
+  pythonAnalyze: (id, python, code, line, column, path) =>
+    ipcRenderer.invoke('python:analyze', id, python, code, line, column, path),
+  applicationPlan: (id, request) => ipcRenderer.invoke('applications:plan', id, request),
+  applicationInstall: (id) => ipcRenderer.invoke('applications:install', id),
+  jobs: (id) => ipcRenderer.invoke('jobs:list', id),
+  cancelJob: (id) => ipcRenderer.invoke('jobs:cancel', id),
+  jupyterStatus: (id, python) => ipcRenderer.invoke('jupyter:status', id, python),
+  jupyterStart: (id, python, port) => ipcRenderer.invoke('jupyter:start', id, python, port),
+  jupyterStop: (id, python) => ipcRenderer.invoke('jupyter:stop', id, python),
+  configureTools: (settings) => ipcRenderer.invoke('tools:configure', settings),
+  dockerSnapshot: (id) => ipcRenderer.invoke('docker:snapshot', id),
+  dockerStats: (id, container) => ipcRenderer.invoke('docker:stats', id, container),
+  dockerDetails: (id, container) => ipcRenderer.invoke('docker:details', id, container),
+  dockerAction: (id, action) => ipcRenderer.invoke('docker:action', id, action),
+  config: () => ipcRenderer.invoke('config'),
+  presets: () => ipcRenderer.invoke('presets:list'),
+  savePreset: (name, preferences) => ipcRenderer.invoke('presets:save', name, preferences),
+  deletePreset: (id) => ipcRenderer.invoke('presets:delete', id),
+  exportPreset: (preferences) => ipcRenderer.invoke('presets:export', preferences),
+  importPreset: () => ipcRenderer.invoke('presets:import'),
+  mcpStatus: () => ipcRenderer.invoke('mcp:status'),
+  mcpConfigure: (settings) => ipcRenderer.invoke('mcp:configure', settings),
+  mcpCopyToken: () => ipcRenderer.invoke('mcp:copy-token'),
+  mcpRotateToken: () => ipcRenderer.invoke('mcp:rotate-token'),
+  systemFonts: () => ipcRenderer.invoke('appearance:fonts'),
+  importAppearance: (kind, token) => ipcRenderer.invoke('appearance:import', kind, token),
+  appearanceData: (id) => ipcRenderer.invoke('appearance:data', id),
+  saveProfile: (profile) => ipcRenderer.invoke('profile:save', profile),
+  deleteProfile: (id) => ipcRenderer.invoke('profile:delete', id),
+  manageGroup: (action) => ipcRenderer.invoke('group:manage', action),
+  preferences: (value) => ipcRenderer.invoke('preferences', value),
+  pickKey: () => ipcRenderer.invoke('key:pick'),
+  connect: (id, credentials) => ipcRenderer.invoke('connect', id, credentials),
+  connectTemporary: (profile, credentials) =>
+    ipcRenderer.invoke('connect:temporary', profile, credentials),
+  disconnect: (id) => ipcRenderer.invoke('disconnect', id),
+  input: (id, data) => ipcRenderer.invoke('input', id, data),
+  acknowledge: (id, characters) => ipcRenderer.invoke('acknowledge', id, characters),
+  resize: (id, cols, rows) => ipcRenderer.invoke('resize', id, cols, rows),
+  list: (id, path) => ipcRenderer.invoke('list', id, path),
+  fileAction: (id, action, path, destination) =>
+    ipcRenderer.invoke('file:action', id, action, path, destination),
+  upload: (id, path, tokens) => ipcRenderer.invoke('upload', id, path, tokens),
+  download: (id, paths) => ipcRenderer.invoke('download', id, paths),
+  cancelTransfer: (id) => ipcRenderer.invoke('transfer:cancel', id),
+  chooseLocal: () => ipcRenderer.invoke('local:choose'),
+  localList: (root, path) => ipcRenderer.invoke('local:list', root, path),
+  localAction: (root, action, path, destination) =>
+    ipcRenderer.invoke('local:action', root, action, path, destination),
+  transferFiles: (sources, target, move) =>
+    ipcRenderer.invoke('file:transfer', sources, target, move),
+  monitor: (id) => ipcRenderer.invoke('monitor', id),
+  droppedFiles: (files) =>
+    files.map((file) => ipcRenderer.sendSync('drop:register', webUtils.getPathForFile(file))),
+  copyText: (text) => ipcRenderer.invoke('clipboard:write', text),
+  pasteText: () => ipcRenderer.invoke('clipboard:read'),
+  events: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: SessionEvent) => listener(payload);
+    ipcRenderer.on('session:event', handler);
+    return () => ipcRenderer.removeListener('session:event', handler);
+  },
+};
+contextBridge.exposeInMainWorld('cshell', bridge);

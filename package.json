@@ -1,0 +1,108 @@
+{
+  "name": "canpshell",
+  "productName": "CShell",
+  "version": "0.3.0",
+  "private": true,
+  "description": "CanpShell offline-first terminal workbench",
+  "author": "CanpShell contributors",
+  "license": "MIT",
+  "main": "dist/main/main.cjs",
+  "scripts": {
+    "build": "tsc --noEmit && vite build && node scripts/build.mjs",
+    "start": "electron .",
+    "dev": "pnpm build && electron .",
+    "test": "tsx --test tests/*.test.ts",
+    "test:desktop": "tsx scripts/smoke.ts",
+    "dist": "pnpm run licenses && pnpm build && electron-builder --win nsis --x64",
+    "licenses": "node scripts/licenses.mjs"
+  },
+  "dependencies": {
+    "@codemirror/autocomplete": "6.20.3",
+    "@codemirror/commands": "6.11.1",
+    "@codemirror/lang-python": "6.2.1",
+    "@codemirror/language": "6.13.1",
+    "@codemirror/lint": "6.9.7",
+    "@codemirror/state": "6.7.6",
+    "@codemirror/view": "6.43.14",
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "@xterm/addon-fit": "0.11.0",
+    "@xterm/addon-search": "0.16.0",
+    "@xterm/addon-unicode11": "0.9.0",
+    "@xterm/xterm": "6.0.0",
+    "lucide-react": "1.54.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "ssh2": "1.17.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.4",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@types/ssh2": "1.15.6",
+    "@vitejs/plugin-react": "6.1.2",
+    "electron": "44.7.0",
+    "electron-builder": "26.15.3",
+    "esbuild": "0.28.2",
+    "playwright": "1.64.0",
+    "prettier": "3.9.9",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2",
+    "vite": "8.3.4"
+  },
+  "build": {
+    "appId": "org.canpshell.desktop",
+    "productName": "CShell",
+    "directories": {
+      "output": "release/0.3.0"
+    },
+    "files": [
+      "dist/**/*",
+      "assets/icon.png",
+      "package.json"
+    ],
+    "asar": true,
+    "artifactName": "CShell-${version}-${os}-${arch}.${ext}",
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.developer-tools",
+      "icon": "assets/icon.png",
+      "identity": null
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Development",
+      "icon": "assets/icon.png",
+      "maintainer": "CShell contributors"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico",
+      "signExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false
+    },
+    "npmRebuild": false,
+    "extraFiles": [
+      {
+        "from": "LICENSE",
+        "to": "LICENSE"
+      },
+      {
+        "from": "THIRD_PARTY_NOTICES.txt",
+        "to": "THIRD_PARTY_NOTICES.txt"
+      }
+    ]
+  },
+  "packageManager": "pnpm@11.25.0",
+  "type": "module"
+}

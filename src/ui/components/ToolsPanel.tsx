@@ -1,0 +1,112 @@
+import { DockerPanel } from './DockerPanel';
+import { Box } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
+import { ChevronDown, ChevronRight, Files, X } from 'lucide-react';
+import type { Transfer } from '../../shared/contracts';
+import { useI18n } from '../i18n';
+import { FilePanel } from './FilePanel';
+import { MonitorPanel } from './MonitorPanel';
+export function ToolsPanel({
+  sessionId,
+  transfers,
+  onError,
+  dragHandle,
+  sessionName,
+  active,
+  dockerEnabled,
+}: {
+  dragHandle?: ReactNode;
+  sessionId: string;
+  sessionName: string;
+  active: boolean;
+  dockerEnabled: boolean;
+  transfers: Transfer[];
+  onError: (e: unknown) => void;
+}) {
+  const { t } = useI18n();
+  const [tool, setTool] = useState<'files' | 'docker'>('files');
+  const dockerVisible = dockerEnabled && tool === 'docker';
+  const [queue, setQueue] = useState(false);
+  const [filesOpen, setFilesOpen] = useState(true);
+  return (
+    <aside className="tools-panel">
+      <header className="files-title" title={`${t('toolsFor')} · ${sessionName}`}>
+        {dragHandle}
+        <button
+          className="file-panel-toggle"
+          aria-expanded={filesOpen && !dockerVisible}
+          onClick={() => {
+            if (dockerVisible) {
+              setTool('files');
+              setFilesOpen(true);
+            } else setFilesOpen((v) => !v);
+          }}
+        >
+          {filesOpen && !dockerVisible ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+          <Files size={14} />
+          {t('files')}
+        </button>
+        {dockerEnabled && (
+          <button
+            className="docker-tool-tab"
+            aria-pressed={dockerVisible}
+            onClick={() => setTool('docker')}
+          >
+            <Box size={14} />
+            Docker
+          </button>
+        )}
+      </header>
+      <div className="tool-content" hidden={!filesOpen || dockerVisible}>
+        <FilePanel key={sessionId} sessionId={sessionId} transfers={transfers} onError={onError} />
+      </div>
+      {dockerEnabled && (
+        <div className="docker-tool-content" hidden={!dockerVisible}>
+          <DockerPanel sessionId={sessionId} active={active && dockerVisible} />
+        </div>
+      )}
+      {!dockerVisible && (
+        <MonitorPanel key={sessionId || 'idle'} sessionId={sessionId} active={active} />
+      )}
+      <div className={`transfers ${queue ? 'expanded' : ''}`}>
+        <button className="queue-toggle" onClick={() => setQueue(!queue)}>
+          {queue ? <ChevronDown size={12} /> : <ChevronRight size={12} />} {t('transfers')}
+          <span>{transfers.filter((x) => x.state === 'running').length}</span>
+        </button>
+        {queue && (
+          <div className="queue-items">
+            {!transfers.length && <p className="empty-small">{t('noTransfers')}</p>}
+            {transfers
+              .slice(-20)
+              .reverse()
+              .map((item) => (
+                <div className="transfer" key={item.id} title={item.error}>
+                  <div>
+                    <span>
+                      {item.direction === 'upload' ? '↑' : '↓'} {item.name}
+                    </span>
+                    <small className={item.state === 'failed' ? 'danger' : ''}>
+                      {t(item.state)}
+                    </small>
+                    {item.state === 'running' && (
+                      <button
+                        className="icon"
+                        aria-label={t('cancel')}
+                        onClick={() => void window.cshell.cancelTransfer(item.id).catch(onError)}
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                  <progress
+                    max={Math.max(item.total, 1)}
+                    value={item.state === 'done' ? Math.max(item.total, 1) : item.done}
+                  />
+                </div>
+              ))}
+          </div>
+        )}
+      </div>
+    </aside>
+  );
+}

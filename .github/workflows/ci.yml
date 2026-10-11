@@ -1,0 +1,30 @@
+name: Windows checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm test
+      - run: pnpm test:desktop
+      - run: pnpm run dist
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-preview
+          path: |
+            release/**/*.exe
+            test-results/*.png

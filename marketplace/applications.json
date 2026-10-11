@@ -1,0 +1,68 @@
+{
+  "protocol": 1,
+  "applications": [
+    {
+      "id": "miniconda",
+      "name": "Miniconda",
+      "description": "轻量 Conda 与 Python，安装到当前用户目录。",
+      "recipe": "cshell:miniconda:1",
+      "platforms": [
+        "linux"
+      ]
+    },
+    {
+      "id": "anaconda",
+      "name": "Anaconda Distribution",
+      "description": "包含数据科学工具的完整 Python 发行版。",
+      "recipe": "cshell:anaconda:1",
+      "platforms": [
+        "linux"
+      ]
+    },
+    {
+      "id": "python",
+      "name": "Python",
+      "description": "在 Conda 中创建独立 Python 环境。",
+      "recipe": "cshell:python:1",
+      "platforms": [
+        "linux"
+      ]
+    },
+    {
+      "id": "jupyter",
+      "name": "JupyterLab",
+      "description": "安装到所选环境，通过 SSH 隧道打开。",
+      "recipe": "cshell:jupyter:1",
+      "platforms": [
+        "linux"
+      ]
+    },
+    {
+      "id": "jedi",
+      "name": "Python 补全引擎",
+      "description": "为所选 Python 环境安装 Jedi 语义分析。",
+      "recipe": "cshell:jedi:1",
+      "platforms": [
+        "linux"
+      ]
+    },
+    {
+      "id": "nginx",
+      "name": "Nginx",
+      "description": "安装发行版提供的 Web 服务。需要服务器管理员身份。",
+      "recipe": "cshell:nginx:1",
+      "platforms": [
+        "linux"
+      ]
+    },
+    {
+      "id": "redis",
+      "name": "Redis",
+      "description": "安装发行版提供的 Redis 服务。需要服务器管理员身份。",
+      "recipe": "cshell:redis:1",
+      "platforms": [
+        "linux"
+      ]
+    }
+  ]
+}

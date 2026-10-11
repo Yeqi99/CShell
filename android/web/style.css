@@ -1,0 +1,170 @@
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  font:
+    14px system-ui,
+    sans-serif;
+  background: #fff;
+  color: #203044;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+body.dark {
+  background: #121820;
+  color: #d9e0e8;
+  color-scheme: dark;
+}
+header,
+footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f5f7fa;
+  flex-shrink: 0;
+}
+body.dark header,
+body.dark footer {
+  background: #1b2430;
+}
+header span {
+  flex: 1;
+}
+button {
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  padding: 10px;
+  min-width: 40px;
+  min-height: 40px;
+  font: inherit;
+}
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #2875eb;
+}
+button.active,
+.tab.active {
+  background: #2875eb22;
+}
+.primary {
+  background: #2875eb;
+  color: white;
+  margin: 16px 0;
+}
+nav {
+  display: flex;
+  gap: 4px;
+  overflow: auto;
+  flex-shrink: 0;
+  border-bottom: 1px solid #8899aa33;
+}
+.tab {
+  display: flex;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.tab button:first-child {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+main {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+form {
+  padding: 20px;
+  max-width: 560px;
+  margin: auto;
+  height: 100%;
+  overflow: auto;
+}
+h2 {
+  font-size: 20px;
+}
+label {
+  display: block;
+  margin: 12px 0;
+}
+input,
+textarea {
+  display: block;
+  width: 100%;
+  font: inherit;
+  background: transparent;
+  color: inherit;
+  border: 1px solid #8899aa66;
+  border-radius: 6px;
+  padding: 10px;
+  margin-top: 6px;
+}
+textarea {
+  min-height: 100px;
+}
+.row {
+  display: flex;
+  gap: 12px;
+}
+.row label:first-child {
+  flex: 1;
+}
+.row label:last-child {
+  width: 90px;
+}
+small {
+  display: block;
+  color: #758498;
+  line-height: 1.6;
+}
+#terminals {
+  height: 100%;
+}
+.terminal {
+  height: 100%;
+  padding: 8px 4px;
+}
+footer {
+  gap: 0;
+  padding: 3px;
+  overflow: auto;
+}
+footer button {
+  padding: 5px;
+  min-width: 38px;
+}
+#status {
+  font-size: 11px;
+  margin-left: auto;
+  white-space: nowrap;
+}
+.minimal header strong,
+.minimal header #theme,
+.minimal header #new,
+.minimal footer {
+  display: none;
+}
+.minimal header {
+  height: 36px;
+  position: absolute;
+  right: 0;
+  top: 0;
+  z-index: 2;
+  padding: 0;
+}
+.minimal nav {
+  padding-right: 42px;
+  min-height: 40px;
+}
+[hidden] {
+  display: none !important;
+}
+main:has(form:not([hidden])) #terminals {
+  display: none;
+}

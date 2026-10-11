@@ -1,0 +1,15 @@
+{
+  "protocol": 1,
+  "id": "cshell.docker",
+  "version": "1.0.0",
+  "name": "Docker",
+  "description": "容器、镜像、端口映射与实时资源。",
+  "descriptionEn": "Containers, images, port mappings and live resources.",
+  "publisher": "CShell",
+  "provider": "docker",
+  "permissions": [
+    "remote.read",
+    "remote.execute"
+  ],
+  "commands": []
+}

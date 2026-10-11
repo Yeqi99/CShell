@@ -1,0 +1,16 @@
+{
+  "protocol": 1,
+  "id": "cshell.conda",
+  "version": "1.0.0",
+  "name": "Anaconda",
+  "description": "识别 Conda 环境，管理依赖，打开环境终端与 Jupyter。",
+  "descriptionEn": "Manage Conda environments, packages, terminals and Jupyter.",
+  "publisher": "CShell",
+  "provider": "conda",
+  "permissions": [
+    "remote.read",
+    "remote.execute",
+    "remote.forward"
+  ],
+  "commands": []
+}

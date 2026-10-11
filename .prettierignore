@@ -1,0 +1,7 @@
+node_modules
+dist
+release
+test-results
+pnpm-lock.yaml
+THIRD_PARTY_NOTICES.txt
+docs/dependency-licenses.json

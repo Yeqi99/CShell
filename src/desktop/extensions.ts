@@ -1,0 +1,140 @@
+import { dialog, shell, type BrowserWindow } from 'electron';
+import { z } from 'zod';
+import { PluginService, httpsText } from '../core/plugins';
+import { applications } from '../shared/plugins';
+import { applicationCatalogUrl } from '../shared/market';
+import { RemoteJobs, quote } from '../core/remote-jobs';
+import { EnvironmentService } from '../core/environments';
+import { ApplicationService } from '../core/applications';
+import {
+  pluginId,
+  pluginEnabled,
+  remoteExecutable,
+  environmentActionSchema,
+} from '../shared/plugins';
+import type { Store } from '../core/store';
+import type { SshService } from '../core/ssh';
+import { PythonFiles } from '../core/python-files';
+export function registerExtensionHandlers(
+  handle: (name: string, fn: (...args: any[]) => any) => void,
+  window: BrowserWindow,
+  store: Store,
+  ssh: SshService,
+) {
+  const plugins = new PluginService(store),
+    jobs = new RemoteJobs(ssh),
+    environments = new EnvironmentService(ssh, jobs),
+    apps = new ApplicationService(jobs);
+  const connected = (id: unknown) => {
+    const value = z.string().uuid().parse(id);
+    ssh.get(value);
+    return value;
+  };
+  const requirePlugin = (provider: 'conda' | 'python') => {
+    if (!pluginEnabled(store.plugins(), provider))
+      throw new Error(`${provider} plugin is not enabled`);
+  };
+  const files = new PythonFiles(ssh);
+  handle('applications:catalog', async () => {
+    const catalog = z
+      .object({
+        protocol: z.literal(1),
+        applications: z
+          .array(
+            z
+              .object({
+                id: z.string(),
+                name: z.string().max(80),
+                description: z.string().max(300),
+                recipe: z.string(),
+                platforms: z.array(z.literal('linux')),
+              })
+              .strict(),
+          )
+          .max(100),
+      })
+      .strict()
+      .parse(JSON.parse(await httpsText(applicationCatalogUrl)));
+    if (
+      new Set(catalog.applications.map((a) => a.id)).size !== catalog.applications.length ||
+      catalog.applications.some(
+        (a) => !applications.some((b) => b.id === a.id) || a.recipe !== `cshell:${a.id}:1`,
+      )
+    )
+      throw new Error('Unsupported application recipe; update CShell');
+    return catalog.applications.map(({ id, name, description }) => ({ id, name, description }));
+  });
+  handle('python:read', (id, path) => {
+    requirePlugin('python');
+    return files.read(connected(id), z.string().max(4096).parse(path));
+  });
+  handle('python:save', (id, path, code, revision) => {
+    requirePlugin('python');
+    return files.save(connected(id), path, code, revision);
+  });
+  handle('plugins:list', () => store.plugins());
+  handle('plugins:install', (id) => plugins.install(pluginId.parse(id)));
+  handle('plugins:toggle', (id, enabled) =>
+    plugins.toggle(pluginId.parse(id), z.boolean().parse(enabled)),
+  );
+  handle('plugins:remove', (id) => plugins.remove(pluginId.parse(id)));
+  handle('plugins:source', () => store.pluginSource());
+  handle('plugins:catalog', (url) => plugins.catalog(z.string().max(2048).parse(url)));
+  handle('plugins:download', (entry) => plugins.download(entry));
+  handle('environments:list', (id) => environments.inspect(connected(id)));
+  handle('environments:packages', (id, python) => {
+    requirePlugin('conda');
+    return environments.packages(connected(id), remoteExecutable.parse(python));
+  });
+  handle('environments:action', async (id, input) => {
+    requirePlugin('conda');
+    const sessionId = connected(id),
+      action = environmentActionSchema.parse(input);
+    if (action.type === 'remove') {
+      const cn = store.snapshot().preferences.locale === 'zh-CN';
+      const result = await dialog.showMessageBox(window, {
+        type: 'warning',
+        message: cn
+          ? '删除此 Conda 环境及其依赖？'
+          : 'Remove this Conda environment and its packages?',
+        detail: action.prefix,
+        buttons: [cn ? '取消' : 'Cancel', cn ? '删除' : 'Remove'],
+        defaultId: 0,
+        cancelId: 0,
+      });
+      if (result.response !== 1) throw new Error(cn ? '已取消' : 'Cancelled');
+    }
+    requirePlugin('conda');
+    return environments.action(connected(sessionId), action);
+  });
+  handle('environments:terminal', async (id, conda, prefix) => {
+    requirePlugin('conda');
+    const sessionId = connected(id);
+    remoteExecutable.parse(conda);
+    remoteExecutable.parse(prefix);
+    await environments.known(sessionId, conda, prefix);
+    return ssh.openEnvironment(
+      sessionId,
+      `${quote(conda)} run --no-capture-output --prefix ${quote(prefix)} bash --noprofile --norc -i`,
+    );
+  });
+  handle('python:analyze', (id, python, code, line, column, path) => {
+    requirePlugin('python');
+    return environments.analyze(connected(id), python, code, line, column, path);
+  });
+  handle('applications:plan', (id, request) => apps.plan(connected(id), request));
+  handle('applications:install', (id) => apps.install(z.string().uuid().parse(id)));
+  handle('jobs:list', (id) => jobs.list(z.string().uuid().parse(id)));
+  handle('jobs:cancel', (id) => jobs.cancel(z.string().uuid().parse(id)));
+  handle('jupyter:status', (id, python) =>
+    environments.jupyterStatus(z.string().uuid().parse(id), remoteExecutable.parse(python)),
+  );
+  handle('jupyter:start', async (id, python, port) => {
+    requirePlugin('conda');
+    const url = await environments.startJupyter(connected(id), python, port);
+    await shell.openExternal(url);
+  });
+  handle('jupyter:stop', (id, python) =>
+    environments.stopJupyter(z.string().uuid().parse(id), remoteExecutable.parse(python)),
+  );
+}

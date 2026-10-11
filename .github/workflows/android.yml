@@ -1,0 +1,37 @@
+name: Android validation
+on:
+  push:
+    paths: ['android/**', 'scripts/build-android.mjs', '.github/workflows/android.yml']
+  pull_request:
+    paths: ['android/**', 'scripts/build-android.mjs', '.github/workflows/android.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/build-android.mjs
+      - run: gradle -p android assembleDebug lint
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-validation-only
+          path: |
+            android/app/build/outputs/apk/debug/*.apk
+            android/app/build/reports/lint-results-debug.html

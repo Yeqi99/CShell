@@ -1,0 +1,14 @@
+{
+  "protocol": 1,
+  "id": "cshell.commands",
+  "version": "1.0.0",
+  "name": "Shell",
+  "description": "Linux 常用命令联想，只补全，不自动执行。",
+  "descriptionEn": "Complete common Linux commands without executing them.",
+  "publisher": "CShell",
+  "provider": "commands",
+  "permissions": [
+    "terminal.input"
+  ],
+  "commands": []
+}

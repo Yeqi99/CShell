@@ -1,0 +1,76 @@
+import { createHash, randomUUID } from 'node:crypto';
+import { posix } from 'node:path';
+import { z } from 'zod';
+import type { SshService } from './ssh';
+import { remotePath } from './paths';
+const hash = (data: Buffer) => createHash('sha256').update(data).digest('hex');
+export class PythonFiles {
+  private writes = new Set<string>();
+  constructor(private ssh: SshService) {}
+  private path(input: string) {
+    const path = remotePath(input);
+    if (!path.endsWith('.py')) throw new Error('Only Python files are supported by this editor');
+    return path;
+  }
+  async read(sessionId: string, input: string) {
+    const path = this.path(input),
+      sftp = await this.ssh.sftp(sessionId);
+    const bytes = await new Promise<Buffer>((resolve, reject) => {
+      const stream = sftp.createReadStream(path);
+      const chunks: Buffer[] = [];
+      let size = 0;
+      stream.on('data', (chunk: Buffer) => {
+        size += chunk.length;
+        if (size > 1_000_000) stream.destroy(new Error('File exceeds 1 MB'));
+        else chunks.push(chunk);
+      });
+      stream.once('error', reject);
+      stream.once('end', () => resolve(Buffer.concat(chunks)));
+    });
+    return { code: new TextDecoder('utf-8', { fatal: true }).decode(bytes), revision: hash(bytes) };
+  }
+  async save(sessionId: string, input: string, code: string, revision: string) {
+    const path = this.path(input),
+      key = `${sessionId}:${path}`;
+    const sftp = await this.ssh.sftp(sessionId);
+    if (this.writes.has(key)) throw new Error('A save is already in progress');
+    z.string().max(1_000_000).parse(code);
+    z.string()
+      .regex(/^[a-f0-9]{64}$/)
+      .parse(revision);
+    if (Buffer.byteLength(code) > 1_000_000) throw new Error('File exceeds 1 MB');
+    this.writes.add(key);
+    const temporary = posix.join(posix.dirname(path), `.cshell-${randomUUID()}.tmp`);
+    try {
+      const current = await this.read(sessionId, path);
+      if (current.revision !== revision)
+        throw new Error('File changed on the server. Reopen it before saving.');
+      const attrs = await new Promise<import('ssh2').Stats>((resolve, reject) =>
+        sftp.lstat(path, (e, a) => (e ? reject(e) : resolve(a))),
+      );
+      if (!attrs.isFile()) throw new Error('Only regular files can be saved');
+      await new Promise<void>((resolve, reject) => {
+        const stream = sftp.createWriteStream(temporary, { flags: 'wx', mode: attrs.mode & 0o777 });
+        stream.once('error', reject);
+        stream.once('close', resolve);
+        stream.end(code);
+      });
+      await new Promise<void>((resolve, reject) =>
+        sftp.setstat(
+          temporary,
+          { uid: attrs.uid, gid: attrs.gid, mode: attrs.mode & 0o7777 },
+          (error) => (error ? reject(error) : resolve()),
+        ),
+      );
+      if ((await this.read(sessionId, path)).revision !== revision)
+        throw new Error('File changed on the server while saving');
+      await new Promise<void>((resolve, reject) =>
+        sftp.ext_openssh_rename(temporary, path, (e) => (e ? reject(e) : resolve())),
+      );
+      return { revision: hash(Buffer.from(code)) };
+    } finally {
+      this.writes.delete(key);
+      sftp.unlink(temporary, () => {});
+    }
+  }
+}

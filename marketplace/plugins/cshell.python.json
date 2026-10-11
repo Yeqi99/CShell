@@ -1,0 +1,15 @@
+{
+  "protocol": 1,
+  "id": "cshell.python",
+  "version": "1.0.0",
+  "name": "Python",
+  "description": "基于当前解释器的补全、签名与语法诊断。",
+  "descriptionEn": "Interpreter-aware completion, signatures and syntax diagnostics.",
+  "publisher": "CShell",
+  "provider": "python",
+  "permissions": [
+    "remote.read",
+    "remote.execute"
+  ],
+  "commands": []
+}
