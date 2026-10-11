@@ -277,7 +277,7 @@ export class AiService {
                       }),
                     )
                     .max(16)
-                    .optional(),
+                    .nullish(),
                 }),
               }),
             )

@@ -11,6 +11,7 @@ import { SshService } from '../src/core/ssh';
 import { createSshConnections } from '../src/core/connections/ssh-provider';
 import { fixture } from './fixture';
 import { initialWindowBounds } from '../src/desktop/window-bounds';
+import { ConnectionRegistry } from '../src/core/connections/registry';
 const until = async (fn: () => boolean) => {
   const deadline = Date.now() + 10000;
   while (!fn()) {
@@ -69,7 +70,7 @@ test('agent enforces target/capability, review, revocation, stop and encrypted p
           {
             message:
               last.role === 'tool'
-                ? { content: 'Done' }
+                ? { content: 'Done', tool_calls: null }
                 : {
                     content: null,
                     tool_calls: [
@@ -203,6 +204,43 @@ test('agent enforces target/capability, review, revocation, stop and encrypted p
     ssh.dispose();
     await remote.close();
     await new Promise<void>((r) => api.close(() => r()));
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('chat accepts null, omitted and empty tool calls but rejects malformed calls', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'cshell-chat-'));
+  let calls: unknown = null;
+  const api = createServer(async (req, res) => {
+    for await (const _ of req) { /* drain request */ }
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ choices: [{ message: { content: '你好', tool_calls: calls } }] }));
+  });
+  await new Promise<void>((resolve) => api.listen(0, '127.0.0.1', resolve));
+  const store = new Store(directory, {
+    encrypt: async (value) => Buffer.from(value).toString('base64'),
+    decrypt: async (value) => Buffer.from(value, 'base64').toString(),
+  });
+  const ai = new AiService(directory, store, new ConnectionRegistry(() => undefined));
+  try {
+    await ai.load();
+    const provider = { id: randomUUID(), name: 'fixture', model: 'fixture',
+      url: `http://127.0.0.1:${(api.address() as any).port}/v1` };
+    await ai.saveProvider(provider, 'test-key');
+    for (const value of [null, undefined, [], {}, [{ id: 'broken' }]]) {
+      calls = value;
+      const thread = await ai.create('terminal', provider.id, 'review');
+      await ai.send(thread.id, 'hello');
+      await until(() => ai.snapshot().threads.find((t) => t.id === thread.id)!.state !== 'running');
+      const result = ai.snapshot().threads.find((t) => t.id === thread.id)!;
+      const valid = value == null || (Array.isArray(value) && value.length === 0);
+      assert.equal(result.state, valid ? 'idle' : 'error');
+      assert.equal(result.messages.some((m) => m.role === 'assistant' && m.content === '你好'), valid);
+      assert.equal(result.messages.some((m) => m.role === 'tool'), false);
+    }
+    await ai.permission({ location: 'terminal', providerId: provider.id, groups: [], profiles: [], capabilities: [] });
+  } finally {
+    await new Promise<void>((resolve) => api.close(() => resolve()));
     await rm(directory, { recursive: true, force: true });
   }
 });
