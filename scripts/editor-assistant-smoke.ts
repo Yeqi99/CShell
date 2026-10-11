@@ -12,6 +12,7 @@ export async function editorAssistantSmoke(
   const pane = page.locator('.terminal-pane.active');
   const bar = pane.locator('.editor-actions');
   const screen = pane.locator('.xterm-screen');
+  let redraw = 0;
   const received = async (action: () => Promise<unknown>, expected: string) => {
     const count = inputs.length;
     await action();
@@ -19,11 +20,25 @@ export async function editorAssistantSmoke(
       await delay(20);
     assert.equal(inputs.slice(count).join(''), expected, await bar.innerText());
     if (expected.startsWith('\x1c')) {
-      await output('\x1b[2J\x1b[Hhello.txt\r\n~\r\n~\x1b[999;1H1,1 All');
-      await page.waitForFunction(() =>
-        document
-          .querySelector('.terminal-pane.active .xterm-screen')
-          ?.textContent?.includes('1,1 All'),
+      // Toolbar expansion/collapse resizes the PTY. The echo fixture cannot
+      // redraw like Vim, so wait for layout and acknowledge a unique new frame.
+      await page.evaluate(
+        () =>
+          new Promise<void>((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+          ),
+      );
+      const marker = `hello-${++redraw}.txt`;
+      await output(`\x1b[2J\x1b[H${marker}\r\n~\r\n~\x1b[999;1H1,1 All`);
+      await page.waitForFunction(
+        (marker) =>
+          document
+            .querySelector('.terminal-pane.active .xterm-screen')
+            ?.textContent?.includes(marker) &&
+          document
+            .querySelector('.terminal-pane.active .xterm-screen')
+            ?.textContent?.includes('1,1 All'),
+        marker,
       );
     }
   };
