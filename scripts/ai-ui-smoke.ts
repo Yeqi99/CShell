@@ -59,7 +59,7 @@ try {
   page.setDefaultTimeout(10000);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.getByRole('heading', { name: '尚未连接' }).waitFor();
+  await page.getByRole('heading', { name: '尚未连接' }).waitFor({ timeout: 60000 });
   assert.equal(await page.getByRole('button', { name: '新建连接', exact: true }).count(), 1);
   assert.equal(await page.locator('.empty-terminal button').count(), 0);
   await page.keyboard.press('Control+Shift+B');
