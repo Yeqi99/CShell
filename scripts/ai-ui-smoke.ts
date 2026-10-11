@@ -78,15 +78,22 @@ try {
   await panel.getByLabel('模型 ID', { exact: true }).fill('test');
   await panel.getByRole('button', { name: '访问权限', exact: true }).click();
   assert.equal(await panel.getByLabel('模型 ID').isVisible(), false);
-  await panel.getByRole('radio', { name: '文件', exact: true }).click();
-  assert.equal(
-    await panel.getByRole('radio', { name: '文件', exact: true }).getAttribute('aria-checked'),
-    'true',
+  await panel.getByLabel('终端：读取资源指标', { exact: true }).check();
+  await panel.getByLabel('文件：读取文件', { exact: true }).check();
+  await panel.getByRole('button', { name: '保存权限', exact: true }).click();
+  await panel.getByText('权限已保存', { exact: true }).waitFor();
+  const savedPermissions = await page.evaluate(() => window.cshell.aiSnapshot());
+  assert.ok(
+    savedPermissions.permissions
+      .find((p) => p.location === 'terminal')
+      ?.capabilities.includes('metrics.read'),
   );
-  await panel.getByRole('radio', { name: '终端', exact: true }).click();
-  await panel.getByRole('button', { name: '保存权限', exact: true }).waitFor();
-  await page.screenshot({ path: 'test-results/agent-permissions-visible.png' });
-
+  assert.ok(
+    savedPermissions.permissions
+      .find((p) => p.location === 'files')
+      ?.capabilities.includes('files.read'),
+  );
+  await page.screenshot({ path: 'test-results/agent-permission-tree.png' });
   await panel.getByRole('button', { name: '模型基座', exact: true }).click();
   assert.equal(await panel.getByLabel('模型 ID').inputValue(), 'test');
   await page.screenshot({ path: 'test-results/agent-settings.png' });
@@ -175,6 +182,19 @@ try {
   await panel.getByRole('button', { name: '停止 AI', exact: true }).click();
   await panel.getByRole('button', { name: '允许本次', exact: true }).waitFor({ state: 'hidden' });
   assert.deepEqual(errors, []);
+  await panel.getByRole('button', { name: '基座与权限', exact: true }).click();
+  await panel.getByRole('button', { name: '访问权限', exact: true }).click();
+  await panel.getByLabel('文件：读取资源指标', { exact: true }).check();
+  await panel.getByRole('button', { name: '基座与权限', exact: true }).click();
+  await panel.getByRole('button', { name: '基座与权限', exact: true }).click();
+  assert.equal(await panel.getByLabel('文件：读取资源指标', { exact: true }).isChecked(), true);
+  await app.evaluate(({ ipcMain }) => {
+    ipcMain.removeHandler('ai:permission');
+    ipcMain.handle('ai:permission', () => { throw new Error('Test save failure'); });
+  });
+  await panel.getByRole('button', { name: '保存权限', exact: true }).click();
+  await panel.getByRole('alert').filter({ hasText: '保存失败' }).waitFor();
+  assert.equal(await panel.getByLabel('文件：读取资源指标', { exact: true }).isChecked(), true);
   console.log(
     'PASS: actual Electron AI configuration, category draft retention, local model response, code rendering, conversation drafts, keyboard send/newline, history, light/dark/narrow',
   );

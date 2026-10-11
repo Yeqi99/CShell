@@ -1,23 +1,11 @@
+import { AiPermissionTree } from './AiPermissionTree';
 import { useEffect, useState } from 'react';
 import { Plus, History, Settings2, MessageSquare, X, Trash2, Cpu, ShieldCheck } from 'lucide-react';
-import {
-  aiLocations,
-  aiCapabilities,
-  type AiSnapshot,
-  type AiLocation,
-  type AiMode,
-  type AiPermission,
-  type AiProvider,
-} from '../../shared/ai';
+import { type AiSnapshot, type AiLocation, type AiMode, type AiProvider } from '../../shared/ai';
 import { AiConversation } from './AiConversation';
 import './ai-panel.css';
 import type { Profile } from '../../shared/contracts';
 const locations = { workspace: '工作台', terminal: '终端', files: '文件', python: 'Python' };
-const capabilities = {
-  'metrics.read': '读取资源指标',
-  'files.read': '读取远端文件',
-  'commands.execute': '执行命令（可修改服务器）',
-};
 export function AiPanel({
   visible,
   sessionId,
@@ -37,7 +25,7 @@ export function AiPanel({
     threads: [],
   });
   const [page, setPage] = useState<'chat' | 'settings' | 'history'>('chat');
-  const [location, setLocation] = useState<AiLocation>('terminal');
+  const [location] = useState<AiLocation>('terminal');
   const [providerId, setProviderId] = useState(''),
     [threadId, setThreadId] = useState('');
   const [mode, setMode] = useState<AiMode>('review');
@@ -50,19 +38,6 @@ export function AiPanel({
   );
   const [key, setKey] = useState(''),
     [keyChanged, setKeyChanged] = useState(false);
-  const [permissionDrafts, setPermissionDrafts] = useState<
-    Partial<Record<AiLocation, AiPermission>>
-  >({});
-  const permission = permissionDrafts[location] ??
-    snapshot.permissions.find((p) => p.location === location) ?? {
-      location,
-      providerId: null,
-      groups: [],
-      profiles: [],
-      capabilities: [],
-    };
-  const setPermission = (value: AiPermission) =>
-    setPermissionDrafts((drafts) => ({ ...drafts, [value.location]: value }));
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const refresh = async () => setSnapshot(await window.cshell.aiSnapshot());
   const run = async (fn: () => Promise<unknown>) => {
@@ -111,9 +86,6 @@ export function AiPanel({
     const t = await window.cshell.aiThreadCreate(location, providerId, mode, sessionId);
     setThreadId(t.id);
     return t;
-  };
-  const changeLocation = (next: AiLocation) => {
-    setLocation(next);
   };
   return (
     <aside className="ai-panel" hidden={!visible} aria-label="AI 智能体">
@@ -249,8 +221,7 @@ export function AiPanel({
             ))}
         </div>
       )}
-      {page === 'settings' && (
-        <div className="ai-settings">
+        <div className="ai-settings" hidden={page !== 'settings'}>
           <nav className="agent-settings-tabs" aria-label="智能体设置分类">
             <button
               aria-pressed={settingsTab === 'models'}
@@ -420,127 +391,14 @@ export function AiPanel({
             )}
           </div>
           <div hidden={settingsTab !== 'permissions'}>
-            <div className="ai-section-heading ai-permission-heading">
-              <h3>会话权限配置</h3>
-              <ShieldCheck size={15} />
-            </div>
-            <p className="ai-section-note">
-              新会话使用所选配置。修改权限也会影响使用该配置的已有会话。
-            </p>
-            <div
-              className="permission-profiles"
-              role="radiogroup"
-              aria-label="新会话使用的权限配置"
-            >
-              {aiLocations.map((l) => (
-                <button
-                  key={l}
-                  type="button"
-                  role="radio"
-                  aria-checked={location === l}
-                  onClick={() => changeLocation(l)}
-                >
-                  {locations[l]}
-                </button>
-              ))}
-            </div>
-            {permission && (
-              <form
-                className="ai-permissions"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void run(async () => {
-                    await window.cshell.aiPermissionSave(permission);
-                  });
-                }}
-              >
-                <label>
-                  默认基座
-                  <select
-                    value={permission.providerId ?? ''}
-                    onChange={(e) =>
-                      setPermission({ ...permission, providerId: e.target.value || null })
-                    }
-                  >
-                    <option value="">手动选择</option>
-                    {snapshot.providers.map((p) => (
-                      <option value={p.id} key={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <fieldset>
-                  <legend>工具能力</legend>
-                  {aiCapabilities.map((c) => (
-                    <label key={c}>
-                      <input
-                        type="checkbox"
-                        checked={permission.capabilities.includes(c)}
-                        onChange={(e) =>
-                          setPermission({
-                            ...permission,
-                            capabilities: e.target.checked
-                              ? [...permission.capabilities, c]
-                              : permission.capabilities.filter((v) => v !== c),
-                          })
-                        }
-                      />
-                      {capabilities[c]}
-                    </label>
-                  ))}
-                </fieldset>
-                <fieldset>
-                  <legend>分组范围（包含以后加入的机器）</legend>
-                  {groups.map((g) => (
-                    <label key={g}>
-                      <input
-                        type="checkbox"
-                        checked={permission.groups.includes(g)}
-                        onChange={(e) =>
-                          setPermission({
-                            ...permission,
-                            groups: e.target.checked
-                              ? [...permission.groups, g]
-                              : permission.groups.filter((v) => v !== g),
-                          })
-                        }
-                      />
-                      {g}
-                    </label>
-                  ))}
-                </fieldset>
-                <fieldset>
-                  <legend>单独授权机器</legend>
-                  {profiles.map((p) => (
-                    <label key={p.id}>
-                      <input
-                        type="checkbox"
-                        checked={permission.profiles.includes(p.id)}
-                        onChange={(e) =>
-                          setPermission({
-                            ...permission,
-                            profiles: e.target.checked
-                              ? [...permission.profiles, p.id]
-                              : permission.profiles.filter((v) => v !== p.id),
-                          })
-                        }
-                      />
-                      {p.name} · {p.host}
-                    </label>
-                  ))}
-                </fieldset>
-                <p className="muted">
-                  工具结果会发送到所选基座。未勾选的机器与功能不可调用，全放行也不扩大范围。临时连接需先保存为服务器才能授权。
-                </p>
-                <button className="primary" disabled={busy}>
-                  保存权限
-                </button>
-              </form>
-            )}
+            <AiPermissionTree
+              snapshot={snapshot}
+              profiles={profiles}
+              groups={groups}
+              refresh={refresh}
+            />
           </div>
         </div>
-      )}
     </aside>
   );
 }
