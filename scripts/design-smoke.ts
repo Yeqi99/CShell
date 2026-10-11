@@ -86,13 +86,15 @@ export async function designSmoke(app: ElectronApplication, page: Page) {
   await page.waitForFunction(
     async () =>
       document.documentElement.dataset.theme === 'dark' &&
+      document.querySelector<HTMLSelectElement>('#workspace-preferences-form select')?.value ===
+        'dark' &&
       (await window.cshell.config()).preferences.theme === 'dark',
   );
   await page.getByRole('button', { name: '切换为浅色', exact: true }).click();
   await page.waitForFunction(
     async () =>
       document.documentElement.dataset.theme === 'light' &&
-      document.querySelector<HTMLSelectElement>('.preferences-page > form select')?.value ===
+      document.querySelector<HTMLSelectElement>('#workspace-preferences-form select')?.value ===
         'light' &&
       (await window.cshell.config()).preferences.theme === 'light',
   );
