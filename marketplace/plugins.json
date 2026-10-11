@@ -16,7 +16,7 @@
         ],
         "commands": []
       },
-      "url": "https://raw.githubusercontent.com/Yeqi99/CShell/v0.3.0/marketplace/plugins/cshell.vim.json",
+      "url": "https://raw.githubusercontent.com/Yeqi99/CShell/v0.3.1/marketplace/plugins/cshell.vim.json",
       "sha256": "738df7f29d67b22365ce50605055f6d992befa970bd716667578322c1331b796"
     },
     {
@@ -34,7 +34,7 @@
         ],
         "commands": []
       },
-      "url": "https://raw.githubusercontent.com/Yeqi99/CShell/v0.3.0/marketplace/plugins/cshell.nano.json",
+      "url": "https://raw.githubusercontent.com/Yeqi99/CShell/v0.3.1/marketplace/plugins/cshell.nano.json",
       "sha256": "17c9e4e8b97b042722788337c178c3403f55a9212bd14fd512dec42ae25ceea9"
     },
     {
@@ -52,7 +52,7 @@
         ],
         "commands": []
       },
-      "url": "https://raw.githubusercontent.com/Yeqi99/CShell/v0.3.0/marketplace/plugins/cshell.commands.json",
+      "url": "https://raw.githubusercontent.com/Yeqi99/CShell/v0.3.1/marketplace/plugins/cshell.commands.json",
       "sha256": "454f9f581b1bee29f09672ecbb70957b0059c713119b95c2cf52b4cc4dc78da2"
     },
     {
@@ -71,7 +71,7 @@
         ],
         "commands": []
       },
-      "url": "https://raw.githubusercontent.com/Yeqi99/CShell/v0.3.0/marketplace/plugins/cshell.docker.json",
+      "url": "https://raw.githubusercontent.com/Yeqi99/CShell/v0.3.1/marketplace/plugins/cshell.docker.json",
       "sha256": "5d78ee94988f9f2ad72f1d58f16b44c80c07d075104b9bb332a0226f2c414856"
     },
     {
@@ -91,7 +91,7 @@
         ],
         "commands": []
       },
-      "url": "https://raw.githubusercontent.com/Yeqi99/CShell/v0.3.0/marketplace/plugins/cshell.conda.json",
+      "url": "https://raw.githubusercontent.com/Yeqi99/CShell/v0.3.1/marketplace/plugins/cshell.conda.json",
       "sha256": "a681da77df0c4e42ba59cc1c45de3562f64e8a51b0f92803735876c833a9b59b"
     },
     {
@@ -110,7 +110,7 @@
         ],
         "commands": []
       },
-      "url": "https://raw.githubusercontent.com/Yeqi99/CShell/v0.3.0/marketplace/plugins/cshell.python.json",
+      "url": "https://raw.githubusercontent.com/Yeqi99/CShell/v0.3.1/marketplace/plugins/cshell.python.json",
       "sha256": "eb5f496344235ddf125942c6631b01f66357fb744f5a53459ea6e7c3806b010c"
     }
   ]

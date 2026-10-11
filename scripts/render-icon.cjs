@@ -7,8 +7,8 @@ app.whenReady().then(async () => {
   try {
     const svg = await readFile(resolve('assets/icon.svg'), 'utf8');
     const window = new BrowserWindow({
-      width: 256,
-      height: 256,
+      width: 512,
+      height: 512,
       show: false,
       frame: false,
       transparent: true,
@@ -17,14 +17,15 @@ app.whenReady().then(async () => {
     await window.loadURL(
       'data:text/html;charset=utf-8,' +
         encodeURIComponent(
-          `<style>html,body{margin:0;background:transparent;width:256px;height:256px}svg{display:block}</style>${svg}`,
+          `<style>html,body{margin:0;background:transparent;width:512px;height:512px}svg{display:block;width:512px;height:512px}</style>${svg}`,
         ),
     );
     const capture = await window.webContents.capturePage();
     const source = nativeImage
       .createFromBuffer(capture.toPNG())
-      .resize({ width: 256, height: 256, quality: 'best' });
-    await writeFile(resolve('assets/icon.png'), source.toPNG());
+      .resize({ width: 512, height: 512, quality: 'best' });
+    await writeFile(resolve('assets/icon-512.png'), source.toPNG());
+    await writeFile(resolve('assets/icon.png'), source.resize({ width: 256, height: 256 }).toPNG());
     const sizes = [16, 24, 32, 48, 64, 128, 256];
     const images = sizes.map((size) =>
       source.resize({ width: size, height: size, quality: 'best' }).toPNG(),

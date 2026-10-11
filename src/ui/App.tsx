@@ -356,6 +356,8 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
         </button>
         <button
           className="palette-trigger"
+          aria-label={t('commandPalette')}
+          title={t('commandPalette')}
           aria-expanded={palette}
           aria-controls="workbench-commands"
           onClick={() => setPalette((value) => !value)}

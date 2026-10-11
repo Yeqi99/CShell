@@ -1,6 +1,6 @@
 # CShell
 
-CanpShell 是面向高频操作的 SSH 与 AI 计算工作台，采用 **MIT** 许可证。源码已开源，当前版本为 **0.3.0 预览版**；各平台下载以 GitHub Releases 中实际发布的附件为准。
+CanpShell 是面向高频操作的 SSH 与 AI 计算工作台，采用 **MIT** 许可证。源码已开源，当前版本为 **0.3.1 预览版**；各平台下载以 GitHub Releases 中实际发布的附件为准。
 
 [源码](https://github.com/Yeqi99/CShell) · [版本下载](https://github.com/Yeqi99/CShell/releases) · [问题反馈](https://github.com/Yeqi99/CShell/issues) · [构建状态](https://github.com/Yeqi99/CShell/actions)
 
@@ -36,7 +36,7 @@ pnpm test:desktop
 pnpm run dist
 ```
 
-`release/0.3.0/CShell-0.3.0-win-x64.exe` 为 NSIS 安装包，`release/0.3.0/win-unpacked/CShell.exe` 为目录版。macOS 使用 `pnpm exec electron-builder --mac --arm64 --publish never`，Linux 使用 `pnpm exec electron-builder --linux --x64 --publish never`。首次安装依赖和构建需要网络。
+`release/0.3.1/CShell-0.3.1-win-x64.exe` 为 NSIS 安装包，`release/0.3.1/win-unpacked/CShell.exe` 为目录版。macOS 使用 `pnpm exec electron-builder --mac --arm64 --publish never`，Linux 使用 `pnpm exec electron-builder --linux --x64 --publish never`。首次安装依赖和构建需要网络。
 
 ## 插件与应用
 

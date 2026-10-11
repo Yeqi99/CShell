@@ -1,7 +1,7 @@
 {
   "name": "canpshell",
   "productName": "CShell",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "CanpShell offline-first terminal workbench",
   "author": "CanpShell contributors",
@@ -54,7 +54,7 @@
     "appId": "org.canpshell.desktop",
     "productName": "CShell",
     "directories": {
-      "output": "release/0.3.0"
+      "output": "release/0.3.1"
     },
     "files": [
       "dist/**/*",
@@ -69,7 +69,7 @@
         "zip"
       ],
       "category": "public.app-category.developer-tools",
-      "icon": "assets/icon.png",
+      "icon": "assets/icon-512.png",
       "identity": null
     },
     "linux": {
