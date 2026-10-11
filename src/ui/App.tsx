@@ -13,6 +13,8 @@ import {
   Bot,
   Minimize2,
   Maximize2,
+  Pin,
+  PinOff,
   Blocks,
   Moon,
   Sun,
@@ -72,6 +74,7 @@ export function App() {
 function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Config) => void }) {
   const { t } = useI18n();
   const [minimal, setMinimal] = useState(false);
+  const [pinned, setPinned] = useState(false);
   const [aiVisible, setAiVisible] = useState(false);
   useEffect(() => {
     const open = () => {
@@ -270,6 +273,13 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
     setConfirmClose(null);
   }
   const run = (p: Promise<unknown>) => void p.catch(onError);
+  useEffect(() => {
+    if (!minimal) setPinned(false);
+    void window.cshell.setAlwaysOnTop(minimal && pinned).catch((e: Error) => {
+      setPinned(false);
+      setError(e.message);
+    });
+  }, [minimal, pinned]);
   const savePreferences = async (value: Preferences) => {
     await window.cshell.preferences(value);
     await refresh();
@@ -434,6 +444,33 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
           style={{ order: layout.order.indexOf('terminal') }}
         >
           <div className="tabbar">
+            {minimal && (
+              <button
+                className="icon minimal-pin"
+                aria-pressed={pinned}
+                title={
+                  config.preferences.locale === 'zh-CN'
+                    ? pinned
+                      ? '取消置顶'
+                      : '窗口置顶'
+                    : pinned
+                      ? 'Unpin window'
+                      : 'Keep window on top'
+                }
+                aria-label={
+                  config.preferences.locale === 'zh-CN'
+                    ? pinned
+                      ? '取消置顶'
+                      : '窗口置顶'
+                    : pinned
+                      ? 'Unpin window'
+                      : 'Keep window on top'
+                }
+                onClick={() => setPinned((value) => !value)}
+              >
+                {pinned ? <PinOff size={16} /> : <Pin size={16} />}
+              </button>
+            )}
             <button
               className="icon minimal-toggle"
               aria-pressed={minimal}

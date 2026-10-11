@@ -189,6 +189,7 @@ export type SessionEvent =
   | { type: 'closed'; sessionId: string; error?: string }
   | { type: 'transfer'; transfer: Transfer };
 export interface Bridge extends ExtensionBridge, AiBridge, UpdateBridge {
+  setAlwaysOnTop(enabled: boolean): Promise<boolean>;
   configureTools(settings: ToolsSettings): Promise<void>;
   dockerSnapshot(sessionId: string): Promise<DockerSnapshot>;
   dockerStats(sessionId: string, id: string): Promise<DockerStats>;

@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { Bridge, SessionEvent } from '../shared/contracts';
 const bridge: Bridge = {
+  setAlwaysOnTop: (enabled) => ipcRenderer.invoke('window:always-on-top', enabled),
   updateState: () => ipcRenderer.invoke('update:state'),
   checkUpdate: () => ipcRenderer.invoke('update:check'),
   downloadUpdate: () => ipcRenderer.invoke('update:download'),

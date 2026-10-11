@@ -4099,12 +4099,16 @@ input[type='radio']:focus-visible {
 .minimal-mode > .statusbar,
 .minimal-mode .dock-side,
 .minimal-mode .tabbar-controls,
-.minimal-mode .tabbar > button:not(.minimal-toggle) {
+.minimal-mode .tabbar > button:not(.minimal-toggle):not(.minimal-pin) {
   display: none;
 }
 .minimal-mode .tabbar {
   -webkit-app-region: drag;
   padding-right: 145px;
+}
+.minimal-pin[aria-pressed='true'] {
+  color: var(--accent);
+  background: var(--hover);
 }
 .minimal-mode .tabbar button,
 .minimal-mode .tabs {

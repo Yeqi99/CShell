@@ -38,6 +38,8 @@ jobs:
       - if: matrix.platform == 'win'
         run: pnpm test:desktop
       - if: matrix.platform == 'win'
+        run: pnpm exec tsx scripts/minimal-pin-smoke.ts
+      - if: matrix.platform == 'win'
         run: pnpm exec tsx scripts/update-smoke.ts
       - if: matrix.platform == 'win'
         run: |

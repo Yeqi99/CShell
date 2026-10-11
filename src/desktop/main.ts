@@ -178,6 +178,10 @@ else
         });
       registerAppearanceHandlers(handle, window, app.getPath('userData'), consume, text);
       registerUpdateHandlers(handle, window);
+      handle('window:always-on-top', (enabled) => {
+        window.setAlwaysOnTop(z.boolean().parse(enabled));
+        return window.isAlwaysOnTop();
+      });
       await registerAiHandlers(handle, app.getPath('userData'), store, ssh);
       registerPresetHandlers(handle, window, app.getPath('userData'), store, text);
       const mcp = new McpService(store, app.getPath('userData'), async (name, command) => {
