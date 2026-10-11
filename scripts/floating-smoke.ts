@@ -101,9 +101,22 @@ try {
   await first.screenshot({ path: 'test-results/floating-terminal.png' });
   await Promise.all([
     second.waitForEvent('close'),
-    second.getByRole('button', { name: '返回工作台', exact: true }).click(),
+    second
+      .getByRole('button', { name: '返回工作台', exact: true })
+      .click()
+      .catch((error) => {
+        if (!second.isClosed() || !String(error).includes('has been closed')) throw error;
+      }),
   ]);
-  await first.getByRole('button', { name: '关闭小窗', exact: true }).click();
+  await Promise.all([
+    first.waitForEvent('close'),
+    first
+      .getByRole('button', { name: '关闭小窗', exact: true })
+      .click()
+      .catch((error) => {
+        if (!first.isClosed() || !String(error).includes('has been closed')) throw error;
+      }),
+  ]);
   await page.evaluate((id) => window.cshell.input(id, 'still-connected\r\n'), id);
   await page.waitForTimeout(100);
   assert.ok(server.shellInputs.join('').includes('still-connected'));

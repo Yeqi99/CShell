@@ -12,7 +12,15 @@ try {
   await page.getByRole('heading', { name: '尚未连接' }).waitFor();
   await page.locator('.topbar button').last().click();
   const nav = page.locator('.settings-nav');
-  assert.equal(await nav.getByRole('button').count(), 6);
+  assert.deepEqual(await nav.getByRole('button').allTextContents(), [
+    '外观',
+    '终端',
+    ...(process.platform === 'win32' ? ['本机终端'] : []),
+    '工作区',
+    '扩展',
+    'AI 与安全',
+    '关于与更新',
+  ]);
   await mkdir('test-results', { recursive: true });
   await page.getByText(/本机已安装字体/).waitFor();
   await page.screenshot({ animations: 'disabled', path: 'test-results/settings-appearance.png' });
