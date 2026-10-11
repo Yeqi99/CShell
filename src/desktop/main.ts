@@ -1,3 +1,8 @@
+import { createSshManager } from '../core/connections/ssh-provider';
+import type { ConnectionManager } from '../core/connections/manager';
+import { ActivityStore } from '../core/activity';
+import { registerActivity } from './activity';
+import type { Activity } from '../shared/activity';
 import { FloatingWindows } from './floating';
 import { registerExtensionHandlers } from './extensions';
 import { registerUpdateHandlers } from './updates';
@@ -68,6 +73,9 @@ else
           (await safeStorage.decryptStringAsync(Buffer.from(value, 'base64'))).result,
       });
       await store.load();
+      const activity = new ActivityStore(app.getPath('userData'));
+      await activity.load();
+      const recordedTransfers = new Set<string>();
       const zh = () => store.snapshot().preferences.locale === 'zh-CN';
       const text = (cn: string, en: string) => (zh() ? cn : en);
       const entry = pathToFileURL(join(__dirname, '../renderer/index.html')).href;
@@ -103,8 +111,32 @@ else
         callback(false),
       );
       session.defaultSession.setPermissionCheckHandler(() => false);
+      let connections: ConnectionManager | undefined;
       let floating: FloatingWindows | undefined;
       const emit = (event: SessionEvent) => {
+        if (event.type === 'closed') connections?.closed(event.sessionId);
+        if (
+          event.type === 'transfer' &&
+          event.transfer.state !== 'running' &&
+          !recordedTransfers.has(event.transfer.id)
+        ) {
+          const transfer = event.transfer;
+          recordedTransfers.add(transfer.id);
+          if (recordedTransfers.size > 2000)
+            recordedTransfers.delete(recordedTransfers.values().next().value!);
+          activity.record({
+            kind: 'transfer',
+            action: transfer.direction,
+            status:
+              transfer.state === 'done'
+                ? 'success'
+                : transfer.state === 'cancelled'
+                  ? 'cancelled'
+                  : 'failed',
+            provider: transfer.sessionId === 'local' ? 'cshell.local' : 'cshell.ssh',
+            bytes: transfer.done,
+          });
+        }
         event = floating?.event(event) ?? event;
         if (!window.isDestroyed()) window.webContents.send('session:event', event);
       };
@@ -140,6 +172,7 @@ else
         await store.trust(endpoint, fingerprint);
         return true;
       });
+      connections = createSshManager(ssh, () => store.snapshot().profiles);
       floating = new FloatingWindows(
         window,
         ssh,
@@ -186,10 +219,61 @@ else
       const handle = (name: string, fn: (...args: any[]) => any) =>
         ipcMain.handle(name, async (event, ...args) => {
           validateSender(event);
-          return fn(...args);
+          const types: Record<string, Activity['kind']> = {
+            connect: 'connection',
+            'connect:temporary': 'connection',
+            'file:action': 'file',
+            'local:action': 'file',
+            'file:transfer': 'file',
+            'ai:send': 'ai',
+            'ai:extract-connection': 'ai',
+            'docker:action': 'tool',
+            'applications:install': 'deployment',
+          };
+          const kind = types[name],
+            provider =
+              name.startsWith('local:') ||
+              (name === 'file:transfer' &&
+                args[1]?.kind === 'local' &&
+                Array.isArray(args[0]) &&
+                args[0].every((s: { kind?: string }) => s?.kind === 'local'))
+                ? 'cshell.local'
+                : kind === 'ai'
+                  ? 'ai'
+                  : 'cshell.ssh',
+            start = Date.now();
+          try {
+            const result = await fn(...args);
+            if (kind)
+              activity.record({
+                kind,
+                action: name,
+                status: 'success',
+                provider,
+                duration: Date.now() - start,
+                ...(kind === 'connection'
+                  ? {
+                      resource:
+                        name === 'connect' ? String(args[0]) : String(args[0]?.id || 'temporary'),
+                    }
+                  : {}),
+              });
+            return result;
+          } catch (error) {
+            if (kind)
+              activity.record({
+                kind,
+                action: name,
+                status: 'failed',
+                provider,
+                duration: Date.now() - start,
+              });
+            throw error;
+          }
         });
       registerAppearanceHandlers(handle, window, app.getPath('userData'), consume, text);
       registerUpdateHandlers(handle, window);
+      registerActivity(handle, window, activity);
       let normalBounds: Electron.Rectangle | null = null;
       let wasMaximized = false;
       handle('window:minimal', (input) => {
@@ -225,7 +309,7 @@ else
         window.setAlwaysOnTop(z.boolean().parse(enabled));
         return window.isAlwaysOnTop();
       });
-      await registerAiHandlers(handle, app.getPath('userData'), store, ssh);
+      await registerAiHandlers(handle, app.getPath('userData'), store, connections.tools);
       registerPresetHandlers(handle, window, app.getPath('userData'), store, text);
       const mcp = new McpService(store, app.getPath('userData'), async (name, command) => {
         const result = await dialog.showMessageBox(window, {
@@ -250,7 +334,7 @@ else
       handle('mcp:copy-token', async () => clipboard.writeText(await mcp.accessToken()));
       handle('mcp:rotate-token', () => serialMcp(() => mcp.rotateToken()));
       await mcp.start();
-      registerExtensionHandlers(handle, window, store, ssh);
+      registerExtensionHandlers(handle, window, store, ssh, connections);
       const docker = new DockerService(ssh, () => {
         const tools = store.snapshot().tools;
         if (!tools.dockerEnabled) throw new Error(text('Docker 面板未启用', 'Docker is disabled'));
@@ -351,11 +435,11 @@ else
               }
             : { password: credentials.password ?? saved?.password };
         if (profile.auth === 'key' && !secret.privateKey) throw new Error('Select a private key');
-        const connected = await ssh.connect(profile, secret);
+        const connected = { sessionId: await connections!.connect('cshell.ssh', profile, secret) };
         try {
           await store.setSecret(id, credentials.remember ? secret : null);
         } catch (error) {
-          ssh.disconnect(connected.sessionId);
+          await connections!.disconnect(connected.sessionId);
           throw error;
         }
         return connected;
@@ -373,36 +457,47 @@ else
           privateKey = await readFile(path, 'utf8');
         }
         // Temporary sessions never read or write saved profile credentials.
-        return ssh.connect(
-          profile,
-          profile.auth === 'key'
-            ? { privateKey, passphrase: credentials.passphrase }
-            : { password: credentials.password },
-        );
+        return connections!
+          .connect(
+            'cshell.ssh',
+            profile,
+            profile.auth === 'key'
+              ? { privateKey, passphrase: credentials.passphrase }
+              : { password: credentials.password },
+          )
+          .then((sessionId) => ({ sessionId }));
       });
       handle('floating:open', (id, snapshot) => floating!.open(id, snapshot));
       handle('disconnect', (id) => {
         idSchema.parse(id);
         transfers.cancelSession(id);
-        ssh.disconnect(id);
+        return connections!.disconnect(id);
       });
       handle('input', (id, data) =>
-        ssh.input(idSchema.parse(id), z.string().max(131072).parse(data)),
+        connections!.tools.terminal(idSchema.parse(id)).input(z.string().max(131072).parse(data)),
       );
-      handle('acknowledge', (id, count) =>
-        ssh.acknowledge(idSchema.parse(id), z.number().int().min(0).max(2_000_000).parse(count)),
+      handle(
+        'acknowledge',
+        (id, count) =>
+          connections!.has(idSchema.parse(id)) &&
+          connections!.tools
+            .terminal(id)
+            .acknowledge(z.number().int().min(0).max(2_000_000).parse(count)),
       );
       handle(
         'resize',
         (id, cols, rows) =>
           (window.isFocused() || !floating) &&
-          ssh.resize(
-            idSchema.parse(id),
-            z.number().int().min(1).max(1000).parse(cols),
-            z.number().int().min(1).max(1000).parse(rows),
-          ),
+          connections!.tools
+            .terminal(idSchema.parse(id))
+            .resize(
+              z.number().int().min(1).max(1000).parse(cols),
+              z.number().int().min(1).max(1000).parse(rows),
+            ),
       );
-      handle('list', (id, path) => ssh.list(idSchema.parse(id), pathSchema.parse(path)));
+      handle('list', (id, path) =>
+        connections!.tools.files(idSchema.parse(id)).list(pathSchema.parse(path)),
+      );
       handle('file:action', async (id, action, path, destination) => {
         idSchema.parse(id);
         z.enum(['mkdir', 'rename', 'delete']).parse(action);
@@ -491,7 +586,21 @@ else
             }
           });
       });
+      let flushed = false;
+      app.on('before-quit', (event) => {
+        if (!flushed) {
+          event.preventDefault();
+          void activity
+            .flush()
+            .catch(() => {})
+            .finally(() => {
+              flushed = true;
+              app.quit();
+            });
+        }
+      });
       window.on('closed', () => {
+        void activity.flush().catch(() => {});
         floating?.dispose();
         void mcp.stop();
         transfers.dispose();

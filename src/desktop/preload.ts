@@ -1,6 +1,10 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { Bridge, SessionEvent } from '../shared/contracts';
 const bridge: Bridge = {
+  activitySnapshot: () => ipcRenderer.invoke('activity:snapshot'),
+  activityEnable: (enabled) => ipcRenderer.invoke('activity:enable', enabled),
+  activityClear: () => ipcRenderer.invoke('activity:clear'),
+  activityExport: (from, to, format) => ipcRenderer.invoke('activity:export', from, to, format),
   openFloating: (id, snapshot) => ipcRenderer.invoke('floating:open', id, snapshot),
   floatingInit: () => ipcRenderer.invoke('floating:init'),
   floatingInput: (data) => ipcRenderer.invoke('floating:input', data),

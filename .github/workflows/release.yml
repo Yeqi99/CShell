@@ -34,6 +34,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm test
+      - if: matrix.platform == 'win'
+        run: pnpm exec tsx scripts/activity-smoke.ts
       - run: pnpm run licenses
       - if: matrix.platform == 'win'
         run: pnpm test:desktop
@@ -87,6 +89,7 @@ jobs:
         with:
           gradle-version: '8.13'
       - run: pnpm install --frozen-lockfile
+      - run: pnpm exec tsc --noEmit -p android/web/tsconfig.json
       - run: node scripts/build-android.mjs
       - name: Restore persistent Android signing key
         env:

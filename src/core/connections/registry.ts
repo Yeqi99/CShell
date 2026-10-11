@@ -71,6 +71,16 @@ export class ConnectionRegistry {
     }
     return connection;
   }
+  terminal(id: string) {
+    const terminal = this.connection(id).terminal;
+    if (!terminal) throw new Error('Terminal capability unavailable');
+    return terminal;
+  }
+  files(id: string) {
+    const files = this.connection(id).files;
+    if (!files) throw new Error('Files capability unavailable');
+    return files;
+  }
   describe(id: string) {
     return structuredClone(this.connection(id).target);
   }

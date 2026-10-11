@@ -1,18 +1,14 @@
 import { AiService } from '../core/ai';
 import type { Store } from '../core/store';
-import type { SshService } from '../core/ssh';
-import { createSshConnections } from '../core/connections/ssh-provider';
+
+import type { ConnectionRegistry } from '../core/connections/registry';
 export async function registerAiHandlers(
   handle: (name: string, fn: (...args: any[]) => any) => void,
   directory: string,
   store: Store,
-  ssh: SshService,
+  connections: ConnectionRegistry,
 ) {
-  const ai = new AiService(
-    directory,
-    store,
-    createSshConnections(ssh, () => store.snapshot().profiles),
-  );
+  const ai = new AiService(directory, store, connections);
   await ai.load();
   handle('ai:snapshot', () => ai.snapshot());
   handle('ai:extract-connection', (text, provider) => ai.extractConnection(text, provider));

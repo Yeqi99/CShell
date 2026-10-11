@@ -1,3 +1,4 @@
+import type { ConnectionManager } from '../core/connections/manager';
 import { dialog, shell, type BrowserWindow } from 'electron';
 import { z } from 'zod';
 import { PluginService, httpsText } from '../core/plugins';
@@ -20,6 +21,7 @@ export function registerExtensionHandlers(
   window: BrowserWindow,
   store: Store,
   ssh: SshService,
+  connections: ConnectionManager,
 ) {
   const plugins = new PluginService(store),
     jobs = new RemoteJobs(ssh),
@@ -113,10 +115,17 @@ export function registerExtensionHandlers(
     remoteExecutable.parse(conda);
     remoteExecutable.parse(prefix);
     await environments.known(sessionId, conda, prefix);
-    return ssh.openEnvironment(
+    const result = await ssh.openEnvironment(
       sessionId,
       `${quote(conda)} run --no-capture-output --prefix ${quote(prefix)} bash --noprofile --norc -i`,
     );
+    try {
+      connections.adopt('cshell.ssh', result.sessionId);
+    } catch (error) {
+      ssh.disconnect(result.sessionId);
+      throw error;
+    }
+    return result;
   });
   handle('python:analyze', (id, python, code, line, column, path) => {
     requirePlugin('python');

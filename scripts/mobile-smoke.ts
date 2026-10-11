@@ -43,6 +43,25 @@ try {
           (window as any).receive(p.id, 'data', btoa('test-session$ '));
         }, 50);
       },
+      fileRequest: (data: string) => {
+        const r = JSON.parse(data);
+        setTimeout(
+          () =>
+            (window as any).fileEvent(
+              JSON.stringify({
+                request: r.request,
+                path: '/home/test',
+                entries: [
+                  { name: 'src', path: '/home/test/src', directory: true, size: 0 },
+                  { name: 'README.md', path: '/home/test/README.md', directory: false, size: 120 },
+                ],
+                name: 'README.md',
+                text: 'hello file',
+              }),
+            ),
+          30,
+        );
+      },
       input: (...args: any[]) => calls.push(args),
       resize: () => {},
       acknowledge: () => {},
@@ -59,7 +78,7 @@ try {
   await mkdir('test-results', { recursive: true });
   assert.equal(await page.locator('#connect').isVisible(), false);
   await page.screenshot({ path: 'test-results/android-home.png' });
-  await page.locator('#empty-new').click();
+  await page.locator('#home-new').click();
   assert.equal(await page.locator('#connect-actions').isVisible(), true);
   await page.locator('[name=host]').fill('test.example');
   await page.locator('[name=name]').fill('测试连接');
@@ -70,14 +89,14 @@ try {
   assert.equal(await page.locator('[name=host]').inputValue(), 'test.example');
   await page.screenshot({ path: 'test-results/android-connection.png' });
   await page.locator('#save').click();
-  assert.equal(await page.locator('.server-open').count(), 1);
+  assert.equal(await page.locator('#server-list .server-open').count(), 1);
   assert.ok(
     !(await page.evaluate(() => localStorage.getItem('profiles')))?.includes(
       'secret-not-persisted',
     ),
   );
   await page.screenshot({ path: 'test-results/android-servers.png' });
-  await page.locator('.server-open').click();
+  await page.locator('#server-list .server-open').click();
   await page.locator('[name=password]').fill('secret');
   await page.locator('button[type=submit]').click();
   try {
@@ -100,11 +119,18 @@ try {
   await page.locator('#minimal').click();
   assert.equal(await page.locator('#navigation').isVisible(), false);
   await page.getByRole('button', { name: '还原工作台' }).click();
-  await page.locator('[data-page=home]').click();
-  await page.locator('[data-page=session-page]').click();
-  await page.locator('#session-list .server-open').click();
+  await page.locator('#navigation [data-page=home]').click();
+  await page.locator('#navigation [data-page=session-page]').click();
   assert.equal(await page.locator('#terminals > .terminal').count(), 1);
   assert.ok(await page.locator('.xterm-screen').isVisible());
+  await page.locator('#navigation [data-page=files]').click();
+  await page.locator('#files-list .server-open').first().waitFor();
+  assert.equal(await page.locator('#files-list .server-open').count(), 2);
+  await page.screenshot({ path: 'test-results/android-files.png' });
+  await page.locator('#files-list .server-open').last().click();
+  await page.locator('#file-preview').waitFor();
+  assert.equal(await page.locator('#preview-text').innerText(), 'hello file');
+  await page.locator('#navigation [data-page=session-page]').click();
   await page.setViewportSize({ width: 320, height: 480 });
   assert.equal(await page.evaluate(() => document.body.scrollWidth <= window.innerWidth), true);
   await page.setViewportSize({ width: 852, height: 393 });
@@ -117,7 +143,7 @@ try {
   await page.screenshot({ path: 'test-results/android-settings-dark.png' });
   await page.reload();
   await page.locator('#home').waitFor();
-  assert.equal(await page.locator('.server-open').count(), 1);
+  assert.equal(await page.locator('#server-list .server-open').count(), 1);
   assert.equal(await page.locator('body.dark').count(), 1);
   assert.deepEqual(errors, []);
   console.log(

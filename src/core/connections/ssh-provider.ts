@@ -1,13 +1,14 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import type { Profile } from '../../shared/contracts';
+import { profileSchema, type Profile } from '../../shared/contracts';
 import type { SshService, Session } from '../ssh';
 import { RemoteJobs } from '../remote-jobs';
 import { metricsCommand } from '../metrics';
 import { remotePath } from '../paths';
 import { commandNeedsReview } from './policy';
 import { ConnectionRegistry } from './registry';
-import type { ConnectionProvider, ProviderConnection, ConnectionTool } from './contracts';
+import { ConnectionManager, type ManagedProvider } from './manager';
+import type { ProviderConnection, ConnectionTool } from './contracts';
 
 export const sshIdentity = (p: Profile) =>
   createHash('sha256')
@@ -23,10 +24,36 @@ const commandInput = z
   })
   .strict();
 const pathInput = z.object({ path: z.string().max(4096).transform(remotePath) }).strict();
-export class SshConnectionProvider implements ConnectionProvider {
+export class SshConnectionProvider implements ManagedProvider {
   readonly id = 'cshell.ssh';
+  readonly configuration = profileSchema;
+  async connect(configuration: unknown, credentials: unknown, signal: AbortSignal) {
+    signal.throwIfAborted();
+    const secret = z
+      .object({
+        password: z.string().optional(),
+        privateKey: z.string().optional(),
+        passphrase: z.string().optional(),
+      })
+      .strict()
+      .parse(credentials);
+    const result = await this.ssh.connect(profileSchema.parse(configuration), secret);
+    if (signal.aborted) {
+      this.ssh.disconnect(result.sessionId);
+      signal.throwIfAborted();
+    }
+    return result.sessionId;
+  }
+  disconnect(id: string) {
+    this.ssh.disconnect(id);
+  }
   readonly version = '0.1.0';
-  readonly capabilities = ['commands.execute', 'files.read', 'metrics.read'];
+  readonly capabilities = [
+    'commands.execute',
+    'files.read',
+    'metrics.read',
+    'terminal.interactive',
+  ];
   private connections = new WeakMap<Session, ProviderConnection>();
   private jobs: RemoteJobs;
   constructor(private ssh: SshService) {
@@ -112,18 +139,37 @@ export class SshConnectionProvider implements ConnectionProvider {
         label: p.name + ' · ' + p.username + '@' + p.host + ':' + p.port,
       }),
       tools: Object.freeze(tools),
+      terminal: Object.freeze({
+        input: (data: string) => this.ssh.input(id, data),
+        resize: (cols: number, rows: number) => this.ssh.resize(id, cols, rows),
+        acknowledge: (count: number) => this.ssh.acknowledge(id, count),
+      }),
+      files: Object.freeze({ list: (path: string) => this.ssh.list(id, path) }),
     };
     this.connections.set(session, connection);
     return connection;
   }
 }
 /** Transitional host composition for existing SSH profile storage; not part of the generic core. */
-export function createSshConnections(ssh: SshService, profiles: () => Profile[]) {
+export function createSshManager(ssh: SshService, profiles: () => Profile[]) {
   const registry = new ConnectionRegistry((target) => {
     if (target.providerId !== 'cshell.ssh') return;
     const profile = profiles().find((p) => p.id === target.resourceId);
     if (!profile || sshIdentity(profile) !== target.identity) return;
     return { id: profile.id, group: profile.group };
+  });
+  const manager = new ConnectionManager(registry);
+  manager.register(new SshConnectionProvider(ssh));
+  return manager;
+}
+
+/** Compatibility composition for tests and standalone embedders. */
+export function createSshConnections(ssh: SshService, profiles: () => Profile[]) {
+  const registry = new ConnectionRegistry((target) => {
+    const p = profiles().find(
+      (p) => p.id === target.resourceId && sshIdentity(p) === target.identity,
+    );
+    return p ? { id: p.id, group: p.group } : undefined;
   }, 'cshell.ssh');
   registry.register(new SshConnectionProvider(ssh));
   return registry;

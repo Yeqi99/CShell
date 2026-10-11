@@ -1,6 +1,8 @@
 package org.canpshell.mobile;
 
 import android.app.Activity;
+import android.content.Intent;
+import org.json.JSONArray;
 import android.app.AlertDialog;
 import android.os.Bundle;
 import android.webkit.*;
@@ -25,9 +27,10 @@ public class MainActivity extends Activity {
   private volatile boolean destroyed;
   private static class Connection {
     Session session; ChannelShell shell; OutputStream output;
+    final ExecutorService files = Executors.newSingleThreadExecutor();
     final ExecutorService writer = Executors.newSingleThreadExecutor();
     final Semaphore outputSlots = new Semaphore(8);
-    synchronized void close() { writer.shutdownNow(); outputSlots.release(8); if (shell != null) shell.disconnect(); if (session != null) session.disconnect(); }
+    synchronized void close() { files.shutdownNow(); writer.shutdownNow(); outputSlots.release(8); if (shell != null) shell.disconnect(); if (session != null) session.disconnect(); }
   }
   @Override public void onCreate(Bundle state) {
     super.onCreate(state);
@@ -142,6 +145,19 @@ public class MainActivity extends Activity {
         finally { c.close(); if (!id.isEmpty()) { connections.remove(id, c); event(id, "closed", ""); } }
       });
     }
+    @JavascriptInterface public void fileRequest(String json) {
+      if (destroyed || json.length()>12000) return;
+      try {
+        JSONObject request=new JSONObject(json);UUID.fromString(request.getString("request"));
+        String id=request.getString("session"), path=request.getString("path"), operation=request.getString("operation");
+        UUID.fromString(id);
+        if(path.isEmpty() || path.length()>4096 || path.indexOf(0)>=0 || path.indexOf(10)>=0 || path.indexOf(13)>=0)throw new IOException("路径无效");
+        Connection c=connections.get(id);if(c==null || c.session==null || !c.session.isConnected())throw new IOException("连接已断开");
+        if(operation.equals("upload")||operation.equals("download")) runOnUiThread(()->pickTransfer(request));
+        else if(operation.equals("list")||operation.equals("preview")) c.files.execute(()->fileOperation(request,null));
+        else throw new IOException("不支持的文件操作");
+      }catch(Exception e){try{JSONObject r=new JSONObject(json);fileResult(r,new JSONObject().put("error",e.getMessage()));}catch(Exception ignored){}}
+    }
     @JavascriptInterface public void input(String id, String text) {
       if (text.length() > 65536 || destroyed) return;
       Connection c = connections.get(id); if (c == null) return;
@@ -152,6 +168,78 @@ public class MainActivity extends Activity {
       Connection c = connections.get(id); if (c != null && c.shell != null && cols >= 2 && cols <= 1000 && rows >= 1 && rows <= 500) c.shell.setPtySize(cols, rows, 0, 0);
     }
     @JavascriptInterface public void disconnect(String id) { Connection c = connections.remove(id); if (c != null) workers.execute(c::close); }
+  }
+  private JSONObject pendingTransfer;
+  private void fileResult(JSONObject request,JSONObject value) {
+    try{value.put("request",request.getString("request"));String json=value.toString();runOnUiThread(()->{if(!destroyed)web.evaluateJavascript("window.fileEvent("+JSONObject.quote(json)+")",null);});}catch(Exception ignored){}
+  }
+  private void pickTransfer(JSONObject request) {
+    try {
+      if(pendingTransfer!=null)throw new IOException("请先完成当前文件选择");
+      pendingTransfer=request;
+      boolean upload=request.getString("operation").equals("upload");
+      Intent intent=new Intent(upload?Intent.ACTION_OPEN_DOCUMENT:Intent.ACTION_CREATE_DOCUMENT);
+      intent.addCategory(Intent.CATEGORY_OPENABLE);intent.setType("application/octet-stream");
+      if(upload)intent.setType("*/*");
+      else {String path=request.getString("path");intent.putExtra(Intent.EXTRA_TITLE,path.substring(path.lastIndexOf('/')+1));}
+      startActivityForResult(intent,4401);
+    }catch(Exception e){if(pendingTransfer==request)pendingTransfer=null;try{fileResult(request,new JSONObject().put("error",e.getMessage()));}catch(Exception ignored){}}
+  }
+  @Override protected void onActivityResult(int code,int result,Intent data) {
+    super.onActivityResult(code,result,data);
+    if(code!=4401 || pendingTransfer==null)return;
+    JSONObject request=pendingTransfer;pendingTransfer=null;
+    try {
+      if(result!=RESULT_OK||data==null||data.getData()==null){fileResult(request,new JSONObject().put("cancelled",true));return;}
+      Connection c=connections.get(request.getString("session"));if(c==null)throw new IOException("连接已断开");
+      Uri uri=data.getData();
+      c.files.execute(()->fileOperation(request,uri));
+    }catch(Exception e){try{fileResult(request,new JSONObject().put("error",e.getMessage()));}catch(Exception ignored){}}
+  }
+  private void fileOperation(JSONObject request,Uri uri) {
+    ChannelSftp channel=null;
+    try {
+      Connection c=connections.get(request.getString("session"));if(c==null || c.session==null || !c.session.isConnected())throw new IOException("连接已断开");
+      channel=(ChannelSftp)c.session.openChannel("sftp");channel.connect(15000);
+      String path=request.getString("path"),op=request.getString("operation");JSONObject result=new JSONObject();
+      if(op.equals("list")){
+        String canonical=channel.realpath(path);JSONArray entries=new JSONArray();
+        Vector<ChannelSftp.LsEntry> values=channel.ls(canonical);
+        if(values.size()>10000)throw new IOException("目录超过 10000 项，请打开更小的目录");
+        values.sort((a,b)->{int d=Boolean.compare(b.getAttrs().isDir(),a.getAttrs().isDir());return d!=0?d:a.getFilename().compareToIgnoreCase(b.getFilename());});
+        for(ChannelSftp.LsEntry item:values){String name=item.getFilename();if(name.equals(".")||name.equals(".."))continue;
+          entries.put(new JSONObject().put("name",name).put("path",canonical+(canonical.endsWith("/")?"":"/")+name).put("directory",item.getAttrs().isDir()).put("size",item.getAttrs().getSize()));}
+        result.put("path",canonical).put("entries",entries);
+      }else if(op.equals("preview")){
+        if(channel.stat(path).getSize()>65536)throw new IOException("文件超过 64 KiB，请下载后查看");
+        try(InputStream in=channel.get(path);ByteArrayOutputStream out=new ByteArrayOutputStream()){
+          byte[] bytes=new byte[4096];int n;while((n=in.read(bytes))!=-1){if(out.size()+n>65536)throw new IOException("文件超过预览限制");out.write(bytes,0,n);}
+          byte[] bytesAll=out.toByteArray();for(byte b:bytesAll)if(b==0)throw new IOException("二进制文件，请下载后查看");
+          String text=StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(bytesAll)).toString();
+          result.put("name",path.substring(path.lastIndexOf('/')+1)).put("text",text);
+        }
+      }else if(op.equals("download")){
+        try(InputStream in=channel.get(path);OutputStream out=getContentResolver().openOutputStream(uri,"w")){if(out==null)throw new IOException("无法写入文件");copyFile(in,out);}
+      }else if(op.equals("upload")){
+        String name=null;try(android.database.Cursor cursor=getContentResolver().query(uri,new String[]{android.provider.OpenableColumns.DISPLAY_NAME},null,null,null)){if(cursor!=null&&cursor.moveToFirst())name=cursor.getString(0);}
+        if(name==null||name.isEmpty()||name.equals(".")||name.equals("..")||name.contains("/")||name.contains("\\")||name.indexOf(0)>=0)throw new IOException("文件名无效");
+        String directory=channel.realpath(path),destination=directory+(directory.endsWith("/")?"":"/")+name;
+        boolean exists=true;try{channel.lstat(destination);}catch(SftpException e){if(e.id==ChannelSftp.SSH_FX_NO_SUCH_FILE)exists=false;else throw e;}
+        if(exists)throw new IOException("目标存在同名文件，请先重命名后上传");
+        // Upload to a unique temporary path; publish only after the stream completes.
+        String temporary=directory+(directory.endsWith("/")?"":"/")+".cshell-upload-"+UUID.randomUUID();
+        try {
+          try(InputStream in=getContentResolver().openInputStream(uri);OutputStream out=channel.put(temporary)){if(in==null)throw new IOException("无法读取文件");copyFile(in,out);}
+          try{channel.lstat(destination);throw new IOException("目标已存在，未覆盖");}catch(SftpException e){if(e.id!=ChannelSftp.SSH_FX_NO_SUCH_FILE)throw e;}
+          channel.rename(temporary,destination);
+        }finally{try{channel.rm(temporary);}catch(Exception ignored){}}
+      }
+      fileResult(request,result);
+    }catch(Exception e){try{fileResult(request,new JSONObject().put("error",e.getMessage()==null?"文件操作失败":e.getMessage()));}catch(Exception ignored){} }
+    finally{if(channel!=null)channel.disconnect();}
+  }
+  private void copyFile(InputStream in,OutputStream out)throws IOException {
+    byte[] bytes=new byte[65536];int n;while((n=in.read(bytes))!=-1){if(destroyed||Thread.currentThread().isInterrupted())throw new IOException("传输已停止");out.write(bytes,0,n);}
   }
   @Override public void onDestroy() {
     destroyed = true; for (Connection c : connections.values()) c.close(); connections.clear(); workers.shutdownNow();

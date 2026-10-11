@@ -6,12 +6,13 @@ CShell 是通用计算工作台。模型供应商（AI API 基座）和连接 Pr
 
 原实现中 `AiService` 直接持有 `SshService` 和 `RemoteJobs`，自行枚举并实现 SSH 工具。插件协议 v1 主要是经过验证的内置适配器与命令清单；它不是可执行第三方代码的扩展宿主。终端、文件与监控通过桌面 IPC 调用 SSH 服务。UI 中环境管理和 Python 编辑器也曾被硬编码为永久通用导航。
 
-本次加入 `src/core/connections`，把 Agent 工具执行迁移到统一注册表。真实 SSH 适配器提供 `execute_command`、`list_files`、`read_file`、`read_metrics`。通用注册表的测试使用独立的 Client fixture，验证 Agent 工具调用不依赖 SSH 类型。现有终端/文件 IPC 保持工作，避免把一次迁移扩大成整个应用的重写。
+本次加入 `src/core/connections`，把 Agent 工具执行迁移到统一注册表。真实 SSH 适配器提供 `execute_command`、`list_files`、`read_file`、`read_metrics`。通用注册表的测试使用独立的 Client fixture，验证 Agent 工具调用不依赖 SSH 类型。连接创建、断开、终端输入/尺寸/背压与文件列表现已通过 Provider 生命周期及可选能力接口分派。文件传输、远程资源采集、浮窗与现有专用插件的 SSH 实现仍在适配层，尚未全部改造成通用流协议。
 
 插件视图从已启用插件的注册表发现，通过插件自己的“打开插件”入口访问。未安装或停用的插件不会占据通用导航。现有 Python 草稿在正常切换页面时保留。该 UI 注册表目前只接受随应用构建的可信视图，不接受远程下载的 React/JavaScript。
 
 ## 内部协议 v0
 
+- `ConnectionManager`：配置 schema 校验、注册、连接/断开、子会话接管、取消后清理、活跃 Provider 升级限制。凭据只传入适配器，不进入注册表。
 - `ConnectionProvider`：命名空间 ID、版本、声明的能力、按连接 ID 解析当前活跃连接。
 - `ProviderConnection`：稳定的活跃连接实例、目标身份、当下可用工具。重连产生新实例。
 - `ConnectionTarget`：Provider ID、持久资源 ID、不包含凭据的端点指纹、显示名称。
@@ -23,7 +24,7 @@ CShell 是通用计算工作台。模型供应商（AI API 基座）和连接 Pr
 
 审批绑定连接代次、Provider 注册实例、目标身份、工具实例与不可变参数。审批后撤销权限、修改端点、重新连接或卸载 Provider，均不能沿用旧审批。一次预备调用只能消费一次。远端超时后不自动重放有副作用的操作。
 
-SSH 兼容入口暂以现有 session ID 路由到 `cshell.ssh`；新 Provider 必须显式绑定。已解绑连接保留墓碑，不能掉回兼容入口。主动断开立即停止新的能力调用，不等待网络 close 回调。
+桌面生产入口显式绑定 `cshell.ssh`，环境插件创建的子会话也必须由宿主接管；独立嵌入/旧测试兼容工厂保留 SSH session ID 回退。已解绑连接保留墓碑，不能掉回兼容入口。主动断开立即停止新的能力调用，不等待网络 close 回调。
 
 ## 权限边界
 
@@ -34,7 +35,7 @@ SSH 兼容入口暂以现有 session ID 路由到 `cshell.ssh`；新 Provider �
 ## 后续扩展顺序
 
 1. 将持久连接配置升级为带 `providerId`、版本与 Provider schema 的资源记录，并迁移旧 SSH 配置。凭据独立存储，外观导入不得改变权限。
-2. Provider 生命周期增加连接、断开、重连、健康状态；终端字节流、文件、屏幕等是可选能力。没有 terminal 能力的 RDP/纯 API 连接不能伪造终端。
+2. 已完成连接/断开生命周期及终端/文件可选接口；后续扩展重连、健康状态和通用字节流。没有 terminal 能力的 RDP/纯 API 连接不能伪造终端。
 3. Client 协议使用可认证的传输、设备公钥配对、能力 schema 版本和请求 ID，支持取消/超时/幂等声明/审计；屏幕与大型文件走独立流。
 4. 建立隔离插件宿主，再开放可执行插件。清单声明配置、Tool、UI、Skill 和 Client 贡献点；安装/升级校验来源、摘要、兼容版本及新增权限。GitHub 负责目录和分发，应用本机负责信任决策。
 5. Docker API Provider 暴露结构化容器/镜像能力；SSH Docker 适配器复用同一接口。RDP/VNC 优先调用系统客户端，只有真正实现的屏幕能力才可提供给 Agent。
@@ -49,3 +50,11 @@ SSH 兼容入口暂以现有 session ID 路由到 `cshell.ssh`；新 Provider �
 ## 验证
 
 `tests/connections.test.ts` 覆盖协议独立调度、参数校验、单次调用、资源撤权、连接与 Provider 替换、断开失效，以及真实 SSH fixture 工具调用。`tests/ai.test.ts` 保持原有审核、撤权、停止和加密保存回归。桌面交互测试覆盖插件启停入口、草稿保留和布局拖放。
+
+## 声明协议与 Client 发现
+
+`src/shared/providers.ts` 定义 data-only 的 Provider contribution v1 和 Client capability discovery envelope：配置 JSON Schema、独立凭据字段名称、能力、工具输入 schema/风险、UI 贡献点，以及设备 ID 和能力代次。重复工具或引用未声明能力会被拒绝。解析成功不代表安装成功或已授权；本版本没有加载任意远程 JavaScript 的入口。
+
+Client 宿主实现须先认证设备，再验证发现消息，并把能力交集绑定到本机批准的机器/分组范围。能力 generation 改变必须替换连接实例，撤销旧预备调用。大型文件和屏幕流与 JSON 工具结果分离；进程重启仅恢复元数据，不自动重放写操作。
+
+RDP/VNC 适配器的首阶段仅为经过校验的系统客户端启动能力，不承诺读屏或无人值守 Agent 操控。Docker 目前实际使用 Docker Engine HTTP API 经认证 SSH 的 Unix socket 隧道访问，并非拼接 Docker CLI；直连 TLS Docker Provider 仍需独立的证书和端点配置。Client/RDP/VNC/直连 Docker 的实际连接器不列为本版已提供功能。

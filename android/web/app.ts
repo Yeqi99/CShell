@@ -6,6 +6,7 @@ import './style.css';
 declare global {
   interface Window {
     CShellNative: {
+      fileRequest(data: string): void;
       connect(data: string): void;
       input(id: string, data: string): void;
       acknowledge(id: string): void;
@@ -16,6 +17,7 @@ declare global {
       version(): string;
       setTheme(dark: boolean): void;
     };
+    fileEvent(json: string): void;
     receive(id: string, type: string, value: string): void;
     updateEvent(json: string): void;
     mobileBack(): boolean;
@@ -23,6 +25,14 @@ declare global {
 }
 const $ = (id: string) => document.getElementById(id)!;
 const icons: Record<string, string> = {
+  home: '<path d="m3 10 9-7 9 7v10H3Z M9 20v-7h6v7"/>',
+  folder: '<path d="M3 7V4h6l3 3h9v13H3Z"/>',
+  file: '<path d="M5 3h9l5 5v13H5Z M14 3v6h5"/>',
+  refresh: '<path d="M20 8a8 8 0 1 0 0 8M20 3v5h-5"/>',
+  up: '<path d="m5 12 7-7 7 7m-7-7v15"/>',
+  arrow: '<path d="M4 12h16m-6-6 6 6-6 6"/>',
+  upload: '<path d="M12 16V3m-5 5 5-5 5 5M3 15v6h18v-6"/>',
+  download: '<path d="M12 3v13m-5-5 5 5 5-5M3 15v6h18v-6"/>',
   terminal: '<path d="m5 6 6 6-6 6m9 0h5"/>',
   server:
     '<rect x="3" y="3" width="18" height="7" rx="2"/><rect x="3" y="14" width="18" height="7" rx="2"/><path d="M7 6.5h.01M7 17.5h.01"/>',
@@ -105,7 +115,15 @@ function navigate(next: string) {
   captureDraft();
   page = next;
   document.body.classList.remove('minimal');
-  for (const key of ['home', 'session-page', 'connect', 'settings', 'terminals'])
+  for (const key of [
+    'home',
+    'connections',
+    'files',
+    'session-page',
+    'connect',
+    'settings',
+    'terminals',
+  ])
     $(key).hidden = key !== next;
   const terminal = next === 'terminals';
   $('connect-actions').hidden = next !== 'connect';
@@ -121,6 +139,7 @@ function navigate(next: string) {
     else b.removeAttribute('aria-current');
   }
   render();
+  if (next === 'files') syncFileSessions();
   if (terminal) requestAnimationFrame(resize);
 }
 function setAuth(value: 'password' | 'key') {
@@ -206,6 +225,23 @@ function row(name: string, detail: string, action: () => void, symbol = 'server'
   return r;
 }
 function render() {
+  $('overview-connections').textContent = String(profiles.length);
+  $('overview-sessions').textContent = String(
+    [...sessions.values()].filter((s) => s.state === '已连接').length,
+  );
+  $('recent-connections').replaceChildren();
+  for (const p of profiles.slice(-5).reverse())
+    $('recent-connections').append(
+      row(p.name, p.host, () => {
+        const live = [...sessions].find(([, s]) => s.profile.id === p.id && s.state === '已连接');
+        live ? select(live[0]) : openForm(p);
+      }),
+    );
+  $('home-empty').hidden = profiles.length > 0;
+  $('home-sessions').replaceChildren();
+  for (const [id, s] of sessions)
+    $('home-sessions').append(row(s.profile.name, s.state, () => select(id), 'terminal'));
+  $('home-session-empty').hidden = sessions.size > 0;
   $('server-count').textContent = String(profiles.length);
   $('server-list').replaceChildren();
   $('groups').replaceChildren();
@@ -284,7 +320,7 @@ $('save').onclick = () => {
     persist(readProfile());
     drafts.delete(editing);
     page = '';
-    navigate('home');
+    navigate('connections');
   } catch {
     $('form-error').textContent = '保存失败，请检查设备存储空间。';
   }
@@ -307,7 +343,7 @@ $('delete-profile').onclick = () => {
 $('remember').onchange = profileFields;
 $('auth-password').onclick = () => setAuth('password');
 $('auth-key').onclick = () => setAuth('key');
-for (const id of ['new', 'empty-new', 'session-new']) $(id).onclick = () => openForm();
+for (const id of ['new', 'empty-new', 'session-new', 'home-new']) $(id).onclick = () => openForm();
 $('back').onclick = () => navigate('home');
 window.mobileBack = () => {
   if (document.body.classList.contains('minimal')) {
@@ -322,7 +358,8 @@ window.mobileBack = () => {
   return false;
 };
 for (const b of document.querySelectorAll<HTMLButtonElement>('[data-page]'))
-  b.onclick = () => navigate(b.dataset.page!);
+  b.onclick = () =>
+    b.dataset.page === 'session-page' && active ? select(active) : navigate(b.dataset.page!);
 $('search').oninput = render;
 $('theme').onclick = () => {
   dark = !dark;
@@ -443,6 +480,7 @@ window.receive = (id, type, value) => {
     if (type === 'error') s.terminal.writeln('\r\n' + value.replace(/[\x00-\x1f\x7f]/g, ' '));
   }
   if (active === id) $('status').textContent = s.state;
+  if (page === 'files') syncFileSessions();
   render();
 };
 $('version').textContent = '当前版本 ' + (window.CShellNative?.version?.() || '开发预览');
@@ -459,3 +497,122 @@ window.updateEvent = (json) => {
   ($('update-progress') as HTMLProgressElement).value = state.progress || 0;
 };
 render();
+
+// File requests are bound to an explicit live session; stale responses never replace another machine.
+const filePaths = new Map<string, string>();
+let fileSession = '',
+  listingRequest = '',
+  fileBusy = false;
+const pendingFiles = new Map<string, { session: string; operation: string }>();
+function syncFileSessions() {
+  const select = $('files-session') as HTMLSelectElement;
+  const live = [...sessions].filter(([, s]) => s.state === '已连接');
+  const previous = fileSession;
+  if (!live.some(([id]) => id === fileSession))
+    fileSession = live.some(([id]) => id === active) ? active : live[0]?.[0] || '';
+  select.replaceChildren();
+  for (const [id, s] of live) {
+    const o = document.createElement('option');
+    o.value = id;
+    o.textContent = s.profile.name + ' · ' + s.profile.host;
+    select.append(o);
+  }
+  select.value = fileSession;
+  select.disabled = !fileSession;
+  for (const id of ['files-upload', 'files-refresh', 'files-up'])
+    ($(id) as HTMLButtonElement).disabled = !fileSession;
+  if (!fileSession) {
+    $('files-status').textContent = '连接服务器后浏览文件';
+    $('files-list').replaceChildren();
+    $('file-preview').hidden = true;
+  } else if (previous !== fileSession || !$('files-list').childElementCount)
+    requestFiles('list', filePaths.get(fileSession) || '.');
+}
+function requestFiles(operation: string, path: string) {
+  if (!fileSession || sessions.get(fileSession)?.state !== '已连接') return;
+  if (!window.CShellNative?.fileRequest) {
+    $('files-status').textContent = '请更新 Android 客户端以使用文件功能';
+    return;
+  }
+  if (pendingFiles.size >= 16) {
+    $('files-status').textContent = '请等待当前操作完成';
+    return;
+  }
+  const request = crypto.randomUUID();
+  pendingFiles.set(request, { session: fileSession, operation });
+  if (operation === 'list') {
+    listingRequest = request;
+    fileBusy = true;
+  }
+  $('files-status').textContent = operation === 'list' ? '正在读取…' : '正在处理…';
+  window.CShellNative.fileRequest(
+    JSON.stringify({ request, session: fileSession, operation, path }),
+  );
+}
+$('files-session').onchange = () => {
+  fileSession = ($('files-session') as HTMLSelectElement).value;
+  $('files-list').replaceChildren();
+  $('file-preview').hidden = true;
+  requestFiles('list', filePaths.get(fileSession) || '.');
+};
+$('files-path-form').onsubmit = (e) => {
+  e.preventDefault();
+  requestFiles('list', ($('files-path') as HTMLInputElement).value);
+};
+$('files-refresh').onclick = () => {
+  if (!fileBusy) requestFiles('list', filePaths.get(fileSession) || '.');
+};
+$('files-up').onclick = () => {
+  const path = filePaths.get(fileSession) || '/';
+  requestFiles('list', path.replace(/\/[^/]+\/?$/, '') || '/');
+};
+$('files-upload').onclick = () => requestFiles('upload', filePaths.get(fileSession) || '.');
+$('preview-close').onclick = () => {
+  $('file-preview').hidden = true;
+};
+window.fileEvent = (json) => {
+  const result = JSON.parse(json),
+    pending = pendingFiles.get(result.request);
+  if (!pending) return;
+  pendingFiles.delete(result.request);
+  if (pending.operation === 'list' && result.request === listingRequest) fileBusy = false;
+  if (pending.session !== fileSession || sessions.get(fileSession)?.state !== '已连接') return;
+  if (pending.operation === 'list' && result.request !== listingRequest) return;
+  if (result.error) {
+    $('files-status').textContent = result.error;
+    return;
+  }
+  if (pending.operation === 'list') {
+    filePaths.set(fileSession, result.path);
+    ($('files-path') as HTMLInputElement).value = result.path;
+    $('files-list').replaceChildren();
+    $('file-preview').hidden = true;
+    for (const entry of result.entries) {
+      const r = row(
+        entry.name,
+        entry.directory ? '文件夹' : (entry.size / 1024).toFixed(1) + ' KB',
+        () => requestFiles(entry.directory ? 'list' : 'preview', entry.path),
+        entry.directory ? 'folder' : 'file',
+      );
+      if (!entry.directory) {
+        const b = document.createElement('button');
+        b.className = 'icon';
+        b.setAttribute('aria-label', '下载 ' + entry.name);
+        icon(b, 'download');
+        b.onclick = () => requestFiles('download', entry.path);
+        r.append(b);
+      }
+      $('files-list').append(r);
+    }
+    $('files-status').textContent = result.entries.length + ' 项';
+  } else if (pending.operation === 'preview') {
+    $('preview-name').textContent = result.name;
+    $('preview-text').textContent = result.text;
+    $('file-preview').hidden = false;
+    $('files-status').textContent = '只读预览 · 最大 64 KiB';
+  } else {
+    $('files-status').textContent = result.cancelled ? '已取消' : '传输完成';
+    if (pending.operation === 'upload' && !result.cancelled)
+      requestFiles('list', filePaths.get(fileSession) || '.');
+  }
+};

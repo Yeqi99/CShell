@@ -1,3 +1,4 @@
+import type { FileEntry } from '../../shared/contracts';
 import type { z } from 'zod';
 
 /** Host-internal contract v0. Not an arbitrary-JavaScript plugin loading API. */
@@ -21,6 +22,12 @@ export interface ProviderConnection {
   readonly target: ConnectionTarget;
   /** Same instance for a live connection; reconnect must create a new instance. */
   readonly tools: readonly ConnectionTool[];
+  readonly terminal?: {
+    input(data: string): void;
+    resize(cols: number, rows: number): void;
+    acknowledge(characters: number): void;
+  };
+  readonly files?: { list(path: string): Promise<{ path: string; entries: FileEntry[] }> };
 }
 export interface ConnectionProvider {
   readonly id: string;

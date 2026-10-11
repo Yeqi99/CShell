@@ -1,3 +1,4 @@
+import { ActivityPage } from './components/ActivityPage';
 import { initialPlugins, pluginEnabled } from '../shared/plugins';
 import { AiPanel } from './components/AiPanel';
 import type { PythonFileRequest } from './components/ExtensionWorkbench';
@@ -10,6 +11,7 @@ import { toolsDefaults } from '../shared/docker';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import {
   HardDrive,
+  BarChart3,
   Bot,
   Minimize2,
   Maximize2,
@@ -89,6 +91,12 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
     return () => window.removeEventListener('cshell:open-ai', open);
   }, []);
   const connectedSessions = useRef(new Set<string>());
+  const [activityOpen, setActivityOpen] = useState(false);
+  const openActivity = () => {
+    setActivityOpen(true);
+    setSurface('activity');
+    setMinimal(false);
+  };
   const [extensions, setExtensions] = useState(false);
   const [extensionVisited, setExtensionVisited] = useState(false);
   const [pythonRequest, setPythonRequest] = useState<PythonFileRequest | null>(null);
@@ -122,7 +130,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
     [form, setForm] = useState<Profile | 'new' | null>(null),
     [settings, setSettings] = useState(false),
     [surface, setSurface] = useState<
-      'terminal' | 'connection' | 'quick' | 'settings' | 'extensions'
+      'terminal' | 'connection' | 'quick' | 'settings' | 'extensions' | 'activity'
     >('terminal'),
     [palette, setPalette] = useState(false),
     [error, setError] = useState(''),
@@ -244,6 +252,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
             },
           })),
           ...(extensions ? [{ key: 'extensions', select: openExtensions }] : []),
+          ...(activityOpen ? [{ key: 'activity', select: () => setSurface('activity') }] : []),
           ...(settings ? [{ key: 'settings', select: () => setSurface('settings') }] : []),
         ];
         const key =
@@ -253,11 +262,13 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
               ? `quick-${quickId}`
               : surface === 'extensions'
                 ? 'extensions'
-                : surface === 'settings'
-                  ? 'settings'
-                  : form === 'new'
-                    ? 'new'
-                    : `edit-${form?.id}`;
+                : surface === 'activity'
+                  ? 'activity'
+                  : surface === 'settings'
+                    ? 'settings'
+                    : form === 'new'
+                      ? 'new'
+                      : `edit-${form?.id}`;
         const next =
           (views.findIndex((v) => v.key === key) +
             (shortcut === 'nextTab' ? 1 : -1) +
@@ -389,6 +400,14 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
           <strong>CShell</strong>
         </div>
         <div className="titlebar-space" />
+        <button
+          className="icon"
+          title={config.preferences.locale === 'zh-CN' ? '统计与历史' : 'Activity & history'}
+          aria-label={config.preferences.locale === 'zh-CN' ? '统计与历史' : 'Activity & history'}
+          onClick={openActivity}
+        >
+          <BarChart3 size={18} />
+        </button>
         <button
           className="icon"
           title="AI 智能体"
@@ -567,6 +586,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
                   {t('workspace')}
                 </div>
               ) : null}
+
               {quickConnections.map((profile) => (
                 <div
                   key={`quick-${profile.id}`}
@@ -649,6 +669,29 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
                       e.stopPropagation();
                       setExtensions(false);
                       if (surface === 'extensions') setSurface('terminal');
+                    }}
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+              )}
+              {activityOpen && (
+                <div
+                  className={`tab ${surface === 'activity' ? 'active' : ''}`}
+                  onClick={() => setSurface('activity')}
+                >
+                  <button onClick={() => setSurface('activity')}>
+                    <BarChart3 size={14} />
+                    {config.preferences.locale === 'zh-CN' ? '统计与历史' : 'Activity & history'}
+                  </button>
+                  <button
+                    className="icon"
+                    aria-label="关闭统计"
+                    title="关闭统计"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActivityOpen(false);
+                      if (surface === 'activity') setSurface('terminal');
                     }}
                   >
                     <X size={13} />
@@ -777,6 +820,11 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
                   }}
                 />
               </Suspense>
+            </div>
+          )}
+          {activityOpen && (
+            <div className="workspace-editor" hidden={surface !== 'activity'}>
+              <ActivityPage active={surface === 'activity'} servers={config.profiles.length} />
             </div>
           )}
           {settings && (

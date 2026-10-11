@@ -35,7 +35,91 @@
     </header>
     <nav id="tabs" aria-label="会话标签" hidden></nav>
     <main id="workspace">
-      <section id="home" class="page">
+      <section id="home" class="page dashboard">
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow">你的计算工作台</p>
+            <h1>首页</h1>
+          </div>
+        </div>
+        <div class="overview-grid">
+          <button data-page="connections">
+            <span data-icon="server"></span
+            ><span>连接<strong id="overview-connections">0</strong></span>
+          </button>
+          <button data-page="session-page">
+            <span data-icon="terminal"></span
+            ><span>在线会话<strong id="overview-sessions">0</strong></span>
+          </button>
+          <button data-page="files">
+            <span data-icon="folder"></span><span>文件<small>浏览与传输</small></span>
+          </button>
+          <button id="home-new">
+            <span data-icon="plus"></span><span>新建连接<small>SSH 服务器</small></span>
+          </button>
+        </div>
+        <div class="section-heading">
+          <h2>已保存的连接</h2>
+          <button data-page="connections" class="text-button">查看全部 →</button>
+        </div>
+        <div id="recent-connections"></div>
+        <p id="home-empty" class="muted">还没有保存的连接，从新建连接开始。</p>
+        <div class="section-heading">
+          <h2>正在使用</h2>
+          <button data-page="session-page" class="text-button">所有会话 →</button>
+        </div>
+        <div id="home-sessions"></div>
+        <p id="home-session-empty" class="muted">连接后，可以随时回到这里继续。</p>
+      </section>
+      <section id="files" class="page" hidden>
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow">当前连接</p>
+            <h1>文件</h1>
+          </div>
+          <button
+            id="files-refresh"
+            class="icon"
+            aria-label="刷新文件"
+            data-icon="refresh"
+          ></button>
+        </div>
+        <select id="files-session" aria-label="文件所属会话"></select>
+        <form id="files-path-form" class="file-path">
+          <button
+            id="files-up"
+            type="button"
+            class="icon"
+            aria-label="上级目录"
+            data-icon="up"
+          ></button
+          ><input
+            id="files-path"
+            aria-label="远程路径"
+            value="."
+            autocapitalize="none"
+            spellcheck="false"
+          /><button class="icon" aria-label="打开路径" data-icon="arrow"></button>
+        </form>
+        <div class="section-heading">
+          <span id="files-status" role="status" class="muted">选择已连接的服务器</span
+          ><button
+            id="files-upload"
+            class="icon"
+            aria-label="上传到当前目录"
+            data-icon="upload"
+          ></button>
+        </div>
+        <div id="files-list"></div>
+        <section id="file-preview" hidden>
+          <div class="section-heading">
+            <h2 id="preview-name"></h2>
+            <button id="preview-close" class="icon" aria-label="关闭预览">×</button>
+          </div>
+          <pre id="preview-text"></pre>
+        </section>
+      </section>
+      <section id="connections" class="page" hidden>
         <div class="page-heading">
           <div>
             <p class="eyebrow">工作台</p>
@@ -214,9 +298,11 @@
     </footer>
     <nav id="navigation" aria-label="工作台导航">
       <button data-page="home" class="selected" aria-current="page">
-        <span data-icon="server"></span>服务器</button
+        <span data-icon="home"></span>首页</button
+      ><button data-page="connections"><span data-icon="server"></span>连接</button
       ><button data-page="session-page">
-        <span data-icon="terminal"></span>会话<span id="session-badge" hidden></span></button
+        <span data-icon="terminal"></span>终端<span id="session-badge" hidden></span></button
+      ><button data-page="files"><span data-icon="folder"></span>文件</button
       ><button data-page="settings"><span data-icon="settings"></span>设置</button>
     </nav>
     <script src="app.js"></script>
