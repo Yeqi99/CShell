@@ -156,3 +156,11 @@ Compose / Swarm 管理的容器不通过该入口重建，避免与部署声明�
 ## 许可证
 
 自有代码采用 [MIT](LICENSE)，允许使用、修改和商业分发，并保留版权及许可声明。第三方组件保持各自许可证；运行 `pnpm run licenses` 更新 [依赖清单](docs/dependency-licenses.json) 和 [第三方声明](THIRD_PARTY_NOTICES.txt)。Electron/Chromium 与 Android 依赖的许可证随各自发行物保留。
+
+### Windows 本机终端
+
+标签栏的终端图标可新建 CMD 或 Windows PowerShell，会话使用原生 ConPTY，可与 SSH 标签同时运行，并可放入极简模式或独立小窗。
+
+“偏好设置 → 本机终端”可查看继承的系统、用户环境变量并设置 CShell 覆盖值。新会话重新读取 Windows 环境；覆盖值在本机加密保存，不修改注册表、不混入外观方案，也不影响已运行的会话。
+
+“插件市场 → WSL Linux”提供本机 Linux 发行版发现与终端入口。需要 Windows 已启用 WSL 并安装发行版；插件不会自动启用系统组件或下载 Linux。没有可用环境时会显示安装命令入口。

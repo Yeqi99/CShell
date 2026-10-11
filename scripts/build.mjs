@@ -5,7 +5,7 @@ await build({
   bundle: true,
   platform: 'node',
   format: 'cjs',
-  external: ['electron', 'ssh2', '@modelcontextprotocol/sdk'],
+  external: ['node-pty', 'electron', 'ssh2', '@modelcontextprotocol/sdk'],
   sourcemap: true,
 });
 await build({

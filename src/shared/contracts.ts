@@ -1,3 +1,4 @@
+import type { LocalTerminalBridge } from './local-terminal';
 import type { ActivityBridge } from './activity';
 import type { FloatingBridge } from './floating';
 import type { ExtensionBridge, InstalledPlugin } from './plugins';
@@ -192,7 +193,13 @@ export type SessionEvent =
   | { type: 'closed'; sessionId: string; error?: string }
   | { type: 'transfer'; transfer: Transfer };
 export interface Bridge
-  extends ExtensionBridge, AiBridge, UpdateBridge, FloatingBridge, ActivityBridge {
+  extends
+    LocalTerminalBridge,
+    ExtensionBridge,
+    AiBridge,
+    UpdateBridge,
+    FloatingBridge,
+    ActivityBridge {
   setAlwaysOnTop(enabled: boolean): Promise<boolean>;
   setMinimalMode(enabled: boolean): Promise<void>;
   configureTools(settings: ToolsSettings): Promise<void>;

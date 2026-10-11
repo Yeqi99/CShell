@@ -1,3 +1,4 @@
+import { LocalTerminalProvider } from '../core/connections/local-terminal-provider';
 import { createSshManager } from '../core/connections/ssh-provider';
 import type { ConnectionManager } from '../core/connections/manager';
 import { ActivityStore } from '../core/activity';
@@ -173,9 +174,16 @@ else
         return true;
       });
       connections = createSshManager(ssh, () => store.snapshot().profiles);
+      const localTerminal = new LocalTerminalProvider(app.getPath('userData'), store, emit);
+      await localTerminal.load();
+      connections.register(localTerminal);
       floating = new FloatingWindows(
         window,
-        ssh,
+        {
+          input: (id, data) => connections!.tools.terminal(id).input(data),
+          resize: (id, cols, rows) => connections!.tools.terminal(id).resize(cols, rows),
+          get: (id) => ({ profile: { name: connections!.tools.describe(id).label } }),
+        },
         entry,
         join(__dirname, 'preload.cjs'),
         () => store.snapshot().preferences,
@@ -393,6 +401,18 @@ else
         requireDocker(sessionId);
         return docker.action(sessionId, action);
       });
+      handle('local-terminal:wsl', () => localTerminal.distributions());
+      handle('local-terminal:open', async (shell) => ({
+        sessionId: await connections!.connect('cshell.local-terminal', shell, {}),
+        name:
+          typeof shell === 'string' && shell.startsWith('wsl:')
+            ? shell.slice(4) + ' · WSL'
+            : shell === 'cmd'
+              ? 'CMD'
+              : 'PowerShell',
+      }));
+      handle('local-terminal:environment', () => localTerminal.settings());
+      handle('local-terminal:environment-save', (rows) => localTerminal.save(rows));
       handle('config', () => store.snapshot());
       handle('clipboard:write', (value) =>
         clipboard.writeText(z.string().max(2_000_000).parse(value)),
@@ -563,7 +583,7 @@ else
       let closing = false,
         closePrompt = false;
       window.on('close', (event) => {
-        if (closing || (!ssh.size && !transfers.size)) return;
+        if (closing || (!ssh.size && !localTerminal.size && !transfers.size)) return;
         event.preventDefault();
         if (closePrompt) return;
         closePrompt = true;
@@ -604,6 +624,7 @@ else
         floating?.dispose();
         void mcp.stop();
         transfers.dispose();
+        localTerminal.dispose();
         ssh.dispose();
       });
       app.on('second-instance', () => {

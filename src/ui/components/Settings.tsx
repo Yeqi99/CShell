@@ -1,3 +1,4 @@
+import { LocalEnvironmentSettings } from './LocalEnvironmentSettings';
 import { Palette, Terminal, PanelsTopLeft, Blocks, ShieldCheck, Download } from 'lucide-react';
 import { UpdateSettings } from './UpdateSettings';
 import { useEffect, useState } from 'react';
@@ -26,6 +27,9 @@ export function Settings({
   const categories = [
     ['appearance', Palette, cn ? '外观' : 'Appearance'],
     ['terminal', Terminal, cn ? '终端' : 'Terminal'],
+    ...(navigator.platform.startsWith('Win')
+      ? [['local', Terminal, cn ? '本机终端' : 'Local terminal'] as const]
+      : []),
     ['workspace', PanelsTopLeft, cn ? '工作区' : 'Workspace'],
     ['extensions', Blocks, cn ? '扩展' : 'Extensions'],
     ['security', ShieldCheck, cn ? 'AI 与安全' : 'AI & security'],
@@ -106,6 +110,9 @@ export function Settings({
         </div>
         <div hidden={category !== 'workspace'}>
           <PresetControls draft={draft} onSelect={setDraft} onError={setError} />
+        </div>
+        <div hidden={category !== 'local'}>
+          {navigator.platform.startsWith('Win') && <LocalEnvironmentSettings />}
         </div>
         <form
           id="workspace-preferences-form"
@@ -347,7 +354,12 @@ export function Settings({
         <button type="button" className="secondary" onClick={onClose}>
           {t('cancel')}
         </button>
-        <button className="primary" form="workspace-preferences-form" disabled={busy}>
+        <button
+          hidden={category === 'local'}
+          className="primary"
+          form="workspace-preferences-form"
+          disabled={busy}
+        >
           {t('save')}
         </button>
       </footer>

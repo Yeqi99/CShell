@@ -1,6 +1,5 @@
 import { BrowserWindow, ipcMain, screen, clipboard } from 'electron';
 import { z } from 'zod';
-import type { SshService } from '../core/ssh';
 import type { Preferences, SessionEvent } from '../shared/contracts';
 import type { TerminalSnapshot } from '../shared/floating';
 const snapshotSchema = z
@@ -31,7 +30,11 @@ export class FloatingWindows {
   >();
   constructor(
     private main: BrowserWindow,
-    private ssh: SshService,
+    private ssh: {
+      input(id: string, data: string): void;
+      resize(id: string, cols: number, rows: number): void;
+      get(id: string): { profile: { name: string } };
+    },
     private entry: string,
     private preload: string,
     private preferences: () => Preferences,

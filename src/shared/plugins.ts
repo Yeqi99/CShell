@@ -13,7 +13,7 @@ export const pluginManifestSchema = z
     description: z.string().max(300),
     descriptionEn: z.string().max(300).optional(),
     publisher: z.string().min(1).max(80),
-    provider: z.enum(['vim', 'nano', 'commands', 'docker', 'conda', 'python', 'snippets']),
+    provider: z.enum(['vim', 'nano', 'commands', 'docker', 'conda', 'python', 'snippets', 'wsl']),
     permissions: z
       .array(z.enum(['terminal.input', 'remote.read', 'remote.execute', 'remote.forward']))
       .max(4),
@@ -67,6 +67,9 @@ const builtin = (
   commands: [],
 });
 export const builtinPlugins = [
+  builtin('wsl', 'WSL Linux', '发现本机 Linux 发行版，在标签中打开 WSL 终端。', 'wsl', [
+    'terminal.input',
+  ]),
   builtin('vim', 'Vim', '模式切换、定位、搜索、保存与退出。', 'vim', ['terminal.input']),
   builtin('nano', 'Nano', '定位、搜索、保存与退出。', 'nano', ['terminal.input']),
   builtin('commands', 'Shell', 'Linux 常用命令联想，只补全，不自动执行。', 'commands', [

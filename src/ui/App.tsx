@@ -1,3 +1,5 @@
+import { TabStrip } from './components/TabStrip';
+import type { LocalShell } from '../shared/local-terminal';
 import { ActivityPage } from './components/ActivityPage';
 import { initialPlugins, pluginEnabled } from '../shared/plugins';
 import { AiPanel } from './components/AiPanel';
@@ -58,7 +60,7 @@ import { shortcutFor } from './shortcuts';
 import { terminalEvent, terminalClosed, terminalSnapshot } from './terminalBus';
 import brandMark from '../../assets/icon.svg';
 
-type Tab = { id: string; profile: Profile; closed: boolean; python?: string };
+type Tab = { local?: LocalShell; id: string; profile: Profile; closed: boolean; python?: string };
 export function App() {
   const [config, setConfig] = useState<Config>({
     plugins: initialPlugins(),
@@ -301,7 +303,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
       }),
     [],
   );
-  const showTools = right && !!current && !current.closed;
+  const showTools = right && !!current && !current.closed && !current.local;
   const saveProfile = async (p: Profile) => {
     await window.cshell.saveProfile(p);
     await refresh();
@@ -318,6 +320,30 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
     setActive(result.sessionId);
     setSurface('terminal');
     await refresh();
+  }
+  async function openLocal(shell: LocalShell) {
+    const result = await window.cshell.localTerminal(shell);
+    connectedSessions.current.add(result.sessionId);
+    setTabs((tabs) => [
+      ...tabs,
+      {
+        id: result.sessionId,
+        local: shell,
+        closed: terminalClosed(result.sessionId),
+        profile: {
+          id: result.sessionId,
+          name: result.name,
+          host: '本机',
+          port: 0,
+          username: '',
+          group: '',
+          favorite: false,
+          auth: 'password',
+        },
+      },
+    ]);
+    setActive(result.sessionId);
+    setSurface('terminal');
   }
   async function closeTab(tab: Tab) {
     await window.cshell.disconnect(tab.id);
@@ -551,7 +577,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
                 <PanelLeft size={17} />
               </button>
             </div>
-            <div className="tabs">
+            <TabStrip>
               {tabs.length ? (
                 tabs.map((tab) => (
                   <SessionTab
@@ -717,7 +743,39 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
                   </button>
                 </div>
               )}
-            </div>
+            </TabStrip>
+            {navigator.platform.startsWith('Win') && (
+              <details
+                className="local-terminal-menu"
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') e.currentTarget.open = false;
+                }}
+              >
+                <summary title="新建本机终端" aria-label="新建本机终端">
+                  <TerminalIcon size={17} />
+                </summary>
+                <div role="menu">
+                  <button
+                    role="menuitem"
+                    onClick={(e) => {
+                      e.currentTarget.closest('details')!.open = false;
+                      run(openLocal('cmd'));
+                    }}
+                  >
+                    CMD
+                  </button>
+                  <button
+                    role="menuitem"
+                    onClick={(e) => {
+                      e.currentTarget.closest('details')!.open = false;
+                      run(openLocal('powershell'));
+                    }}
+                  >
+                    PowerShell
+                  </button>
+                </div>
+              </details>
+            )}
             <button className="icon" title={t('newServer')} onClick={() => openConnection('new')}>
               <Plus size={18} />
             </button>
@@ -789,17 +847,20 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
             >
               <Suspense fallback={<div className="extension-empty">…</div>}>
                 <ExtensionWorkbench
+                  onLocal={openLocal}
                   tools={config.tools}
                   visible={surface === 'extensions'}
                   plugins={config.plugins}
-                  sessions={tabs.map((tab) => ({
-                    id: tab.id,
-                    label:
-                      tab.profile.name === tab.profile.host
-                        ? tab.profile.username + '@' + tab.profile.host
-                        : tab.profile.name + ' · ' + tab.profile.host,
-                    closed: tab.closed,
-                  }))}
+                  sessions={tabs
+                    .filter((tab) => !tab.local)
+                    .map((tab) => ({
+                      id: tab.id,
+                      label:
+                        tab.profile.name === tab.profile.host
+                          ? tab.profile.username + '@' + tab.profile.host
+                          : tab.profile.name + ' · ' + tab.profile.host,
+                      closed: tab.closed,
+                    }))}
                   request={pythonRequest}
                   onChange={refresh}
                   onTerminal={(parent, id, name, python) => {
@@ -842,7 +903,13 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
           {current?.closed && (
             <div className="disconnected-session-bar">
               <span>{t('disconnected')}</span>
-              <button onClick={() => openConnection(current.profile)}>{t('reconnect')}</button>
+              <button
+                onClick={() =>
+                  current.local ? run(openLocal(current.local)) : openConnection(current.profile)
+                }
+              >
+                {t('reconnect')}
+              </button>
             </div>
           )}
           {tabs.length ? (
@@ -853,11 +920,12 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
                   id={tab.id}
                   active={surface === 'terminal' && active === tab.id}
                   pythonInterpreter={tab.python}
-                  plugins={config.plugins}
+                  plugins={tab.local ? [] : config.plugins}
                   suggestionsEnabled={
-                    pluginEnabled(config.plugins, 'commands') ||
-                    pluginEnabled(config.plugins, 'snippets') ||
-                    pluginEnabled(config.plugins, 'python')
+                    !tab.local &&
+                    (pluginEnabled(config.plugins, 'commands') ||
+                      pluginEnabled(config.plugins, 'snippets') ||
+                      pluginEnabled(config.plugins, 'python'))
                   }
                   preferences={preferences}
                   closed={tab.closed}
@@ -882,7 +950,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
 
           {localDock && surface === 'terminal' && !minimal && (
             <LocalDock
-              sessionId={current?.id}
+              sessionId={current?.local ? undefined : current?.id}
               transfers={transfers}
               onError={onError}
               onClose={() => setLocalDock(false)}
@@ -947,7 +1015,9 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
             {current
               ? current.closed
                 ? t('disconnected')
-                : `SSH · ${current.profile.host}:${current.profile.port}`
+                : current.local
+                  ? `本机 · ${current.profile.name}`
+                  : `SSH · ${current.profile.host}:${current.profile.port}`
               : t('ready')}
           </span>
         </div>

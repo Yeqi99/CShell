@@ -32,6 +32,10 @@ const bridge: Bridge = {
   downloadUpdate: () => ipcRenderer.invoke('update:download'),
   installUpdate: () => ipcRenderer.invoke('update:install'),
   applicationCatalog: () => ipcRenderer.invoke('applications:catalog'),
+  wslDistributions: () => ipcRenderer.invoke('local-terminal:wsl'),
+  localTerminal: (shell) => ipcRenderer.invoke('local-terminal:open', shell),
+  localEnvironment: () => ipcRenderer.invoke('local-terminal:environment'),
+  saveLocalEnvironment: (rows) => ipcRenderer.invoke('local-terminal:environment-save', rows),
   aiSnapshot: () => ipcRenderer.invoke('ai:snapshot'),
   aiExtractConnection: (text, providerId) =>
     ipcRenderer.invoke('ai:extract-connection', text, providerId),

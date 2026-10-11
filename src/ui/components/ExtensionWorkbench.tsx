@@ -1,3 +1,5 @@
+import { WslPlugin } from './WslPlugin';
+import type { LocalShell } from '../../shared/local-terminal';
 import { useEffect, useState } from 'react';
 import { pluginCatalogUrl } from '../../shared/market';
 import {
@@ -36,6 +38,7 @@ export type ExtensionSession = { id: string; label: string; closed: boolean };
 export type PythonFileRequest = { sessionId: string; path: string; serial: number };
 export function ExtensionWorkbench({
   tools,
+  onLocal,
   visible,
   plugins,
   sessions,
@@ -43,6 +46,7 @@ export function ExtensionWorkbench({
   onTerminal,
   request,
 }: {
+  onLocal: (shell: LocalShell) => Promise<void>;
   tools: ToolsSettings;
   visible: boolean;
   plugins: InstalledPlugin[];
@@ -53,7 +57,9 @@ export function ExtensionWorkbench({
 }) {
   const { locale } = useI18n(),
     zh = locale === 'zh-CN';
-  const [section, setSection] = useState<'plugins' | 'apps' | 'environment' | 'python'>('plugins');
+  const [section, setSection] = useState<'plugins' | 'apps' | 'environment' | 'python' | 'wsl'>(
+    'plugins',
+  );
   const [settingsPlugin, setSettingsPlugin] = useState<string | null>(null);
   const views = availablePluginViews(plugins);
   const currentView = views.find((view) => view.id === section);
@@ -162,19 +168,23 @@ export function ExtensionWorkbench({
                     ? zh
                       ? 'Anaconda 环境'
                       : 'Anaconda environments'
-                    : 'Python'}
+                    : section === 'wsl'
+                      ? 'WSL Linux'
+                      : 'Python'}
             </h1>
             <p>
               {section === 'plugins'
                 ? zh
                   ? '按需添加，随时停用。'
                   : 'Add the tools you need.'
-                : zh
-                  ? '操作仅作用于所选连接。'
-                  : 'Actions belong to the selected connection.'}
+                : section === 'wsl'
+                  ? '本机 Linux 环境 · Windows WSL'
+                  : zh
+                    ? '操作仅作用于所选连接。'
+                    : 'Actions belong to the selected connection.'}
             </p>
           </div>
-          {section !== 'plugins' && (
+          {section !== 'plugins' && section !== 'wsl' && (
             <label className="extension-server">
               {zh ? '目标服务器' : 'Target server'}
               <select
@@ -183,6 +193,7 @@ export function ExtensionWorkbench({
                 onChange={(e) => setTarget(e.target.value)}
               >
                 <option value="">{zh ? '选择连接' : 'Select connection'}</option>
+
                 {sessions.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.label}
@@ -222,6 +233,7 @@ export function ExtensionWorkbench({
             {manifests
               .filter(
                 (p) =>
+                  (p.provider !== 'wsl' || navigator.platform.startsWith('Win')) &&
                   `${p.name} ${p.description}`.toLowerCase().includes(query.toLowerCase()) &&
                   (filter !== 'installed' || plugins.some((i) => i.manifest.id === p.id)),
               )
@@ -360,7 +372,8 @@ export function ExtensionWorkbench({
             </form>
           </details>
         </div>
-        {section !== 'plugins' && !target && (
+        {section === 'wsl' && currentView && <WslPlugin onOpen={onLocal} />}
+        {section !== 'plugins' && section !== 'wsl' && !target && (
           <div className="extension-empty">
             {zh
               ? '先连接一台服务器，再选择安装或管理环境。'
@@ -371,12 +384,12 @@ export function ExtensionWorkbench({
           <div
             className="extension-session"
             key={s.id}
-            hidden={section === 'plugins' || target !== s.id}
+            hidden={section === 'plugins' || section === 'wsl' || target !== s.id}
           >
             <ServerExtensions
               session={s}
-              active={visible && target === s.id && section !== 'plugins'}
-              section={section}
+              active={visible && target === s.id && section !== 'plugins' && section !== 'wsl'}
+              section={section === 'wsl' ? 'plugins' : section}
               plugins={plugins}
               appRequest={appRequest}
               fileRequest={request?.sessionId === s.id ? request : null}
