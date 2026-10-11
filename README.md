@@ -12,10 +12,10 @@ CanpShell 是面向高频操作的 SSH 与 AI 计算工作台，采用 **MIT** �
 
 | 平台    | 格式 / 架构                           | 当前验证状态                                             |
 | ------- | ------------------------------------- | -------------------------------------------------------- |
-| Windows | NSIS `.exe`，x64                      | 本地构建与桌面回归                                       |
-| macOS   | `.dmg` / `.zip`，Apple Silicon、Intel | 已配置 CI，待运行与平台验证                              |
-| Linux   | `.AppImage` / `.deb`，x64、ARM64      | 已配置 CI，待运行与平台验证                              |
-| Android | `.apk`，Android 8+                    | 独立移动终端源码；待编译、签名、设备验证，功能不等同桌面 |
+| Windows | NSIS `.exe`，x64                      | 云端构建及桌面回归通过                                   |
+| macOS   | `.dmg` / `.zip`，Apple Silicon、Intel | 云端测试及构建通过；真机交互待验收                       |
+| Linux   | `.AppImage` / `.deb`，x64、ARM64      | 云端测试及构建通过；真机交互待验收                       |
+| Android | 测试 `.apk`，Android 8+               | 编译与 lint 通过，调试签名；真机待测试，功能不等同桌面   |
 
 尚无商业代码签名证书，macOS 未公证。核对附件的 SHA256SUMS.txt。完整范围见 [发布说明](docs/RELEASE.md)，已执行的检查见 [验证记录](docs/VALIDATION.md)。
 
@@ -133,7 +133,7 @@ Compose / Swarm 管理的容器不通过该入口重建，避免与部署声明�
 
 ## 已知边界
 
-详见 [路线图](docs/ROADMAP.md) 和 [验证记录](docs/VALIDATION.md)。未完成能力包括：标签内多终端拆分、SSH Agent/系统密钥发现、SSH Config 导入、系统级远端拖出、断点续传、跨盘移动回退、递归删除、连接超时前主动取消、代理/跳板机、主机指纹管理界面、正式签名、真实 Linux 服务器和长时间压力验收、Web/Android。界面没有为这些能力放置不可用入口。macOS/Linux 暂未打包验证。
+详见 [路线图](docs/ROADMAP.md) 和 [验证记录](docs/VALIDATION.md)。未完成能力包括：标签内多终端拆分、SSH Agent/系统密钥发现、SSH Config 导入、系统级远端拖出、断点续传、跨盘移动回退、递归删除、连接超时前主动取消、代理/跳板机、主机指纹管理界面、正式签名、真实 Linux 服务器和长时间压力验收、Web 嵌入、Android 桌面功能补齐。界面没有为这些能力放置不可用入口。macOS/Linux 已打包，真机交互验证尚未完成。
 
 本预览版不适用于不可信多租户 Web 嵌入。未来浏览器版本必须通过授权服务端网关连接 SSH，详情见 [架构决策](docs/ARCHITECTURE.md)。AI 不在后台自动读取终端输入；只有用户发送任务后才会请求配置的基座与已授权工具。
 
