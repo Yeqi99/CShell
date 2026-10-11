@@ -153,6 +153,6 @@ test('authenticated MCP lifecycle, origin isolation, scoped SSH tools, command c
     await service.stop();
     trusted.dispose();
     await fixtureServer.close();
-    await rm(directory, { recursive: true, force: true });
+    await rm(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
 });

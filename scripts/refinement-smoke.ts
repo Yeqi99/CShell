@@ -104,8 +104,8 @@ try {
     .evaluate((el) => el.getBoundingClientRect().height);
   assert.ok(height <= 34);
   await page.getByRole('button', { name: '访问权限', exact: true }).click();
-  await page.getByRole('button', { name: '编辑该位置权限', exact: true }).click();
-  await page.locator('.ai-permissions').waitFor();
+  await page.getByLabel('默认：资源监控', { exact: true }).waitFor();
+  await page.getByRole('button', { name: '保存权限', exact: true }).waitFor();
   await page.screenshot({ path: 'test-results/ai-settings-refined.png' });
   await page.getByRole('button', { name: '折叠智能体' }).click();
   await page.getByRole('button', { name: '新建连接', exact: true }).first().click();
