@@ -669,3 +669,92 @@
 .permission-scope-groups {
   margin-top: 8px;
 }
+
+.agent-markdown {
+  white-space: normal;
+  min-width: 0;
+}
+.agent-markdown > :first-child {
+  margin-top: 0;
+}
+.agent-markdown > :last-child {
+  margin-bottom: 0;
+}
+.agent-markdown p {
+  margin: 0 0 10px;
+  white-space: pre-wrap;
+}
+.agent-markdown strong {
+  font-weight: 700;
+}
+.agent-markdown :is(ul, ol) {
+  margin: 8px 0 12px;
+  padding-left: 22px;
+}
+.agent-markdown li {
+  margin: 3px 0;
+}
+.agent-markdown li > p {
+  margin: 3px 0;
+}
+.agent-markdown :is(h1, h2, h3, h4, h5, h6) {
+  margin: 16px 0 8px;
+  font-size: 1.1em;
+  line-height: 1.5;
+}
+.agent-markdown blockquote {
+  margin: 10px 0;
+  padding: 2px 12px;
+  border-left: 3px solid var(--border-strong);
+  color: var(--muted);
+}
+.agent-markdown :not(pre) > code {
+  font-family: Consolas, monospace;
+  font-size: 0.95em;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--panel);
+  overflow-wrap: anywhere;
+}
+.agent-markdown .agent-code pre {
+  white-space: pre;
+  overflow-x: auto;
+}
+.agent-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 12px 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.agent-table-scroll:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.agent-markdown table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12px;
+}
+.agent-markdown :is(th, td) {
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+.agent-markdown th {
+  background: var(--panel);
+  font-weight: 600;
+}
+.agent-markdown .task-list-item {
+  list-style: none;
+}
+.agent-markdown input[type='checkbox'] {
+  width: auto;
+  margin-right: 6px;
+}
+.agent-markdown hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 14px 0;
+}

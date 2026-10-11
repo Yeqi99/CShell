@@ -3,54 +3,15 @@ import {
   ArrowDown,
   ArrowUp,
   Check,
-  Copy,
   Cpu,
   MessageSquare,
   ShieldCheck,
   Square,
   Terminal,
 } from 'lucide-react';
+import { CopyButton } from './AiCopyButton';
+import { AiMarkdown } from './AiMarkdown';
 import { type AiSnapshot, type AiLocation, type AiMode, type AiThread } from '../../shared/ai';
-function CopyButton({ content }: { content: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      type="button"
-      className="icon"
-      title={copied ? '已复制' : '复制内容'}
-      aria-label="复制内容"
-      onClick={() =>
-        void navigator.clipboard
-          .writeText(content)
-          .then(() => setCopied(true))
-          .catch(() => setCopied(false))
-      }
-      onBlur={() => setCopied(false)}
-    >
-      {copied ? <Check size={13} /> : <Copy size={13} />}
-    </button>
-  );
-}
-function Content({ text }: { text: string }) {
-  return (
-    <>
-      {text.split(/(```[\s\S]*?```)/g).map((part, i) => {
-        const code = /^```([^\n]*)\n?([\s\S]*?)```$/.exec(part);
-        return code ? (
-          <div className="agent-code" key={i}>
-            <header>
-              <span>{code[1] || '代码'}</span>
-              <CopyButton content={code[2].trimEnd()} />
-            </header>
-            <pre>{code[2].trimEnd()}</pre>
-          </div>
-        ) : (
-          <span key={i}>{part}</span>
-        );
-      })}
-    </>
-  );
-}
 export function AiConversation({
   snapshot,
   thread,
@@ -171,7 +132,11 @@ export function AiConversation({
                   <CopyButton content={message.content} />
                 </header>
                 <div className="agent-content">
-                  <Content text={message.content} />
+                  {message.role === 'assistant' ? (
+                    <AiMarkdown text={message.content} />
+                  ) : (
+                    message.content
+                  )}
                 </div>
               </article>
             ),

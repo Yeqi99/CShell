@@ -36,7 +36,8 @@ const api = createServer(async (req, res) => {
                 }
               : {
                   role: 'assistant',
-                  content: '可以先查看当前目录。\n```sh\npwd\n```\n这条命令只读取当前路径。',
+                  content:
+                    '目前有 **1 个连接目标**。\n\n| 名称 | 主机 | 端口 | 用户 | 会话状态 |\n| --- | --- | --- | --- | --- |\n| 测试服务器 | 127.0.0.1 | 22 | tester | 已激活（1 个活动会话） |\n\n- 查看当前目录\n- 只读取当前路径\n\n```sh\npwd\n```',
                 },
         },
       ],
@@ -46,7 +47,12 @@ const api = createServer(async (req, res) => {
 await new Promise<void>((resolve) => api.listen(0, '127.0.0.1', resolve));
 const env = { ...process.env, CSHELL_TEST_DATA: data };
 delete env.ELECTRON_RUN_AS_NODE;
-const app = await electron.launch({ args: ['.'], env });
+const app = await electron.launch({
+  ...(process.env.CSHELL_EXECUTABLE
+    ? { executablePath: process.env.CSHELL_EXECUTABLE, args: [] }
+    : { args: ['.'] }),
+  env,
+});
 try {
   await mkdir('test-results', { recursive: true });
   const page = await app.firstWindow();
@@ -102,6 +108,14 @@ try {
   await panel.getByLabel('发送给智能体').press('Enter');
   await panel.locator('.agent-code pre').waitFor();
   assert.equal(await panel.locator('.agent-code pre').innerText(), 'pwd');
+  assert.equal(await panel.locator('.agent-markdown strong').innerText(), '1 个连接目标');
+  assert.equal(await panel.locator('.agent-markdown th').count(), 5);
+  assert.equal(await panel.locator('.agent-markdown td').count(), 5);
+  assert.equal(await panel.locator('.agent-markdown li').count(), 2);
+  await panel.locator('.agent-code').getByRole('button', { name: '复制内容' }).click();
+  await panel.locator('.agent-code').getByTitle('已复制').waitFor();
+  assert.equal(await app.evaluate(({ clipboard }) => clipboard.readText()), 'pwd');
+  assert.equal(await panel.evaluate((el) => el.scrollWidth > el.clientWidth), false);
   await panel.getByLabel('发送给智能体').fill('这段草稿要保留');
   await panel.getByRole('button', { name: '新建 AI 会话' }).click();
   assert.equal(await panel.getByLabel('发送给智能体').inputValue(), '');

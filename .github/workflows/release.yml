@@ -35,6 +35,8 @@ jobs:
       - run: pnpm build
       - run: pnpm test
       - if: matrix.platform == 'win'
+        run: pnpm exec tsx scripts/ai-ui-smoke.ts
+      - if: matrix.platform == 'win'
         run: pnpm exec tsx scripts/activity-smoke.ts
       - run: pnpm run licenses
       - if: matrix.platform == 'win'
