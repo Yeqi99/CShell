@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Terminal, RefreshCw, Copy } from 'lucide-react';
-import type { LocalShell } from '../../shared/local-terminal';
+import { Terminal, RefreshCw, Copy, ShieldCheck } from 'lucide-react';
+import type { LocalShell, WslSetupState } from '../../shared/local-terminal';
 export function WslPlugin({ onOpen }: { onOpen: (shell: LocalShell) => Promise<void> }) {
   const [state, setState] = useState<{
       available: boolean;
@@ -9,6 +9,8 @@ export function WslPlugin({ onOpen }: { onOpen: (shell: LocalShell) => Promise<v
     } | null>(null),
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false),
+    [ubuntu, setUbuntu] = useState(true),
+    [setup, setSetup] = useState<WslSetupState>({ phase: 'idle' }),
     [copied, setCopied] = useState(false);
   const refresh = async () => {
     setBusy(true);
@@ -23,6 +25,25 @@ export function WslPlugin({ onOpen }: { onOpen: (shell: LocalShell) => Promise<v
   };
   useEffect(() => {
     void refresh();
+    let active = true;
+    let previous = '';
+    const poll = async () => {
+      try {
+        const next = await window.cshell.wslInstallStatus();
+        if (!active) return;
+        setSetup(next);
+        if (previous === 'running' && next.phase !== 'running') void refresh();
+        previous = next.phase;
+      } catch {
+        /* Keep the current install state if the window is closing. */
+      }
+    };
+    void poll();
+    const timer = setInterval(() => void poll(), 1500);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
   }, []);
   return (
     <section className="wsl-plugin">
@@ -42,6 +63,11 @@ export function WslPlugin({ onOpen }: { onOpen: (shell: LocalShell) => Promise<v
       {error && (
         <p role="alert" className="form-error">
           {error}
+        </p>
+      )}
+      {setup.message && (
+        <p role="status" className={setup.phase === 'error' ? 'form-error' : 'muted'}>
+          {setup.message}
         </p>
       )}
       {state?.distributions.map((name) => (
@@ -71,10 +97,46 @@ export function WslPlugin({ onOpen }: { onOpen: (shell: LocalShell) => Promise<v
           <div>
             <strong>{state.available ? '尚未安装 Linux 发行版' : 'WSL 暂不可用'}</strong>
             <p>{state.error || '在 Windows 安装发行版后，点击刷新。'}</p>
+            <label className="wsl-install-option">
+              <input
+                type="checkbox"
+                checked={ubuntu}
+                disabled={setup.phase === 'running'}
+                onChange={(e) => setUbuntu(e.target.checked)}
+              />
+              同时安装 Ubuntu
+            </label>
+            <p className="muted">
+              将启用 Windows Linux 与虚拟化组件，可能需要重启。不会自动重启或修改已有发行版。
+            </p>
+            <button
+              className="primary"
+              disabled={setup.phase === 'running'}
+              onClick={() => {
+                setError('');
+                void window.cshell
+                  .wslInstall(ubuntu)
+                  .then(setSetup)
+                  .catch((e) => setError(e.message));
+              }}
+            >
+              <ShieldCheck size={15} />
+              {setup.phase === 'running'
+                ? '正在安装…'
+                : ubuntu
+                  ? '启用 WSL 并安装 Ubuntu'
+                  : '启用 WSL'}
+            </button>
             <button
               className="secondary"
               onClick={() =>
-                void window.cshell.copyText('wsl --install').then(() => setCopied(true))
+                void window.cshell
+                  .copyText(
+                    ubuntu
+                      ? 'wsl --install -d Ubuntu --no-launch'
+                      : 'wsl --install --no-distribution',
+                  )
+                  .then(() => setCopied(true))
               }
             >
               <Copy size={14} />

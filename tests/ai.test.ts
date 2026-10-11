@@ -211,10 +211,13 @@ test('agent enforces target/capability, review, revocation, stop and encrypted p
 test('chat accepts null, omitted and empty tool calls but rejects malformed calls', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'cshell-chat-'));
   let calls: unknown = null;
+  let chatContent = '你好';
   const api = createServer(async (req, res) => {
-    for await (const _ of req) { /* drain request */ }
+    let body = '';
+    for await (const chunk of req) body += chunk;
+    const correcting = JSON.parse(body).messages.at(-1).role === 'system';
     res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({ choices: [{ message: { content: '你好', tool_calls: calls } }] }));
+    res.end(JSON.stringify({ choices: [{ message: { content: correcting ? '当前未绑定机器，无法查询。' : chatContent, tool_calls: calls } }] }));
   });
   await new Promise<void>((resolve) => api.listen(0, '127.0.0.1', resolve));
   const store = new Store(directory, {
@@ -238,6 +241,15 @@ test('chat accepts null, omitted and empty tool calls but rejects malformed call
       assert.equal(result.messages.some((m) => m.role === 'assistant' && m.content === '你好'), valid);
       assert.equal(result.messages.some((m) => m.role === 'tool'), false);
     }
+    calls = null;
+    chatContent = '<tool_call><function=list_machines></function></tool_call>';
+    const corrected = await ai.create('terminal', provider.id, 'review');
+    await ai.send(corrected.id, '我有几台机器');
+    await until(() => ai.snapshot().threads.find((t) => t.id === corrected.id)!.state !== 'running');
+    const result = ai.snapshot().threads.find((t) => t.id === corrected.id)!;
+    assert.equal(result.state, 'idle');
+    assert.equal(result.messages.at(-1)!.content, '当前未绑定机器，无法查询。');
+    assert.equal(result.messages.some((m) => m.role === 'tool' || m.content.includes('<tool_call>')), false);
     await ai.permission({ location: 'terminal', providerId: provider.id, groups: [], profiles: [], capabilities: [] });
   } finally {
     await new Promise<void>((resolve) => api.close(() => resolve()));

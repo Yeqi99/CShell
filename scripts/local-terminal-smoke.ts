@@ -92,7 +92,6 @@ try {
     .locator('.plugin-row')
     .filter({ has: page.getByRole('heading', { name: /WSL Linux/ }) });
   await wsl.getByRole('button', { name: '安装', exact: true }).click();
-  await wsl.getByRole('button', { name: '打开插件', exact: true }).click();
   await page.getByRole('heading', { name: 'Linux 发行版', exact: true }).waitFor();
   const detected = await page.evaluate(() => window.cshell.wslDistributions());
   assert.ok(Array.isArray(detected.distributions));

@@ -330,6 +330,7 @@ export function ExtensionWorkbench({
                               if (entry) await window.cshell.pluginDownload(entry);
                               else await window.cshell.pluginInstall(p.id);
                               await onChange();
+                              if (p.provider === 'wsl') setSection('wsl');
                             })
                           }
                         >

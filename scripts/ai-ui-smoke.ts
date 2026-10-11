@@ -60,7 +60,7 @@ try {
   await page.screenshot({ path: 'test-results/agent-empty.png' });
   await panel.getByRole('button', { name: '配置基座', exact: true }).click();
   await panel.getByRole('button', { name: '添加基座', exact: true }).click();
-  await panel.getByLabel('名称', { exact: true }).fill('本机测试模型');
+  await panel.getByLabel('名称', { exact: true }).fill('MiMo Token Plan · 超长基座名称布局验证');
   await panel
     .getByLabel('API URL', { exact: false })
     .fill(`http://127.0.0.1:${(api.address() as any).port}/v1`);
@@ -74,6 +74,8 @@ try {
   await panel.getByText('test · 无 Key', { exact: true }).waitFor();
   await panel.getByRole('button', { name: '基座与权限', exact: true }).click();
   await panel.getByRole('heading', { name: '从一个任务开始' }).waitFor();
+  await page.screenshot({ path: 'test-results/agent-model-picker.png' });
+  assert.equal(await panel.locator('.agent-composer-tools').evaluate((el) => el.scrollWidth > el.clientWidth), false);
   await panel.getByLabel('发送给智能体').fill('查看当前目录');
   await panel.getByLabel('发送给智能体').press('Enter');
   await panel.locator('.agent-code pre').waitFor();

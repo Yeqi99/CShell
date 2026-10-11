@@ -29,18 +29,7 @@
   border-bottom: 1px solid var(--border);
   min-width: 0;
 }
-.agent-context select {
-  width: auto;
-  max-width: 95px;
-  min-height: 26px;
-  height: 26px;
-  padding: 0 4px;
-  border: 0;
-  background: transparent;
-  font-size: 11px;
-}
 .agent-target {
-  margin-left: auto;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -438,4 +427,59 @@
   .agent-policy {
     margin-right: auto;
   }
+}
+.agent-model-picker {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  padding-right: 16px;
+}
+.agent-model-picker > span {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.agent-model-picker::after {
+  content: '⌄';
+  position: absolute;
+  right: 2px;
+  top: 0;
+  pointer-events: none;
+}
+.agent-model-picker select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.agent-model-picker:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+.agent-policy {
+  flex-shrink: 0;
+}
+.wsl-install-option {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px;
+  margin: 18px 0 8px;
+}
+.wsl-install-option input {
+  width: 15px !important;
+  height: 15px;
+  min-height: 0;
+  margin: 0;
+  flex: none;
+}
+.wsl-plugin .ai-provider-empty .secondary {
+  margin-left: 8px;
+}
+.wsl-plugin .ai-provider-empty small {
+  display: block;
+  margin-top: 10px;
 }

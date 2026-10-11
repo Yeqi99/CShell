@@ -10,13 +10,7 @@ import {
   Square,
   Terminal,
 } from 'lucide-react';
-import {
-  aiLocations,
-  type AiSnapshot,
-  type AiLocation,
-  type AiMode,
-  type AiThread,
-} from '../../shared/ai';
+import { type AiSnapshot, type AiLocation, type AiMode, type AiThread } from '../../shared/ai';
 const names = { workspace: '工作台', terminal: '终端', files: '文件', python: 'Python' };
 function CopyButton({ content }: { content: string }) {
   const [copied, setCopied] = useState(false);
@@ -66,7 +60,6 @@ export function AiConversation({
   mode,
   sessionId,
   busy,
-  changeLocation,
   setProviderId,
   setMode,
   create,
@@ -80,7 +73,6 @@ export function AiConversation({
   mode: AiMode;
   sessionId?: string;
   busy: boolean;
-  changeLocation: (value: AiLocation) => void;
   setProviderId: (value: string) => void;
   setMode: (value: AiMode) => void;
   create: () => Promise<AiThread>;
@@ -119,24 +111,17 @@ export function AiConversation({
   return (
     <>
       <div className="agent-context">
-        <Terminal size={14} />
-        {thread ? (
-          <span>{names[thread.location]}</span>
+        {thread?.sessionId || (!thread && sessionId) ? (
+          <Terminal size={14} />
         ) : (
-          <select
-            aria-label="AI 位置"
-            value={location}
-            onChange={(e) => changeLocation(e.target.value as AiLocation)}
-          >
-            {aiLocations.map((l) => (
-              <option key={l} value={l}>
-                {names[l]}
-              </option>
-            ))}
-          </select>
+          <MessageSquare size={14} />
         )}
-        <span className="agent-target" title={thread?.target}>
-          {thread?.target ?? (sessionId ? '当前服务器 · 新会话' : '仅对话 · 未绑定机器')}
+        <span className="agent-target" title={`权限配置：${names[thread?.location ?? location]}`}>
+          {thread
+            ? (thread.target ?? '未连接服务器 · 仅聊天')
+            : sessionId
+              ? '当前连接 · 新会话'
+              : '未连接服务器 · 仅聊天'}
         </span>
       </div>
       <div className="agent-conversation">
@@ -284,20 +269,28 @@ export function AiConversation({
             {thread ? (
               <span title={provider?.model}>{provider?.name ?? '基座已删除'}</span>
             ) : (
-              <select
-                aria-label="AI 基座"
-                value={providerId}
-                onChange={(e) => setProviderId(e.target.value)}
+              <div
+                className="agent-model-picker"
+                title={snapshot.providers.find((p) => p.id === providerId)?.model}
               >
-                <option value="" disabled>
-                  选择基座
-                </option>
-                {snapshot.providers.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} · {p.model}
+                <span>
+                  {snapshot.providers.find((p) => p.id === providerId)?.name || '选择基座'}
+                </span>
+                <select
+                  aria-label="AI 基座"
+                  value={providerId}
+                  onChange={(e) => setProviderId(e.target.value)}
+                >
+                  <option value="" disabled>
+                    选择基座
                   </option>
-                ))}
-              </select>
+                  {snapshot.providers.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} · {p.model}
+                    </option>
+                  ))}
+                </select>
+              </div>
             )}
           </div>
           <div className="agent-policy">

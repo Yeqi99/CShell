@@ -1,4 +1,5 @@
 import { LocalTerminalProvider } from '../core/connections/local-terminal-provider';
+import { WslSetup } from './wsl-setup';
 import { createSshManager } from '../core/connections/ssh-provider';
 import type { ConnectionManager } from '../core/connections/manager';
 import { ActivityStore } from '../core/activity';
@@ -402,6 +403,16 @@ else
         return docker.action(sessionId, action);
       });
       handle('local-terminal:wsl', () => localTerminal.distributions());
+      const wslSetup = new WslSetup();
+      handle('local-terminal:wsl-install-status', () => wslSetup.snapshot());
+      handle('local-terminal:wsl-install', (ubuntu) => {
+        if (
+          process.platform !== 'win32' ||
+          !store.snapshot().plugins.some((p) => p.enabled && p.manifest.id === 'cshell.wsl')
+        )
+          throw new Error('请先启用 WSL 插件。');
+        return wslSetup.start(z.boolean().parse(ubuntu));
+      });
       handle('local-terminal:open', async (shell) => ({
         sessionId: await connections!.connect('cshell.local-terminal', shell, {}),
         name:
