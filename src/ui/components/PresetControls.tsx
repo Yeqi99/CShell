@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Download, Upload, Save, Trash2 } from 'lucide-react';
 import type { Preferences, WorkspacePreset } from '../../shared/contracts';
 import { useI18n } from '../i18n';
 export function PresetControls({
@@ -21,7 +22,39 @@ export function PresetControls({
   const run = (work: Promise<unknown>) => void work.catch((e) => onError(e.message));
   return (
     <section className="preset-controls">
-      <h2>{t('presets')}</h2>
+      <header className="preset-heading">
+        <h2>{t('presets')}</h2>{' '}
+        <div className="preset-utilities">
+          <button
+            className="icon"
+            title={t('importPreset')}
+            aria-label={t('importPreset')}
+            type="button"
+            onClick={() =>
+              run(
+                window.cshell.importPreset().then((preset) => {
+                  if (preset) {
+                    onSelect(preset.preferences);
+                    setName(preset.name);
+                    setSelected('');
+                  }
+                }),
+              )
+            }
+          >
+            <Upload size={15} />
+          </button>
+          <button
+            className="icon"
+            title={t('exportPreset')}
+            aria-label={t('exportPreset')}
+            type="button"
+            onClick={() => run(window.cshell.exportPreset(draft))}
+          >
+            <Download size={15} />
+          </button>
+        </div>
+      </header>
       <div className="preset-row">
         <label>
           {t('savedPresets')}
@@ -45,7 +78,9 @@ export function PresetControls({
           </select>
         </label>
         <button
-          className="secondary"
+          className="icon"
+          title={t('delete')}
+          aria-label={t('delete')}
           type="button"
           disabled={!selected}
           onClick={() =>
@@ -57,7 +92,7 @@ export function PresetControls({
             )
           }
         >
-          {t('delete')}
+          <Trash2 size={15} />
         </button>
       </div>
       <div className="preset-row">
@@ -70,35 +105,12 @@ export function PresetControls({
         />
         <button
           type="button"
+          className="secondary"
           disabled={!name.trim()}
           onClick={() => run(window.cshell.savePreset(name, draft).then(refresh))}
         >
+          <Save size={14} />
           {t('savePreset')}
-        </button>
-      </div>
-      <div className="preset-row">
-        <button
-          type="button"
-          onClick={() =>
-            run(
-              window.cshell.importPreset().then((preset) => {
-                if (preset) {
-                  onSelect(preset.preferences);
-                  setName(preset.name);
-                  setSelected('');
-                }
-              }),
-            )
-          }
-        >
-          {t('importPreset')}
-        </button>
-        <button
-          className="secondary"
-          type="button"
-          onClick={() => run(window.cshell.exportPreset(draft))}
-        >
-          {t('exportPreset')}
         </button>
       </div>
       <small>{t('presetHint')}</small>

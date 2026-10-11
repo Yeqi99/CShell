@@ -103,6 +103,7 @@ try {
     .first()
     .evaluate((el) => el.getBoundingClientRect().height);
   assert.ok(height <= 34);
+  await page.getByRole('button', { name: '访问权限', exact: true }).click();
   await page.getByRole('button', { name: '编辑该位置权限', exact: true }).click();
   await page.locator('.ai-permissions').waitFor();
   await page.screenshot({ path: 'test-results/ai-settings-refined.png' });

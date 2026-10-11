@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { RefreshCw, Download } from 'lucide-react';
 import type { UpdateState } from '../../shared/updates';
 export function UpdateSettings({ english }: { english: boolean }) {
   const [state, setState] = useState<UpdateState | null>(null),
@@ -43,7 +44,10 @@ export function UpdateSettings({ english }: { english: boolean }) {
   };
   return (
     <section className="update-settings">
-      <h2>{t('应用更新', 'App updates')}</h2>
+      <h2>
+        {t('应用更新', 'App updates')}
+        <span className="update-version">v{state?.current || '…'}</span>
+      </h2>
       <p className="muted">
         {t('当前版本', 'Current version')} {state?.current || '…'} ·{' '}
         {t('包含预览版', 'Includes previews')}
@@ -60,6 +64,7 @@ export function UpdateSettings({ english }: { english: boolean }) {
           disabled={!!busy}
           onClick={() => void run(() => window.cshell.checkUpdate())}
         >
+          <RefreshCw size={14} />
           {t('检查更新', 'Check for updates')}
         </button>
         {state?.phase === 'available' && (
@@ -68,6 +73,7 @@ export function UpdateSettings({ english }: { english: boolean }) {
             className="primary"
             onClick={() => void run(() => window.cshell.downloadUpdate())}
           >
+            <Download size={14} />
             {t('下载更新', 'Download update')}
           </button>
         )}

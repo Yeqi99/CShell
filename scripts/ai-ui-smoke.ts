@@ -1,0 +1,161 @@
+import { _electron as electron } from 'playwright';
+import { mkdtemp, rm, mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { createServer } from 'node:http';
+import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import { fixture } from '../tests/fixture';
+const remote = await fixture();
+let useTools = false;
+const data = await mkdtemp(join(tmpdir(), 'cshell-agent-ui-'));
+const api = createServer(async (req, res) => {
+  let body = '';
+  for await (const chunk of req) body += chunk;
+  const last = JSON.parse(body).messages.at(-1);
+  res.setHeader('Content-Type', 'application/json');
+  res.end(
+    JSON.stringify({
+      choices: [
+        {
+          message:
+            useTools && last.role !== 'tool'
+              ? {
+                  role: 'assistant',
+                  content: null,
+                  tool_calls: [
+                    {
+                      id: randomUUID(),
+                      type: 'function',
+                      function: {
+                        name: 'execute_command',
+                        arguments: JSON.stringify({ command: 'pwd' }),
+                      },
+                    },
+                  ],
+                }
+              : {
+                  role: 'assistant',
+                  content: '可以先查看当前目录。\n```sh\npwd\n```\n这条命令只读取当前路径。',
+                },
+        },
+      ],
+    }),
+  );
+});
+await new Promise<void>((resolve) => api.listen(0, '127.0.0.1', resolve));
+const env = { ...process.env, CSHELL_TEST_DATA: data };
+delete env.ELECTRON_RUN_AS_NODE;
+const app = await electron.launch({ args: ['.'], env });
+try {
+  await mkdir('test-results', { recursive: true });
+  const page = await app.firstWindow();
+  page.setDefaultTimeout(10000);
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.getByRole('heading', { name: '尚未连接' }).waitFor();
+  await page.getByRole('button', { name: 'AI 智能体', exact: true }).click();
+  const panel = page.getByRole('complementary', { name: 'AI 智能体' });
+  await panel.getByRole('heading', { name: '连接你的 AI' }).waitFor();
+  await page.screenshot({ path: 'test-results/agent-empty.png' });
+  await panel.getByRole('button', { name: '配置基座', exact: true }).click();
+  await panel.getByRole('button', { name: '添加基座', exact: true }).click();
+  await panel.getByLabel('名称', { exact: true }).fill('本机测试模型');
+  await panel
+    .getByLabel('API URL', { exact: false })
+    .fill(`http://127.0.0.1:${(api.address() as any).port}/v1`);
+  await panel.getByLabel('模型 ID', { exact: true }).fill('test');
+  await panel.getByRole('button', { name: '访问权限', exact: true }).click();
+  assert.equal(await panel.getByLabel('模型 ID').isVisible(), false);
+  await panel.getByRole('button', { name: '模型基座', exact: true }).click();
+  assert.equal(await panel.getByLabel('模型 ID').inputValue(), 'test');
+  await page.screenshot({ path: 'test-results/agent-settings.png' });
+  await panel.getByRole('button', { name: '保存基座', exact: true }).click();
+  await panel.getByText('test · 无 Key', { exact: true }).waitFor();
+  await panel.getByRole('button', { name: '基座与权限', exact: true }).click();
+  await panel.getByRole('heading', { name: '从一个任务开始' }).waitFor();
+  await panel.getByLabel('发送给智能体').fill('查看当前目录');
+  await panel.getByLabel('发送给智能体').press('Enter');
+  await panel.locator('.agent-code pre').waitFor();
+  assert.equal(await panel.locator('.agent-code pre').innerText(), 'pwd');
+  await panel.getByLabel('发送给智能体').fill('这段草稿要保留');
+  await panel.getByRole('button', { name: '新建 AI 会话' }).click();
+  assert.equal(await panel.getByLabel('发送给智能体').inputValue(), '');
+  await panel.getByRole('button', { name: '会话记录', exact: true }).click();
+  await panel.locator('.agent-history-row > button').first().click();
+  assert.equal(await panel.getByLabel('发送给智能体').inputValue(), '这段草稿要保留');
+  await panel.getByLabel('发送给智能体').press('Shift+Enter');
+  assert.match(await panel.getByLabel('发送给智能体').inputValue(), /\n/);
+  await page.screenshot({ path: 'test-results/agent-chat-light.png' });
+  await page.locator('.theme-toggle').click();
+  await page.mouse.move(600, 300);
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: 'test-results/agent-chat-dark.png' });
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(920, 650));
+  await page.screenshot({ path: 'test-results/agent-narrow.png' });
+  assert.equal(await panel.evaluate((el) => el.scrollWidth > el.clientWidth), false);
+  await app.evaluate(({ BrowserWindow, dialog }) => {
+    BrowserWindow.getAllWindows()[0].setSize(1150, 680);
+    dialog.showMessageBox = (async () => ({ response: 1, checkboxChecked: false })) as any;
+  });
+  const profile = {
+    id: randomUUID(),
+    name: 'UI test server',
+    host: '127.0.0.1',
+    port: remote.port,
+    username: 'tester',
+    auth: 'password' as const,
+    group: '',
+    favorite: false,
+  };
+  const toolThread = await page.evaluate(
+    async ({ profile, password }) => {
+      await window.cshell.saveProfile(profile);
+      const { sessionId } = await window.cshell.connect(profile.id, { password, remember: false });
+      const providerId = (await window.cshell.aiSnapshot()).providers[0].id;
+      await window.cshell.aiPermissionSave({
+        location: 'terminal',
+        providerId,
+        profiles: [profile.id],
+        groups: [],
+        capabilities: ['commands.execute'],
+      });
+      return window.cshell.aiThreadCreate('terminal', providerId, 'review', sessionId);
+    },
+    { profile, password: remote.password },
+  );
+  useTools = true;
+  await page.evaluate((id) => window.cshell.aiSend(id, '测试授权流程'), toolThread.id);
+  await panel.getByRole('button', { name: '会话记录', exact: true }).click();
+  await panel.getByRole('button').filter({ hasText: '测试授权流程' }).click();
+  await panel.getByRole('button', { name: '允许本次', exact: true }).waitFor();
+  await page.screenshot({ path: 'test-results/agent-approval.png' });
+  await panel.getByRole('button', { name: '拒绝', exact: true }).click();
+  await page.waitForFunction(
+    (id) =>
+      window.cshell.aiSnapshot().then((s) => s.threads.find((t) => t.id === id)?.state === 'idle'),
+    toolThread.id,
+  );
+  await panel.getByLabel('发送给智能体').fill('再次查看目录');
+  await panel.getByRole('button', { name: '发送', exact: true }).click();
+  await panel.getByRole('button', { name: '允许本次', exact: true }).click();
+  await page.waitForFunction(
+    (id) =>
+      window.cshell.aiSnapshot().then((s) => s.threads.find((t) => t.id === id)?.state === 'idle'),
+    toolThread.id,
+  );
+  await panel.getByLabel('发送给智能体').fill('停止等待授权的任务');
+  await panel.getByRole('button', { name: '发送', exact: true }).click();
+  await panel.getByRole('button', { name: '允许本次', exact: true }).waitFor();
+  await panel.getByRole('button', { name: '停止 AI', exact: true }).click();
+  await panel.getByRole('button', { name: '允许本次', exact: true }).waitFor({ state: 'hidden' });
+  assert.deepEqual(errors, []);
+  console.log(
+    'PASS: actual Electron AI configuration, category draft retention, local model response, code rendering, conversation drafts, keyboard send/newline, history, light/dark/narrow',
+  );
+} finally {
+  await app.close();
+  await remote.close();
+  await new Promise<void>((resolve) => api.close(() => resolve()));
+  await rm(data, { recursive: true, force: true });
+}

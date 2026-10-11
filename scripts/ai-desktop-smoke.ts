@@ -39,11 +39,12 @@ try {
   await panel.getByRole('button', { name: '保存基座', exact: true }).click();
   await panel.getByText('已保存 Key', { exact: false }).waitFor();
   assert.equal((await page.evaluate(() => window.cshell.aiSnapshot())).providers[0].hasKey, true);
+  await panel.getByRole('button', { name: '访问权限', exact: true }).click();
   await panel.getByRole('button', { name: '编辑该位置权限' }).click();
   await panel.getByLabel('读取资源指标').check();
   await panel.getByRole('button', { name: '保存权限', exact: true }).click();
   await page.screenshot({ path: 'test-results/ai-settings-light.png' });
-  await panel.getByRole('button', { name: '会话', exact: true }).click();
+  await panel.getByRole('button', { name: '基座与权限', exact: true }).click();
   await panel.getByRole('button', { name: '新建 AI 会话' }).click();
   await panel.getByLabel('审核等级').selectOption('restricted');
   await panel.getByRole('button', { name: '折叠智能体' }).click();

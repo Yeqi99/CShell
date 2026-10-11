@@ -4148,65 +4148,10 @@ input[type='radio']:focus-visible {
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
-.ai-toolbar,
-.ai-controls {
+.ai-toolbar {
   display: flex;
   gap: 6px;
   align-items: center;
-}
-.ai-controls {
-  margin: 8px 12px 0;
-}
-.ai-controls select {
-  padding: 6px 8px;
-  flex: 1;
-}
-.ai-controls select:first-child:not(:only-child) {
-  flex: 0.6;
-}
-.ai-target {
-  display: flex;
-  gap: 6px;
-  padding: 10px 14px 4px;
-  color: var(--muted);
-  font-size: 11px;
-  overflow-wrap: anywhere;
-}
-.ai-context {
-  padding: 2px 14px;
-}
-.ai-mode {
-  margin: 8px 12px;
-  width: calc(100% - 24px);
-  padding: 6px 8px;
-}
-.ai-messages {
-  flex: 1;
-  min-height: 80px;
-  overflow: auto;
-  padding: 12px 14px;
-}
-.ai-empty {
-  color: var(--muted);
-  margin: 20px 0;
-  line-height: 1.8;
-}
-.ai-message {
-  margin-bottom: 18px;
-  line-height: 1.7;
-  overflow-wrap: anywhere;
-}
-.ai-message > div {
-  white-space: pre-wrap;
-}
-.ai-message.user {
-  background: var(--panel);
-  padding: 10px 12px;
-  border-radius: 8px;
-}
-.ai-tool-result {
-  color: var(--muted);
-  margin-bottom: 12px;
 }
 .ai-panel pre {
   white-space: pre-wrap;
@@ -4214,40 +4159,6 @@ input[type='radio']:focus-visible {
   font-size: 11px;
   max-height: 280px;
   overflow: auto;
-}
-.ai-approval {
-  border: 1px solid var(--accent);
-  padding: 12px;
-  border-radius: 8px;
-  margin: 10px 0;
-}
-.ai-approval > div {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-.ai-composer {
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-  padding: 12px;
-  border-top: 1px solid var(--border);
-}
-.ai-composer textarea {
-  flex: 1;
-  resize: vertical;
-  min-height: 64px;
-  max-height: 200px;
-  border: 0;
-  outline: none;
-  background: var(--field);
-  color: var(--text);
-  border-radius: 6px;
-  padding: 10px;
-  font: inherit;
-}
-.ai-composer textarea:focus {
-  outline: 1px solid var(--accent);
 }
 .ai-settings {
   overflow: auto;
@@ -4315,9 +4226,6 @@ input[type='radio']:focus-visible {
 }
 .ai-panel {
   background: var(--panel);
-}
-.ai-messages {
-  background: var(--bg);
 }
 
 /* Directory panes remain mounted so navigation and selection survive other actions. */
@@ -5425,4 +5333,30 @@ input[type='radio']:focus-visible {
   .activity-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+.preset-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.preset-utilities {
+  display: flex;
+  gap: 4px;
+}
+.preset-heading h2 {
+  margin: 0;
+}
+.update-settings h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.update-version {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 3px 6px;
 }
