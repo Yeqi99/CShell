@@ -80,9 +80,14 @@ export async function designSmoke(app: ElectronApplication, page: Page) {
   await page.keyboard.press('Enter'); // Preferences, selected through the keyboard.
   await page.locator('.preferences-page:visible').waitFor();
   await page.locator('.preferences-page').getByLabel('外观').selectOption('light');
+  await page.waitForFunction(() => document.documentElement.dataset.theme === 'light');
   // The persisted theme is still dark here; the quick toggle must also update a preview.
   await page.getByRole('button', { name: '切换为深色', exact: true }).click();
-  await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
+  await page.waitForFunction(
+    async () =>
+      document.documentElement.dataset.theme === 'dark' &&
+      (await window.cshell.config()).preferences.theme === 'dark',
+  );
   await page.getByRole('button', { name: '切换为浅色', exact: true }).click();
   await page.waitForFunction(
     async () =>
