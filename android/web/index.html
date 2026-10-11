@@ -11,46 +11,214 @@
     <link rel="stylesheet" href="app.css" />
   </head>
   <body>
-    <header>
-      <strong>CShell</strong><span></span><button id="theme" aria-label="切换明暗">◐</button
-      ><button id="minimal" aria-label="极简模式">↗</button
-      ><button id="new" aria-label="新建连接">＋</button>
+    <header class="app-header">
+      <button id="back" class="icon" aria-label="返回工作台" hidden data-icon="back"></button>
+      <div class="brand">
+        <span class="brand-mark" data-icon="terminal"></span><strong>CShell</strong>
+      </div>
+      <span class="spacer"></span
+      ><button
+        id="minimal"
+        class="icon"
+        aria-label="极简模式"
+        title="极简模式"
+        data-icon="expand"
+        hidden
+      ></button
+      ><button
+        id="new"
+        class="icon"
+        aria-label="新建连接"
+        title="新建连接"
+        data-icon="plus"
+      ></button>
     </header>
-    <nav id="tabs" aria-label="会话标签"></nav>
+    <nav id="tabs" aria-label="会话标签" hidden></nav>
     <main id="workspace">
-      <form id="connect">
-        <h2>SSH 连接</h2>
-        <label
-          >主机地址<input name="host" required autocomplete="off" autocapitalize="none"
-        /></label>
-        <div class="row">
-          <label>用户名<input name="username" value="root" required autocapitalize="none" /></label
-          ><label
-            >端口<input name="port" value="22" type="number" min="1" max="65535" required
-          /></label>
+      <section id="home" class="page">
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow">工作台</p>
+            <h1>服务器</h1>
+          </div>
+          <span id="server-count" class="count">0</span>
         </div>
-        <label>密码<input name="password" type="password" autocomplete="off" /></label>
-        <details>
-          <summary>私钥认证</summary>
+        <label class="search"
+          ><span data-icon="search"></span
+          ><input
+            id="search"
+            aria-label="搜索服务器"
+            placeholder="搜索名称、地址或分组"
+            autocomplete="off"
+        /></label>
+        <div id="server-list"></div>
+        <div id="empty" class="empty">
+          <span class="empty-icon" data-icon="server"></span>
+          <h2>连接你的第一台服务器</h2>
+          <p>保存连接地址，下次从这里打开终端。</p>
+          <button id="empty-new" class="primary"><span data-icon="plus"></span>新建连接</button>
+        </div>
+        <p id="no-results" class="muted" hidden>没有匹配的服务器</p>
+      </section>
+      <section id="session-page" class="page" hidden>
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow">工作台</p>
+            <h1>会话</h1>
+          </div>
+          <span id="session-count" class="count">0</span>
+        </div>
+        <div id="session-list"></div>
+        <div id="session-empty" class="empty">
+          <span class="empty-icon" data-icon="terminal"></span>
+          <h2>没有打开的会话</h2>
+          <p>连接服务器后，在这里继续操作。</p>
+          <button id="session-new" class="primary">新建连接</button>
+        </div>
+      </section>
+      <form id="connect" class="page" hidden>
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow">连接配置</p>
+            <h1 id="form-title">新建连接</h1>
+          </div>
+          <span class="protocol">SSH</span>
+        </div>
+        <div class="form-section">
+          <h2>连接信息</h2>
           <label
-            >私钥内容<textarea
-              name="privateKey"
-              spellcheck="false"
+            >主机地址<input
+              name="host"
+              required
+              maxlength="255"
+              placeholder="主机名或 IP 地址"
+              autocomplete="off"
               autocapitalize="none"
-            ></textarea></label
-          ><label>私钥口令<input name="passphrase" type="password" autocomplete="off" /></label>
-        </details>
-        <button class="primary">连接</button
-        ><small>凭据仅用于本次连接，不保存。首次连接需核对主机指纹。</small>
+              spellcheck="false"
+          /></label>
+          <div class="row">
+            <label
+              >用户名<input
+                name="username"
+                value="root"
+                required
+                maxlength="255"
+                autocapitalize="none"
+                spellcheck="false" /></label
+            ><label class="port"
+              >端口<input
+                name="port"
+                value="22"
+                type="number"
+                min="1"
+                max="65535"
+                required
+                inputmode="numeric"
+            /></label>
+          </div>
+        </div>
+        <div class="form-section">
+          <h2>身份验证</h2>
+          <div class="segments" aria-label="认证方式">
+            <button id="auth-password" type="button" class="selected" aria-pressed="true">
+              密码</button
+            ><button id="auth-key" type="button" aria-pressed="false">私钥</button>
+          </div>
+          <label id="password-field"
+            >密码<input
+              name="password"
+              type="password"
+              autocomplete="off"
+              placeholder="输入登录密码"
+          /></label>
+          <div id="key-fields" hidden>
+            <label
+              >私钥内容<textarea
+                name="privateKey"
+                spellcheck="false"
+                autocapitalize="none"
+                placeholder="粘贴 PEM / OpenSSH 私钥"
+              ></textarea></label
+            ><label>私钥口令<input name="passphrase" type="password" autocomplete="off" /></label>
+          </div>
+        </div>
+        <div class="form-section">
+          <label class="check"
+            ><input id="remember" type="checkbox" checked />保存到服务器列表</label
+          >
+          <div id="profile-fields">
+            <label
+              >名称<input name="name" maxlength="80" placeholder="可选，默认使用主机地址" /></label
+            ><label
+              >分组<input name="group" maxlength="80" list="groups" placeholder="未分组" /><datalist
+                id="groups"
+              ></datalist
+            ></label>
+          </div>
+          <p class="muted caption">仅保存连接信息，密码和私钥不落盘。</p>
+        </div>
+        <p id="form-error" role="alert" class="error"></p>
+        <button id="delete-profile" class="danger" type="button" hidden>删除此连接配置</button>
       </form>
-      <div id="terminals"></div>
+      <section id="settings" class="page" hidden>
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow">偏好设置</p>
+            <h1>设置</h1>
+          </div>
+        </div>
+        <div class="setting-row">
+          <div>
+            <strong>外观</strong>
+            <p class="muted caption">默认浅色，可随时切换</p>
+          </div>
+          <button
+            id="theme"
+            class="icon"
+            aria-label="切换明暗"
+            title="切换明暗"
+            data-icon="moon"
+          ></button>
+        </div>
+        <div class="update-section">
+          <h2>应用更新</h2>
+          <p id="version" class="muted"></p>
+          <p id="update-status" role="status">从 GitHub Releases 获取更新</p>
+          <progress id="update-progress" max="100" value="0" hidden></progress>
+          <div class="form-actions">
+            <button id="check-update">检查更新</button
+            ><button id="install-update" class="primary" hidden>下载更新</button>
+          </div>
+          <p class="muted caption">当前包含预览版。下载校验后由 Android 确认安装。</p>
+        </div>
+      </section>
+      <div id="terminals" hidden></div>
     </main>
-    <footer>
-      <button data-key="\u001b">Esc</button><button id="ctrl">Ctrl</button
-      ><button data-key="\t">Tab</button><button data-key="\u001b[A">↑</button
-      ><button data-key="\u001b[B">↓</button><button data-key="\u001b[D">←</button
-      ><button data-key="\u001b[C">→</button><span id="status">就绪</span>
+    <div id="connect-actions" hidden>
+      <button id="save" type="button">仅保存</button
+      ><button class="primary" type="submit" form="connect">
+        <span data-icon="terminal"></span>连接
+      </button>
+    </div>
+    <footer id="terminal-tools" hidden>
+      <div class="key-row">
+        <button data-key="\u001b">Esc</button><button id="ctrl" aria-pressed="false">Ctrl</button
+        ><button data-key="\t">Tab</button><button data-key="\u001b[A" aria-label="上">↑</button
+        ><button data-key="\u001b[B" aria-label="下">↓</button
+        ><button data-key="\u001b[D" aria-label="左">←</button
+        ><button data-key="\u001b[C" aria-label="右">→</button>
+      </div>
+      <div class="terminal-status">
+        <span id="status" role="status">就绪</span><span>SSH · UTF-8</span>
+      </div>
     </footer>
+    <nav id="navigation" aria-label="工作台导航">
+      <button data-page="home" class="selected" aria-current="page">
+        <span data-icon="server"></span>服务器</button
+      ><button data-page="session-page">
+        <span data-icon="terminal"></span>会话<span id="session-badge" hidden></span></button
+      ><button data-page="settings"><span data-icon="settings"></span>设置</button>
+    </nav>
     <script src="app.js"></script>
   </body>
 </html>

@@ -1,4 +1,5 @@
 import { ToolSettings } from './ToolSettings';
+import { UpdateSettings } from './UpdateSettings';
 import type { ToolsSettings } from '../../shared/docker';
 import { useEffect, useState } from 'react';
 import { defaults, type Preferences } from '../../shared/contracts';
@@ -73,6 +74,7 @@ export function Settings({
   return (
     <section className="editor-page preferences-page" aria-label={t('settingsTitle')}>
       <h1>{t('settingsTitle')}</h1>
+      <UpdateSettings english={value.locale === 'en-US'} />
       <PresetControls draft={draft} onSelect={setDraft} onError={setError} />
       <form
         onSubmit={(e) => {

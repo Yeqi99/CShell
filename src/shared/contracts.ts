@@ -1,5 +1,6 @@
 import type { ExtensionBridge, InstalledPlugin } from './plugins';
 import type { AiBridge } from './ai';
+import type { UpdateBridge } from './updates';
 import type {
   ToolsSettings,
   DockerSnapshot,
@@ -187,7 +188,7 @@ export type SessionEvent =
   | { type: 'data'; sessionId: string; data: string }
   | { type: 'closed'; sessionId: string; error?: string }
   | { type: 'transfer'; transfer: Transfer };
-export interface Bridge extends ExtensionBridge, AiBridge {
+export interface Bridge extends ExtensionBridge, AiBridge, UpdateBridge {
   configureTools(settings: ToolsSettings): Promise<void>;
   dockerSnapshot(sessionId: string): Promise<DockerSnapshot>;
   dockerStats(sessionId: string, id: string): Promise<DockerStats>;

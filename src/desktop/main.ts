@@ -1,4 +1,5 @@
 import { registerExtensionHandlers } from './extensions';
+import { registerUpdateHandlers } from './updates';
 import { initialWindowBounds } from './window-bounds';
 import { registerAiHandlers } from './ai';
 import { DockerService } from '../core/docker';
@@ -176,6 +177,7 @@ else
           return fn(...args);
         });
       registerAppearanceHandlers(handle, window, app.getPath('userData'), consume, text);
+      registerUpdateHandlers(handle, window);
       await registerAiHandlers(handle, app.getPath('userData'), store, ssh);
       registerPresetHandlers(handle, window, app.getPath('userData'), store, text);
       const mcp = new McpService(store, app.getPath('userData'), async (name, command) => {

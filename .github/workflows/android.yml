@@ -28,6 +28,7 @@ jobs:
           gradle-version: '8.13'
       - run: pnpm install --frozen-lockfile
       - run: node scripts/build-android.mjs
+      - run: pnpm exec tsc -p android/web/tsconfig.json
       - run: gradle -p android assembleDebug lint
       - uses: actions/upload-artifact@v4
         with:

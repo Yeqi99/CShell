@@ -17,6 +17,7 @@ android {
     buildTypes { release { signingConfig signingConfigs.release; minifyEnabled false } }
 }
 dependencies {
+    implementation 'androidx.core:core:1.17.0'
     implementation 'com.github.mwiede:jsch:2.28.8'
     implementation 'org.bouncycastle:bcprov-jdk18on:1.86'
 }

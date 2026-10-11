@@ -19,6 +19,7 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider;
 /** Local-only UI bridge. No remote page or remote script can access this interface. */
 public class MainActivity extends Activity {
   private WebView web;
+  private AppUpdates updates;
   private final ExecutorService workers = Executors.newCachedThreadPool();
   private final Map<String, Connection> connections = new ConcurrentHashMap<>();
   private volatile boolean destroyed;
@@ -32,6 +33,9 @@ public class MainActivity extends Activity {
     super.onCreate(state);
     Security.removeProvider("BC"); Security.addProvider(new BouncyCastleProvider());
     web = new WebView(this);
+    updates = new AppUpdates(this, workers, value -> runOnUiThread(() -> {
+      if (!destroyed) web.evaluateJavascript("window.updateEvent(" + JSONObject.quote(value) + ")", null);
+    }));
     web.getSettings().setJavaScriptEnabled(true);
     web.getSettings().setDomStorageEnabled(true);
     web.getSettings().setAllowFileAccess(false);
@@ -79,6 +83,9 @@ public class MainActivity extends Activity {
     } catch (Exception e) { return false; }
   }
   public class Bridge {
+    @JavascriptInterface public String version() { return updates.current(); }
+    @JavascriptInterface public void checkUpdate() { updates.check(); }
+    @JavascriptInterface public void installUpdate() { updates.install(); }
     @JavascriptInterface public void connect(String json) {
       if (destroyed) return;
       workers.execute(() -> {
@@ -132,5 +139,10 @@ public class MainActivity extends Activity {
   @Override public void onDestroy() {
     destroyed = true; for (Connection c : connections.values()) c.close(); connections.clear(); workers.shutdownNow();
     web.removeJavascriptInterface("CShellNative"); web.destroy(); super.onDestroy();
+  }
+  @Override public void onBackPressed() {
+    web.evaluateJavascript("window.mobileBack()", result -> {
+      if (!"true".equals(result)) moveTaskToBack(true);
+    });
   }
 }

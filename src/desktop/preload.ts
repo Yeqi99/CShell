@@ -1,6 +1,10 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { Bridge, SessionEvent } from '../shared/contracts';
 const bridge: Bridge = {
+  updateState: () => ipcRenderer.invoke('update:state'),
+  checkUpdate: () => ipcRenderer.invoke('update:check'),
+  downloadUpdate: () => ipcRenderer.invoke('update:download'),
+  installUpdate: () => ipcRenderer.invoke('update:install'),
   applicationCatalog: () => ipcRenderer.invoke('applications:catalog'),
   aiSnapshot: () => ipcRenderer.invoke('ai:snapshot'),
   aiProviderSave: (p, key) => ipcRenderer.invoke('ai:provider-save', p, key),
