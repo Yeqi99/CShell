@@ -87,6 +87,19 @@ public class MainActivity extends Activity {
     } catch (Exception e) { return false; }
   }
   public class Bridge {
+    @JavascriptInterface public void setTheme(boolean dark) {
+      runOnUiThread(() -> {
+        int color = android.graphics.Color.parseColor(dark ? "#141b24" : "#ffffff");
+        web.setBackgroundColor(color);
+        getWindow().setStatusBarColor(color); getWindow().setNavigationBarColor(color);
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
+          int mask = android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS | android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
+          getWindow().getInsetsController().setSystemBarsAppearance(dark ? 0 : mask, mask);
+        } else {
+          web.setSystemUiVisibility(dark ? 0 : android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | android.view.View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+        }
+      });
+    }
     @JavascriptInterface public String version() { return updates.current(); }
     @JavascriptInterface public void checkUpdate() { updates.check(); }
     @JavascriptInterface public void installUpdate() { updates.install(); }

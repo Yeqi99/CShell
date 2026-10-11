@@ -14,6 +14,7 @@ declare global {
       checkUpdate(): void;
       installUpdate(): void;
       version(): string;
+      setTheme(dark: boolean): void;
     };
     receive(id: string, type: string, value: string): void;
     updateEvent(json: string): void;
@@ -88,6 +89,7 @@ const theme = () => ({
 });
 function applyTheme() {
   document.body.classList.toggle('dark', dark);
+  window.CShellNative?.setTheme?.(dark);
   for (const s of sessions.values()) s.terminal.options.theme = theme();
 }
 applyTheme();
