@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, readFile, rm, writeFile, mkdir } from 'node:fs/promises';
+import { mkdtemp, readFile, realpath, rm, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { Store } from '../src/core/store';
@@ -136,7 +136,7 @@ test('local directory capability, copy and conflict preservation', async () => {
     await assert.rejects(() => local.list(randomUUID(), '/'), /expired/);
     await assert.rejects(() => local.resolve(grant.root, 'C:\\Windows'), /Invalid/);
     await assert.rejects(() => local.resolve(grant.root, '/file:stream'), /Invalid/);
-    assert.equal(await local.resolve(grant.root, '/../../'), directory);
+    assert.equal(await local.resolve(grant.root, '/../../'), await realpath(directory));
     await local.action(grant.root, 'mkdir', '/target');
     const controller = new AbortController();
     let bytes = 0;
