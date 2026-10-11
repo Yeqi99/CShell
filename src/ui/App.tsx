@@ -42,17 +42,18 @@ import { CommandPicker, type WorkbenchCommand } from './components/CommandPicker
 import { ConnectionForm } from './components/ConnectionForm';
 import { Settings } from './components/Settings';
 import { LanguageMenu } from './components/LanguageMenu';
-import { DockGrip, PanelResizer, panelDragType, type PanelId } from './components/Docking';
+import { DockGrip, PanelResizer, usePanelDrop } from './components/Docking';
 import { Tooltips } from './components/Tooltips';
 import { useAppearance, WorkbenchBackground } from './appearance';
 import { Modal } from './components/Modal';
 import { TerminalPane } from './components/TerminalPane';
 import { ServerSidebar } from './components/ServerSidebar';
+import { SavedConnection } from './components/SavedConnection';
 import { LocalDock } from './components/LocalDock';
 import { ToolsPanel } from './components/ToolsPanel';
 import { SessionTab } from './components/SessionTab';
 import { shortcutFor } from './shortcuts';
-import { terminalEvent, terminalClosed } from './terminalBus';
+import { terminalEvent, terminalClosed, terminalSnapshot } from './terminalBus';
 import brandMark from '../../assets/icon.svg';
 
 type Tab = { id: string; profile: Profile; closed: boolean; python?: string };
@@ -74,6 +75,9 @@ export function App() {
 function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Config) => void }) {
   const { t } = useI18n();
   const [minimal, setMinimal] = useState(false);
+  useEffect(() => {
+    void window.cshell.setMinimalMode(minimal).catch(onError);
+  }, [minimal]);
   const [pinned, setPinned] = useState(false);
   const [aiVisible, setAiVisible] = useState(false);
   useEffect(() => {
@@ -117,15 +121,25 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
     [active, setActive] = useState(''),
     [form, setForm] = useState<Profile | 'new' | null>(null),
     [settings, setSettings] = useState(false),
-    [surface, setSurface] = useState<'terminal' | 'connection' | 'settings' | 'extensions'>(
-      'terminal',
-    ),
+    [surface, setSurface] = useState<
+      'terminal' | 'connection' | 'quick' | 'settings' | 'extensions'
+    >('terminal'),
     [palette, setPalette] = useState(false),
     [error, setError] = useState(''),
     [searching, setSearching] = useState(false),
     [transfers, setTransfers] = useState<Transfer[]>([]),
     [confirmDelete, setConfirmDelete] = useState<Profile | null>(null),
     [confirmClose, setConfirmClose] = useState<Tab | null>(null);
+  const [quickConnections, setQuickConnections] = useState<Profile[]>([]);
+  const [quickId, setQuickId] = useState('');
+  const [quickBusy, setQuickBusy] = useState<string[]>([]);
+  const openSaved = (profile: Profile) => {
+    setQuickConnections((items) =>
+      items.some((item) => item.id === profile.id) ? items : [...items, profile],
+    );
+    setQuickId(profile.id);
+    setSurface('quick');
+  };
   const openConnection = (profile: Profile | 'new') => {
     setDrafts((items) =>
       items.some(
@@ -222,19 +236,28 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
               setSurface('connection');
             },
           })),
+          ...quickConnections.map((profile) => ({
+            key: `quick-${profile.id}`,
+            select: () => {
+              setQuickId(profile.id);
+              setSurface('quick');
+            },
+          })),
           ...(extensions ? [{ key: 'extensions', select: openExtensions }] : []),
           ...(settings ? [{ key: 'settings', select: () => setSurface('settings') }] : []),
         ];
         const key =
           surface === 'terminal'
             ? active
-            : surface === 'extensions'
-              ? 'extensions'
-              : surface === 'settings'
-                ? 'settings'
-                : form === 'new'
-                  ? 'new'
-                  : `edit-${form?.id}`;
+            : surface === 'quick'
+              ? `quick-${quickId}`
+              : surface === 'extensions'
+                ? 'extensions'
+                : surface === 'settings'
+                  ? 'settings'
+                  : form === 'new'
+                    ? 'new'
+                    : `edit-${form?.id}`;
         const next =
           (views.findIndex((v) => v.key === key) +
             (shortcut === 'nextTab' ? 1 : -1) +
@@ -245,8 +268,28 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [preferences, drafts, tabs, active, surface, settings, form, extensions]);
+  }, [
+    preferences,
+    drafts,
+    tabs,
+    active,
+    surface,
+    settings,
+    form,
+    extensions,
+    quickConnections,
+    quickId,
+  ]);
   const current = surface === 'terminal' ? tabs.find((tab) => tab.id === active) : undefined;
+  useEffect(
+    () =>
+      window.cshell.onFocusSession((id) => {
+        setActive(id);
+        setSurface('terminal');
+        setMinimal(false);
+      }),
+    [],
+  );
   const showTools = right && !!current && !current.closed;
   const saveProfile = async (p: Profile) => {
     await window.cshell.saveProfile(p);
@@ -291,6 +334,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
   };
   const togglePanel = (key: 'serverVisible' | 'fileVisible') =>
     onLayout({ ...layout, [key]: !layout[key] });
+  const docking = usePanelDrop(layout, onLayout);
   const commands: WorkbenchCommand[] = [
     {
       id: 'new',
@@ -384,23 +428,9 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
 
       <div
         className={`workspace dock-workspace ${left ? '' : 'hide-left'} ${showTools ? '' : 'hide-right'}`}
-        onDragOver={(e) => {
-          if (e.dataTransfer.types.includes(panelDragType)) e.preventDefault();
-        }}
-        onDrop={(e) => {
-          const source = e.dataTransfer.getData(panelDragType) as PanelId;
-          const target = (e.target as Element).closest<HTMLElement>('[data-panel]')?.dataset
-            .panel as PanelId;
-          if (!layout.order.includes(source) || !layout.order.includes(target) || source === target)
-            return;
-          e.preventDefault();
-          const order = [...layout.order];
-          const a = order.indexOf(source),
-            b = order.indexOf(target);
-          [order[a], order[b]] = [order[b], order[a]];
-          onLayout({ ...layout, order });
-        }}
+        {...docking.events}
       >
+        {docking.overlay}
         <WorkbenchBackground preferences={preferences} onError={onError} />
         {left && (
           <div
@@ -429,6 +459,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
               activeProfile={current?.profile.id}
               online={tabs.filter((tab) => !tab.closed).map((tab) => tab.profile.id)}
               onOpen={(p) => openConnection(p || 'new')}
+              onConnect={openSaved}
               onSave={saveProfile}
               onManageGroup={async (action) => {
                 await window.cshell.manageGroup(action);
@@ -512,6 +543,11 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
                       setActive(tab.id);
                       setSurface('terminal');
                     }}
+                    onFloat={() => {
+                      void terminalSnapshot(tab.id)
+                        .then((snapshot) => window.cshell.openFloating(tab.id, snapshot))
+                        .catch(onError);
+                    }}
                     onClose={() => (tab.closed ? run(closeTab(tab)) : setConfirmClose(tab))}
                     onMove={(source, target) =>
                       setTabs((items) => {
@@ -525,12 +561,46 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
                     }
                   />
                 ))
-              ) : !form && !settings ? (
+              ) : !form && !settings && !quickConnections.length ? (
                 <div className="tab active welcome-tab">
                   <TerminalIcon size={15} />
                   {t('workspace')}
                 </div>
               ) : null}
+              {quickConnections.map((profile) => (
+                <div
+                  key={`quick-${profile.id}`}
+                  className={`tab ${surface === 'quick' && quickId === profile.id ? 'active' : ''}`}
+                  onClick={() => {
+                    setQuickId(profile.id);
+                    setSurface('quick');
+                  }}
+                >
+                  <button
+                    onClick={() => {
+                      setQuickId(profile.id);
+                      setSurface('quick');
+                    }}
+                  >
+                    {profile.name}
+                  </button>
+                  <button
+                    className="icon"
+                    disabled={quickBusy.includes(profile.id)}
+                    title={t('close')}
+                    aria-label={`${t('close')} ${profile.name}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setQuickConnections((items) =>
+                        items.filter((item) => item.id !== profile.id),
+                      );
+                      if (quickId === profile.id) setSurface('terminal');
+                    }}
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+              ))}
               {drafts.map((draft) => (
                 <div
                   key={draft === 'new' ? 'new' : draft.id}
@@ -627,6 +697,29 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
               <PanelRight size={17} />
             </button>
           </div>
+          {quickConnections.map((profile) => (
+            <div
+              key={`quick-${profile.id}`}
+              className="workspace-editor"
+              hidden={surface !== 'quick' || quickId !== profile.id}
+            >
+              <SavedConnection
+                profile={profile}
+                saved={config.savedCredentials.includes(profile.id)}
+                onConnect={connect}
+                onDone={() =>
+                  setQuickConnections((items) => items.filter((item) => item.id !== profile.id))
+                }
+                onBusy={(busy) =>
+                  setQuickBusy((items) =>
+                    busy
+                      ? [...items.filter((id) => id !== profile.id), profile.id]
+                      : items.filter((id) => id !== profile.id),
+                  )
+                }
+              />
+            </div>
+          ))}
           {drafts.map((draft) => (
             <div
               key={draft === 'new' ? 'new' : draft.id}
@@ -653,6 +746,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
             >
               <Suspense fallback={<div className="extension-empty">…</div>}>
                 <ExtensionWorkbench
+                  tools={config.tools}
                   visible={surface === 'extensions'}
                   plugins={config.plugins}
                   sessions={tabs.map((tab) => ({
@@ -689,8 +783,6 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
             <div className="workspace-editor" hidden={surface !== 'settings'}>
               <Settings
                 themeRequest={themeRequest}
-                tools={config.tools}
-                onToolsSave={refresh}
                 value={config.preferences}
                 onPreview={setPreview}
                 layout={preferences.layout}

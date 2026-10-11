@@ -1,3 +1,4 @@
+import { SerializeAddon } from '@xterm/addon-serialize';
 import { pluginEnabled, type InstalledPlugin } from '../../shared/plugins';
 import { suggestCommands, shellPromptInput, linuxCommands } from '../command-suggestions';
 import { useEffect, useRef, useState } from 'react';
@@ -7,12 +8,12 @@ import { SearchAddon } from '@xterm/addon-search';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { ArrowDown, ArrowUp, X, Search } from 'lucide-react';
 import type { Preferences } from '../../shared/contracts';
-import { subscribeTerminal } from '../terminalBus';
+import { subscribeTerminal, registerTerminalSnapshot } from '../terminalBus';
 import { useI18n } from '../i18n';
 import { shortcutFor } from '../shortcuts';
 import { detectEditor, editorFromCommand, type EditorDetection } from '../editor-detection';
 import { EditorAssistant, type AssistantChoice } from './EditorAssistant';
-import { editorActionInput, editorPromptBusy } from '../editor-actions';
+import { editorActionInput, editorPromptBusy, vimExitFromPrompt } from '../editor-actions';
 import '@xterm/xterm/css/xterm.css';
 function currentShellInput(terminal: Terminal) {
   const buffer = terminal.buffer.active;
@@ -403,9 +404,41 @@ export function TerminalPane({
     const resize = terminal.onResize(
       (size) => void window.cshell.resize(id, size.cols, size.rows).catch(() => {}),
     );
-    const dispose = subscribeTerminal(id, (value) =>
-      terminal.write(value, () => void window.cshell.acknowledge(id, value.length).catch(() => {})),
+    const serializer = new SerializeAddon();
+    terminal.loadAddon(serializer);
+    let writtenSequence = 0;
+    const dispose = subscribeTerminal(id, (value, sequence) =>
+      terminal.write(value, () => {
+        writtenSequence = sequence;
+        void window.cshell.acknowledge(id, value.length).catch(() => {});
+      }),
     );
+    const snapshotDispose = registerTerminalSnapshot(
+      id,
+      () =>
+        new Promise((resolve) =>
+          terminal.write('', () =>
+            resolve({
+              data: serializer.serialize(),
+              sequence: writtenSequence,
+              cols: terminal.cols,
+              rows: terminal.rows,
+              theme: Object.fromEntries(
+                Object.entries(terminal.options.theme || {}).filter(
+                  (entry): entry is [string, string] => typeof entry[1] === 'string',
+                ),
+              ),
+            }),
+          ),
+        ),
+    );
+    const focusTerminal = () => {
+      if (suggestionState.current.active && host.current?.clientWidth) {
+        fitter.fit();
+        void window.cshell.resize(id, terminal.cols, terminal.rows).catch(() => {});
+      }
+    };
+    window.addEventListener('focus', focusTerminal);
     const observer = new ResizeObserver(() => {
       if (host.current?.clientWidth) fitter.fit();
     });
@@ -419,6 +452,8 @@ export function TerminalPane({
     window.addEventListener('cshell:fonts-loaded', fontsLoaded);
     return () => {
       dispose();
+      snapshotDispose();
+      window.removeEventListener('focus', focusTerminal);
       observer.disconnect();
       window.removeEventListener('cshell:fonts-loaded', fontsLoaded);
       data.dispose();
@@ -626,16 +661,25 @@ export function TerminalPane({
             (_, row) => buffer.getLine(buffer.baseY + row)?.translateToString(true) || '',
           );
           // Multiplexers can retain the alternate buffer after an editor exits.
+          const resumeExit = kind === 'vim' && vimExitFromPrompt(lines, action);
           // Automatic actions require fresh editor evidence, not just a latched badge.
           if (
             assistantChoice === 'auto' &&
             detectEditor(lines, true)?.kind !== kind &&
+            !resumeExit &&
             !(['normal', 'cancel'].includes(action) && editorPromptBusy(lines, kind))
           )
             throw new Error('EDITOR_INACTIVE');
-          if (!['normal', 'cancel'].includes(action) && editorPromptBusy(lines, kind))
+          if (
+            !resumeExit &&
+            !['normal', 'cancel'].includes(action) &&
+            editorPromptBusy(lines, kind)
+          )
             throw new Error('EDITOR_PROMPT');
-          await window.cshell.input(id, editorActionInput(kind, action, value, modern, nanoSearch));
+          await window.cshell.input(
+            id,
+            (resumeExit ? '\r' : '') + editorActionInput(kind, action, value, modern, nanoSearch),
+          );
         }}
       >
         <div className="terminal-host" ref={host} />

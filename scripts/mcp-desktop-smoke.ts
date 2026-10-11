@@ -7,6 +7,10 @@ export async function mcpDesktopSmoke(app: ElectronApplication, page: Page) {
   const port = (probe.address() as { port: number }).port;
   await new Promise<void>((resolve) => probe.close(() => resolve()));
   await page.locator('.topbar button').last().click();
+  await page
+    .getByRole('navigation', { name: '设置分类' })
+    .getByRole('button', { name: 'AI 与安全', exact: true })
+    .click();
   const panel = page.locator('.mcp-settings');
   await panel.getByLabel('在本机启用 MCP').check();
   await panel.getByLabel('端口', { exact: true }).fill(String(port));

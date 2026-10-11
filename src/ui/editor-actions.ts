@@ -11,6 +11,7 @@ export type EditorAction =
   | 'exitAll'
   | 'saveExitAll'
   | 'discard'
+  | 'discardCurrent'
   | 'first'
   | 'last'
   | 'search'
@@ -54,6 +55,7 @@ export function editorActionInput(
       exitAll: 'qall',
       saveExitAll: 'wall|qall',
       discard: 'qall!',
+      discardCurrent: 'quit!',
     };
     if (action === 'line') {
       if (!/^[1-9]\d{0,8}$/.test(value)) throw new Error('INVALID_LINE');
@@ -66,6 +68,7 @@ export function editorActionInput(
       const pattern = ('\\V' + value.replaceAll('\\', '\\\\')).replaceAll("'", "''");
       return normal + ":let @/ = '" + pattern + "'\r:call search(@/, 'w')\r";
     }
+    if (!commands[action]) throw new Error('UNSUPPORTED_ACTION');
     return normal + ':' + commands[action] + '\r';
   }
   const keys: Partial<Record<EditorAction, string>> = {
@@ -82,6 +85,12 @@ export function editorActionInput(
   };
   if (!keys[action]) throw new Error('UNSUPPORTED_ACTION');
   return keys[action]!;
+}
+export function vimExitFromPrompt(lines: string[], action: EditorAction) {
+  return (
+    ['exit', 'saveExit', 'exitAll', 'saveExitAll', 'discard', 'discardCurrent'].includes(action) &&
+    /Press ENTER|按.*(?:ENTER|回车)/i.test(lines.slice(-4).join('\n'))
+  );
 }
 export function editorPromptBusy(lines: string[], kind: EditorKind) {
   const bottom = lines.slice(-4).join('\n');

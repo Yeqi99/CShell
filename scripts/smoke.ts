@@ -103,7 +103,8 @@ async function main() {
         checkboxChecked: false,
       })) as typeof dialog.showMessageBox;
     });
-    await page.getByRole('button', { name: /Local integration 127.0.0.1/ }).dblclick();
+    await page.getByRole('button', { name: '连接操作 · Local integration', exact: true }).click();
+    await page.getByRole('menuitem', { name: '编辑连接', exact: true }).click();
     await page
       .locator('.connection-editor:visible .connection-secret input')
       .fill('wrong-password');
@@ -242,7 +243,11 @@ async function main() {
     await page.screenshot({ path: 'test-results/workspace-light-en.png' });
     await page.setViewportSize({ width: 900, height: 640 });
     await page.screenshot({ path: 'test-results/compact.png' });
-    await page.locator('.tab .icon').first().click();
+    await page
+      .locator('.session-tab')
+      .getByRole('button', { name: /^Close / })
+      .first()
+      .click();
     await page.getByRole('dialog').getByRole('button', { name: 'Confirm', exact: true }).click();
     await page.locator('.monitor-panel').waitFor({ state: 'hidden' });
     assert.deepEqual(errors, []);

@@ -56,6 +56,7 @@ export function UpdateSettings({ english }: { english: boolean }) {
       <div className="form-actions">
         <button
           type="button"
+          className="secondary"
           disabled={!!busy}
           onClick={() => void run(() => window.cshell.checkUpdate())}
         >

@@ -42,6 +42,7 @@ test('editor actions normalize Vim mode, quote literal queries and reject contro
   assert.equal(editorActionInput('vim', 'visualBlock'), '\x1c\x0e\x16');
   assert.equal(editorActionInput('vim', 'exitAll'), '\x1c\x0e:qall\r');
   assert.equal(editorActionInput('vim', 'discard'), '\x1c\x0e:qall!\r');
+  assert.equal(editorActionInput('vim', 'discardCurrent'), '\x1c\x0e:quit!\r');
   assert.equal(editorActionInput('nano', 'cancel'), '\x03');
   assert.equal(editorActionInput('vim', 'first'), '\x1c\x0e:normal! gg\r');
   assert.equal(editorActionInput('vim', 'last'), '\x1c\x0e:normal! G\r');

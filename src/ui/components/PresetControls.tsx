@@ -45,6 +45,7 @@ export function PresetControls({
           </select>
         </label>
         <button
+          className="secondary"
           type="button"
           disabled={!selected}
           onClick={() =>
@@ -92,7 +93,11 @@ export function PresetControls({
         >
           {t('importPreset')}
         </button>
-        <button type="button" onClick={() => run(window.cshell.exportPreset(draft))}>
+        <button
+          className="secondary"
+          type="button"
+          onClick={() => run(window.cshell.exportPreset(draft))}
+        >
           {t('exportPreset')}
         </button>
       </div>

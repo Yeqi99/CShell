@@ -27,6 +27,7 @@ export function ServerSidebar({
   activeProfile,
   online,
   onOpen,
+  onConnect,
   onSave,
   onDelete,
   onManageGroup,
@@ -36,6 +37,7 @@ export function ServerSidebar({
   activeProfile?: string;
   online: string[];
   onOpen: (p?: Profile) => void;
+  onConnect: (p: Profile) => void;
   onSave: (p: Profile) => Promise<void>;
   onDelete: (p: Profile) => void;
   onManageGroup: (action: GroupAction) => Promise<void>;
@@ -321,7 +323,13 @@ export function ServerSidebar({
                   <div className="server-row">
                     <button
                       className="server-open"
-                      onDoubleClick={() => onOpen(profile)}
+                      onDoubleClick={() => onConnect(profile)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          onConnect(profile);
+                        }
+                      }}
                       onClick={() => closeMenu()}
                       title={`${profile.username}@${profile.host}:${profile.port}`}
                     >

@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import { AiService, commandNeedsReview } from '../src/core/ai';
 import { Store } from '../src/core/store';
 import { SshService } from '../src/core/ssh';
+import { createSshConnections } from '../src/core/connections/ssh-provider';
 import { fixture } from './fixture';
 import { initialWindowBounds } from '../src/desktop/window-bounds';
 const until = async (fn: () => boolean) => {
@@ -101,7 +102,8 @@ test('agent enforces target/capability, review, revocation, stop and encrypted p
     };
     await store.saveProfile(profile);
     const { sessionId } = await ssh.connect(profile, { password: remote.password });
-    const ai = new AiService(directory, store, ssh);
+    const connections = createSshConnections(ssh, () => store.snapshot().profiles);
+    const ai = new AiService(directory, store, connections);
     await ai.load();
     const provider = {
       id: randomUUID(),
@@ -193,7 +195,7 @@ test('agent enforces target/capability, review, revocation, stop and encrypted p
     const stored = await readFile(join(directory, 'ai.enc'), 'utf8');
     assert.equal(stored.includes('private-test-key'), false);
     assert.equal(stored.includes('show directory'), false);
-    const reloaded = new AiService(directory, store, ssh);
+    const reloaded = new AiService(directory, store, connections);
     await reloaded.load();
     assert.equal(reloaded.snapshot().providers[0].hasKey, true);
     assert.equal(reloaded.snapshot().threads.length, 2);

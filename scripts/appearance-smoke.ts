@@ -5,6 +5,7 @@ import type { ElectronApplication, Page } from 'playwright';
 
 export async function appearanceSmoke(app: ElectronApplication, page: Page, data: string) {
   const settingsButton = page.locator('.topbar button').last();
+  await page.mouse.move(10, 10);
   await settingsButton.hover();
   await page.getByRole('tooltip').filter({ hasText: '偏好设置' }).waitFor();
   await page.keyboard.press('Escape');
@@ -64,6 +65,7 @@ export async function appearanceSmoke(app: ElectronApplication, page: Page, data
     ),
   );
   await chooseFile(sourceFont);
+  await page.locator('.settings-nav').getByRole('button', { name: '终端', exact: true }).click();
   await page.getByRole('button', { name: '导入字体文件', exact: true }).last().click();
   await page.waitForFunction(() =>
     [...document.fonts].some(
@@ -73,6 +75,7 @@ export async function appearanceSmoke(app: ElectronApplication, page: Page, data
   const invalid = join(data, 'invalid.ttf');
   await writeFile(invalid, 'not a font');
   await chooseFile(invalid);
+  await page.locator('.settings-nav').getByRole('button', { name: '外观', exact: true }).click();
   await page.getByRole('button', { name: '导入字体文件', exact: true }).first().click();
   await page.getByRole('alert').filter({ hasText: '字体加载失败' }).waitFor();
   const imagePath = join(data, 'background.png');
@@ -99,6 +102,7 @@ export async function appearanceSmoke(app: ElectronApplication, page: Page, data
     await page.locator('.workbench-background').evaluate((el) => getComputedStyle(el).opacity),
     '0.3',
   );
+  await page.locator('.settings-nav').getByRole('button', { name: '工作区', exact: true }).click();
   await page.getByRole('textbox', { name: '配置名称', exact: true }).fill('Night workspace');
   await page.getByRole('button', { name: '保存配置', exact: true }).click();
   await page.waitForFunction(async () =>
@@ -126,8 +130,10 @@ export async function appearanceSmoke(app: ElectronApplication, page: Page, data
   assert.ok(bundle?.assets.length);
   assert.equal(bundle.secrets, undefined);
   assert.equal(bundle.mcp, undefined);
+  await page.locator('.settings-nav').getByRole('button', { name: '外观', exact: true }).click();
   await page.getByRole('button', { name: '移除图片', exact: true }).click();
   await chooseFile(exportPath);
+  await page.locator('.settings-nav').getByRole('button', { name: '工作区', exact: true }).click();
   await page.getByRole('button', { name: '导入配置', exact: true }).click();
   await page.locator('.workbench-background').waitFor({ state: 'attached' });
   await page.screenshot({ path: 'test-results/appearance-settings.png' });
@@ -161,6 +167,7 @@ export async function appearanceSmoke(app: ElectronApplication, page: Page, data
   });
   assert.equal(rejected, true);
   await settingsButton.click();
+  await page.locator('.settings-nav').getByRole('button', { name: '外观', exact: true }).click();
   await page.getByRole('button', { name: '移除图片', exact: true }).click();
   await page.locator('.workbench-background').waitFor({ state: 'detached' });
   await page

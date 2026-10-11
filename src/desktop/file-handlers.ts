@@ -54,11 +54,27 @@ export function registerFileHandlers(
     await local.action(root, action, path, destination);
   });
   handle('file:transfer', async (inputSources, inputTarget, inputMove) => {
-    const sources = z.array(fileRefSchema).min(1).max(1000).parse(inputSources),
-      target = fileRefSchema.parse(inputTarget),
+    let sources = z.array(fileRefSchema).min(1).max(1000).parse(inputSources);
+    const target = fileRefSchema.parse(inputTarget),
       move = z.boolean().parse(inputMove);
     remotePath(target.path);
     sources.forEach((source) => remotePath(source.path));
+    // Resolve grants before prompting: two tabs can represent the same native directory.
+    if (target.kind === 'local') {
+      const destination = await local.resolve(target.root, target.path);
+      if (!(await lstat(destination)).isDirectory()) throw new Error('Target is not a directory');
+      const effective = [];
+      for (const source of sources) {
+        if (source.kind === 'local') {
+          const from = await local.resolve(source.root, source.path);
+          const to = join(destination, safeName(posix.basename(source.path)));
+          if (!relative(from, to)) continue;
+        }
+        effective.push(source);
+      }
+      sources = effective;
+      if (!sources.length) return;
+    }
     if (
       move &&
       !(await confirm(

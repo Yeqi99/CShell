@@ -158,3 +158,17 @@ SSH 测试服务仅监听 127.0.0.1；测试密码和主机/客户端密钥运�
 - Android 系统安装、真实 IME/后台进程限制、macOS/Linux 原生交互仍待实机验证；Linux 当前下载后打开位置，不声称自动替换。
 
 发布结果：Release 工作流 38138218087 全部成功，构建提交 0f5cc1eddb60bc63b66d1f017ca39d777c5fe58e。Android 持久签名发行 APK、Windows NSIS、macOS 两架构 DMG/ZIP、Linux 两架构 AppImage/DEB 共 10 个安装包及 SHA256SUMS.txt 已由统一流水线发布。Windows 额外通过更新 IPC、流式下载、校验和兼容与安装前篡改拒绝测试；移动网页回归由发布工作流执行通过。真机范围仍按上文保留。
+
+## 工作台整理（未发布源码）
+
+- 27 个核心测试覆盖 Provider 调度、权限撤回、一次性调用、SSH 适配、AI 提取输出约束和资源解析。
+- 完整 Electron 回归覆盖设置分类、外观预览/取消/导入导出、插件自身入口、Vim 退出菜单与按回车继续状态；测试 SSH 服务只监听 loopback。
+- `scripts/settings-smoke.ts`：分类切换保留草稿、跨分类保存、窄窗口深色预览和固定操作区。
+- `scripts/refinement-smoke.ts`：同目录拖放无操作、多目录真实复制/移动、监控刷新高度稳定、GPU/CPU 型号及进程偏好、原生布局拖放预览/取消。
+- `scripts/saved-connect-smoke.ts`：双击只补认证、失败原位重试、已保存凭据直接连接、编辑保留会话。
+- `scripts/floating-smoke.ts`：小窗复用会话与历史、独立置顶、只读模式后端拒绝输入、IPC 隔离、关闭和返回工作台保持连接。
+- `scripts/minimal-pin-smoke.ts`：极简置顶、键盘操作、还原、离开极简自动取消置顶。
+
+GPU 利用率与显存目前通过 NVIDIA 工具获得，其他 PCI 显卡仅列出型号。进程使用 Linux ps 快照（CPU 是进程生命周期平均，每核 100%），默认手动获取，可设置刷新周期；不称为瞬时 CPU。真实多显示器拖动、显示器拔插、复杂远端编辑器、长时间输出压力和非 Windows 原生窗口仍需实机验收。上述源码尚未进入 0.3.2 下载包。
+
+补充：scripts/extraction-smoke.ts 使用本机模拟 AI API 验证默认基座、点击后提取、字段可继续编辑，以及不自动建立 SSH、不保存连接或聊天记录。

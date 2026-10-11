@@ -12,6 +12,7 @@ import {
 import type { Profile, Credentials } from '../../shared/contracts';
 import { parseSshCommand } from '../../shared/ssh-command';
 import { useI18n } from '../i18n';
+import { ConnectionExtractor } from './ConnectionExtractor';
 
 type Field = 'name' | 'host' | 'port' | 'username';
 
@@ -187,6 +188,22 @@ export function ConnectionForm({
           {t('extractCommand')}
         </button>
       </header>
+      <ConnectionExtractor
+        onBusy={setExtracting}
+        onExtract={({ fields }) => {
+          const { port: extractedPort, password: extractedPassword, ...profileFields } = fields;
+          setValue((current) => ({
+            ...current,
+            ...profileFields,
+            ...(extractedPassword !== undefined ? { auth: 'password' as const } : {}),
+          }));
+          if (extractedPort !== undefined) setPort(String(extractedPort));
+          if (extractedPassword !== undefined) setPassword(extractedPassword);
+          setInvalid({});
+          setError('');
+          setExtraction('done');
+        }}
+      />
       {extraction && (
         <p
           className={`connection-extraction ${extraction === 'done' ? '' : 'danger'}`}

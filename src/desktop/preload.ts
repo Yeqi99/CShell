@@ -1,13 +1,36 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { Bridge, SessionEvent } from '../shared/contracts';
 const bridge: Bridge = {
+  openFloating: (id, snapshot) => ipcRenderer.invoke('floating:open', id, snapshot),
+  floatingInit: () => ipcRenderer.invoke('floating:init'),
+  floatingInput: (data) => ipcRenderer.invoke('floating:input', data),
+  floatingResize: (cols, rows) => ipcRenderer.invoke('floating:resize', cols, rows),
+  floatingMode: (readOnly) => ipcRenderer.invoke('floating:mode', readOnly),
+  floatingPin: (enabled) => ipcRenderer.invoke('floating:pin', enabled),
+  floatingCopy: (text) => ipcRenderer.invoke('floating:copy', text),
+  floatingPaste: () => ipcRenderer.invoke('floating:paste'),
+  floatingClose: () => ipcRenderer.invoke('floating:close'),
+  floatingRestore: () => ipcRenderer.invoke('floating:restore'),
+  onFocusSession: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, id: string) => listener(id);
+    ipcRenderer.on('window:focus-session', handler);
+    return () => ipcRenderer.removeListener('window:focus-session', handler);
+  },
+  onFloatingEvent: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, event: SessionEvent) => listener(event);
+    ipcRenderer.on('floating:event', handler);
+    return () => ipcRenderer.removeListener('floating:event', handler);
+  },
   setAlwaysOnTop: (enabled) => ipcRenderer.invoke('window:always-on-top', enabled),
+  setMinimalMode: (enabled) => ipcRenderer.invoke('window:minimal', enabled),
   updateState: () => ipcRenderer.invoke('update:state'),
   checkUpdate: () => ipcRenderer.invoke('update:check'),
   downloadUpdate: () => ipcRenderer.invoke('update:download'),
   installUpdate: () => ipcRenderer.invoke('update:install'),
   applicationCatalog: () => ipcRenderer.invoke('applications:catalog'),
   aiSnapshot: () => ipcRenderer.invoke('ai:snapshot'),
+  aiExtractConnection: (text, providerId) =>
+    ipcRenderer.invoke('ai:extract-connection', text, providerId),
   aiProviderSave: (p, key) => ipcRenderer.invoke('ai:provider-save', p, key),
   aiProviderDelete: (id) => ipcRenderer.invoke('ai:provider-delete', id),
   aiPermissionSave: (p) => ipcRenderer.invoke('ai:permission', p),
@@ -85,6 +108,8 @@ const bridge: Bridge = {
   transferFiles: (sources, target, move) =>
     ipcRenderer.invoke('file:transfer', sources, target, move),
   monitor: (id) => ipcRenderer.invoke('monitor', id),
+  resourceHardware: (id) => ipcRenderer.invoke('resources:hardware', id),
+  resourceProcesses: (id) => ipcRenderer.invoke('resources:processes', id),
   droppedFiles: (files) =>
     files.map((file) => ipcRenderer.sendSync('drop:register', webUtils.getPathForFile(file))),
   copyText: (text) => ipcRenderer.invoke('clipboard:write', text),

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import type { Metrics } from '../../shared/contracts';
 import { useI18n } from '../i18n';
+import { ResourceDetails } from './ResourceDetails';
 
 function capacity(bytes: number | null | undefined, locale: string) {
   if (bytes == null) return '—';
@@ -35,17 +36,21 @@ export function MonitorPanel({
   const [retry, setRetry] = useState(0);
   const [cpuUnavailable, setCpuUnavailable] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const { t, locale } = useI18n();
   useEffect(() => {
     setMetrics(null);
     setHistory([]);
     setFailed(false);
     setCpuUnavailable(false);
+  }, [sessionId, active]);
+  useEffect(() => {
     if (!sessionId || !expanded || !active) return;
     let missedCpu = 0;
     let disposed = false,
       timer: ReturnType<typeof setTimeout>;
     const poll = async () => {
+      setRefreshing(true);
       try {
         const next = await window.cshell.monitor(sessionId);
         if (!disposed) {
@@ -59,11 +64,12 @@ export function MonitorPanel({
       } catch {
         if (!disposed) {
           setFailed(true);
-          setMetrics(null);
-          setHistory([]);
         }
       } finally {
-        if (!disposed) timer = setTimeout(poll, 5000);
+        if (!disposed) {
+          setRefreshing(false);
+          timer = setTimeout(poll, 5000);
+        }
       }
     };
     void poll();
@@ -95,6 +101,7 @@ export function MonitorPanel({
               className="icon"
               title={t('retry')}
               aria-label={t('retry')}
+              disabled={refreshing}
               onClick={() => setRetry((v) => v + 1)}
             >
               <RefreshCw size={12} />
@@ -109,7 +116,7 @@ export function MonitorPanel({
               <Cpu size={13} />
               CPU
             </span>
-            <span className="resource-detail">
+            <span className="resource-detail" title={metrics?.cpuModel || undefined} tabIndex={0}>
               {metrics?.cpuCount ? metrics.cpuCount + ' ' + t('logicalCores') : '—'}
             </span>
             <strong>{percent(metrics?.cpu)}</strong>
@@ -132,11 +139,6 @@ export function MonitorPanel({
               </svg>
             )}
           </div>
-          {metrics?.cpu == null && (
-            <p className="resource-message">
-              {failed || cpuUnavailable ? t('cpuUnavailable') : t('cpuSampling')}
-            </p>
-          )}
           {(['memory', 'disk'] as const).map((key) => {
             const Icon = key === 'memory' ? Database : HardDrive;
             const used = key === 'memory' ? metrics?.memoryUsed : metrics?.diskUsed;
@@ -179,11 +181,7 @@ export function MonitorPanel({
             <span className="resource-detail">SSH RTT</span>
             <strong>{metrics ? metrics.latency + ' ms' : '—'}</strong>
           </div>
-          {missing && (
-            <p className="resource-message" role="status">
-              {t('monitorUnavailable')}
-            </p>
-          )}
+          <ResourceDetails key={sessionId} sessionId={sessionId} />
         </div>
       )}
     </section>

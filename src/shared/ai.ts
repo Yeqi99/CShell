@@ -56,6 +56,10 @@ export interface AiSnapshot {
   threads: AiThread[];
 }
 export interface AiBridge {
+  aiExtractConnection(
+    text: string,
+    providerId?: string,
+  ): Promise<import('./connection-extraction').ExtractedConnection>;
   aiSnapshot(): Promise<AiSnapshot>;
   aiProviderSave(provider: z.infer<typeof aiProviderSchema>, key?: string): Promise<void>;
   aiProviderDelete(id: string): Promise<void>;

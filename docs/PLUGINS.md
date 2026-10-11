@@ -78,3 +78,7 @@ Jupyter 以已认证的 SSH 用户在所选环境启动（支持 root 连接，�
 - [CodeMirror 补全接口](https://codemirror.net/examples/autocompletion/)
 - [Jupyter 认证与 token](https://jupyter-server.readthedocs.io/en/latest/operators/security.html)
 - [Anaconda 安装器索引](https://repo.anaconda.com/archive/)、[Miniconda 索引](https://repo.anaconda.com/miniconda/)
+
+## 工作台入口归属
+
+通用扩展导航仅包含插件市场和应用市场。已安装且启用的 Anaconda、Python 插件从自身条目的“打开插件”进入；停用或卸载后不保留入口。Docker Socket 配置位于 Docker 插件条目内。当前 UI 注册表仅装配随应用构建、受信任的内置组件，不支持下载后执行任意 React/JavaScript。第三方可拖动组件协议属于后续扩展，不能用永久占位入口替代插件贡献。

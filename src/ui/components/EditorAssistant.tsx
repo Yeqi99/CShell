@@ -1,5 +1,5 @@
 import { Modal } from './Modal';
-import { useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   TextCursorInput,
   MousePointer2,
@@ -44,7 +44,18 @@ export function EditorAssistant({
 }) {
   const { locale } = useI18n();
   const zh = locale === 'zh-CN';
-  const [discard, setDiscard] = useState(false);
+  const [discard, setDiscard] = useState<'discard' | 'discardCurrent' | null>(null);
+  const [exitMenu, setExitMenu] = useState(false);
+  const exitRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!exitMenu) return;
+    exitRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
+    const dismiss = (e: PointerEvent) => {
+      if (!exitRef.current?.contains(e.target as Node)) setExitMenu(false);
+    };
+    document.addEventListener('pointerdown', dismiss);
+    return () => document.removeEventListener('pointerdown', dismiss);
+  }, [exitMenu]);
   const [more, setMore] = useState(false);
   const [entry, setEntry] = useState<'search' | 'line' | null>(null);
   const [query, setQuery] = useState('');
@@ -65,6 +76,7 @@ export function EditorAssistant({
       await onAction(kind, action, value, modern, detected?.nanoSearch || 'Ctrl+W');
       setEntry(null);
       setMore(false);
+      setExitMenu(false);
       onFocusTerminal();
     } catch (e) {
       const code = (e as Error).message;
@@ -118,19 +130,32 @@ export function EditorAssistant({
     <div className="terminal-editor-layout">
       {discard && (
         <Modal
-          title={zh ? '放弃修改并退出 Vim' : 'Discard changes & exit Vim'}
-          onClose={() => setDiscard(false)}
+          title={
+            zh
+              ? discard === 'discard'
+                ? '放弃全部修改并退出 Vim'
+                : '不保存，关闭当前 Vim 窗口'
+              : 'Discard changes & exit Vim'
+          }
+          onClose={() => setDiscard(null)}
         >
           <p>
-            {zh ? '所有未保存的缓冲区修改都会丢失。' : 'All unsaved buffer changes will be lost.'}
+            {discard === 'discard'
+              ? zh
+                ? '所有未保存的缓冲区修改都会丢失。'
+                : 'All unsaved buffer changes will be lost.'
+              : zh
+                ? '当前窗口将关闭，未保存的修改可能丢失。其他窗口不会关闭。'
+                : 'Close this window without saving. Unsaved changes may be lost; other windows remain open.'}
           </p>
           <footer>
-            <button onClick={() => setDiscard(false)}>{zh ? '取消' : 'Cancel'}</button>
+            <button onClick={() => setDiscard(null)}>{zh ? '取消' : 'Cancel'}</button>
             <button
               className="danger"
               onClick={() => {
-                setDiscard(false);
-                void act('discard');
+                const action = discard;
+                setDiscard(null);
+                void act(action);
               }}
             >
               {zh ? '放弃并退出' : 'Discard & exit'}
@@ -149,6 +174,7 @@ export function EditorAssistant({
                 e.stopPropagation();
                 setEntry(null);
                 setMore(false);
+                setExitMenu(false);
                 setError('');
                 onFocusTerminal();
               }
@@ -255,22 +281,7 @@ export function EditorAssistant({
                         </option>
                       ))}
                     </select>
-                    <button onClick={() => void act('exitAll')}>
-                      {zh ? '退出所有窗口' : 'Exit all windows'}
-                    </button>
-                    <button onClick={() => void act('saveExitAll')}>
-                      {zh ? '全部保存并退出' : 'Save all & exit'}
-                    </button>
-                    <button className="danger" onClick={() => setDiscard(true)}>
-                      {zh ? '放弃修改并退出' : 'Discard & exit'}
-                    </button>
                   </>
-                )}
-                {kind === 'vim' && (
-                  <button onClick={() => void act('saveExit')} disabled={busy}>
-                    <Save size={13} />
-                    {zh ? '保存并退出' : 'Save & exit'}
-                  </button>
                 )}
                 <select
                   aria-label={zh ? '编辑器模式' : 'Editor mode'}
@@ -382,11 +393,84 @@ export function EditorAssistant({
                   <Save size={15} />,
                 )}
               </div>
-              {button(
-                'exit',
-                zh ? '退出编辑器' : 'Exit editor',
-                kind === 'vim' ? ':q' : modern ? 'Ctrl+Q' : 'Ctrl+X',
-                <LogOut size={15} />,
+              {kind === 'vim' ? (
+                <div className="editor-exit-controls" ref={exitRef}>
+                  <button
+                    className="icon editor-exit-trigger"
+                    aria-label={zh ? '退出选项' : 'Exit options'}
+                    title={zh ? '退出选项' : 'Exit options'}
+                    aria-haspopup="menu"
+                    aria-expanded={exitMenu}
+                    disabled={busy}
+                    onClick={() => {
+                      setExitMenu((v) => !v);
+                      setMore(false);
+                      setEntry(null);
+                    }}
+                  >
+                    <LogOut size={15} />
+                    <ChevronDown size={10} />
+                  </button>
+                  {exitMenu && (
+                    <div
+                      className="editor-exit-menu"
+                      role="menu"
+                      aria-label={zh ? 'Vim 退出选项' : 'Vim exit options'}
+                      onKeyDown={(e) => {
+                        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                          e.preventDefault();
+                          const items = Array.from(
+                            e.currentTarget.querySelectorAll<HTMLButtonElement>(
+                              '[role="menuitem"]',
+                            ),
+                          );
+                          const i = items.indexOf(document.activeElement as HTMLButtonElement);
+                          items[
+                            (i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length
+                          ]?.focus();
+                        }
+                      }}
+                    >
+                      {(
+                        [
+                          ['exit', '退出当前窗口', 'Close current window', ':q'],
+                          ['saveExit', '保存并退出当前窗口', 'Save & close window', ':wq'],
+                          [
+                            'discardCurrent',
+                            '不保存退出当前窗口',
+                            'Close window without saving',
+                            ':q!',
+                          ],
+                          ['exitAll', '退出所有窗口', 'Exit all windows', ':qa'],
+                          ['saveExitAll', '全部保存并退出', 'Save all & exit', ':wqa'],
+                          ['discard', '放弃全部修改并退出', 'Discard all & exit', ':qa!'],
+                        ] as const
+                      ).map(([action, cn, en, command]) => (
+                        <button
+                          role="menuitem"
+                          key={action}
+                          className={action.startsWith('discard') ? 'danger' : ''}
+                          onClick={() => {
+                            if (action === 'discard' || action === 'discardCurrent') {
+                              setExitMenu(false);
+                              setDiscard(action);
+                            } else void act(action);
+                          }}
+                        >
+                          <span>{zh ? cn : en}</span>
+                          <kbd>{command}</kbd>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                button(
+                  'exit',
+                  zh ? '退出编辑器' : 'Exit editor',
+                  modern ? 'Ctrl+Q' : 'Ctrl+X',
+                  <LogOut size={15} />,
+                )
               )}
               <button
                 className="icon editor-action-menu"

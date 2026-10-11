@@ -58,10 +58,32 @@ export async function editorAssistantSmoke(
   );
   await bar.getByRole('button', { name: '更多操作', exact: true }).click();
   await received(() => bar.getByLabel('切换 Vim 模式').selectOption('visual'), '\x1c\x0ev');
+  await bar.getByRole('button', { name: '退出选项', exact: true }).click();
   await received(
-    () => bar.getByRole('button', { name: '退出编辑器', exact: true }).click(),
+    () => bar.getByRole('menuitem', { name: /退出当前窗口.*:q$/ }).click(),
     '\x1c\x0e:quit\r',
   );
+  await bar.getByRole('button', { name: '退出选项', exact: true }).click();
+  await bar.getByRole('menuitem', { name: /不保存退出当前窗口/ }).click();
+  const beforeCancel = inputs.length;
+  await page.getByRole('dialog').getByRole('button', { name: '取消', exact: true }).click();
+  assert.equal(inputs.length, beforeCancel);
+  await bar.getByRole('button', { name: '退出选项', exact: true }).click();
+  await bar.getByRole('menuitem', { name: /不保存退出当前窗口/ }).click();
+  await received(
+    () => page.getByRole('dialog').getByRole('button', { name: '放弃并退出', exact: true }).click(),
+    '\x1c\x0e:quit!\r',
+  );
+  await output(
+    '\x1b[2J\x1b[H~\r\n~\x1b[999;1HE37: No write since last change\r\nPress ENTER or type command to continue',
+  );
+  await bar.getByRole('button', { name: '退出选项', exact: true }).click();
+  await bar.getByRole('menuitem', { name: /放弃全部修改并退出/ }).click();
+  await received(
+    () => page.getByRole('dialog').getByRole('button', { name: '放弃并退出', exact: true }).click(),
+    '\r\x1c\x0e:qall!\r',
+  );
+  await output('\x1b[2J\x1b[Hhello.txt\r\n~\r\n~\x1b[999;1H1,1 All');
   await received(
     () => bar.getByRole('button', { name: '文件开头', exact: true }).click(),
     '\x1c\x0e:normal! gg\r',

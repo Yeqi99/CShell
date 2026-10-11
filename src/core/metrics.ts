@@ -1,6 +1,9 @@
-export const metricsCommand =
+const baseMetricsCommand =
   "LC_ALL=C; export LC_ALL; printf '__CPU__\\n'; awk '/^cpu / {print} /^cpu[0-9]+ / {n++} END {printf \"__CORES__ %d\\n\", n}' /proc/stat; printf '__MEM__\\n'; cat /proc/meminfo; printf '__DISK__\\n'; df -Pk / | tail -n 1";
 export type CpuSample = { total: number; idle: number };
+export const metricsCommand =
+  baseMetricsCommand +
+  "; printf '__MODEL__\\n'; awk -F ': ' '/^(model name|Hardware|Processor)[[:space:]]*:/ {print $2; exit}' /proc/cpuinfo";
 export function parseMetrics(output: string, previous?: CpuSample) {
   const cpuLine = output.match(/^cpu\s+(.+)$/m);
   const values = cpuLine?.[1].trim().split(/\s+/).map(Number).slice(0, 8);
@@ -33,6 +36,11 @@ export function parseMetrics(output: string, previous?: CpuSample) {
     sample,
     cpu,
     cpuCount,
+    cpuModel:
+      output
+        .match(/^__MODEL__\r?\n([^\r\n]+)/m)?.[1]
+        .trim()
+        .slice(0, 256) || null,
     memory: validMemory ? (1 - available / total) * 100 : null,
     memoryUsed: validMemory ? (total - available) * 1024 : null,
     memoryTotal: total > 0 ? total * 1024 : null,

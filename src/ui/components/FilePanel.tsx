@@ -131,7 +131,7 @@ export function FilePanel({
       const sources = draggedFiles();
       const same = sources.every((source) =>
         localRoot
-          ? source.kind === 'local' && source.root === localRoot
+          ? source.kind === 'local'
           : source.kind === 'remote' && source.sessionId === sessionId,
       );
       run(transfer(sources, destination, same && !event.ctrlKey && !event.metaKey));

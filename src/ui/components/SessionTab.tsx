@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { X } from 'lucide-react';
+import { X, SquareArrowOutUpRight } from 'lucide-react';
 import type { Profile } from '../../shared/contracts';
 import { useI18n } from '../i18n';
 const dragType = 'application/x-cshell-session';
@@ -11,16 +11,18 @@ export function SessionTab({
   onSelect,
   onClose,
   onMove,
+  onFloat,
 }: {
   id: string;
   profile: Profile;
   closed: boolean;
   active: boolean;
+  onFloat: () => void;
   onSelect: () => void;
   onClose: () => void;
   onMove: (source: string, target: string) => void;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [label, setLabel] = useState(profile.name);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(label);
@@ -95,6 +97,19 @@ export function SessionTab({
         >
           <i className={`dot ${closed ? 'off' : ''}`} />
           {label}
+        </button>
+      )}
+      {!closed && (
+        <button
+          className="icon tab-float"
+          aria-label={locale === 'zh-CN' ? '在独立小窗打开' : 'Open floating terminal'}
+          title={locale === 'zh-CN' ? '在独立小窗打开' : 'Open floating terminal'}
+          onClick={(e) => {
+            e.stopPropagation();
+            onFloat();
+          }}
+        >
+          <SquareArrowOutUpRight size={13} />
         </button>
       )}
       <button

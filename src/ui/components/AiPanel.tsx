@@ -351,11 +351,19 @@ export function AiPanel({
         </>
       ) : (
         <div className="ai-settings">
-          <h3>API 基座</h3>
-          <p className="muted">
-            OpenAI 兼容接口。URL 填到 /v1 或完整 /chat/completions；支持本机
-            HTTP。密钥和会话记录在本机加密保存。
-          </p>
+          <div className="ai-section-heading">
+            <h3>API 基座</h3>
+            <span>{snapshot.providers.length} 个</span>
+          </div>
+          <p className="ai-section-note">连接模型，为各个工作位置选择默认基座。</p>
+          {!snapshot.providers.length && !editing && (
+            <div className="ai-provider-empty">
+              <Settings2 size={18} />
+              <span>
+                尚未添加基座<small>支持 OpenAI 兼容接口与本机模型</small>
+              </span>
+            </div>
+          )}
           {snapshot.providers.map((p) => (
             <div className="ai-provider" key={p.id}>
               <button
@@ -399,7 +407,7 @@ export function AiPanel({
             </div>
           ))}
           <button
-            className="secondary"
+            className="ai-add-provider"
             onClick={() => {
               setEditing({ id: crypto.randomUUID(), name: '', url: '', model: '' });
               setKey('');
@@ -424,6 +432,12 @@ export function AiPanel({
                 });
               }}
             >
+              <div className="ai-form-heading">
+                <strong>
+                  {snapshot.providers.some((p) => p.id === editing.id) ? '编辑基座' : '新基座'}
+                </strong>
+                <small>密钥在本机加密保存</small>
+              </div>
               <label>
                 名称
                 <input
@@ -441,6 +455,7 @@ export function AiPanel({
                   placeholder="https://api.example.com/v1"
                   onChange={(e) => setEditing({ ...editing, url: e.target.value })}
                 />
+                <small>填写 /v1 或完整 /chat/completions 地址</small>
               </label>
               <label>
                 模型 ID
@@ -463,9 +478,10 @@ export function AiPanel({
                   }}
                 />
               </label>
-              <div>
+              <div className="ai-form-actions">
                 <button
                   type="button"
+                  className="secondary"
                   onClick={() => {
                     setEditing(null);
                     setKey('');
@@ -479,34 +495,42 @@ export function AiPanel({
               </div>
             </form>
           )}
-          <h3>位置与权限</h3>
-          <select
-            aria-label="权限位置"
-            value={location}
-            onChange={(e) => changeLocation(e.target.value as AiLocation)}
-          >
-            {aiLocations.map((l) => (
-              <option key={l} value={l}>
-                {locations[l]}
-              </option>
-            ))}
-          </select>
-          <button
-            className="secondary"
-            onClick={() =>
-              setPermission(
-                snapshot.permissions.find((p) => p.location === location) ?? {
-                  location,
-                  providerId: null,
-                  groups: [],
-                  profiles: [],
-                  capabilities: [],
-                },
-              )
-            }
-          >
-            编辑该位置权限
-          </button>
+          <div className="ai-section-heading ai-permission-heading">
+            <h3>位置与权限</h3>
+            <ShieldCheck size={15} />
+          </div>
+          <p className="ai-section-note">按使用位置设置模型和可访问的机器、工具。</p>
+          <div className="ai-permission-toolbar">
+            <select
+              aria-label="权限位置"
+              value={location}
+              onChange={(e) => changeLocation(e.target.value as AiLocation)}
+            >
+              {aiLocations.map((l) => (
+                <option key={l} value={l}>
+                  {locations[l]}
+                </option>
+              ))}
+            </select>
+            <button
+              className="icon"
+              title="编辑该位置权限"
+              aria-label="编辑该位置权限"
+              onClick={() =>
+                setPermission(
+                  snapshot.permissions.find((p) => p.location === location) ?? {
+                    location,
+                    providerId: null,
+                    groups: [],
+                    profiles: [],
+                    capabilities: [],
+                  },
+                )
+              }
+            >
+              <Settings2 size={16} />
+            </button>
+          </div>
           {permission && (
             <form
               className="ai-permissions"

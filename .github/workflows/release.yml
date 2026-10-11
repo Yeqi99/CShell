@@ -40,6 +40,16 @@ jobs:
       - if: matrix.platform == 'win'
         run: pnpm exec tsx scripts/minimal-pin-smoke.ts
       - if: matrix.platform == 'win'
+        run: pnpm exec tsx scripts/refinement-smoke.ts
+      - if: matrix.platform == 'win'
+        run: pnpm exec tsx scripts/saved-connect-smoke.ts
+      - if: matrix.platform == 'win'
+        run: pnpm exec tsx scripts/settings-smoke.ts
+      - if: matrix.platform == 'win'
+        run: pnpm exec tsx scripts/floating-smoke.ts
+      - if: matrix.platform == 'win'
+        run: pnpm exec tsx scripts/extraction-smoke.ts
+      - if: matrix.platform == 'win'
         run: pnpm exec tsx scripts/update-smoke.ts
       - if: matrix.platform == 'win'
         run: |

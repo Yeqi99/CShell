@@ -26,6 +26,12 @@ try {
   await pin.focus();
   await page.keyboard.press('Space');
   await waitPinned(true);
+  const bounds = await app.evaluate(({ BrowserWindow }) => ({
+    size: BrowserWindow.getAllWindows()[0].getSize(),
+    minimum: BrowserWindow.getAllWindows()[0].getMinimumSize(),
+  }));
+  assert.deepEqual(bounds.minimum, [320, 200]);
+  assert.ok(bounds.size[0] <= 565 && bounds.size[1] <= 365);
   assert.equal(
     await page.getByRole('button', { name: '取消置顶' }).getAttribute('aria-pressed'),
     'true',

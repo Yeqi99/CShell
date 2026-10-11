@@ -1,3 +1,4 @@
+import type { FloatingBridge } from './floating';
 import type { ExtensionBridge, InstalledPlugin } from './plugins';
 import type { AiBridge } from './ai';
 import type { UpdateBridge } from './updates';
@@ -173,6 +174,7 @@ export const fileRefSchema = z.discriminatedUnion('kind', [
 ]);
 export type FileRef = z.infer<typeof fileRefSchema>;
 export interface Metrics {
+  cpuModel?: string | null;
   cpu: number | null;
   cpuCount: number | null;
   memory: number | null;
@@ -185,11 +187,12 @@ export interface Metrics {
   error?: string;
 }
 export type SessionEvent =
-  | { type: 'data'; sessionId: string; data: string }
+  | { type: 'data'; sessionId: string; data: string; sequence?: number }
   | { type: 'closed'; sessionId: string; error?: string }
   | { type: 'transfer'; transfer: Transfer };
-export interface Bridge extends ExtensionBridge, AiBridge, UpdateBridge {
+export interface Bridge extends ExtensionBridge, AiBridge, UpdateBridge, FloatingBridge {
   setAlwaysOnTop(enabled: boolean): Promise<boolean>;
+  setMinimalMode(enabled: boolean): Promise<void>;
   configureTools(settings: ToolsSettings): Promise<void>;
   dockerSnapshot(sessionId: string): Promise<DockerSnapshot>;
   dockerStats(sessionId: string, id: string): Promise<DockerStats>;
@@ -239,6 +242,8 @@ export interface Bridge extends ExtensionBridge, AiBridge, UpdateBridge {
   ): Promise<void>;
   transferFiles(sources: FileRef[], target: FileRef, move: boolean): Promise<void>;
   monitor(sessionId: string): Promise<Metrics>;
+  resourceHardware(sessionId: string): Promise<import('./resources').HardwareInfo>;
+  resourceProcesses(sessionId: string): Promise<import('./resources').ProcessSnapshot>;
   droppedFiles(files: File[]): string[];
   copyText(text: string): Promise<void>;
   pasteText(): Promise<string>;

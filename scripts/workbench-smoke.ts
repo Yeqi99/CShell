@@ -160,7 +160,7 @@ export async function workbenchSmoke(
   assert.equal(await page.locator('.editor-actions:visible').count(), 0);
   await page.locator('.session-tab.active .icon').click();
   await page.locator(`[data-session="${secondId}"]`).waitFor({ state: 'hidden' });
-  await page.locator('.session-tab .icon').click();
+  await page.getByRole('button', { name: '关闭 build', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: '确认', exact: true }).click();
   await page.locator('.session-tab').waitFor({ state: 'hidden' });
   await page.locator('.monitor-panel').waitFor({ state: 'hidden' });

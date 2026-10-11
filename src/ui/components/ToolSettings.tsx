@@ -16,13 +16,7 @@ export function ToolSettings({
     [saved, setSaved] = useState(false);
   return (
     <section className="tool-settings">
-      <h2>{zh ? '插件设置' : 'Plugin settings'}</h2>
-      <button
-        type="button"
-        onClick={() => window.dispatchEvent(new Event('cshell:open-extensions'))}
-      >
-        {zh ? '管理插件' : 'Manage plugins'}
-      </button>
+      <h2>{zh ? 'Docker 连接设置' : 'Docker connection settings'}</h2>
       <form
         onSubmit={async (e) => {
           e.preventDefault();

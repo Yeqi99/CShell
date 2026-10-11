@@ -21,7 +21,11 @@ export async function extensionsSmoke(
     await row.getByRole('button', { name: '停用', exact: true }).waitFor();
   }
   await page.screenshot({ path: 'test-results/plugin-market-light.png' });
-  await workbench.getByRole('button', { name: '环境', exact: true }).click();
+  await workbench
+    .locator('.plugin-row')
+    .filter({ has: page.getByRole('heading', { name: /^Anaconda/ }) })
+    .getByRole('button', { name: '打开插件', exact: true })
+    .click();
   const manager = workbench.locator('.environment-manager:visible');
   await page.waitForFunction(
     () =>
@@ -46,7 +50,12 @@ export async function extensionsSmoke(
   await page.screenshot({ path: 'test-results/application-install-plan.png' });
   await workbench.getByRole('button', { name: '安装到此服务器', exact: true }).click();
   await workbench.locator('.extension-jobs').getByText('已完成', { exact: true }).waitFor();
-  await workbench.getByRole('button', { name: 'Python', exact: true }).click();
+  await workbench.getByRole('button', { name: '插件市场', exact: true }).click();
+  await workbench
+    .locator('.plugin-row')
+    .filter({ has: page.getByRole('heading', { name: /^Python/ }) })
+    .getByRole('button', { name: '打开插件', exact: true })
+    .click();
   const editor = workbench.locator('.python-editor-slot:visible .cm-content');
   await editor.fill('import os\nos.pa');
   await editor.press('Control+Space');
@@ -90,7 +99,12 @@ export async function extensionsSmoke(
   await page.getByRole('button', { name: '关闭扩展', exact: true }).click();
   await page.locator('.terminal-pane.active .xterm-screen').waitFor();
   await page.getByRole('button', { name: '插件与应用', exact: true }).click();
-  await workbench.getByRole('button', { name: 'Python', exact: true }).click();
+  await workbench.getByRole('button', { name: '插件市场', exact: true }).click();
+  await workbench
+    .locator('.plugin-row')
+    .filter({ has: page.getByRole('heading', { name: /^Python/ }) })
+    .getByRole('button', { name: '打开插件', exact: true })
+    .click();
   assert.match(
     await workbench.locator('.python-editor-slot:visible .cm-content').innerText(),
     /os.path/,

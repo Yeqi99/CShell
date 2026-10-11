@@ -16,6 +16,7 @@ export interface Session {
   cpu?: CpuSample;
   monitoring: boolean;
   closed: boolean;
+  disconnecting?: boolean;
   outstanding: number;
   parent?: string;
 }
@@ -108,7 +109,8 @@ export class SshService {
   }
   get(id: string) {
     const session = this.sessions.get(id);
-    if (!session || session.closed) throw new Error('Session is not connected');
+    if (!session || session.closed || session.disconnecting)
+      throw new Error('Session is not connected');
     return session;
   }
   async openEnvironment(parentId: string, command: string) {
@@ -156,6 +158,10 @@ export class SshService {
   disconnect(id: string) {
     const s = this.sessions.get(id);
     if (s) {
+      s.disconnecting = true;
+      for (const child of this.sessions.values()) {
+        if (child.parent === id) child.disconnecting = true;
+      }
       if (s.parent) {
         s.shell?.signal('TERM');
         s.shell?.close();
@@ -307,6 +313,7 @@ export class SshService {
       return {
         cpu: parsed.cpu,
         cpuCount: parsed.cpuCount,
+        cpuModel: parsed.cpuModel,
         memory: parsed.memory,
         memoryUsed: parsed.memoryUsed,
         memoryTotal: parsed.memoryTotal,

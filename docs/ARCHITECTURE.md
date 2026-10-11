@@ -54,3 +54,9 @@ Android 单独设计触控 UI 和平台适配层，不直接装进桌面布局�
 - MCP SSH 会话与界面会话隔离；只接受用户勾选的 profile ID，凭据只在后端读取，主机指纹必须预先信任。工具包括列出服务器、连接/断开、列文件、监控；命令执行单独开启，每条命令由桌面确认，30 秒超时、256 KiB 输出上限。变更配置、禁用、轮换令牌或退出程序会释放 MCP 会话。审计仅记时间、工具名及成功与否，不记录密码、命令正文或输出。局域网/公网开放和无人值守命令授权暂未提供。
 
 参考：[Microsoft 字体枚举 API](https://learn.microsoft.com/en-us/dotnet/api/system.drawing.text.installedfontcollection)、[Electron 文件拖入 API](https://www.electronjs.org/docs/latest/api/web-utils)、[官方 MCP TypeScript SDK](https://ts.sdk.modelcontextprotocol.io/server)。
+
+## 连接 Provider 与浮动会话（开发中版本）
+
+参见 [Connection Provider Architecture](CONNECTION-PROVIDERS.md)。Agent 工具调度已从 SSH 实现中解耦，当前内置适配器仍只有 SSH；后续协议按能力注册，不提前放置空实现。
+
+独立终端小窗是现有会话的另一视图：主视图持有输出流控，快照携带输出序号，小窗接续有界尾流并去重。输入与窗口尺寸只作用于绑定的会话；仅观察模式拒绝输入，焦点输入窗口决定远端 PTY 尺寸。关闭小窗不结束连接，关闭主工作台仍按连接关闭规则处理。子窗口独立校验发送方，不开放主工作台配置、密钥与文件授权接口。它不是独立后台会话服务，也不承诺进程退出后恢复 shell。

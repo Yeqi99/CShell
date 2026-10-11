@@ -29,9 +29,13 @@ import {
 } from '../../shared/plugins';
 import { useI18n } from '../i18n';
 import { PythonEditor } from './PythonEditor';
+import { availablePluginViews } from './plugin-views';
+import { ToolSettings } from './ToolSettings';
+import type { ToolsSettings } from '../../shared/docker';
 export type ExtensionSession = { id: string; label: string; closed: boolean };
 export type PythonFileRequest = { sessionId: string; path: string; serial: number };
 export function ExtensionWorkbench({
+  tools,
   visible,
   plugins,
   sessions,
@@ -39,6 +43,7 @@ export function ExtensionWorkbench({
   onTerminal,
   request,
 }: {
+  tools: ToolsSettings;
   visible: boolean;
   plugins: InstalledPlugin[];
   sessions: ExtensionSession[];
@@ -49,6 +54,9 @@ export function ExtensionWorkbench({
   const { locale } = useI18n(),
     zh = locale === 'zh-CN';
   const [section, setSection] = useState<'plugins' | 'apps' | 'environment' | 'python'>('plugins');
+  const [settingsPlugin, setSettingsPlugin] = useState<string | null>(null);
+  const views = availablePluginViews(plugins);
+  const currentView = views.find((view) => view.id === section);
   const [target, setTarget] = useState(''),
     [query, setQuery] = useState(''),
     [filter, setFilter] = useState('all');
@@ -76,9 +84,12 @@ export function ExtensionWorkbench({
   useEffect(() => {
     if (request) {
       setTarget(request.sessionId);
-      setSection('python');
+      setSection(views.some((view) => view.id === 'python') ? 'python' : 'plugins');
     }
   }, [request]);
+  useEffect(() => {
+    if (section !== 'plugins' && section !== 'apps' && !currentView) setSection('plugins');
+  }, [section, currentView]);
   const run = async (fn: () => Promise<unknown>) => {
     setBusy(true);
     setError('');
@@ -113,8 +124,6 @@ export function ExtensionWorkbench({
           [
             ['plugins', Blocks, zh ? '插件市场' : 'Plugins'],
             ['apps', Package, zh ? '应用市场' : 'Applications'],
-            ['environment', Layers, zh ? '环境' : 'Environments'],
-            ['python', Code2, 'Python'],
           ] as const
         ).map(([id, Icon, label]) => (
           <button
@@ -135,6 +144,11 @@ export function ExtensionWorkbench({
       <div className="extension-main">
         <header className="extension-heading">
           <div>
+            {currentView && (
+              <button className="plugin-back" onClick={() => setSection('plugins')}>
+                ← {zh ? '插件市场' : 'Plugins'} / {currentView.title}
+              </button>
+            )}
             <h1>
               {section === 'plugins'
                 ? zh
@@ -253,6 +267,21 @@ export function ExtensionWorkbench({
                       </small>
                     </div>
                     <div className="plugin-actions">
+                      {p.id === 'cshell.docker' && installed?.enabled && (
+                        <button
+                          onClick={() => setSettingsPlugin(settingsPlugin === p.id ? null : p.id)}
+                          aria-expanded={settingsPlugin === p.id}
+                        >
+                          {zh ? '设置' : 'Settings'}
+                        </button>
+                      )}
+                      {views
+                        .filter((view) => view.pluginId === p.id)
+                        .map((view) => (
+                          <button key={view.id} onClick={() => setSection(view.id)}>
+                            {zh ? '打开插件' : 'Open plugin'}
+                          </button>
+                        ))}
                       {installed ? (
                         <>
                           <button
@@ -297,6 +326,11 @@ export function ExtensionWorkbench({
                         </button>
                       )}
                     </div>
+                    {settingsPlugin === p.id && p.id === 'cshell.docker' && installed?.enabled && (
+                      <div className="plugin-inline-settings">
+                        <ToolSettings value={tools} onSave={onChange} />
+                      </div>
+                    )}
                   </article>
                 );
               })}

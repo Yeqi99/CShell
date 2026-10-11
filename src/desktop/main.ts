@@ -1,3 +1,4 @@
+import { FloatingWindows } from './floating';
 import { registerExtensionHandlers } from './extensions';
 import { registerUpdateHandlers } from './updates';
 import { initialWindowBounds } from './window-bounds';
@@ -35,6 +36,7 @@ import { McpService } from '../core/mcp';
 import { registerPresetHandlers } from './presets';
 import { registerAppearanceHandlers } from './appearance';
 import { registerFileHandlers } from './file-handlers';
+import { ResourceInspection } from '../core/resource-inspection';
 
 let window: BrowserWindow;
 let ssh: SshService;
@@ -90,6 +92,7 @@ else
           contextIsolation: true,
           nodeIntegration: false,
           spellcheck: false,
+          backgroundThrottling: false,
         },
       });
       Menu.setApplicationMenu(null);
@@ -100,7 +103,9 @@ else
         callback(false),
       );
       session.defaultSession.setPermissionCheckHandler(() => false);
+      let floating: FloatingWindows | undefined;
       const emit = (event: SessionEvent) => {
+        event = floating?.event(event) ?? event;
         if (!window.isDestroyed()) window.webContents.send('session:event', event);
       };
       ssh = new SshService(emit, async (profile, fingerprint) => {
@@ -135,6 +140,13 @@ else
         await store.trust(endpoint, fingerprint);
         return true;
       });
+      floating = new FloatingWindows(
+        window,
+        ssh,
+        entry,
+        join(__dirname, 'preload.cjs'),
+        () => store.snapshot().preferences,
+      );
       transfers = new Transfers(
         ssh,
         (transfer) => emit({ type: 'transfer', transfer }),
@@ -178,6 +190,37 @@ else
         });
       registerAppearanceHandlers(handle, window, app.getPath('userData'), consume, text);
       registerUpdateHandlers(handle, window);
+      let normalBounds: Electron.Rectangle | null = null;
+      let wasMaximized = false;
+      handle('window:minimal', (input) => {
+        const enabled = z.boolean().parse(input);
+        if (enabled && !normalBounds) {
+          normalBounds = window.getNormalBounds();
+          wasMaximized = window.isMaximized();
+          if (wasMaximized) window.unmaximize();
+          const area = screen.getDisplayMatching(window.getBounds()).workArea;
+          window.setMinimumSize(320, 200);
+          window.setBounds({
+            x: Math.max(area.x, Math.min(area.x + area.width - 560, normalBounds.x)),
+            y: Math.max(area.y, Math.min(area.y + area.height - 360, normalBounds.y)),
+            width: Math.min(560, area.width),
+            height: Math.min(360, area.height),
+          });
+        } else if (!enabled && normalBounds) {
+          const area = screen.getDisplayMatching(normalBounds).workArea;
+          const width = Math.min(normalBounds.width, area.width),
+            height = Math.min(normalBounds.height, area.height);
+          window.setMinimumSize(Math.min(840, area.width), Math.min(580, area.height));
+          window.setBounds({
+            width,
+            height,
+            x: Math.max(area.x, Math.min(area.x + area.width - width, normalBounds.x)),
+            y: Math.max(area.y, Math.min(area.y + area.height - height, normalBounds.y)),
+          });
+          if (wasMaximized) window.maximize();
+          normalBounds = null;
+        }
+      });
       handle('window:always-on-top', (enabled) => {
         window.setAlwaysOnTop(z.boolean().parse(enabled));
         return window.isAlwaysOnTop();
@@ -337,6 +380,7 @@ else
             : { password: credentials.password },
         );
       });
+      handle('floating:open', (id, snapshot) => floating!.open(id, snapshot));
       handle('disconnect', (id) => {
         idSchema.parse(id);
         transfers.cancelSession(id);
@@ -348,12 +392,15 @@ else
       handle('acknowledge', (id, count) =>
         ssh.acknowledge(idSchema.parse(id), z.number().int().min(0).max(2_000_000).parse(count)),
       );
-      handle('resize', (id, cols, rows) =>
-        ssh.resize(
-          idSchema.parse(id),
-          z.number().int().min(1).max(1000).parse(cols),
-          z.number().int().min(1).max(1000).parse(rows),
-        ),
+      handle(
+        'resize',
+        (id, cols, rows) =>
+          (window.isFocused() || !floating) &&
+          ssh.resize(
+            idSchema.parse(id),
+            z.number().int().min(1).max(1000).parse(cols),
+            z.number().int().min(1).max(1000).parse(rows),
+          ),
       );
       handle('list', (id, path) => ssh.list(idSchema.parse(id), pathSchema.parse(path)));
       handle('file:action', async (id, action, path, destination) => {
@@ -413,6 +460,9 @@ else
       });
       handle('transfer:cancel', (id) => transfers.cancel(idSchema.parse(id)));
       handle('monitor', (id) => ssh.monitor(idSchema.parse(id)));
+      const resources = new ResourceInspection(ssh);
+      handle('resources:hardware', (id) => resources.hardware(idSchema.parse(id)));
+      handle('resources:processes', (id) => resources.processes(idSchema.parse(id)));
       registerFileHandlers(handle, window, ssh, transfers, text);
       window.once('ready-to-show', () => window.show());
       let closing = false,
@@ -442,6 +492,7 @@ else
           });
       });
       window.on('closed', () => {
+        floating?.dispose();
         void mcp.stop();
         transfers.dispose();
         ssh.dispose();

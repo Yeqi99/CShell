@@ -62,10 +62,20 @@ export async function fixture() {
         session.on('exec', (acceptExec, _reject, info) => {
           const stream = acceptExec();
           if (extensions.handle(info.command, stream)) return;
+          if (info.command.includes('--query-gpu=')) {
+            stream.exit(0);
+            stream.end('__NVIDIA__\nNVIDIA Test GPU, 12, 400, 24564\n__PCI__\n');
+            return;
+          }
+          if (info.command.includes('ps -eo pid=')) {
+            stream.exit(0);
+            stream.end('  101 tester 12.5 1.2 python3\n  202 root 0.2 0.1 sshd\n');
+            return;
+          }
           samples++;
           stream.exit(0);
           stream.end(
-            `__CPU__\ncpu ${100 + samples * 10} 0 20 ${800 + samples * 90} 10 0 0 0\ncpu0 25 0 5 200\ncpu1 25 0 5 200\ncpu2 25 0 5 200\ncpu3 25 0 5 200\n__MEM__\nMemTotal: 16384000 kB\nMemAvailable: 9830400 kB\n__DISK__\n/dev/sda 104857600 31457280 73400320 30% /\n`,
+            `__CPU__\ncpu ${100 + samples * 10} 0 20 ${800 + samples * 90} 10 0 0 0\ncpu0 25 0 5 200\ncpu1 25 0 5 200\ncpu2 25 0 5 200\ncpu3 25 0 5 200\n__MEM__\nMemTotal: 16384000 kB\nMemAvailable: 9830400 kB\n__DISK__\n/dev/sda 104857600 31457280 73400320 30% /\n__MODEL__\nTest CPU Model\n`,
           );
         });
         session.on('sftp', (acceptSftp) => {
