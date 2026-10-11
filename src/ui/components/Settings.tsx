@@ -1,7 +1,7 @@
 import { LocalEnvironmentSettings } from './LocalEnvironmentSettings';
 import { Palette, Terminal, PanelsTopLeft, Blocks, ShieldCheck, Download } from 'lucide-react';
 import { UpdateSettings } from './UpdateSettings';
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import { defaults, type Preferences } from '../../shared/contracts';
 import { useI18n } from '../i18n';
 import { PresetControls } from './PresetControls';
@@ -41,7 +41,7 @@ export function Settings({
   const [fonts, setFonts] = useState<string[]>([]),
     [fontState, setFontState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [busy, setBusy] = useState(false);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (themeRequest) {
       setDraft((current) => ({ ...current, theme: themeRequest.theme }));
       setCategory('appearance');
@@ -68,7 +68,7 @@ export function Settings({
   useEffect(() => {
     setDraft((current) => (current.layout === layout ? current : { ...current, layout }));
   }, [layout]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     onPreview(draft);
   }, [draft, onPreview]);
   const importBackground = async (token?: string) => {

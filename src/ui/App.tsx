@@ -10,7 +10,7 @@ const ExtensionWorkbench = lazy(() =>
   })),
 );
 import { toolsDefaults } from '../shared/docker';
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   HardDrive,
   BarChart3,
@@ -212,7 +212,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
         );
     });
   }, [refresh, onError]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     document.documentElement.dataset.theme = preferences.theme;
     document.documentElement.lang = config.preferences.locale;
     document.body.style.fontFamily = preferences.uiFont;

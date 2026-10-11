@@ -98,6 +98,24 @@ export async function designSmoke(app: ElectronApplication, page: Page) {
         'light' &&
       (await window.cshell.config()).preferences.theme === 'light',
   );
+  for (let cycle = 0; cycle < 4; cycle++) {
+    for (const [label, theme] of [
+      ['切换为深色', 'dark'],
+      ['切换为浅色', 'light'],
+    ] as const) {
+      await page.getByRole('button', { name: label, exact: true }).click();
+      await page.waitForFunction(async (theme) => {
+        const saved = (await window.cshell.config()).preferences.theme;
+        return (
+          saved === theme &&
+          document.documentElement.dataset.theme === theme &&
+          document.querySelector<HTMLSelectElement>('#workspace-preferences-form select')?.value ===
+            theme
+        );
+      }, theme);
+      assert.equal(await page.locator('.preferences-page').getByLabel('外观').inputValue(), theme);
+    }
+  }
   assert.equal(await page.locator('.preferences-page').getByLabel('外观').inputValue(), 'light');
   await page
     .locator('.preferences-page')
