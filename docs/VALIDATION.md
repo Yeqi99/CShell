@@ -156,3 +156,5 @@ SSH 测试服务仅监听 127.0.0.1；测试密码和主机/客户端密钥运�
 - 首轮安卓云端编译成功，lint 拒绝旧返回手势 API；已改为 API 33+ OnBackInvokedDispatcher，旧版使用返回键处理，随后重新构建。
 - 更新源固定 GitHub 官方仓库附件，校验 SHA256。APK 额外校验包名、版本号、签名。0.3.2 开始使用 GitHub 加密 Secrets 中的持久化发布签名，0.3.1 临时签名不保证覆盖兼容。
 - Android 系统安装、真实 IME/后台进程限制、macOS/Linux 原生交互仍待实机验证；Linux 当前下载后打开位置，不声称自动替换。
+
+发布结果：Release 工作流 38138218087 全部成功，构建提交 0f5cc1eddb60bc63b66d1f017ca39d777c5fe58e。Android 持久签名发行 APK、Windows NSIS、macOS 两架构 DMG/ZIP、Linux 两架构 AppImage/DEB 共 10 个安装包及 SHA256SUMS.txt 已由统一流水线发布。Windows 额外通过更新 IPC、流式下载、校验和兼容与安装前篡改拒绝测试；移动网页回归由发布工作流执行通过。真机范围仍按上文保留。

@@ -34,7 +34,7 @@ try {
     const calls: any[] = [];
     (window as any).nativeCalls = calls;
     (window as any).CShellNative = {
-      version: () => '0.3.1',
+      version: () => '0.3.2',
       connect: (data: string) => {
         const p = JSON.parse(data);
         calls.push(p);

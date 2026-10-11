@@ -1,6 +1,6 @@
 # CShell
 
-CanpShell 是面向高频操作的 SSH 与 AI 计算工作台，采用 **MIT** 许可证。源码已开源，当前版本为 **0.3.1 预览版**；各平台下载以 GitHub Releases 中实际发布的附件为准。
+CanpShell 是面向高频操作的 SSH 与 AI 计算工作台，采用 **MIT** 许可证。源码已开源，当前版本为 **0.3.2 预览版**；各平台下载以 GitHub Releases 中实际发布的附件为准。
 
 [源码](https://github.com/Yeqi99/CShell) · [版本下载](https://github.com/Yeqi99/CShell/releases) · [问题反馈](https://github.com/Yeqi99/CShell/issues) · [构建状态](https://github.com/Yeqi99/CShell/actions)
 
@@ -8,16 +8,26 @@ CanpShell 是面向高频操作的 SSH 与 AI 计算工作台，采用 **MIT** �
 
 ## 版本与下载
 
-发行产物统一放到 [GitHub Releases](https://github.com/Yeqi99/CShell/releases)；市场目录与源码使用同一发行标签，不需要部署市场服务器。仓库为 [Yeqi99/CShell](https://github.com/Yeqi99/CShell)，以实际发布完成的附件为准。
+发行产物统一放到 [GitHub Releases](https://github.com/Yeqi99/CShell/releases)；市场目录固定到已发布的源码标签，不需要部署市场服务器。仓库为 [Yeqi99/CShell](https://github.com/Yeqi99/CShell)，以实际发布完成的附件为准。
 
 | 平台    | 格式 / 架构                           | 当前验证状态                                             |
 | ------- | ------------------------------------- | -------------------------------------------------------- |
 | Windows | NSIS `.exe`，x64                      | 云端构建及桌面回归通过                                   |
 | macOS   | `.dmg` / `.zip`，Apple Silicon、Intel | 云端测试及构建通过；真机交互待验收                       |
 | Linux   | `.AppImage` / `.deb`，x64、ARM64      | 云端测试及构建通过；真机交互待验收                       |
-| Android | 测试 `.apk`，Android 8+               | 编译与 lint 通过，调试签名；真机待测试，功能不等同桌面   |
+| Android | 测试 `.apk`，Android 8+               | 编译与 lint 通过，持久化签名；真机待测试，功能不等同桌面 |
 
 尚无商业代码签名证书，macOS 未公证。核对附件的 SHA256SUMS.txt。完整范围见 [发布说明](docs/RELEASE.md)，已执行的检查见 [验证记录](docs/VALIDATION.md)。
+
+## Android 工作台与更新
+
+Android 默认进入服务器列表，支持搜索、分组、会话切换与独立连接页。切页保留终端和未提交草稿，连接按钮固定在操作区；密码与私钥不落盘。设置中可切换明暗、检查和下载更新。
+
+桌面与 Android 均从 GitHub Releases 检查更新并校验 SHA256，随后进入系统安装流程。Linux 当前提供 AppImage 下载和文件位置，需要手动替换与授权执行。更新不会自动关闭正在操作的会话。
+
+**从 Android 0.3.1 升级需注意签名变化**：旧版是临时调试签名，需要卸载后重装，卸载会清除本地配置。0.3.2 开始复用持久化发布签名，后续版本可覆盖更新。
+
+<img src="docs/images/android-home.png" width="260" alt="Android 服务器首页，默认浅色" /> <img src="docs/images/android-settings.png" width="260" alt="Android 深色设置及应用更新" />
 
 ## AI 智能体
 
@@ -36,7 +46,7 @@ pnpm test:desktop
 pnpm run dist
 ```
 
-`release/0.3.1/CShell-0.3.1-win-x64.exe` 为 NSIS 安装包，`release/0.3.1/win-unpacked/CShell.exe` 为目录版。macOS 使用 `pnpm exec electron-builder --mac --arm64 --publish never`，Linux 使用 `pnpm exec electron-builder --linux --x64 --publish never`。首次安装依赖和构建需要网络。
+`release/0.3.2/CShell-0.3.2-win-x64.exe` 为 NSIS 安装包，`release/0.3.2/win-unpacked/CShell.exe` 为目录版。macOS 使用 `pnpm exec electron-builder --mac --arm64 --publish never`，Linux 使用 `pnpm exec electron-builder --linux --x64 --publish never`。首次安装依赖和构建需要网络。
 
 ## 插件与应用
 
