@@ -10,6 +10,8 @@ export async function registerAiHandlers(
 ) {
   const ai = new AiService(directory, store, connections);
   await ai.load();
+  handle('ai:policy', (p) => ai.savePolicy(p));
+  handle('ai:extraction-provider', (id) => ai.setExtractionProvider(id));
   handle('ai:snapshot', () => ai.snapshot());
   handle('ai:extract-connection', (text, provider) => ai.extractConnection(text, provider));
   handle('ai:provider-save', (p, key) => ai.saveProvider(p, key));

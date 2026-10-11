@@ -26,7 +26,7 @@ export function ConnectionExtractor({
       .then((snapshot) => {
         if (disposed) return;
         setProviders(snapshot.providers);
-        const preferred = snapshot.permissions.find((p) => p.location === 'terminal')?.providerId;
+        const preferred = snapshot.extractionProviderId;
         setProvider((current) =>
           snapshot.providers.some((p) => p.id === current)
             ? current

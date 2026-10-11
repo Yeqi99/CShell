@@ -71,6 +71,23 @@ export class ConnectionRegistry {
     }
     return connection;
   }
+  activeTargets() {
+    return [...this.owners.keys()].flatMap((id) => {
+      try {
+        const target = this.describe(id);
+        return [
+          {
+            sessionId: id,
+            providerId: target.providerId,
+            resourceId: target.resourceId,
+            label: target.label,
+          },
+        ];
+      } catch {
+        return [];
+      }
+    });
+  }
   terminal(id: string) {
     const terminal = this.connection(id).terminal;
     if (!terminal) throw new Error('Terminal capability unavailable');

@@ -612,3 +612,60 @@
 .permission-tree-footer button {
   flex: none;
 }
+.permission-global-section {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+}
+.permission-global-section h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
+  font-size: 13px;
+}
+.permission-global-section label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 5px 0;
+}
+.permission-global-section small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+.permission-default-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 8px 0 12px;
+}
+.permission-machine-card {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--panel);
+}
+.permission-machine-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.permission-machine-heading label {
+  min-width: 0;
+}
+.permission-machine-heading label span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.permission-reset {
+  font-size: 11px;
+  padding: 4px 6px;
+}
+.permission-scope-groups {
+  margin-top: 8px;
+}

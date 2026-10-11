@@ -11,7 +11,6 @@ import {
   Terminal,
 } from 'lucide-react';
 import { type AiSnapshot, type AiLocation, type AiMode, type AiThread } from '../../shared/ai';
-const names = { workspace: '工作台', terminal: '终端', files: '文件', python: 'Python' };
 function CopyButton({ content }: { content: string }) {
   const [copied, setCopied] = useState(false);
   return (
@@ -116,12 +115,12 @@ export function AiConversation({
         ) : (
           <MessageSquare size={14} />
         )}
-        <span className="agent-target" title={`权限配置：${names[thread?.location ?? location]}`}>
+        <span className="agent-target" title="全局智能体权限">
           {thread
-            ? (thread.target ?? '未连接服务器 · 仅聊天')
+            ? (thread.target ?? 'CShell · 未绑定机器')
             : sessionId
               ? '当前连接 · 新会话'
-              : '未连接服务器 · 仅聊天'}
+              : 'CShell · 未绑定机器'}
         </span>
       </div>
       <div className="agent-conversation">

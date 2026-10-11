@@ -33,6 +33,31 @@ export const aiPermissionSchema = z
     capabilities: z.array(z.enum(aiCapabilities)),
   })
   .strict();
+export const aiPolicySchema = z
+  .object({
+    application: z.array(z.enum(['connections.read'])),
+    allMachines: z.boolean(),
+    profiles: z.array(z.string().uuid()).max(1000),
+    groups: z.array(z.string().max(100)).max(1000),
+    capabilities: z.array(z.enum(aiCapabilities)),
+    overrides: z
+      .array(
+        z
+          .object({ profileId: z.string().uuid(), capabilities: z.array(z.enum(aiCapabilities)) })
+          .strict(),
+      )
+      .max(1000),
+  })
+  .strict();
+export type AiPolicy = z.infer<typeof aiPolicySchema>;
+export const emptyAiPolicy = (): AiPolicy => ({
+  application: [],
+  allMachines: false,
+  profiles: [],
+  groups: [],
+  capabilities: [],
+  overrides: [],
+});
 export type AiPermission = z.infer<typeof aiPermissionSchema>;
 export type AiLocation = (typeof aiLocations)[number];
 export type AiMode = 'review' | 'restricted' | 'allow';
@@ -52,6 +77,8 @@ export type AiThread = {
 };
 export interface AiSnapshot {
   providers: AiProvider[];
+  policy: AiPolicy;
+  extractionProviderId: string | null;
   permissions: AiPermission[];
   threads: AiThread[];
 }
@@ -60,6 +87,8 @@ export interface AiBridge {
     text: string,
     providerId?: string,
   ): Promise<import('./connection-extraction').ExtractedConnection>;
+  aiPolicySave(policy: AiPolicy): Promise<void>;
+  aiExtractionProviderSave(id: string | null): Promise<void>;
   aiSnapshot(): Promise<AiSnapshot>;
   aiProviderSave(provider: z.infer<typeof aiProviderSchema>, key?: string): Promise<void>;
   aiProviderDelete(id: string): Promise<void>;

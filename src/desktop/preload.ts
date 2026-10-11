@@ -43,6 +43,8 @@ const bridge: Bridge = {
     ipcRenderer.invoke('ai:extract-connection', text, providerId),
   aiProviderSave: (p, key) => ipcRenderer.invoke('ai:provider-save', p, key),
   aiProviderDelete: (id) => ipcRenderer.invoke('ai:provider-delete', id),
+  aiPolicySave: (p) => ipcRenderer.invoke('ai:policy', p),
+  aiExtractionProviderSave: (id) => ipcRenderer.invoke('ai:extraction-provider', id),
   aiPermissionSave: (p) => ipcRenderer.invoke('ai:permission', p),
   aiThreadCreate: (location, provider, mode, session) =>
     ipcRenderer.invoke('ai:create', location, provider, mode, session),
