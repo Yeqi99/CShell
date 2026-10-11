@@ -1,12 +1,14 @@
 # CShell
 
-CanpShell 是面向高频操作的 SSH 工作台，采用 **MIT** 许可证。当前准备发布 **0.3.0 预览版**；公开仓库和跨平台附件尚待发布验证，不能将构建配置视为已发布下载。
+CanpShell 是面向高频操作的 SSH 与 AI 计算工作台，采用 **MIT** 许可证。源码已开源，当前版本为 **0.3.0 预览版**；各平台下载以 GitHub Releases 中实际发布的附件为准。
+
+[源码](https://github.com/Yeqi99/CShell) · [版本下载](https://github.com/Yeqi99/CShell/releases) · [问题反馈](https://github.com/Yeqi99/CShell/issues) · [构建状态](https://github.com/Yeqi99/CShell/actions)
 
 白色默认界面、多标签终端、可收纳文件和资源侧栏；暗色可在右下角切换。极简模式仅保留标签与终端，并提供还原按钮。窗口依据当前屏幕可用区域缩放，切换工作区保留会话、滚动历史和草稿。SSH、配置和随包插件可离线使用，无产品账号、云同步、遥测或在线授权。
 
 ## 版本与下载
 
-发行产物统一放到 GitHub Releases；市场目录与源码使用同一发行标签，不需要部署市场服务器。目标仓库配置为 `Yeqi99/CShell`，以实际发布完成的附件为准。
+发行产物统一放到 [GitHub Releases](https://github.com/Yeqi99/CShell/releases)；市场目录与源码使用同一发行标签，不需要部署市场服务器。仓库为 [Yeqi99/CShell](https://github.com/Yeqi99/CShell)，以实际发布完成的附件为准。
 
 | 平台    | 格式 / 架构                           | 当前验证状态                                             |
 | ------- | ------------------------------------- | -------------------------------------------------------- |
