@@ -776,9 +776,16 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
                 </div>
               </details>
             )}
-            <button className="icon" title={t('newServer')} onClick={() => openConnection('new')}>
-              <Plus size={18} />
-            </button>
+            {!left && (
+              <button
+                className="icon"
+                title={t('newServer')}
+                aria-label={t('newServer')}
+                onClick={() => openConnection('new')}
+              >
+                <Plus size={18} />
+              </button>
+            )}
             <button
               hidden={surface !== 'terminal'}
               className="workbench-tool"
@@ -940,11 +947,6 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
               <TerminalIcon size={30} strokeWidth={1.2} />
               <h1>{t('noActiveSession')}</h1>
               <p>{t('openConnectionHint')}</p>
-              <button className="secondary" onClick={() => openConnection('new')}>
-                <Plus size={14} />
-                {t('newServer')}
-                <kbd>Ctrl+Shift+N</kbd>
-              </button>
             </div>
           )}
 

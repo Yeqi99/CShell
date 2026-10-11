@@ -410,13 +410,17 @@ export function AiPanel({
           </div>
           <div hidden={settingsTab !== 'permissions'}>
             <div className="ai-section-heading ai-permission-heading">
-              <h3>位置与权限</h3>
+              <h3>会话权限配置</h3>
               <ShieldCheck size={15} />
             </div>
-            <p className="ai-section-note">按使用位置设置模型和可访问的机器、工具。</p>
+            <p className="ai-section-note">
+              新会话使用下方选中的配置，决定默认模型及允许访问的机器、工具；不会切换工作区。已有会话保留原配置，修改该配置的权限也会影响使用它的会话。
+            </p>
+            <label htmlFor="agent-permission-profile">新会话使用的权限配置</label>
             <div className="ai-permission-toolbar">
               <select
-                aria-label="权限位置"
+                id="agent-permission-profile"
+                aria-label="新会话使用的权限配置"
                 value={location}
                 onChange={(e) => changeLocation(e.target.value as AiLocation)}
               >

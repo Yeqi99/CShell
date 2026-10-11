@@ -54,8 +54,19 @@ try {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.getByRole('heading', { name: '尚未连接' }).waitFor();
+  assert.equal(await page.getByRole('button', { name: '新建连接', exact: true }).count(), 1);
+  assert.equal(await page.locator('.empty-terminal button').count(), 0);
+  await page.keyboard.press('Control+Shift+B');
+  await page.locator('.sidebar').waitFor({ state: 'hidden' });
+  assert.equal(await page.getByRole('button', { name: '新建连接', exact: true }).count(), 1);
+  await page.keyboard.press('Control+Shift+B');
+
+  await page.locator('.sidebar').waitFor({ state: 'visible' });
   await page.getByRole('button', { name: 'AI 智能体', exact: true }).click();
   const panel = page.getByRole('complementary', { name: 'AI 智能体' });
+  assert.equal(await panel.locator('.agent-context select').count(), 0);
+  await panel.getByText('未连接服务器 · 仅聊天', { exact: true }).waitFor();
+
   await panel.getByRole('heading', { name: '连接你的 AI' }).waitFor();
   await page.screenshot({ path: 'test-results/agent-empty.png' });
   await panel.getByRole('button', { name: '配置基座', exact: true }).click();
@@ -67,6 +78,10 @@ try {
   await panel.getByLabel('模型 ID', { exact: true }).fill('test');
   await panel.getByRole('button', { name: '访问权限', exact: true }).click();
   assert.equal(await panel.getByLabel('模型 ID').isVisible(), false);
+  await panel.getByLabel('新会话使用的权限配置').selectOption('files');
+  assert.equal(await panel.getByLabel('新会话使用的权限配置').inputValue(), 'files');
+  await panel.getByLabel('新会话使用的权限配置').selectOption('terminal');
+
   await panel.getByRole('button', { name: '模型基座', exact: true }).click();
   assert.equal(await panel.getByLabel('模型 ID').inputValue(), 'test');
   await page.screenshot({ path: 'test-results/agent-settings.png' });
@@ -75,7 +90,10 @@ try {
   await panel.getByRole('button', { name: '基座与权限', exact: true }).click();
   await panel.getByRole('heading', { name: '从一个任务开始' }).waitFor();
   await page.screenshot({ path: 'test-results/agent-model-picker.png' });
-  assert.equal(await panel.locator('.agent-composer-tools').evaluate((el) => el.scrollWidth > el.clientWidth), false);
+  assert.equal(
+    await panel.locator('.agent-composer-tools').evaluate((el) => el.scrollWidth > el.clientWidth),
+    false,
+  );
   await panel.getByLabel('发送给智能体').fill('查看当前目录');
   await panel.getByLabel('发送给智能体').press('Enter');
   await panel.locator('.agent-code pre').waitFor();
