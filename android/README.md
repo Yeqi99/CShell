@@ -27,3 +27,7 @@ SSH 输入每连接顺序写入；输出最多 8 个待渲染数据块，xterm �
 设置中可手动检查 GitHub Releases（包含预览版），下载后核对 SHA256、包名、递增 versionCode 和签名，再交给 Android 安装程序。仅该操作请求“安装未知应用”权限；不会静默安装。0.3.1 的临时调试签名不能保证覆盖升级，新版签名不同会明确报错。安装和进程终止会结束当前 SSH 会话。
 
 AndroidX Core 1.17.0（Apache-2.0）提供仅暴露私有更新目录的 FileProvider。移动网页回归：`pnpm exec tsx scripts/mobile-smoke.ts`（需要 Edge）。它使用本地测试桥验证页面行为，不能替代真机 SSH、IME、后台生命周期和系统安装验收。
+
+发行工作流现在强制使用 GitHub Actions 加密 Secrets 中的持久化 PKCS#12 签名，不再自动发布临时调试签名。须备份原始密钥；不能在后续发行中重新生成密钥。发布包从 0.3.2 起沿用这套签名。调试构建仅用于开发验证。
+
+返回导航在 Android 13+ 使用系统 OnBackInvokedDispatcher，旧系统处理返回键；首页返回将应用切到后台，不隐式关闭现有终端。

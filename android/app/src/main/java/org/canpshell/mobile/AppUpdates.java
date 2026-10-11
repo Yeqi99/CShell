@@ -92,7 +92,7 @@ final class AppUpdates {
         String hash=null;
         for(String line:text(sums,100000).split("\\r?\\n")){
           java.util.regex.Matcher m=java.util.regex.Pattern.compile("^([a-fA-F0-9]{64})\\s+\\*?(.+)$").matcher(line);
-          if(m.matches()&&name.equals(m.group(2))){if(hash!=null)throw new IOException("校验和重复");hash=m.group(1);}
+          if(m.matches()&&name.equals(m.group(2).replaceFirst("^\\./", ""))){if(hash!=null)throw new IOException("校验和重复");hash=m.group(1);}
         }
         if(hash==null)throw new IOException("缺少安装包校验和");
         if(!file.getParentFile().isDirectory()&&!file.getParentFile().mkdirs())throw new IOException("无法创建下载目录");

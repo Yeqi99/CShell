@@ -75,7 +75,7 @@ export function checksumFor(text: string, name: string): string {
   const entries = text
     .split(/\r?\n/)
     .map((line) => /^([a-fA-F0-9]{64})\s+\*?(.+)$/.exec(line))
-    .filter((m) => m && m[2] === name);
+    .filter((m) => m && m[2].replace(/^\.\//, '') === name);
   if (entries.length !== 1) throw new Error('Missing or ambiguous checksum');
   return entries[0]![1].toLowerCase();
 }

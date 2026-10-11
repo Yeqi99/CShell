@@ -61,6 +61,10 @@ public class MainActivity extends Activity {
       return insets.consumeSystemWindowInsets();
     });
     web.loadUrl("https://cshell.local/index.html");
+    if (android.os.Build.VERSION.SDK_INT >= 33) {
+      getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+        android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, this::navigateBack);
+    }
   }
   private void event(String id, String type, String value) {
     if (destroyed) return;
@@ -140,9 +144,15 @@ public class MainActivity extends Activity {
     destroyed = true; for (Connection c : connections.values()) c.close(); connections.clear(); workers.shutdownNow();
     web.removeJavascriptInterface("CShellNative"); web.destroy(); super.onDestroy();
   }
-  @Override public void onBackPressed() {
+  private void navigateBack() {
     web.evaluateJavascript("window.mobileBack()", result -> {
       if (!"true".equals(result)) moveTaskToBack(true);
     });
+  }
+  @Override public boolean onKeyUp(int keyCode, android.view.KeyEvent event) {
+    if (android.os.Build.VERSION.SDK_INT < 33 && keyCode == android.view.KeyEvent.KEYCODE_BACK) {
+      navigateBack(); return true;
+    }
+    return super.onKeyUp(keyCode, event);
   }
 }
