@@ -70,6 +70,12 @@ export function WslPlugin({ onOpen }: { onOpen: (shell: LocalShell) => Promise<v
           {setup.message}
         </p>
       )}
+      {setup.details && (
+        <details className="wsl-install-log" open={setup.phase === 'error'}>
+          <summary>系统安装输出</summary>
+          <pre>{setup.details}</pre>
+        </details>
+      )}
       {state?.distributions.map((name) => (
         <div className="wsl-distribution" key={name}>
           <Terminal size={20} />

@@ -50,7 +50,19 @@ export function AiPanel({
   );
   const [key, setKey] = useState(''),
     [keyChanged, setKeyChanged] = useState(false);
-  const [permission, setPermission] = useState<AiPermission | null>(null);
+  const [permissionDrafts, setPermissionDrafts] = useState<
+    Partial<Record<AiLocation, AiPermission>>
+  >({});
+  const permission = permissionDrafts[location] ??
+    snapshot.permissions.find((p) => p.location === location) ?? {
+      location,
+      providerId: null,
+      groups: [],
+      profiles: [],
+      capabilities: [],
+    };
+  const setPermission = (value: AiPermission) =>
+    setPermissionDrafts((drafts) => ({ ...drafts, [value.location]: value }));
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const refresh = async () => setSnapshot(await window.cshell.aiSnapshot());
   const run = async (fn: () => Promise<unknown>) => {
@@ -102,7 +114,6 @@ export function AiPanel({
   };
   const changeLocation = (next: AiLocation) => {
     setLocation(next);
-    setPermission(null);
   };
   return (
     <aside className="ai-panel" hidden={!visible} aria-label="AI 智能体">
@@ -414,40 +425,24 @@ export function AiPanel({
               <ShieldCheck size={15} />
             </div>
             <p className="ai-section-note">
-              新会话使用下方选中的配置，决定默认模型及允许访问的机器、工具；不会切换工作区。已有会话保留原配置，修改该配置的权限也会影响使用它的会话。
+              新会话使用所选配置。修改权限也会影响使用该配置的已有会话。
             </p>
-            <label htmlFor="agent-permission-profile">新会话使用的权限配置</label>
-            <div className="ai-permission-toolbar">
-              <select
-                id="agent-permission-profile"
-                aria-label="新会话使用的权限配置"
-                value={location}
-                onChange={(e) => changeLocation(e.target.value as AiLocation)}
-              >
-                {aiLocations.map((l) => (
-                  <option key={l} value={l}>
-                    {locations[l]}
-                  </option>
-                ))}
-              </select>
-              <button
-                className="icon"
-                title="编辑该位置权限"
-                aria-label="编辑该位置权限"
-                onClick={() =>
-                  setPermission(
-                    snapshot.permissions.find((p) => p.location === location) ?? {
-                      location,
-                      providerId: null,
-                      groups: [],
-                      profiles: [],
-                      capabilities: [],
-                    },
-                  )
-                }
-              >
-                <Settings2 size={16} />
-              </button>
+            <div
+              className="permission-profiles"
+              role="radiogroup"
+              aria-label="新会话使用的权限配置"
+            >
+              {aiLocations.map((l) => (
+                <button
+                  key={l}
+                  type="button"
+                  role="radio"
+                  aria-checked={location === l}
+                  onClick={() => changeLocation(l)}
+                >
+                  {locations[l]}
+                </button>
+              ))}
             </div>
             {permission && (
               <form
@@ -456,7 +451,6 @@ export function AiPanel({
                   e.preventDefault();
                   void run(async () => {
                     await window.cshell.aiPermissionSave(permission);
-                    setPermission(null);
                   });
                 }}
               >

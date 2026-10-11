@@ -32,3 +32,15 @@ test('WSL setup uses fixed elevated commands and keeps installation lifecycle', 
   await new Promise((r) => setImmediate(r));
   assert.equal(failed.snapshot().phase, 'error');
 });
+import { decodeWslOutput, wslInstallArguments } from '../src/desktop/wsl-setup';
+test('WSL bootstrap uses only supported flags and decodes native diagnostics', () => {
+  assert.deepEqual(wslInstallArguments('--install --update --help', true), ['--install']);
+  assert.throws(() => wslInstallArguments('--install --update --help', false), /引导程序/);
+  assert.deepEqual(wslInstallArguments('--install --no-launch', true), [
+    '--install',
+    '--distribution',
+    'Ubuntu',
+    '--no-launch',
+  ]);
+  assert.equal(decodeWslOutput(Buffer.from('需要重启\r\r\n', 'utf16le')), '需要重启');
+});

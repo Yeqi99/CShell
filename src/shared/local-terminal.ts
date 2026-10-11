@@ -26,7 +26,11 @@ export const localEnvironmentSchema = z
     '环境变量名称不能重复',
   );
 export type LocalEnvironment = z.infer<typeof localEnvironmentSchema>;
-export type WslSetupState = { phase: 'idle' | 'running' | 'complete' | 'error'; message?: string };
+export type WslSetupState = {
+  phase: 'idle' | 'running' | 'complete' | 'error';
+  message?: string;
+  details?: string;
+};
 export interface LocalTerminalBridge {
   wslInstall(ubuntu: boolean): Promise<WslSetupState>;
   wslInstallStatus(): Promise<WslSetupState>;

@@ -78,9 +78,14 @@ try {
   await panel.getByLabel('模型 ID', { exact: true }).fill('test');
   await panel.getByRole('button', { name: '访问权限', exact: true }).click();
   assert.equal(await panel.getByLabel('模型 ID').isVisible(), false);
-  await panel.getByLabel('新会话使用的权限配置').selectOption('files');
-  assert.equal(await panel.getByLabel('新会话使用的权限配置').inputValue(), 'files');
-  await panel.getByLabel('新会话使用的权限配置').selectOption('terminal');
+  await panel.getByRole('radio', { name: '文件', exact: true }).click();
+  assert.equal(
+    await panel.getByRole('radio', { name: '文件', exact: true }).getAttribute('aria-checked'),
+    'true',
+  );
+  await panel.getByRole('radio', { name: '终端', exact: true }).click();
+  await panel.getByRole('button', { name: '保存权限', exact: true }).waitFor();
+  await page.screenshot({ path: 'test-results/agent-permissions-visible.png' });
 
   await panel.getByRole('button', { name: '模型基座', exact: true }).click();
   assert.equal(await panel.getByLabel('模型 ID').inputValue(), 'test');

@@ -483,3 +483,35 @@
   display: block;
   margin-top: 10px;
 }
+.permission-profiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 16px 0;
+}
+.permission-profiles button {
+  min-width: 0;
+  text-align: left;
+  border: 1px solid var(--border);
+  padding: 9px 12px;
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+}
+.permission-profiles button[aria-checked='true'] {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--hover);
+}
+.wsl-install-log {
+  margin: 12px 0;
+}
+.wsl-install-log pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 240px;
+  overflow: auto;
+  font-size: 12px;
+  padding: 12px;
+  background: var(--hover);
+}
