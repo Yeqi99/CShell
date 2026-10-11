@@ -3,7 +3,7 @@
 - GitHub 公开仓库为 Yeqi99/CShell，MIT、源码、市场目录及构建工作流已上线。
 - 构建提交为 28503cb87fa777352f540a25ed916a9655b09aec。Release 38135348340 的 Android、macOS arm64/x64、Linux arm64/x64 构建成功；Windows 使用相同提交的 Windows checks 38135320761，包含桌面回归及 NSIS 构建。
 - 修复 macOS 图标不足 512 px、临时路径规范化测试，以及窄窗口命令面板按钮可访问名称。Vim 测试等待窗口调整后的新帧，避免接受旧终端画面。
-- Release 矩阵中重复的 Windows 桌面测试出现主题切换时序失败；独立 Windows checks 与本地完整桌面回归通过。该间歇问题仍需跟进，不将失败流水线描述为全绿。
+- Release 矩阵中重复的 Windows 桌面测试出现主题切换时序失败；独立 Windows checks 的桌面回归与本地完整桌面回归通过。Windows checks 在生成 NSIS 与 blockmap 后尝试自动发布，因未配置 GH_TOKEN 退出失败，产物已上传；已将 dist 命令改为显式 --publish never，由独立发布流程负责上传。该主题间歇问题仍需跟进，不将失败流水线描述为全绿。
 - Android 为 assembleDebug + lint 通过的调试签名测试包，未进行真机验收；macOS/Linux 未进行原生桌面交互验收。安装与卸载、长时间连接和复杂服务器兼容性仍需用户测试。未做商业代码签名或 macOS 公证。
 
 ## 0.3.0 MIT 与发行准备（2026-10-11）
