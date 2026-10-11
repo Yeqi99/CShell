@@ -161,7 +161,6 @@ export function AiPanel({
           mode={mode}
           sessionId={sessionId}
           busy={busy}
-          changeLocation={changeLocation}
           setProviderId={setProviderId}
           setMode={setMode}
           create={create}
