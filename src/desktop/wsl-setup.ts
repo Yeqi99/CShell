@@ -24,6 +24,11 @@ export function wslInstallArguments(help: string, ubuntu: boolean) {
     : ['--install', '--no-distribution'];
 }
 const quote = (value: string) => "'" + value.replace(/'/g, "''") + "'";
+export function wslFailureMessage(code: number, details: string) {
+  if (/WININET_E_CANNOT_CONNECT|WININET_E_TIMEOUT|WININET_E_NAME_NOT_RESOLVED/i.test(details))
+    return '无法连接 WSL 发行版下载服务。请检查 Windows 系统代理与网络，恢复后重试安装。';
+  return `WSL 安装未完成（退出码 ${code}）。请查看下方系统输出。`;
+}
 export function wslSetupScript(ubuntu: boolean) {
   return `$p=Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\\wsl.exe') -ArgumentList ${wslInstallArguments('--no-launch', ubuntu).map(quote).join(',')} -Verb RunAs -WindowStyle Hidden -Wait -PassThru; Write-Output $p.ExitCode`;
 }
@@ -40,6 +45,44 @@ async function install(ubuntu: boolean): Promise<{ code: number; details: string
   }
   if (!help.length) throw new Error('无法读取 Windows WSL 安装程序。');
   const args = wslInstallArguments(decodeWslOutput(help), ubuntu);
+  // Distribution registration belongs to the current user. Only bootstrap/component
+  // installation needs our elevated helper; do not change users/network context for a distro.
+  const installed = await exec(executable, ['--version'], {
+    encoding: 'buffer',
+    windowsHide: true,
+    timeout: 15000,
+  }).then(
+    () => true,
+    () => false,
+  );
+  if (ubuntu && installed) {
+    try {
+      const result = await exec(executable, args, {
+        encoding: 'buffer',
+        windowsHide: true,
+        maxBuffer: 4_000_000,
+      });
+      return {
+        code: 0,
+        details: [result.stdout, result.stderr]
+          .map(decodeWslOutput)
+          .filter(Boolean)
+          .join('\n')
+          .slice(-12000),
+      };
+    } catch (e) {
+      const result = e as { code?: number | string; stdout?: Buffer; stderr?: Buffer };
+      return {
+        code: typeof result.code === 'number' ? result.code : -1,
+        details:
+          [result.stdout, result.stderr]
+            .filter((b): b is Buffer => Buffer.isBuffer(b))
+            .map(decodeWslOutput)
+            .join('\n')
+            .slice(-12000) || (e as Error).message,
+      };
+    }
+  }
   const directory = await mkdtemp(join(tmpdir(), 'cshell-wsl-'));
   const output = join(directory, 'output.log'),
     error = join(directory, 'error.log');
@@ -59,7 +102,14 @@ async function install(ubuntu: boolean): Promise<{ code: number; details: string
             '-EncodedCommand',
             Buffer.from(outer, 'utf16le').toString('base64'),
           ],
-          { windowsHide: true, maxBuffer: 65536, env: { ...process.env, PSModulePath: join(system, 'WindowsPowerShell', 'v1.0', 'Modules') } },
+          {
+            windowsHide: true,
+            maxBuffer: 65536,
+            env: {
+              ...process.env,
+              PSModulePath: join(system, 'WindowsPowerShell', 'v1.0', 'Modules'),
+            },
+          },
         )
       ).stdout;
     } catch {
@@ -92,7 +142,10 @@ export class WslSetup {
   }
   start(ubuntu: boolean) {
     if (this.state.phase === 'running') return this.snapshot();
-    this.state = { phase: 'running', message: '请完成 Windows 管理员授权，正在安装 WSL…' };
+    this.state = {
+      phase: 'running',
+      message: '正在安装，请稍候；如 Windows 请求管理员授权，请完成授权。',
+    };
     void this.run(ubuntu)
       .then((result) => {
         const { code, details } =
@@ -105,7 +158,7 @@ export class WslSetup {
               ? '需要重启 Windows。保存工作并手动重启后返回刷新。'
               : code === 0
                 ? '安装程序已完成。请刷新检测；如系统要求重启，请保存工作后手动重启。'
-                : `WSL 安装未完成（退出码 ${code}）。请查看下方系统输出。`,
+                : wslFailureMessage(code, details),
         };
       })
       .catch((e) => {

@@ -1,6 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { WslSetup, wslSetupScript } from '../src/desktop/wsl-setup';
+import { WslSetup, wslSetupScript, wslFailureMessage } from '../src/desktop/wsl-setup';
+
+test('WSL network failures explain recovery without claiming the runtime is missing', () => {
+  assert.match(
+    wslFailureMessage(-1, 'Wsl/InstallDistro/WININET_E_CANNOT_CONNECT'),
+    /系统代理与网络/,
+  );
+  assert.match(wslFailureMessage(-1, 'WININET_E_NAME_NOT_RESOLVED'), /下载服务/);
+  assert.match(wslFailureMessage(5, 'Access denied'), /退出码 5/);
+});
 test('WSL setup uses fixed elevated commands and keeps installation lifecycle', async () => {
   assert.match(wslSetupScript(true), /Ubuntu/);
   assert.match(wslSetupScript(false), /--no-distribution/);
