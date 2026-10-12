@@ -7,8 +7,23 @@ import type { Store } from './store';
 export function applicationTools(
   store: Store,
   connections: ConnectionRegistry,
+  connect?: (profileId: string, signal: AbortSignal) => Promise<string>,
 ): readonly ConnectionTool[] {
   return [
+    ...(connect
+      ? [
+          {
+            name: 'connect_machine',
+            capability: 'connections.open',
+            description:
+              'Open a real CShell terminal session for a saved target by its ID from list_machines. Uses stored credentials without exposing them. Binds subsequent machine tools in this conversation to the new connection. Call this first, then inspect the tools returned in the next model turn. Do not ask for passwords in chat.',
+            input: z.object({ profileId: z.string().uuid() }).strict(),
+            needsReview: () => false,
+            invoke: (input: unknown, signal: AbortSignal) =>
+              connect((input as { profileId: string }).profileId, signal),
+          },
+        ]
+      : []),
     {
       name: 'list_machines',
       capability: 'connections.read',

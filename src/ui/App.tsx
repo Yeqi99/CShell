@@ -1,3 +1,9 @@
+import { WslAccount } from './components/WslAccount';
+import type { LocalConnectionTarget } from '../shared/local-terminal';
+import { ConnectionEntry } from './components/ConnectionEntry';
+import { TextAssist } from './components/TextAssist';
+import { ClientProfileEditor } from './components/ClientProfileEditor';
+import type { ClientDevice, ClientShell } from '../shared/client';
 import { TabStrip } from './components/TabStrip';
 import type { LocalShell } from '../shared/local-terminal';
 import { ActivityPage } from './components/ActivityPage';
@@ -60,7 +66,14 @@ import { shortcutFor } from './shortcuts';
 import { terminalEvent, terminalClosed, terminalSnapshot } from './terminalBus';
 import brandMark from '../../assets/icon.svg';
 
-type Tab = { local?: LocalShell; id: string; profile: Profile; closed: boolean; python?: string };
+type Tab = {
+  client?: { device: ClientDevice; shell: ClientShell };
+  local?: LocalShell;
+  id: string;
+  profile: Profile;
+  closed: boolean;
+  python?: string;
+};
 export function App() {
   const [config, setConfig] = useState<Config>({
     plugins: initialPlugins(),
@@ -78,6 +91,41 @@ export function App() {
 }
 function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Config) => void }) {
   const { t } = useI18n();
+  const [localTargets, setLocalTargets] = useState<LocalConnectionTarget[]>([]);
+  const [wslSetupTarget, setWslSetupTarget] = useState<string | null>(null);
+  const [wslBusy, setWslBusy] = useState(false);
+  useEffect(() => {
+    let active = true;
+    const update = () =>
+      void window.cshell
+        .localTargets()
+        .then((v) => {
+          if (active) setLocalTargets(v);
+        })
+        .catch(() => {});
+    update();
+    const timer = setInterval(update, 8000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [config.plugins]);
+  const [minimalHover, setMinimalHover] = useState(false);
+  useEffect(() => window.cshell.onMinimalHover(setMinimalHover), []);
+  useEffect(
+    () =>
+      window.cshell.onAiConnection(({ sessionId, profile }) => {
+        connectedSessions.current.add(sessionId);
+        setTabs((items) =>
+          items.some((t) => t.id === sessionId)
+            ? items
+            : [...items, { id: sessionId, profile, closed: terminalClosed(sessionId) }],
+        );
+        setActive(sessionId);
+        setSurface('terminal');
+      }),
+    [],
+  );
   const [minimal, setMinimal] = useState(false);
   useEffect(() => {
     void window.cshell.setMinimalMode(minimal).catch(onError);
@@ -132,7 +180,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
     [form, setForm] = useState<Profile | 'new' | null>(null),
     [settings, setSettings] = useState(false),
     [surface, setSurface] = useState<
-      'terminal' | 'connection' | 'quick' | 'settings' | 'extensions' | 'activity'
+      'terminal' | 'connection' | 'quick' | 'settings' | 'extensions' | 'activity' | 'wsl'
     >('terminal'),
     [palette, setPalette] = useState(false),
     [error, setError] = useState(''),
@@ -140,10 +188,27 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
     [transfers, setTransfers] = useState<Transfer[]>([]),
     [confirmDelete, setConfirmDelete] = useState<Profile | null>(null),
     [confirmClose, setConfirmClose] = useState<Tab | null>(null);
+  const wslReturnSurface = useRef<typeof surface>('terminal');
+  const closeWslSetup = () => {
+    setWslSetupTarget(null);
+    setSurface(wslReturnSurface.current);
+  };
   const [quickConnections, setQuickConnections] = useState<Profile[]>([]);
   const [quickId, setQuickId] = useState('');
   const [quickBusy, setQuickBusy] = useState<string[]>([]);
   const openSaved = (profile: Profile) => {
+    if (profile.protocol === 'client') {
+      void (async () => {
+        const device = (await window.cshell.clientDevices()).find((d) => d.deviceId === profile.id);
+        if (!device) throw new Error('Client identity unavailable');
+        const shell = profile.clientShell ?? 'powershell';
+        await addClient(await window.cshell.clientConnect(device.deviceId, shell), device, shell);
+      })().catch((e) => {
+        openConnection(profile);
+        setError((e as Error).message);
+      });
+      return;
+    }
     setQuickConnections((items) =>
       items.some((item) => item.id === profile.id) ? items : [...items, profile],
     );
@@ -303,9 +368,12 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
       }),
     [],
   );
-  const showTools = right && !!current && !current.closed && !current.local;
+  const showTools = right && !!current && !current.closed && !current.local && !current.client;
   const saveProfile = async (p: Profile) => {
     await window.cshell.saveProfile(p);
+    setTabs((items) =>
+      items.map((tab) => (tab.profile.id === p.id ? { ...tab, profile: p } : tab)),
+    );
     await refresh();
   };
   async function connect(profile: Profile, credentials: Credentials, persist: boolean) {
@@ -321,7 +389,48 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
     setSurface('terminal');
     await refresh();
   }
+  async function addClient(
+    result: { sessionId: string; name: string },
+    device: ClientDevice,
+    shell: ClientShell,
+  ) {
+    const latest = await window.cshell.config();
+    setConfig(latest);
+    const saved = latest.profiles.find((p) => p.id === device.deviceId);
+    connectedSessions.current.add(result.sessionId);
+    setTabs((items) => [
+      ...items,
+      {
+        id: result.sessionId,
+        client: { device, shell },
+        closed: terminalClosed(result.sessionId),
+        profile: {
+          id: device.deviceId,
+          name: result.name,
+          protocol: 'client',
+          clientShell: shell,
+          host: device.host,
+          port: device.port,
+          username: '',
+          group: '',
+          favorite: false,
+          auth: 'password',
+          ...saved,
+        },
+      },
+    ]);
+    setActive(result.sessionId);
+    setSurface('terminal');
+  }
   async function openLocal(shell: LocalShell) {
+    if (wslBusy && shell.startsWith('wsl:') && shell.slice(4) !== wslSetupTarget)
+      throw new Error('当前 Linux 用户正在初始化，请稍候');
+    if (shell.startsWith('wsl:') && !(await window.cshell.wslAccountStatus(shell.slice(4))).ready) {
+      if (surface !== 'wsl') wslReturnSurface.current = surface;
+      setWslSetupTarget(shell.slice(4));
+      setSurface('wsl');
+      return;
+    }
     const result = await window.cshell.localTerminal(shell);
     connectedSessions.current.add(result.sessionId);
     setTabs((tabs) => [
@@ -417,7 +526,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
   ];
   return (
     <div
-      className={`app-shell ${minimal ? 'minimal-mode' : ''} ${preferences.backgroundAsset ? 'has-background' : ''}`}
+      className={`app-shell ${minimal ? 'minimal-mode' : ''} ${minimalHover ? 'minimal-hover' : ''} ${preferences.backgroundAsset ? 'has-background' : ''}`}
     >
       <Tooltips />
       <header className="topbar">
@@ -499,10 +608,12 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
               onChange={(serverWidth) => onLayout({ ...layout, serverWidth })}
             />
             <ServerSidebar
+              targets={localTargets}
+              onTarget={(target) => run(openLocal(target.shell))}
               groups={config.groups}
               profiles={config.profiles}
               activeProfile={current?.profile.id}
-              online={tabs.filter((tab) => !tab.closed).map((tab) => tab.profile.id)}
+              online={tabs.filter((tab) => !tab.closed && !tab.local).map((tab) => tab.profile.id)}
               onOpen={(p) => openConnection(p || 'new')}
               onConnect={openSaved}
               onSave={saveProfile}
@@ -613,6 +724,26 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
                 </div>
               ) : null}
 
+              {wslSetupTarget && (
+                <div
+                  className={`tab ${surface === 'wsl' ? 'active' : ''}`}
+                  onClick={() => setSurface('wsl')}
+                >
+                  <button onClick={() => setSurface('wsl')}>设置 {wslSetupTarget}</button>
+                  <button
+                    className="icon"
+                    title="关闭 Linux 设置"
+                    aria-label="关闭 Linux 设置"
+                    disabled={wslBusy}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      closeWslSetup();
+                    }}
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+              )}
               {quickConnections.map((profile) => (
                 <div
                   key={`quick-${profile.id}`}
@@ -805,6 +936,21 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
               <PanelRight size={17} />
             </button>
           </div>
+          {wslSetupTarget && (
+            <div className="workspace-editor" hidden={surface !== 'wsl'}>
+              <WslAccount
+                onBusy={setWslBusy}
+                key={wslSetupTarget}
+                distribution={wslSetupTarget}
+                onCancel={closeWslSetup}
+                onReady={async () => {
+                  const shell: LocalShell = `wsl:${wslSetupTarget}`;
+                  setWslSetupTarget(null);
+                  await openLocal(shell);
+                }}
+              />
+            </div>
+          )}
           {quickConnections.map((profile) => (
             <div
               key={`quick-${profile.id}`}
@@ -834,17 +980,42 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
               className="workspace-editor"
               hidden={surface !== 'connection' || form !== draft}
             >
-              <ConnectionForm
-                profile={draft === 'new' ? undefined : draft}
-                initialPersist={
-                  draft !== 'new' && config.profiles.some((profile) => profile.id === draft.id)
-                }
-                groups={config.groups}
-                saved={draft !== 'new' && config.savedCredentials.includes(draft.id)}
-                onClose={() => closeEditor(draft)}
-                onSave={saveProfile}
-                onConnect={connect}
-              />
+              {draft === 'new' ? (
+                <ConnectionEntry
+                  onClient={addClient}
+                  onLocal={openLocal}
+                  profiles={config.profiles}
+                  onConnect={openSaved}
+                  targets={localTargets}
+                  onTarget={(target) => run(openLocal(target.shell))}
+                >
+                  <ConnectionForm
+                    initialPersist={true}
+                    groups={config.groups}
+                    saved={false}
+                    onClose={() => closeEditor(draft)}
+                    onSave={saveProfile}
+                    onConnect={connect}
+                  />
+                </ConnectionEntry>
+              ) : draft.protocol === 'client' ? (
+                <ClientProfileEditor
+                  profile={draft}
+                  onSave={saveProfile}
+                  onConnect={openSaved}
+                  onClient={addClient}
+                />
+              ) : (
+                <ConnectionForm
+                  profile={draft}
+                  initialPersist={config.profiles.some((p) => p.id === draft.id)}
+                  groups={config.groups}
+                  saved={config.savedCredentials.includes(draft.id)}
+                  onClose={() => closeEditor(draft)}
+                  onSave={saveProfile}
+                  onConnect={connect}
+                />
+              )}
             </div>
           ))}
           {extensionVisited && (
@@ -912,7 +1083,17 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
               <span>{t('disconnected')}</span>
               <button
                 onClick={() =>
-                  current.local ? run(openLocal(current.local)) : openConnection(current.profile)
+                  current.client
+                    ? run(
+                        window.cshell
+                          .clientConnect(current.client.device.deviceId, current.client.shell)
+                          .then((result) =>
+                            addClient(result, current.client!.device, current.client!.shell),
+                          ),
+                      )
+                    : current.local
+                      ? run(openLocal(current.local))
+                      : openConnection(current.profile)
                 }
               >
                 {t('reconnect')}
@@ -927,9 +1108,10 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
                   id={tab.id}
                   active={surface === 'terminal' && active === tab.id}
                   pythonInterpreter={tab.python}
-                  plugins={tab.local ? [] : config.plugins}
+                  plugins={tab.local || tab.client ? [] : config.plugins}
                   suggestionsEnabled={
                     !tab.local &&
+                    !tab.client &&
                     (pluginEnabled(config.plugins, 'commands') ||
                       pluginEnabled(config.plugins, 'snippets') ||
                       pluginEnabled(config.plugins, 'python'))
@@ -952,7 +1134,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
 
           {localDock && surface === 'terminal' && !minimal && (
             <LocalDock
-              sessionId={current?.local ? undefined : current?.id}
+              sessionId={current?.local || current?.client ? undefined : current?.id}
               transfers={transfers}
               onError={onError}
               onClose={() => setLocalDock(false)}
@@ -1003,7 +1185,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
         <div className="ai-panel-slot" hidden={!aiVisible || minimal}>
           <AiPanel
             visible={aiVisible && !minimal}
-            sessionId={current && !current.closed ? current.id : undefined}
+            sessionId={current && !current.closed && !current.client ? current.id : undefined}
             profiles={config.profiles}
             groups={config.groups}
             onClose={() => setAiVisible(false)}
@@ -1019,7 +1201,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
                 ? t('disconnected')
                 : current.local
                   ? `本机 · ${current.profile.name}`
-                  : `SSH · ${current.profile.host}:${current.profile.port}`
+                  : `${current.client ? 'Client' : 'SSH'} · ${current.profile.host}:${current.profile.port}`
               : t('ready')}
           </span>
         </div>
@@ -1084,6 +1266,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
           </footer>
         </Modal>
       )}
+      <TextAssist />
       {confirmClose && (
         <Modal title={t('closeSession')} onClose={() => setConfirmClose(null)}>
           <p>{t('closeSessionBody')}</p>

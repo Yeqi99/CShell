@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { AiService, commandNeedsReview } from '../src/core/ai';
 import { Store } from '../src/core/store';
 import { SshService } from '../src/core/ssh';
-import { createSshConnections } from '../src/core/connections/ssh-provider';
+import { createSshConnections, createSshManager } from '../src/core/connections/ssh-provider';
 import { fixture } from './fixture';
 import { initialWindowBounds } from '../src/desktop/window-bounds';
 import { ConnectionRegistry } from '../src/core/connections/registry';
@@ -19,6 +19,130 @@ const until = async (fn: () => boolean) => {
     await new Promise((r) => setTimeout(r, 20));
   }
 };
+test('agent connects a saved machine then discovers its tools, with scope and approval rechecks', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'cshell-connect-ai-'));
+  const store = new Store(directory, {
+    encrypt: async (s) => Buffer.from(s).toString('base64'),
+    decrypt: async (s) => Buffer.from(s, 'base64').toString(),
+  });
+  const remote = await fixture(),
+    ssh = new SshService(
+      () => {},
+      async () => true,
+    ),
+    manager = createSshManager(ssh, () => store.snapshot().profiles);
+  const profile = {
+    id: randomUUID(),
+    name: 'machine1',
+    host: '127.0.0.1',
+    port: remote.port,
+    username: 'tester',
+    auth: 'password' as const,
+    group: 'Dev',
+    favorite: false,
+  };
+  const requests: any[] = [];
+  let connects = 0;
+  const api = createServer(async (req, res) => {
+    let raw = '';
+    for await (const c of req) raw += c;
+    const input = JSON.parse(raw);
+    requests.push(input);
+    const last = input.messages.at(-1),
+      connected = last.role === 'tool' && last.content.includes('"connected":true');
+    const name = connected ? 'execute_command' : 'connect_machine';
+    res.setHeader('content-type', 'application/json');
+    res.end(
+      JSON.stringify({
+        choices: [
+          {
+            message:
+              last.role === 'tool' && !connected
+                ? { content: '完成' }
+                : {
+                    content: null,
+                    tool_calls: [
+                      {
+                        id: randomUUID(),
+                        type: 'function',
+                        function: {
+                          name,
+                          arguments: JSON.stringify(
+                            connected ? { command: 'pwd' } : { profileId: profile.id },
+                          ),
+                        },
+                      },
+                    ],
+                  },
+          },
+        ],
+      }),
+    );
+  });
+  await new Promise<void>((r) => api.listen(0, '127.0.0.1', r));
+  const ai = new AiService(directory, store, manager.tools, async (p, signal, authorize) => {
+    assert.ok(authorize());
+    connects++;
+    const id = await manager.connect('cshell.ssh', p, { password: remote.password }, signal);
+    if (!authorize()) {
+      await manager.disconnect(id);
+      throw new Error('revoked');
+    }
+    return id;
+  });
+  const provider = {
+    id: randomUUID(),
+    name: 'fixture',
+    model: 'fixture',
+    url: `http://127.0.0.1:${(api.address() as any).port}/v1`,
+  };
+  try {
+    await store.saveProfile(profile);
+    await ai.saveProvider(provider, 'private-key');
+    await ai.savePolicy({
+      ...ai.snapshot().policy,
+      application: ['connections.read', 'connections.open'],
+      profiles: [profile.id],
+      capabilities: ['commands.execute'],
+    });
+    const thread = await ai.create('workspace', provider.id, 'restricted');
+    await ai.send(thread.id, '连接机器1并检查');
+    await until(() => ai.snapshot().threads[0].state === 'idle');
+    const result = ai.snapshot().threads[0];
+    assert.equal(connects, 1);
+    assert.ok(result.sessionId);
+    assert.ok(requests[1].tools.some((t: any) => t.function.name === 'execute_command'));
+    assert.ok(
+      result.messages.some(
+        (m) => m.tool?.name === 'execute_command' && !m.tool.output.startsWith('Error:'),
+      ),
+    );
+    assert.equal(JSON.stringify(requests).includes(remote.password), false);
+    await ai.savePolicy({ ...ai.snapshot().policy, profiles: [] });
+    const denied = await ai.create('workspace', provider.id, 'allow');
+    await ai.send(denied.id, '连接');
+    await until(() => ai.snapshot().threads[0].state === 'idle');
+    assert.equal(connects, 1);
+    assert.match(ai.snapshot().threads[0].messages.find((m) => m.tool)!.content, /denied/);
+    await ai.savePolicy({ ...ai.snapshot().policy, profiles: [profile.id] });
+    const review = await ai.create('workspace', provider.id, 'review');
+    await ai.send(review.id, '连接');
+    await until(() => ai.snapshot().threads[0].state === 'approval');
+    await store.saveProfile({ ...profile, host: '192.0.2.2' });
+    ai.approve(review.id, ai.snapshot().threads[0].pending!.id, true);
+    await until(() => ai.snapshot().threads[0].state === 'idle');
+    assert.equal(connects, 1);
+    assert.match(
+      ai.snapshot().threads[0].messages.find((m) => m.tool)!.content,
+      /configuration changed/,
+    );
+  } finally {
+    for (const t of manager.tools.activeTargets()) await manager.disconnect(t.sessionId);
+    await remote.close();
+    await new Promise<void>((r) => api.close(() => r()));
+    await rm(directory, { recursive: true, force: true });
+  }
+});
 test('initial window fits work area including small/high-DPI and secondary screens', () => {
   for (const area of [
     { x: 0, y: 0, width: 1280, height: 680 },

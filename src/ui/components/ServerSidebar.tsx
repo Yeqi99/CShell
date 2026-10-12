@@ -1,3 +1,4 @@
+import type { LocalConnectionTarget } from '../../shared/local-terminal';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
@@ -23,6 +24,8 @@ type Menu = { x: number; y: number } & (
 );
 export function ServerSidebar({
   profiles,
+  targets = [],
+  onTarget,
   groups,
   activeProfile,
   online,
@@ -33,6 +36,8 @@ export function ServerSidebar({
   onManageGroup,
 }: {
   profiles: Profile[];
+  targets?: LocalConnectionTarget[];
+  onTarget?: (target: LocalConnectionTarget) => void;
   groups: string[];
   activeProfile?: string;
   online: string[];
@@ -264,6 +269,36 @@ export function ServerSidebar({
         </p>
       )}
       <div className="server-list">
+        {!!targets.length && (
+          <section className="server-group">
+            <div className="group-heading">
+              <span className="group-name">本机环境</span>
+              <small>{targets.length}</small>
+            </div>
+            {targets
+              .filter((t) => t.name.toLowerCase().includes(query.toLowerCase()))
+              .map((target) => (
+                <button
+                  className="local-target-row"
+                  key={target.id}
+                  onDoubleClick={() => onTarget?.(target)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      onTarget?.(target);
+                    }
+                  }}
+                  title="双击打开终端"
+                >
+                  <Server size={20} />
+                  <span>
+                    <strong>{target.name}</strong>
+                    <small>{target.detail}</small>
+                  </span>
+                </button>
+              ))}
+          </section>
+        )}
         {sections.map((section) => (
           <section
             key={`${section.favorite ? 'favorite' : 'group'}:${section.id}`}
@@ -331,7 +366,7 @@ export function ServerSidebar({
                         }
                       }}
                       onClick={() => closeMenu()}
-                      title={`${profile.username}@${profile.host}:${profile.port}`}
+                      title={`${profile.protocol === 'client' ? 'Client · ' : profile.username + '@'}${profile.host}:${profile.port}`}
                     >
                       <div className="server-glyph">
                         <Server size={16} />

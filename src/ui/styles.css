@@ -5510,3 +5510,291 @@ input[type='radio']:focus-visible {
 .wsl-plugin {
   max-width: 760px;
 }
+.connection-chooser {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 32px;
+}
+.connection-chooser header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.connection-chooser h1 {
+  font-size: 20px;
+  margin: 0 0 6px;
+}
+.connection-chooser p {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 0;
+}
+.connection-chooser-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.connection-chooser-search input {
+  border: 0;
+  background: transparent;
+  flex: 1;
+  min-width: 0;
+}
+.connection-choices {
+  display: grid;
+  gap: 6px;
+  margin-top: 16px;
+}
+.local-target-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  text-align: left;
+}
+.local-target-row > svg {
+  padding: 4px;
+  width: 27px;
+  height: 29px;
+  background: var(--hover);
+  border-radius: 6px;
+  flex: none;
+}
+.local-target-row > span {
+  min-width: 0;
+  flex: 1;
+}
+.local-target-row strong,
+.local-target-row small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 400;
+}
+.local-target-row small {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.server-group > .group-heading > .group-name {
+  font-size: 11px;
+  color: var(--muted);
+  padding: 8px 12px;
+  flex: 1;
+}
+.terminal-context {
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+}
+.connection-choices > button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  padding: 12px;
+  border-radius: 8px;
+}
+.connection-choices > button:hover {
+  background: var(--hover);
+}
+.connection-choices span {
+  flex: 1;
+  min-width: 0;
+}
+.connection-choices strong,
+.connection-choices small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.connection-choices small {
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 4px;
+}
+.connection-chooser-empty {
+  padding: 32px 0;
+  text-align: center;
+}
+.connection-entry-back {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin: 16px 24px 0;
+  font-size: 12px;
+}
+.minimal-mode.minimal-hover .tabs {
+  visibility: visible;
+  opacity: 1;
+}
+.minimal-mode.minimal-hover .tab-scroll,
+.minimal-mode.minimal-hover .local-terminal-menu {
+  opacity: 1;
+  visibility: visible;
+}
+.local-target-row:hover {
+  background: var(--hover);
+}
+.wsl-account-workspace {
+  position: absolute;
+  inset: 40px 0 0;
+  z-index: 12;
+  overflow: auto;
+  background: var(--panel);
+}
+.wsl-account {
+  max-width: 420px;
+  margin: 32px auto;
+  padding: 24px;
+}
+.wsl-account h1 {
+  font-size: 20px;
+}
+.wsl-account p,
+.wsl-account small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.wsl-account label {
+  display: grid;
+  gap: 6px;
+  margin: 16px 0;
+  font-size: 12px;
+}
+.wsl-account footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+/* Connection entry uses one aligned action row; extraction stays within the form. */
+.connection-ai-extractor {
+  margin: 0 0 20px;
+}
+.compact-connection .connection-ai-extractor .connection-heading {
+  justify-content: space-between;
+  margin: 0;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.connection-extract-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.connection-extract-actions button {
+  height: 30px;
+  margin: 0;
+}
+.connection-extract-actions .icon {
+  width: 30px;
+}
+.connection-extract-panel {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+}
+.connection-extract-modes {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 7px;
+  background: var(--bg);
+}
+.connection-extract-modes button {
+  padding: 5px 9px;
+  font-size: 11px;
+  gap: 5px;
+  border-radius: 5px;
+  color: var(--muted);
+}
+.connection-extract-modes button[aria-pressed='true'] {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.connection-extract-model {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 10px 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+.connection-extract-model select {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 4px 8px;
+  font-size: 11px;
+}
+.connection-extract-controls {
+  justify-content: space-between;
+  gap: 12px;
+  margin: 10px 0 0;
+}
+.connection-extract-controls small {
+  line-height: 1.5;
+}
+.connection-extract-controls .primary {
+  flex-shrink: 0;
+  height: 30px;
+}
+.connection-extract-panel textarea {
+  display: block;
+  min-height: 100px;
+  line-height: 1.65;
+}
+.connection-extract-panel .form-error {
+  margin: 8px 0 0;
+  line-height: 1.5;
+}
+.ai-provider-fields {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.ai-provider-test {
+  font-size: 11px;
+  line-height: 1.6;
+  margin: 10px 0 0;
+  overflow-wrap: anywhere;
+}
+.ai-form-actions {
+  flex-wrap: wrap;
+}
+.ai-form-actions > button:first-child {
+  margin-right: auto;
+}
+.connection-extract-panel textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.connection-extract-modes button[aria-pressed='false'] {
+  background: transparent;
+  color: var(--muted);
+}
+.connection-extract-modes button[aria-pressed='true'] {
+  background: var(--terminal);
+  box-shadow: 0 1px 3px #00000012;
+}
+.ai-provider-fields {
+  display: grid;
+  gap: 12px;
+}
+.ai-settings .permission-model {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+}

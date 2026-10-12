@@ -1,59 +1,81 @@
-import { useEffect, useState } from 'react';
-import { ClipboardPaste, Sparkles, X } from 'lucide-react';
-import type { AiProvider } from '../../shared/ai';
+import { useState } from 'react';
+import { ClipboardPaste, ScanText, Sparkles, X } from 'lucide-react';
 import type { ExtractedConnection } from '../../shared/connection-extraction';
+import { ConnectionRuleError, extractConnectionByRules } from '../../shared/connection-rules';
+import { useAiProviders } from '../use-ai-providers';
 import { useI18n } from '../i18n';
+
 export function ConnectionExtractor({
+  title,
+  titleId,
+  disabled,
+  onStart,
   onExtract,
   onBusy,
 }: {
+  title: string;
+  titleId: string;
+  disabled: boolean;
+  onStart: () => void;
   onExtract: (value: ExtractedConnection) => void;
   onBusy: (busy: boolean) => void;
 }) {
   const { locale } = useI18n(),
     cn = locale === 'zh-CN';
-  const [providers, setProviders] = useState<AiProvider[]>([]),
-    [provider, setProvider] = useState('');
+  const { providers, extractionProviderId } = useAiProviders();
+  const [provider, setProvider] = useState('');
+  const [mode, setMode] = useState<'rules' | 'ai'>('rules');
   const [text, setText] = useState(''),
     [busy, setBusy] = useState(false),
     [error, setError] = useState('');
   const [open, setOpen] = useState(false);
-  useEffect(() => {
-    if (!open) return;
-    let disposed = false;
-    void window.cshell
-      .aiSnapshot()
-      .then((snapshot) => {
-        if (disposed) return;
-        setProviders(snapshot.providers);
-        const preferred = snapshot.extractionProviderId;
-        setProvider((current) =>
-          snapshot.providers.some((p) => p.id === current)
-            ? current
-            : snapshot.providers.find((p) => p.id === preferred)?.id ||
-              snapshot.providers[0]?.id ||
-              '',
-        );
-      })
-      .catch(() => {
-        if (!disposed) setError(cn ? '无法读取 AI 基座' : 'Could not load AI providers');
-      });
-    return () => {
-      disposed = true;
-    };
-  }, [open]);
+  const ai = mode === 'ai' && providers.length > 0;
+  const selected =
+    providers.find((p) => p.id === provider) ??
+    providers.find((p) => p.id === extractionProviderId) ??
+    providers[0];
+  const locked = busy || disabled;
+  const paste = async () => {
+    onStart();
+    setOpen(true);
+    setError('');
+    try {
+      setText((await window.cshell.pasteText()).slice(0, 24000));
+    } catch {
+      setError(cn ? '无法读取剪贴板，请手动粘贴。' : 'Clipboard unavailable. Paste text manually.');
+    }
+  };
   const extract = async () => {
-    if (busy || !provider || !text.trim()) return;
+    if (locked || !text.trim()) return;
     setBusy(true);
     onBusy(true);
     setError('');
     try {
-      const result = await window.cshell.aiExtractConnection(text, provider);
+      const result = ai
+        ? await window.cshell.aiExtractConnection(text, selected.id)
+        : extractConnectionByRules(text);
       onExtract(result);
       setText('');
       setOpen(false);
     } catch (e) {
-      setError((e as Error).message.replace(/^Error invoking remote method '[^']+': Error: /, ''));
+      if (e instanceof ConnectionRuleError) {
+        const errors = {
+          empty: cn ? '请先粘贴连接信息。' : 'Paste connection information first.',
+          unsupported: cn
+            ? '未找到可识别的 SSH 信息。请使用 SSH 命令，或“主机、端口、用户名”等字段标签。'
+            : 'No SSH details found. Use an SSH command or labelled Host, Port and Username fields.',
+          ambiguous: cn
+            ? '发现多组或相互冲突的连接信息，请仅保留一个目标后重试。'
+            : 'Conflicting connection details found. Keep only one target and retry.',
+          invalid: cn
+            ? '连接信息格式有误，请检查主机地址和端口（1–65535）。'
+            : 'Check the host and port (1–65535).',
+        };
+        setError(errors[e.reason]);
+      } else
+        setError(
+          (e as Error).message.replace(/^Error invoking remote method '[^']+': Error: /, ''),
+        );
     } finally {
       setBusy(false);
       onBusy(false);
@@ -61,102 +83,141 @@ export function ConnectionExtractor({
   };
   return (
     <div className="connection-ai-extractor">
-      <button
-        type="button"
-        className="connection-extract"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-        disabled={busy}
-      >
-        <Sparkles size={14} />
-        {cn ? '从文本智能填写' : 'Fill from text'}
-      </button>
+      <header className="connection-heading">
+        <h1 id={titleId}>{title}</h1>
+        <div className="connection-extract-actions">
+          <button
+            type="button"
+            className="connection-extract"
+            aria-expanded={open}
+            disabled={locked}
+            onClick={() => {
+              onStart();
+              setOpen(!open);
+              setError('');
+            }}
+          >
+            <ScanText size={14} />
+            {cn ? '从文本填写' : 'Fill from text'}
+          </button>
+          <button
+            type="button"
+            className="icon"
+            title={cn ? '粘贴连接信息' : 'Paste connection text'}
+            aria-label={cn ? '粘贴连接信息' : 'Paste connection text'}
+            disabled={locked}
+            onClick={() => void paste()}
+          >
+            <ClipboardPaste size={14} />
+          </button>
+        </div>
+      </header>
       {open && (
         <section
           className="connection-extract-panel"
           aria-label={cn ? '连接信息提取' : 'Extract connection'}
         >
           <header>
-            <span>{cn ? 'SSH 连接信息' : 'SSH connection details'}</span>
+            <div
+              className="connection-extract-modes"
+              role="group"
+              aria-label={cn ? '读取方式' : 'Extraction method'}
+            >
+              <button
+                type="button"
+                aria-pressed={!ai}
+                disabled={locked}
+                onClick={() => {
+                  setMode('rules');
+                  setError('');
+                }}
+              >
+                <ScanText size={14} />
+                {cn ? '本地规则' : 'Local rules'}
+              </button>
+              {providers.length > 0 && (
+                <button
+                  type="button"
+                  aria-pressed={ai}
+                  disabled={locked}
+                  onClick={() => {
+                    setMode('ai');
+                    setError('');
+                  }}
+                >
+                  <Sparkles size={14} />
+                  {cn ? 'AI 模型' : 'AI model'}
+                </button>
+              )}
+            </div>
             <button
               type="button"
               className="icon"
+              title={cn ? '关闭提取' : 'Close extraction'}
               aria-label={cn ? '关闭提取' : 'Close extraction'}
+              disabled={locked}
               onClick={() => setOpen(false)}
-              disabled={busy}
             >
-              <X size={13} />
+              <X size={14} />
             </button>
           </header>
-          {providers.length ? (
-            <>
-              <textarea
-                aria-label={cn ? '待提取文本' : 'Connection text'}
-                placeholder={
-                  cn ? '粘贴服务器地址、账号、端口等信息…' : 'Paste server address, account, port…'
-                }
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                maxLength={24000}
-                disabled={busy}
-              />
-              <div className="connection-extract-controls">
-                <button
-                  type="button"
-                  className="icon"
-                  title={cn ? '粘贴' : 'Paste'}
-                  aria-label={cn ? '粘贴连接信息' : 'Paste connection text'}
-                  disabled={busy}
-                  onClick={() =>
-                    void window.cshell
-                      .pasteText()
-                      .then(setText)
-                      .catch(() => setError(cn ? '无法读取剪贴板' : 'Clipboard unavailable'))
-                  }
-                >
-                  <ClipboardPaste size={14} />
-                </button>
-                <select
-                  aria-label={cn ? '提取使用的 AI 基座' : 'Extraction AI provider'}
-                  value={provider}
-                  onChange={(e) => setProvider(e.target.value)}
-                  disabled={busy}
-                >
-                  {providers.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} · {p.model}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  className="primary"
-                  disabled={busy || !text.trim()}
-                  onClick={() => void extract()}
-                >
-                  {busy ? (cn ? '识别中…' : 'Extracting…') : cn ? '提取并填写' : 'Extract & fill'}
-                </button>
-              </div>
-              <small>
-                {cn
-                  ? '文本会发送至所选基座，仅填写表单，不自动连接。'
-                  : 'Text is sent to the selected provider. Fills the form without connecting.'}
-              </small>
-            </>
-          ) : (
-            <button
-              type="button"
-              className="secondary"
-              onClick={() => window.dispatchEvent(new Event('cshell:open-ai'))}
-            >
-              {cn ? '配置 AI 基座' : 'Configure an AI provider'}
-            </button>
+          {ai && (
+            <label className="connection-extract-model">
+              {cn ? '解析模型' : 'Model'}
+              <select
+                aria-label={cn ? '提取使用的 AI 基座' : 'Extraction AI provider'}
+                value={selected.id}
+                disabled={locked}
+                onChange={(e) => setProvider(e.target.value)}
+              >
+                {providers.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} · {p.model}
+                  </option>
+                ))}
+              </select>
+            </label>
           )}
+          <textarea
+            aria-label={cn ? '待提取文本' : 'Connection text'}
+            autoFocus
+            placeholder={
+              cn
+                ? 'ssh user@host -p 2222\n或粘贴：主机: example.com  端口: 22  用户名: root'
+                : 'ssh user@host -p 2222\nOr: Host: example.com  Port: 22  Username: root'
+            }
+            value={text}
+            onChange={(e) => {
+              setText(e.target.value);
+              setError('');
+            }}
+            maxLength={24000}
+            disabled={locked}
+          />
           {error && (
             <p className="form-error" role="alert">
               {error}
             </p>
           )}
+          <div className="connection-extract-controls">
+            <small>
+              {ai
+                ? cn
+                  ? '发送至所选模型，提取后可继续修改。'
+                  : 'Sent to the selected model. Review and edit after extraction.'
+                : cn
+                  ? '在本机匹配关键词与格式，无需 AI。'
+                  : 'Matches labels and formats locally. No AI required.'}
+            </small>
+            <button
+              type="button"
+              className="primary"
+              disabled={locked || !text.trim()}
+              onClick={() => void extract()}
+            >
+              {busy ? (cn ? '识别中…' : 'Extracting…') : cn ? '提取并填写' : 'Extract & fill'}
+            </button>
+          </div>
         </section>
       )}
     </div>

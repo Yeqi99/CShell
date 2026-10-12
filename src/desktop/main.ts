@@ -1,3 +1,11 @@
+import { syncClientProfiles } from '../core/client/profiles';
+import { spawn } from 'node:child_process';
+import { clientEndpointSchema } from '../shared/client';
+import { wslAccountStatus, initializeWslAccount } from './wsl-account';
+import { startClientApplication, clientCodec } from './client-app';
+import { ClientProvider } from '../core/client/provider';
+import { ClientVault } from '../core/client/identity';
+import { clientShellSchema } from '../shared/client';
 import { LocalTerminalProvider } from '../core/connections/local-terminal-provider';
 import { WslSetup } from './wsl-setup';
 import { createSshManager } from '../core/connections/ssh-provider';
@@ -22,6 +30,7 @@ import {
   safeStorage,
   session,
   screen,
+  shell,
 } from 'electron';
 import { join, basename } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -54,6 +63,8 @@ const pathSchema = z
   .min(1)
   .max(4096)
   .refine((p) => !/[\0\r\n]/.test(p));
+const clientMode = process.argv.includes('--client') || app.getName() === 'CShell Client';
+if (clientMode) app.setPath('userData', join(app.getPath('appData'), 'CShell Client'));
 if (process.env.CSHELL_TEST_DATA) app.setPath('userData', process.env.CSHELL_TEST_DATA);
 const hasLock = app.requestSingleInstanceLock();
 if (!hasLock) app.quit();
@@ -61,6 +72,7 @@ else
   app
     .whenReady()
     .then(async () => {
+      if (clientMode) return startClientApplication();
       const store = new Store(app.getPath('userData'), {
         encrypt: async (value) => {
           if (
@@ -178,6 +190,13 @@ else
       const localTerminal = new LocalTerminalProvider(app.getPath('userData'), store, emit);
       await localTerminal.load();
       connections.register(localTerminal);
+      const clientProvider = new ClientProvider(
+        new ClientVault(join(app.getPath('userData'), 'client-controller'), clientCodec),
+        emit,
+      );
+      await clientProvider.load();
+      await syncClientProfiles(store, clientProvider.list());
+      connections.register(clientProvider);
       floating = new FloatingWindows(
         window,
         {
@@ -280,11 +299,71 @@ else
             throw error;
           }
         });
+      handle('client:download-page', () =>
+        shell.openExternal('https://github.com/Yeqi99/CShell/releases'),
+      );
+      handle('client:probe', (endpoint) => clientProvider.probe(endpoint));
+      handle('client:password-pair', async (info, password) => {
+        const device = await clientProvider.pairPassword(info, password);
+        await syncClientProfiles(store, [device]);
+        return device;
+      });
+      handle('connection:rdp', async (value) => {
+        if (process.platform !== 'win32') throw new Error('RDP requires Windows');
+        const endpoint = clientEndpointSchema
+          .extend({ port: z.number().int().min(1).max(65535) })
+          .parse(value);
+        const host = endpoint.host.includes(':') ? '[' + endpoint.host + ']' : endpoint.host;
+        await new Promise<void>((resolve, reject) => {
+          const child = spawn(
+            join(process.env.SystemRoot || 'C:/Windows', 'System32', 'mstsc.exe'),
+            ['/v:' + host + ':' + endpoint.port],
+            { detached: true, stdio: 'ignore' },
+          );
+          child.once('error', reject);
+          child.once('spawn', () => {
+            child.unref();
+            resolve();
+          });
+        });
+      });
+      handle('client:devices', () => clientProvider.list());
+      handle('client:pair', async (text) => {
+        const device = await clientProvider.pair(z.string().max(16384).parse(text));
+        await syncClientProfiles(store, [device]);
+        return device;
+      });
+      handle('client:forget', (id) => clientProvider.forget(idSchema.parse(id)));
+      handle('client:connect', async (id, shell) => {
+        const sessionId = await connections!.connect(
+          clientProvider.id,
+          { deviceId: idSchema.parse(id), shell: clientShellSchema.parse(shell) },
+          undefined,
+        );
+        return { sessionId, name: clientProvider.resolve(sessionId).target.label };
+      });
       registerAppearanceHandlers(handle, window, app.getPath('userData'), consume, text);
       registerUpdateHandlers(handle, window);
       registerActivity(handle, window, activity);
       let normalBounds: Electron.Rectangle | null = null;
       let wasMaximized = false;
+      let minimalHover = false;
+      const hoverTimer = setInterval(() => {
+        if (!normalBounds || window.isDestroyed()) return;
+        const cursor = screen.getCursorScreenPoint(),
+          bounds = window.getBounds();
+        const hovered =
+          !window.isMinimized() &&
+          cursor.x >= bounds.x &&
+          cursor.x < bounds.x + bounds.width &&
+          cursor.y >= bounds.y &&
+          cursor.y < bounds.y + 44;
+        if (hovered !== minimalHover) {
+          minimalHover = hovered;
+          window.webContents.send('window:minimal-hover', hovered);
+        }
+      }, 100);
+      window.once('closed', () => clearInterval(hoverTimer));
       handle('window:minimal', (input) => {
         const enabled = z.boolean().parse(input);
         if (enabled && !normalBounds) {
@@ -318,7 +397,34 @@ else
         window.setAlwaysOnTop(z.boolean().parse(enabled));
         return window.isAlwaysOnTop();
       });
-      await registerAiHandlers(handle, app.getPath('userData'), store, connections.tools);
+      await registerAiHandlers(
+        handle,
+        app.getPath('userData'),
+        store,
+        connections.tools,
+        async (profile, signal, authorize) => {
+          const secret = await store.secret(profile.id);
+          if (
+            !secret ||
+            (profile.auth === 'key' ? !secret.privateKey : secret.password === undefined)
+          )
+            throw new Error(
+              '这台机器未保存连接凭据。请在工作区连接并保存凭据后重试；不要在聊天中发送密码。',
+            );
+          signal.throwIfAborted();
+          if (!authorize()) throw new Error('Machine connection permission revoked');
+          const sessionId = await connections!.connect('cshell.ssh', profile, secret, signal);
+          if (signal.aborted || !authorize() || window.isDestroyed()) {
+            await connections!.disconnect(sessionId);
+            throw new Error('Connection cancelled or permission revoked');
+          }
+          window.webContents.send('ai:connected', { sessionId, profile });
+          return sessionId;
+        },
+        (channel, value) => {
+          if (!window.isDestroyed()) window.webContents.send(channel, value);
+        },
+      );
       registerPresetHandlers(handle, window, app.getPath('userData'), store, text);
       const mcp = new McpService(store, app.getPath('userData'), async (name, command) => {
         const result = await dialog.showMessageBox(window, {
@@ -402,6 +508,34 @@ else
         requireDocker(sessionId);
         return docker.action(sessionId, action);
       });
+      const assertWsl = () => {
+        if (
+          process.platform !== 'win32' ||
+          !store.snapshot().plugins.some((p) => p.enabled && p.manifest.id === 'cshell.wsl')
+        )
+          throw new Error('请先启用 WSL 插件');
+      };
+      handle('local-terminal:targets', async () => {
+        if (
+          process.platform !== 'win32' ||
+          !store.snapshot().plugins.some((p) => p.enabled && p.manifest.id === 'cshell.wsl')
+        )
+          return [];
+        return (await localTerminal.distributions()).distributions.map((name) => ({
+          id: 'wsl:' + name,
+          name,
+          detail: '本机 Linux · WSL',
+          shell: 'wsl:' + name,
+        }));
+      });
+      handle('local-terminal:wsl-account', async (name) => {
+        assertWsl();
+        return wslAccountStatus(name);
+      });
+      handle('local-terminal:wsl-initialize', async (input) => {
+        assertWsl();
+        return initializeWslAccount(input);
+      });
       handle('local-terminal:wsl', () => localTerminal.distributions());
       const wslSetup = new WslSetup();
       handle('local-terminal:wsl-install-status', () => wslSetup.snapshot());
@@ -429,8 +563,23 @@ else
         clipboard.writeText(z.string().max(2_000_000).parse(value)),
       );
       handle('clipboard:read', async () => (await clipboard.readText()).slice(0, 2_000_000));
-      handle('profile:save', (value) => store.saveProfile(profileSchema.parse(value)));
-      handle('profile:delete', (id) => store.deleteProfile(idSchema.parse(id)));
+      handle('profile:save', (value) => {
+        const profile = profileSchema.parse(value);
+        const old = store.snapshot().profiles.find((p) => p.id === profile.id);
+        if (old && (old.protocol ?? 'ssh') !== (profile.protocol ?? 'ssh'))
+          throw new Error('Cannot change connection protocol');
+        if (profile.protocol === 'client') {
+          const device = clientProvider.list().find((d) => d.deviceId === profile.id);
+          if (!device || device.host !== profile.host || device.port !== profile.port)
+            throw new Error('Client identity or endpoint mismatch');
+        }
+        return store.saveProfile(profile);
+      });
+      handle('profile:delete', async (value) => {
+        const id = idSchema.parse(value);
+        if (store.profile(id).protocol === 'client') await clientProvider.forget(id);
+        await store.deleteProfile(id);
+      });
       handle('group:manage', (action) => store.manageGroup(groupActionSchema.parse(action)));
       handle('preferences', async (value) => {
         const preferences = preferencesSchema.parse(value);
@@ -594,7 +743,11 @@ else
       let closing = false,
         closePrompt = false;
       window.on('close', (event) => {
-        if (closing || (!ssh.size && !localTerminal.size && !transfers.size)) return;
+        if (
+          closing ||
+          (!ssh.size && !localTerminal.size && !clientProvider.size && !transfers.size)
+        )
+          return;
         event.preventDefault();
         if (closePrompt) return;
         closePrompt = true;
@@ -635,6 +788,7 @@ else
         floating?.dispose();
         void mcp.stop();
         transfers.dispose();
+        clientProvider.dispose();
         localTerminal.dispose();
         ssh.dispose();
       });

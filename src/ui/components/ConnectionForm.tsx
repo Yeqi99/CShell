@@ -7,10 +7,8 @@ import {
   LoaderCircle,
   KeyRound,
   LockKeyhole,
-  ClipboardPaste,
 } from 'lucide-react';
 import type { Profile, Credentials } from '../../shared/contracts';
-import { parseSshCommand } from '../../shared/ssh-command';
 import { useI18n } from '../i18n';
 import { ConnectionExtractor } from './ConnectionExtractor';
 
@@ -58,7 +56,7 @@ export function ConnectionForm({
   const [busy, setBusy] = useState<'save' | 'connect' | null>(null);
   const [error, setError] = useState('');
   const [extracting, setExtracting] = useState(false);
-  const [extraction, setExtraction] = useState<'done' | 'invalid' | 'unavailable' | null>(null);
+  const [extraction, setExtraction] = useState<'done' | null>(null);
   const [invalid, setInvalid] = useState<Partial<Record<Field, boolean>>>({});
   const canReuse = persist && saved && profile?.auth === value.auth;
   const update = (field: keyof Profile, next: string | number | boolean) => {
@@ -144,51 +142,16 @@ export function ConnectionForm({
       setBusy(null);
     }
   }
-  const extractCommand = async () => {
-    if (busy || extracting) return;
-    setExtracting(true);
-    setExtraction(null);
-    let text: string;
-    try {
-      text = await window.cshell.pasteText();
-    } catch {
-      setExtraction('unavailable');
-      setExtracting(false);
-      return;
-    }
-    try {
-      const parsed = parseSshCommand(text);
-      if (!parsed) throw new Error('No SSH command');
-      setValue((v) => ({ ...v, host: parsed.host, username: parsed.username || v.username }));
-      setPort(String(parsed.port));
-      setInvalid({});
-      setError('');
-      setExtraction('done');
-    } catch {
-      setExtraction('invalid');
-    } finally {
-      setExtracting(false);
-    }
-  };
   return (
     <section
       className="editor-page connection-editor compact-connection"
       aria-labelledby={id + '-title'}
     >
-      <header className="connection-heading">
-        <h1 id={id + '-title'}>{profile ? t('editConnection') : t('sshConnection')}</h1>
-        <button
-          type="button"
-          className="connection-extract"
-          disabled={!!busy || extracting}
-          title={t('extractCommandHint')}
-          onClick={() => void extractCommand()}
-        >
-          <ClipboardPaste size={14} aria-hidden="true" />
-          {t('extractCommand')}
-        </button>
-      </header>
       <ConnectionExtractor
+        title={profile ? t('editConnection') : t('sshConnection')}
+        titleId={id + '-title'}
+        disabled={!!busy}
+        onStart={() => setExtraction(null)}
         onBusy={setExtracting}
         onExtract={({ fields }) => {
           const { port: extractedPort, password: extractedPassword, ...profileFields } = fields;
@@ -205,17 +168,8 @@ export function ConnectionForm({
         }}
       />
       {extraction && (
-        <p
-          className={`connection-extraction ${extraction === 'done' ? '' : 'danger'}`}
-          role="status"
-        >
-          {t(
-            extraction === 'done'
-              ? 'commandExtracted'
-              : extraction === 'invalid'
-                ? 'sshCommandInvalid'
-                : 'clipboardUnavailable',
-          )}
+        <p className="connection-extraction" role="status">
+          {t('commandExtracted')}
         </p>
       )}
       <form

@@ -1,5 +1,5 @@
 import { AiPermissionTree } from './AiPermissionTree';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Plus, History, Settings2, MessageSquare, X, Trash2, Cpu, ShieldCheck } from 'lucide-react';
 import {
   emptyAiPolicy,
@@ -47,6 +47,23 @@ export function AiPanel({
   const [key, setKey] = useState(''),
     [keyChanged, setKeyChanged] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; text: string } | null>(null);
+  useEffect(() => {
+    setTestResult(null);
+  }, [editing?.id, editing?.url, editing?.model, key]);
+  useEffect(
+    () =>
+      window.cshell.onAiThread((next) => {
+        setSnapshot((previous) => ({
+          ...previous,
+          threads: previous.threads.some((t) => t.id === next.id)
+            ? previous.threads.map((t) => (t.id === next.id ? next : t))
+            : [...previous.threads, next],
+        }));
+      }),
+    [],
+  );
   const refresh = async () => setSnapshot(await window.cshell.aiSnapshot());
   const run = async (fn: () => Promise<unknown>) => {
     setBusy(true);
@@ -82,6 +99,45 @@ export function AiPanel({
     setProviderId(snapshot.providers[0]?.id ?? '');
   }, [location, snapshot.providers.map((p) => p.id).join(',')]);
   const thread = snapshot.threads.find((t) => t.id === threadId);
+  const [insertion, setInsertion] = useState<{ id: string; text: string; threadId: string } | null>(
+    null,
+  );
+  const insertQueue = useRef(Promise.resolve());
+  const currentConversation = useRef({ threadId, providerId, mode, sessionId });
+  currentConversation.current = { threadId, providerId, mode, sessionId };
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const text = (event as CustomEvent<string>).detail;
+      setPage('chat');
+      insertQueue.current = insertQueue.current
+        .catch(() => {})
+        .then(async () => {
+          const current = currentConversation.current;
+          let targetId = current.threadId;
+          if (!targetId) {
+            const next = await window.cshell.aiSnapshot();
+            const provider =
+              next.providers.find((p) => p.id === current.providerId) ?? next.providers[0];
+            if (provider) {
+              const created = await window.cshell.aiThreadCreate(
+                'terminal',
+                provider.id,
+                current.mode,
+                current.sessionId,
+              );
+              targetId = created.id;
+              currentConversation.current.threadId = targetId;
+              setSnapshot(await window.cshell.aiSnapshot());
+              setThreadId(targetId);
+            }
+          }
+          setInsertion({ id: crypto.randomUUID(), text, threadId: targetId || 'new:terminal' });
+        })
+        .catch((e) => setError(String(e)));
+    };
+    window.addEventListener('cshell:analyze-selection', handler);
+    return () => window.removeEventListener('cshell:analyze-selection', handler);
+  }, []);
   const create = async () => {
     const t = await window.cshell.aiThreadCreate(location, providerId, mode, sessionId);
     setThreadId(t.id);
@@ -98,6 +154,7 @@ export function AiPanel({
           <button
             className="icon"
             title="新建会话"
+            hidden={!snapshot.providers.length}
             aria-label="新建 AI 会话"
             onClick={() => {
               setThreadId('');
@@ -110,6 +167,7 @@ export function AiPanel({
           <button
             className="icon"
             title="会话记录"
+            hidden={!snapshot.providers.length && !snapshot.threads.length}
             aria-label="会话记录"
             aria-pressed={page === 'history'}
             onClick={() => setPage(page === 'history' ? 'chat' : 'history')}
@@ -137,6 +195,7 @@ export function AiPanel({
       )}
       <div className="agent-chat-page" hidden={page !== 'chat'}>
         <AiConversation
+          insertion={insertion}
           snapshot={snapshot}
           thread={thread}
           location={location}
@@ -229,6 +288,7 @@ export function AiPanel({
           </button>
           <button
             aria-pressed={settingsTab === 'permissions'}
+            hidden={!snapshot.providers.length}
             onClick={() => setSettingsTab('permissions')}
           >
             <ShieldCheck size={14} />
@@ -241,25 +301,47 @@ export function AiPanel({
             <span>{snapshot.providers.length} 个</span>
           </div>
           <p className="ai-section-note">管理对话模型与连接信息解析模型。</p>
-          <label className="permission-model">
-            连接凭证解析模型
-            <select
-              aria-label="连接凭证解析模型"
-              value={snapshot.extractionProviderId ?? ''}
-              disabled={busy}
-              onChange={(e) =>
-                void run(() => window.cshell.aiExtractionProviderSave(e.target.value || null))
-              }
-            >
-              <option value="">自动选择可用基座</option>
-              {snapshot.providers.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} · {p.model}
-                </option>
-              ))}
-            </select>
-          </label>
-          <p className="ai-section-note">用于从文本填写连接表单，与对话使用的模型独立。</p>
+          <div hidden={!snapshot.providers.length}>
+            <label className="permission-model">
+              连接凭证解析模型
+              <select
+                aria-label="连接凭证解析模型"
+                value={snapshot.extractionProviderId ?? ''}
+                disabled={busy}
+                onChange={(e) =>
+                  void run(() => window.cshell.aiExtractionProviderSave(e.target.value || null))
+                }
+              >
+                <option value="">自动选择可用基座</option>
+                {snapshot.providers.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} · {p.model}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="ai-section-note">用于从文本填写连接表单，与对话使用的模型独立。</p>
+            {(['translate', 'compose'] as const).map((kind) => (
+              <label className="permission-model" key={kind}>
+                {kind === 'translate' ? '默认翻译 AI' : '“我想……”输入助手 AI'}
+                <select
+                  aria-label={kind === 'translate' ? '默认翻译 AI' : '输入助手 AI'}
+                  value={snapshot.textProviderIds?.[kind] ?? ''}
+                  disabled={busy}
+                  onChange={(e) =>
+                    void run(() => window.cshell.aiTextProviderSave(kind, e.target.value || null))
+                  }
+                >
+                  <option value="">自动选择可用基座</option>
+                  {snapshot.providers.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} · {p.model}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ))}
+          </div>
           {!snapshot.providers.length && !editing && (
             <div className="ai-provider-empty">
               <Settings2 size={18} />
@@ -271,6 +353,7 @@ export function AiPanel({
           {snapshot.providers.map((p) => (
             <div className="ai-provider" key={p.id}>
               <button
+                disabled={testing || busy}
                 onClick={() => {
                   setEditing(p);
                   setKey('');
@@ -286,6 +369,7 @@ export function AiPanel({
               <button
                 className="icon"
                 title="删除基座"
+                disabled={testing || busy}
                 aria-label={`删除基座 ${p.name}`}
                 onClick={() => setConfirmDelete(p.id)}
               >
@@ -312,6 +396,7 @@ export function AiPanel({
           ))}
           <button
             className="ai-add-provider"
+            disabled={testing || busy}
             onClick={() => {
               setEditing({ id: crypto.randomUUID(), name: '', url: '', model: '' });
               setKey('');
@@ -341,68 +426,115 @@ export function AiPanel({
                 });
               }}
             >
-              <div className="ai-form-heading">
-                <strong>
-                  {snapshot.providers.some((p) => p.id === editing.id) ? '编辑基座' : '新基座'}
-                </strong>
-                <small>密钥在本机加密保存</small>
-              </div>
-              <label>
-                名称
-                <input
-                  required
-                  value={editing.name}
-                  onChange={(e) => setEditing({ ...editing, name: e.target.value })}
-                />
-              </label>
-              <label>
-                API URL
-                <input
-                  required
-                  type="url"
-                  aria-label="API URL"
-                  value={editing.url}
-                  placeholder="https://api.example.com/v1"
-                  onChange={(e) => setEditing({ ...editing, url: e.target.value })}
-                />
-                <small>填写 /v1 或完整 /chat/completions 地址</small>
-              </label>
-              <label>
-                模型 ID
-                <input
-                  required
-                  value={editing.model}
-                  onChange={(e) => setEditing({ ...editing, model: e.target.value })}
-                />
-              </label>
-              <label>
-                API Key
-                <input
-                  type="password"
-                  autoComplete="new-password"
-                  value={key}
-                  placeholder={keyChanged ? '可留空（本机模型）' : '留空保留原 Key'}
-                  onChange={(e) => {
-                    setKeyChanged(true);
-                    setKey(e.target.value);
-                  }}
-                />
-              </label>
-              <div className="ai-form-actions">
-                <button
-                  type="button"
-                  className="secondary"
-                  onClick={() => {
-                    setEditing(null);
-                    setKey('');
-                  }}
+              <fieldset disabled={busy || testing} className="ai-provider-fields">
+                <div className="ai-form-heading">
+                  <strong>
+                    {snapshot.providers.some((p) => p.id === editing.id) ? '编辑基座' : '新基座'}
+                  </strong>
+                  <small>密钥在本机加密保存</small>
+                </div>
+                <label>
+                  名称
+                  <input
+                    required
+                    value={editing.name}
+                    onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+                  />
+                </label>
+                <label>
+                  API URL
+                  <input
+                    required
+                    type="url"
+                    aria-label="API URL"
+                    value={editing.url}
+                    placeholder="https://api.example.com/v1"
+                    onChange={(e) => setEditing({ ...editing, url: e.target.value })}
+                  />
+                  <small>填写 /v1 或完整 /chat/completions 地址</small>
+                </label>
+                <label>
+                  模型 ID
+                  <input
+                    required
+                    value={editing.model}
+                    onChange={(e) => setEditing({ ...editing, model: e.target.value })}
+                  />
+                </label>
+                <label>
+                  API Key
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    value={key}
+                    placeholder={keyChanged ? '可留空（本机模型）' : '留空保留原 Key'}
+                    onChange={(e) => {
+                      setKeyChanged(true);
+                      setKey(e.target.value);
+                    }}
+                  />
+                </label>
+                <div className="ai-form-actions">
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={async (event) => {
+                      if (!event.currentTarget.form?.reportValidity()) return;
+                      setTesting(true);
+                      setTestResult(null);
+                      try {
+                        const { id, name, url, model } = editing;
+                        const result = await window.cshell.aiProviderTest(
+                          { id, name, url, model },
+                          keyChanged ? key : undefined,
+                        );
+                        setTestResult({
+                          ok: true,
+                          text: `连接成功 · ${result.elapsedMs} ms · ${result.streaming ? '支持流式回复' : '接口返回完整回复'}`,
+                        });
+                      } catch (e) {
+                        setTestResult({
+                          ok: false,
+                          text: (e as Error).message.replace(
+                            /^Error invoking remote method '[^']+': Error: /,
+                            '',
+                          ),
+                        });
+                      } finally {
+                        setTesting(false);
+                      }
+                    }}
+                  >
+                    测试连通性
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={() => {
+                      setEditing(null);
+                      setKey('');
+                    }}
+                  >
+                    取消
+                  </button>
+                  <button className="primary" disabled={busy}>
+                    保存基座
+                  </button>
+                </div>
+              </fieldset>
+              {testing && (
+                <p className="ai-provider-test" role="status">
+                  正在测试模型回复…
+                </p>
+              )}
+              {testResult && (
+                <p
+                  className={`ai-provider-test ${testResult.ok ? '' : 'danger'}`}
+                  role={testResult.ok ? 'status' : 'alert'}
                 >
-                  取消
-                </button>
-                <button className="primary" disabled={busy}>
-                  保存基座
-                </button>
-              </div>
+                  {testResult.text}
+                </p>
+              )}
             </form>
           )}
         </div>

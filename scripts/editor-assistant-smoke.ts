@@ -125,6 +125,8 @@ export async function editorAssistantSmoke(
   await page.screenshot({ path: 'test-results/vim-actions-dark.png' });
   await page.getByRole('button', { name: '切换为浅色', exact: true }).click();
   await page.getByRole('button', { name: '新建连接', exact: true }).first().click();
+  if (await page.getByRole('button', { name: '添加连接记录', exact: true }).isVisible())
+    await page.getByRole('button', { name: '添加连接记录', exact: true }).click();
   assert.equal(await page.locator('.editor-actions:visible').count(), 0);
   await page.getByRole('button', { name: '关闭连接编辑 · 放弃未保存修改', exact: true }).click();
   await bar.waitFor();

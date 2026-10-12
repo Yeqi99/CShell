@@ -35,7 +35,7 @@ export const aiPermissionSchema = z
   .strict();
 export const aiPolicySchema = z
   .object({
-    application: z.array(z.enum(['connections.read'])),
+    application: z.array(z.enum(['connections.read', 'connections.open'])),
     allMachines: z.boolean(),
     profiles: z.array(z.string().uuid()).max(1000),
     groups: z.array(z.string().max(100)).max(1000),
@@ -61,7 +61,12 @@ export const emptyAiPolicy = (): AiPolicy => ({
 export type AiPermission = z.infer<typeof aiPermissionSchema>;
 export type AiLocation = (typeof aiLocations)[number];
 export type AiMode = 'review' | 'restricted' | 'allow';
-export type AiMessage = { role: 'user' | 'assistant' | 'tool'; content: string; time: number };
+export type AiMessage = {
+  role: 'user' | 'assistant' | 'tool';
+  content: string;
+  time: number;
+  tool?: { name: string; input: string; output: string; target?: string };
+};
 export type AiThread = {
   id: string;
   title: string;
@@ -73,16 +78,29 @@ export type AiThread = {
   messages: AiMessage[];
   state: 'idle' | 'running' | 'approval' | 'error';
   error?: string;
-  pending?: { id: string; tool: string; arguments: string; reason: string };
+  pending?: { id: string; tool: string; arguments: string; reason: string; target?: string };
 };
 export interface AiSnapshot {
   providers: AiProvider[];
   policy: AiPolicy;
   extractionProviderId: string | null;
+  textProviderIds?: { translate: string | null; compose: string | null };
   permissions: AiPermission[];
   threads: AiThread[];
 }
 export interface AiBridge {
+  onAiProvidersChanged(listener: () => void): () => void;
+  onAiThread(listener: (thread: AiThread) => void): () => void;
+  aiProviderTest(
+    provider: z.infer<typeof aiProviderSchema>,
+    key?: string,
+  ): Promise<{ elapsedMs: number; firstTokenMs: number | null; streaming: boolean }>;
+  aiText(input: import('./ai-text').TextRequest): Promise<import('./ai-text').TextResult>;
+  aiTextProviderSave(kind: 'translate' | 'compose', id: string | null): Promise<void>;
+  onAiConnection(
+    listener: (value: { sessionId: string; profile: import('./contracts').Profile }) => void,
+  ): () => void;
+  onMinimalHover(listener: (hovered: boolean) => void): () => void;
   aiExtractConnection(
     text: string,
     providerId?: string,

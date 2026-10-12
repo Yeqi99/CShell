@@ -1,0 +1,483 @@
+.client-page {
+  padding: 24px;
+  overflow: auto;
+  min-height: 0;
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+.client-page h1 {
+  font-size: 20px;
+  margin: 0;
+}
+.client-page h2 {
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
+  font-weight: 600;
+}
+.client-heading,
+.client-device {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.client-page section {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 18px;
+  margin: 18px 0;
+  background: var(--panel);
+}
+.client-fields {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.client-page label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0;
+}
+.client-page input,
+.client-page select {
+  min-height: 32px;
+  min-width: 0;
+  padding: 6px 9px;
+}
+.client-page textarea {
+  width: 100%;
+  min-height: 90px;
+  resize: vertical;
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  background: var(--field);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 8px;
+  margin-top: 8px;
+}
+.client-page fieldset {
+  border: 0;
+  padding: 0;
+  margin: 16px 0;
+}
+.client-page fieldset label {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  margin: 8px 22px 0 0;
+}
+.client-page fieldset input {
+  min-height: unset;
+}
+.client-page button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+}
+.client-page button:not(.icon) {
+  border: 1px solid var(--border);
+  background: var(--field);
+}
+.client-page button:not(.icon):hover {
+  background: var(--hover);
+}
+.client-page p {
+  font-size: 12px;
+  line-height: 1.65;
+}
+.client-page [role='alert'] {
+  color: var(--red);
+  overflow-wrap: anywhere;
+}
+.client-fingerprint {
+  display: block;
+  overflow-wrap: anywhere;
+  font-family: monospace;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 10px;
+}
+.client-device > div {
+  min-width: 0;
+}
+.client-device span {
+  display: block;
+  font-size: 12px;
+  margin-top: 5px;
+}
+.client-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+.client-audit {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.client-audit time {
+  color: var(--muted);
+  font-size: 11px;
+}
+.client-page summary {
+  cursor: pointer;
+  margin: 12px 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.client-page summary:hover {
+  color: var(--text);
+}
+.client-page button.client-primary,
+.client-app button.client-primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+.client-page button.client-primary:hover:not(:disabled),
+.client-app button.client-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+.client-subtitle {
+  color: var(--muted);
+  margin: 6px 0 0;
+}
+.client-count {
+  margin-left: auto;
+  padding: 1px 5px;
+  font-size: 10px;
+  border-radius: 4px;
+  background: var(--hover);
+  color: var(--muted);
+}
+.client-empty {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  text-align: center;
+  gap: 12px;
+  padding: 36px 12px;
+  color: var(--muted);
+}
+.client-empty strong {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+}
+.client-empty p {
+  margin: 0;
+}
+.client-permission-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  color: var(--muted);
+}
+.client-permission-note svg {
+  flex: none;
+  margin-top: 2px;
+}
+.client-download-card {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+.client-download-card h2 {
+  margin-bottom: 6px;
+}
+.client-download-card p {
+  color: var(--muted);
+}
+.client-machine-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  flex: none;
+}
+/* Standalone Client: compact utility window, one task per view. */
+.client-app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--terminal);
+  color: var(--text);
+  font-family: 'Segoe UI', 'Microsoft YaHei UI', sans-serif;
+  font-size: 12px;
+}
+.client-app [hidden] {
+  display: none !important;
+}
+.client-app .topbar {
+  flex: none;
+  min-height: 40px;
+  height: 40px;
+  padding: 0 145px 0 16px;
+  gap: 9px;
+  background: var(--terminal);
+  border: 0;
+  font-family: inherit;
+}
+.client-app .topbar strong {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+}
+.client-brand {
+  width: 22px;
+  height: 22px;
+}
+.client-service-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 26px 24px 22px;
+  flex: none;
+}
+.client-service-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  min-width: 0;
+}
+.client-service-heading h1 {
+  margin: 0 0 6px;
+  font-size: 17px;
+  line-height: 1.3;
+  font-weight: 600;
+}
+.client-service-heading p {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.client-led {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--faint);
+  margin-top: 7px;
+  flex: none;
+}
+.client-led.online {
+  background: var(--green);
+}
+.client-service-card > button {
+  flex: none;
+  padding: 7px 10px;
+  font-size: 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+.client-nav {
+  display: flex;
+  padding: 0 24px;
+  gap: 20px;
+  border-bottom: 1px solid var(--border);
+  flex: none;
+}
+.client-nav button {
+  position: relative;
+  gap: 6px;
+  font-size: 12px;
+  padding: 10px 0;
+  border-radius: 0;
+  color: var(--muted);
+}
+.client-nav button:hover {
+  color: var(--text);
+  background: transparent;
+}
+.client-nav button[aria-current] {
+  color: var(--accent);
+}
+.client-nav button[aria-current]::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent);
+}
+.client-dashboard {
+  flex: 1;
+  padding: 22px 24px;
+  max-width: none;
+}
+.client-dashboard section {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+}
+.client-dashboard input,
+.client-dashboard select {
+  background: var(--panel);
+}
+.client-dashboard .client-device {
+  flex-wrap: wrap;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+.client-dashboard .client-device > div {
+  flex: 1;
+}
+.client-dashboard .client-identity {
+  margin-top: 12px;
+}
+.client-dashboard .client-pair-card > h2 {
+  font-size: 13px;
+}
+.client-dashboard .client-pair-card > .client-subtitle {
+  margin-bottom: 12px;
+}
+.client-dashboard button.client-network-link {
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  padding: 8px 0;
+  margin-top: 12px;
+  font-size: 11px;
+}
+.client-dashboard button.client-network-link:hover {
+  color: var(--accent);
+}
+.client-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex: none;
+  height: 36px;
+  padding: 0 16px;
+  background: var(--terminal);
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+}
+.client-footer select {
+  width: 100px;
+  padding: 3px 5px;
+  border: 0;
+  background: transparent;
+  font-size: 11px;
+}
+.client-footer button {
+  padding: 5px;
+}
+.client-app :is(button, select, input, textarea, summary):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+@media (max-width: 480px) {
+  .client-service-card {
+    padding: 20px 16px;
+  }
+  .client-nav {
+    padding: 0 16px;
+    gap: 16px;
+  }
+  .client-dashboard {
+    padding: 18px 16px;
+  }
+  .client-service-heading p {
+    max-width: 195px;
+  }
+}
+.client-connect-form fieldset {
+  border: 0;
+  padding: 0;
+  margin: 12px 0;
+}
+.client-connect-form .client-trust {
+  padding: 12px;
+  margin: 12px 0;
+  background: var(--panel);
+  border-left: 2px solid var(--accent);
+}
+.client-connect-form .client-trust code {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+  margin: 8px 0;
+}
+.client-connect-form .client-trust label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+.protocol-form {
+  height: auto;
+  padding: 0;
+}
+.protocol-form > label {
+  max-width: 300px;
+  margin-bottom: 22px;
+}
+.protocol-form {
+  max-width: 720px;
+  padding: 16px 28px;
+  margin: 0;
+}
+.protocol-form > label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.protocol-form .protocol-client {
+  padding: 0;
+}
+.client-connect-form fieldset label {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  margin: 10px 0;
+}
+.client-connect-form .client-trust label {
+  flex-direction: row;
+  align-items: center;
+}
+.client-connect-form .client-fields {
+  grid-template-columns: minmax(0, 1fr) 110px;
+  margin-bottom: 0;
+}
+.client-profile-editor {
+  max-width: 660px;
+  margin: 0;
+}
+.client-profile-editor > form > fieldset {
+  border: 0;
+  padding: 0;
+}
+.client-profile-editor > form > fieldset > label {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  margin: 12px 0;
+}
+.client-page label.client-favorite {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}

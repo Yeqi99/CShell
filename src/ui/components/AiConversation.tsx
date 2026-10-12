@@ -1,3 +1,4 @@
+import { AiToolRecord, toolInput } from './AiToolRecord';
 import { useEffect, useRef, useState } from 'react';
 import {
   ArrowDown,
@@ -13,6 +14,7 @@ import { CopyButton } from './AiCopyButton';
 import { AiMarkdown } from './AiMarkdown';
 import { type AiSnapshot, type AiLocation, type AiMode, type AiThread } from '../../shared/ai';
 export function AiConversation({
+  insertion,
   snapshot,
   thread,
   location,
@@ -26,6 +28,7 @@ export function AiConversation({
   run,
   configure,
 }: {
+  insertion: { id: string; text: string; threadId: string } | null;
   snapshot: AiSnapshot;
   thread?: AiThread;
   location: AiLocation;
@@ -40,6 +43,26 @@ export function AiConversation({
   configure: () => void;
 }) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const composer = useRef<HTMLTextAreaElement>(null),
+    inserted = useRef('');
+  useEffect(() => {
+    if (!insertion || inserted.current === insertion.id) return;
+    inserted.current = insertion.id;
+    setDrafts((previous) => ({
+      ...previous,
+      [insertion.threadId]:
+        (previous[insertion.threadId] ? previous[insertion.threadId] + '\n\n' : '') +
+        insertion.text,
+    }));
+    requestAnimationFrame(() => {
+      const input = composer.current;
+      if (input) {
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+        input.scrollTop = input.scrollHeight;
+      }
+    });
+  }, [insertion]);
   const draftId = thread?.id ?? `new:${location}`;
   const text = drafts[draftId] ?? '';
   const active = thread?.state === 'running' || thread?.state === 'approval';
@@ -54,7 +77,13 @@ export function AiConversation({
   useEffect(() => {
     if (follow.current && viewport.current)
       viewport.current.scrollTop = viewport.current.scrollHeight;
-  }, [thread?.id, thread?.messages.length, thread?.pending?.id, thread?.state]);
+  }, [
+    thread?.id,
+    thread?.messages.length,
+    thread?.messages.at(-1)?.content,
+    thread?.pending?.id,
+    thread?.state,
+  ]);
   const send = () => {
     if (busy || active || !text.trim() || !provider) return;
     void run(async () => {
@@ -117,14 +146,7 @@ export function AiConversation({
           )}
           {thread?.messages.map((message, i) =>
             message.role === 'tool' ? (
-              <details className="agent-tool" key={i}>
-                <summary>
-                  <Terminal size={13} />
-                  工具执行记录
-                </summary>
-                <pre>{message.content}</pre>
-                <CopyButton content={message.content} />
-              </details>
+              <AiToolRecord message={message} key={i} />
             ) : (
               <article className={`agent-message ${message.role}`} key={i}>
                 <header>
@@ -148,10 +170,15 @@ export function AiConversation({
                 <strong>等待执行授权</strong>
               </header>
               <p>{thread.pending.reason}</p>
-              <small>{thread.target}</small>
+              <small>{thread.pending.target ?? thread.target}</small>
               <div className="agent-code">
                 <header>{thread.pending.tool}</header>
-                <pre>{thread.pending.arguments}</pre>
+                {toolInput(thread.pending.arguments) && (
+                  <>
+                    <small>输入</small>
+                    <pre>{toolInput(thread.pending.arguments)}</pre>
+                  </>
+                )}
               </div>
               <footer>
                 <button
@@ -205,12 +232,14 @@ export function AiConversation({
       </div>
       <form
         className="agent-composer"
+        hidden={!provider}
         onSubmit={(e) => {
           e.preventDefault();
           send();
         }}
       >
         <textarea
+          ref={composer}
           aria-label="发送给智能体"
           placeholder={active ? '可以先写下一个任务…' : '描述任务或提出问题…'}
           value={text}

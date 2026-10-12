@@ -15,6 +15,8 @@ import { detectEditor, editorFromCommand, type EditorDetection } from '../editor
 import { EditorAssistant, type AssistantChoice } from './EditorAssistant';
 import { editorActionInput, editorPromptBusy, vimExitFromPrompt } from '../editor-actions';
 import '@xterm/xterm/css/xterm.css';
+import { openTextAssist, analyzeSelection } from '../text-assist';
+import { useAiProviders } from '../use-ai-providers';
 function currentShellInput(terminal: Terminal) {
   const buffer = terminal.buffer.active;
   const row = buffer.getLine(buffer.baseY + buffer.cursorY);
@@ -50,6 +52,7 @@ export function TerminalPane({
     search = useRef<SearchAddon | null>(null),
     [query, setQuery] = useState('');
   const { t } = useI18n();
+  const aiAvailable = useAiProviders().providers.length > 0;
   const [zoom, setZoom] = useState(0);
   const [commandInput, setCommandInput] = useState('');
   const [commandPosition, setCommandPosition] = useState({ left: 12, top: 12 });
@@ -536,7 +539,7 @@ export function TerminalPane({
         event.preventDefault();
         setContextMenu({
           x: Math.max(0, Math.min(event.clientX, window.innerWidth - 260)),
-          y: Math.max(8, Math.min(event.clientY, window.innerHeight - 330)),
+          y: Math.max(8, Math.min(event.clientY, window.innerHeight - 520)),
         });
       }}
       onClick={() => setContextMenu(null)}
@@ -686,6 +689,90 @@ export function TerminalPane({
       </EditorAssistant>
       {contextMenu && (
         <div className="terminal-context" style={{ left: contextMenu.x, top: contextMenu.y }}>
+          {aiAvailable && (
+            <>
+              <button
+                disabled={!term.current?.hasSelection()}
+                onClick={() => analyzeSelection(term.current?.getSelection() || '')}
+              >
+                AI 分析
+              </button>
+              <button
+                disabled={!term.current?.hasSelection()}
+                onClick={() =>
+                  openTextAssist({
+                    mode: 'translate',
+                    text: term.current?.getSelection() || '',
+                    label: '终端选中文字',
+                  })
+                }
+              >
+                AI 翻译选中文字
+              </button>
+              <button
+                onClick={() => {
+                  const read = () => {
+                    const terminal = term.current;
+                    if (
+                      !terminal ||
+                      !suggestionState.current.active ||
+                      suggestionState.current.closed
+                    )
+                      return null;
+                    const buffer = terminal.buffer.active;
+                    // Read displayed output only; never inspect the terminal input textarea.
+                    return Array.from(
+                      { length: buffer.length },
+                      (_, i) => buffer.getLine(i)?.translateToString(true) || '',
+                    )
+                      .join('\n')
+                      .trimEnd();
+                  };
+                  openTextAssist({
+                    mode: 'translate',
+                    text: read() || '',
+                    label: '终端输出',
+                    read,
+                  });
+                }}
+              >
+                翻译终端内容…
+              </button>
+              <button
+                disabled={
+                  closed ||
+                  !term.current ||
+                  term.current.buffer.active.type !== 'normal' ||
+                  promptInput(term.current) === null
+                }
+                onClick={() => {
+                  const terminal = term.current!,
+                    before = promptInput(terminal);
+                  openTextAssist({
+                    mode: 'compose',
+                    text: before || '',
+                    label: 'Shell 命令输入（仅生成单行命令）',
+                    apply(value) {
+                      if (
+                        !suggestionState.current.active ||
+                        suggestionState.current.closed ||
+                        terminal.buffer.active.type !== 'normal' ||
+                        promptInput(terminal) !== before
+                      )
+                        throw new Error('终端输入位置已变化，请重新打开助手');
+                      if (/[\x00-\x1f\x7f]/.test(value))
+                        throw new Error('候选包含换行或控制字符，请要求生成单行命令');
+                      // Insert at the current cursor, without Enter or clearing existing input.
+                      terminal.paste(value);
+                      terminal.focus();
+                    },
+                  });
+                }}
+              >
+                我想……
+              </button>
+            </>
+          )}
           <button onClick={copy}>
             {t('copy')}
             <kbd>Ctrl+Shift+C</kbd>

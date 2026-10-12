@@ -758,3 +758,35 @@
   border-top: 1px solid var(--border);
   margin: 14px 0;
 }
+.agent-tool > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.agent-tool > summary small {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 10px;
+}
+.agent-tool-target {
+  color: var(--muted);
+  font-size: 11px;
+  padding: 8px 10px;
+}
+.agent-tool section {
+  border-top: 1px solid var(--border);
+}
+.agent-tool section > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.agent-tool section > pre {
+  margin: 0;
+  padding: 0 10px 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

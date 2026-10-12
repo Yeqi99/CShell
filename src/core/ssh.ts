@@ -33,6 +33,7 @@ export class SshService {
     profile: Profile,
     credentials: Pick<ConnectConfig, 'password' | 'privateKey' | 'passphrase'>,
   ) {
+    if (profile.protocol === 'client') throw new Error('Client connections cannot use SSH');
     const client = new ssh2.Client();
     const session: Session = {
       profile: { ...profile },

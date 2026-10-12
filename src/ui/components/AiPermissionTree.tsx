@@ -63,12 +63,29 @@ export function AiPermissionTree({
               type="checkbox"
               checked={p.application.includes('connections.read')}
               onChange={(e) =>
-                edit({ ...p, application: e.target.checked ? ['connections.read'] : [] })
+                edit({
+                  ...p,
+                  application: toggle(p.application, 'connections.read', e.target.checked),
+                })
               }
             />
             查询连接目标、分组与会话
           </label>
           <small>可查询尚未连接的目标；不会读取凭据或连接机器。</small>
+          <label>
+            <input
+              type="checkbox"
+              checked={p.application.includes('connections.open')}
+              onChange={(e) =>
+                edit({
+                  ...p,
+                  application: toggle(p.application, 'connections.open', e.target.checked),
+                })
+              }
+            />
+            为授权机器新建连接
+          </label>
+          <small>使用已保存的凭据打开终端，后续操作仍受机器权限限制。</small>
         </section>
         <section className="permission-global-section">
           <h4>

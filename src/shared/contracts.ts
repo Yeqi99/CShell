@@ -1,3 +1,4 @@
+import type { ClientBridge } from './client';
 import type { LocalTerminalBridge } from './local-terminal';
 import type { ActivityBridge } from './activity';
 import type { FloatingBridge } from './floating';
@@ -18,6 +19,8 @@ const text = z.string().trim().min(1).max(255);
 export const profileSchema = z
   .object({
     id: z.string().uuid(),
+    protocol: z.enum(['ssh', 'client']).optional(),
+    clientShell: z.enum(['cmd', 'powershell']).optional(),
     name: text,
     host: text,
     port: z.number().int().min(1).max(65535),
@@ -194,6 +197,7 @@ export type SessionEvent =
   | { type: 'transfer'; transfer: Transfer };
 export interface Bridge
   extends
+    ClientBridge,
     LocalTerminalBridge,
     ExtensionBridge,
     AiBridge,

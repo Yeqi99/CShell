@@ -20,6 +20,7 @@ jobs:
       - run: pnpm build
       - run: pnpm test
       - run: pnpm test:desktop
+      - run: pnpm exec tsx scripts/client-smoke.ts
       - run: pnpm exec tsx scripts/minimal-pin-smoke.ts
       - run: pnpm exec tsx scripts/refinement-smoke.ts
       - run: pnpm exec tsx scripts/saved-connect-smoke.ts
@@ -28,6 +29,7 @@ jobs:
       - run: pnpm exec tsx scripts/extraction-smoke.ts
       - run: pnpm exec tsx scripts/activity-smoke.ts
       - run: pnpm run dist
+      - run: pnpm dist:client
       - uses: actions/upload-artifact@v4
         if: always()
         with:

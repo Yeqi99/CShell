@@ -82,6 +82,12 @@ try {
     .getByLabel('API URL', { exact: false })
     .fill(`http://127.0.0.1:${(api.address() as any).port}/v1`);
   await panel.getByLabel('模型 ID', { exact: true }).fill('test');
+  await panel.getByRole('button', { name: '测试连通性', exact: true }).click();
+  await panel.getByRole('status').filter({ hasText: '连接成功' }).waitFor();
+  assert.equal((await page.evaluate(() => window.cshell.aiSnapshot())).providers.length, 0);
+  await panel.getByRole('button', { name: '保存基座', exact: true }).click();
+  await panel.getByText('test · 无 Key', { exact: true }).waitFor();
+  await panel.locator('.ai-provider > button').first().click();
   await panel.getByRole('button', { name: '访问权限', exact: true }).click();
   assert.equal(await panel.getByLabel('模型 ID').isVisible(), false);
   await panel.getByLabel('默认：资源监控', { exact: true }).check();

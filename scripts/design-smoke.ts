@@ -7,7 +7,10 @@ export async function designSmoke(app: ElectronApplication, page: Page) {
   await page.getByRole('button', { name: '切换为深色', exact: true }).click();
   await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
   await page.getByRole('button', { name: '新建连接', exact: true }).first().click();
+  if (await page.getByRole('button', { name: '添加连接记录', exact: true }).isVisible())
+    await page.getByRole('button', { name: '添加连接记录', exact: true }).click();
   const editor = page.locator('.connection-editor:visible');
+  await editor.getByLabel('保存到服务器列表').uncheck();
   const name = editor.getByLabel('主机地址', { exact: true });
   await page.screenshot({ path: 'test-results/connection-redesign-dark.png' });
   await editor.getByRole('button', { name: '连接', exact: true }).click();
@@ -29,15 +32,17 @@ export async function designSmoke(app: ElectronApplication, page: Page) {
   assert.equal(await editor.getByLabel('用户名').inputValue(), 'root');
   await editor.getByRole('button', { name: '连接', exact: true }).click();
   assert.equal(await name.getAttribute('aria-invalid'), 'true');
-  await editor.getByRole('button', { name: '从剪贴板提取', exact: true }).click();
+  await editor.getByRole('button', { name: '粘贴连接信息', exact: true }).click();
+  await editor.getByRole('button', { name: '提取并填写', exact: true }).click();
   await editor.getByText('已填入连接信息，仍可手动修改。', { exact: true }).waitFor();
   assert.equal(await name.inputValue(), 'example.test');
   assert.equal(await editor.getByLabel('用户名').inputValue(), 'deploy');
   assert.equal(await editor.getByLabel('端口').inputValue(), '2222');
   assert.equal(await editor.locator('.connection-secret input').inputValue(), 'draft-secret');
   await page.evaluate(() => window.cshell.copyText('ssh host -J jump'));
-  await editor.getByRole('button', { name: '从剪贴板提取', exact: true }).click();
-  await editor.getByRole('status').filter({ hasText: '未识别到支持的 SSH 命令' }).waitFor();
+  await editor.getByRole('button', { name: '粘贴连接信息', exact: true }).click();
+  await editor.getByRole('button', { name: '提取并填写', exact: true }).click();
+  await editor.getByRole('alert').filter({ hasText: '未找到可识别的 SSH 信息' }).waitFor();
   assert.equal(await name.inputValue(), 'example.test');
   await name.fill('127.0.0.1');
   await editor.getByLabel('用户名').fill('root');

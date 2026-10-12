@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import type { WslSetupState } from '../shared/local-terminal';
+import { downloadUbuntu } from './wsl-download';
 const exec = promisify(execFile);
 export function decodeWslOutput(buffer: Buffer) {
   return (buffer.includes(0) ? buffer.toString('utf16le') : buffer.toString('utf8'))
@@ -72,6 +73,36 @@ async function install(ubuntu: boolean): Promise<{ code: number; details: string
       };
     } catch (e) {
       const result = e as { code?: number | string; stdout?: Buffer; stderr?: Buffer };
+      const details = [result.stdout, result.stderr]
+        .filter((b): b is Buffer => Buffer.isBuffer(b))
+        .map(decodeWslOutput)
+        .join('\n');
+      if (
+        /WININET_E_CANNOT_CONNECT|WININET_E_TIMEOUT|WININET_E_NAME_NOT_RESOLVED/i.test(details) &&
+        decodeWslOutput(help).includes('--from-file')
+      ) {
+        const directory = await mkdtemp(join(tmpdir(), 'cshell-ubuntu-')),
+          image = join(directory, 'Ubuntu.wsl');
+        try {
+          const { net } = await import('electron');
+          await downloadUbuntu(image, net.fetch.bind(net) as typeof fetch);
+          const installed = await exec(
+            executable,
+            ['--install', '--from-file', image, '--no-launch'],
+            { encoding: 'buffer', windowsHide: true, maxBuffer: 4000000 },
+          );
+          return {
+            code: 0,
+            details:
+              '已通过系统代理下载官方 Ubuntu 镜像，SHA-256 校验通过。\n' +
+              decodeWslOutput(installed.stdout),
+          };
+        } catch (fallback) {
+          return { code: -1, details: details + '\n官方镜像安装：' + (fallback as Error).message };
+        } finally {
+          await rm(image, { force: true }).catch(() => {});
+        }
+      }
       return {
         code: typeof result.code === 'number' ? result.code : -1,
         details:

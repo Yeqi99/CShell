@@ -27,13 +27,17 @@ export async function workbenchSmoke(
   await mkdir(join(server.root, 'projects'));
   const connect = async () => {
     await page.getByRole('button', { name: '新建连接', exact: true }).first().click();
+    if (await page.getByRole('button', { name: '添加连接记录', exact: true }).isVisible())
+      await page.getByRole('button', { name: '添加连接记录', exact: true }).click();
     const form = page.locator('.connection-editor:visible');
+    await form.getByLabel('保存到服务器列表').uncheck();
     assert.equal(await form.getByLabel('名称', { exact: true }).count(), 0);
     await page.evaluate(
       (text) => window.cshell.copyText(text),
       `ssh tester@127.0.0.1 -p ${server.port}`,
     );
-    await form.getByRole('button', { name: '从剪贴板提取', exact: true }).click();
+    await form.getByRole('button', { name: '粘贴连接信息', exact: true }).click();
+    await form.getByRole('button', { name: '提取并填写', exact: true }).click();
     await form.getByText('已填入连接信息，仍可手动修改。', { exact: true }).waitFor();
     assert.equal(await form.getByLabel('主机地址').inputValue(), '127.0.0.1');
     assert.equal(await form.getByLabel('用户名').inputValue(), 'tester');

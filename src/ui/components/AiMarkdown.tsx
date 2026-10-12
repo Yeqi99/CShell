@@ -1,6 +1,7 @@
 import { Children, isValidElement, type ReactNode } from 'react';
 import Markdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { remarkCjkStrong } from '../markdown-strong';
 import { CopyButton } from './AiCopyButton';
 
 function textContent(children: ReactNode): string {
@@ -44,7 +45,7 @@ const components: Components = {
 export function AiMarkdown({ text }: { text: string }) {
   return (
     <div className="agent-markdown">
-      <Markdown remarkPlugins={[remarkGfm]} skipHtml components={components}>
+      <Markdown remarkPlugins={[remarkGfm, remarkCjkStrong]} skipHtml components={components}>
         {text}
       </Markdown>
     </div>

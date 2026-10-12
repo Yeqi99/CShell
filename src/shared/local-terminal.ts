@@ -31,7 +31,11 @@ export type WslSetupState = {
   message?: string;
   details?: string;
 };
+export type LocalConnectionTarget = { id: string; name: string; detail: string; shell: LocalShell };
 export interface LocalTerminalBridge {
+  localTargets(): Promise<LocalConnectionTarget[]>;
+  wslAccountStatus(distribution: string): Promise<{ ready: boolean }>;
+  wslInitialize(input: { distribution: string; username: string; password: string }): Promise<void>;
   wslInstall(ubuntu: boolean): Promise<WslSetupState>;
   wslInstallStatus(): Promise<WslSetupState>;
   wslDistributions(): Promise<{ available: boolean; distributions: string[]; error?: string }>;

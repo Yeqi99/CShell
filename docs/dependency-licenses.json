@@ -102,6 +102,84 @@
     "repository": "git+https://github.com/modelcontextprotocol/typescript-sdk.git"
   },
   {
+    "name": "@noble/hashes",
+    "version": "1.8.0",
+    "license": "MIT",
+    "repository": "git+https://github.com/paulmillr/noble-hashes.git"
+  },
+  {
+    "name": "@peculiar/asn1-cms",
+    "version": "2.10.0",
+    "license": "MIT",
+    "repository": "https://github.com/PeculiarVentures/asn1-schema"
+  },
+  {
+    "name": "@peculiar/asn1-csr",
+    "version": "2.10.0",
+    "license": "MIT",
+    "repository": "https://github.com/PeculiarVentures/asn1-schema"
+  },
+  {
+    "name": "@peculiar/asn1-ecc",
+    "version": "2.10.0",
+    "license": "MIT",
+    "repository": "https://github.com/PeculiarVentures/asn1-schema"
+  },
+  {
+    "name": "@peculiar/asn1-pfx",
+    "version": "2.10.0",
+    "license": "MIT",
+    "repository": "https://github.com/PeculiarVentures/asn1-schema"
+  },
+  {
+    "name": "@peculiar/asn1-pkcs8",
+    "version": "2.10.0",
+    "license": "MIT",
+    "repository": "https://github.com/PeculiarVentures/asn1-schema"
+  },
+  {
+    "name": "@peculiar/asn1-pkcs9",
+    "version": "2.10.0",
+    "license": "MIT",
+    "repository": "https://github.com/PeculiarVentures/asn1-schema"
+  },
+  {
+    "name": "@peculiar/asn1-rsa",
+    "version": "2.10.0",
+    "license": "MIT",
+    "repository": "https://github.com/PeculiarVentures/asn1-schema"
+  },
+  {
+    "name": "@peculiar/asn1-schema",
+    "version": "2.10.0",
+    "license": "MIT",
+    "repository": "https://github.com/PeculiarVentures/asn1-schema"
+  },
+  {
+    "name": "@peculiar/asn1-x509",
+    "version": "2.10.0",
+    "license": "MIT",
+    "repository": "https://github.com/PeculiarVentures/asn1-schema"
+  },
+  {
+    "name": "@peculiar/asn1-x509-attr",
+    "version": "2.10.0",
+    "license": "MIT",
+    "repository": "https://github.com/PeculiarVentures/asn1-schema"
+  },
+  {
+    "name": "@peculiar/utils",
+    "version": "2.0.3",
+    "license": "MIT",
+    "repository": "https://github.com/PeculiarVentures/pvtsutils"
+  },
+  {
+    "name": "@peculiar/x509",
+    "version": "1.14.3",
+    "license": "MIT",
+    "repository": "git+https://github.com/PeculiarVentures/x509.git"
+  },
+  {
     "name": "@types/debug",
     "version": "4.1.13",
     "license": "MIT",
@@ -216,6 +294,12 @@
     "repository": "https://github.com/joyent/node-asn1.git"
   },
   {
+    "name": "asn1js",
+    "version": "3.0.10",
+    "license": "BSD-3-Clause",
+    "repository": "https://github.com/PeculiarVentures/ASN1.js"
+  },
+  {
     "name": "bail",
     "version": "2.0.2",
     "license": "MIT",
@@ -244,6 +328,12 @@
     "version": "3.1.2",
     "license": "MIT",
     "repository": "visionmedia/bytes.js"
+  },
+  {
+    "name": "bytestreamjs",
+    "version": "2.0.1",
+    "license": "BSD-3-Clause",
+    "repository": "git://github.com/PeculiarVentures/ByteStream.js.git"
   },
   {
     "name": "call-bind-apply-helpers",
@@ -1068,6 +1158,12 @@
     "repository": "git+https://github.com/crouchcd/pkce-challenge.git"
   },
   {
+    "name": "pkijs",
+    "version": "3.4.1",
+    "license": "BSD-3-Clause",
+    "repository": "https://github.com/PeculiarVentures/PKI.js"
+  },
+  {
     "name": "progress",
     "version": "2.0.3",
     "license": "MIT",
@@ -1084,6 +1180,18 @@
     "version": "2.0.8",
     "license": "MIT",
     "repository": "jshttp/proxy-addr"
+  },
+  {
+    "name": "pvtsutils",
+    "version": "1.3.6",
+    "license": "MIT",
+    "repository": "git+https://github.com/PeculiarVentures/pvtsutils"
+  },
+  {
+    "name": "pvutils",
+    "version": "1.2.0",
+    "license": "MIT",
+    "repository": "https://github.com/PeculiarVentures/pvutils"
   },
   {
     "name": "qs",
@@ -1120,6 +1228,12 @@
     "version": "10.1.0",
     "license": "MIT",
     "repository": "remarkjs/react-markdown"
+  },
+  {
+    "name": "reflect-metadata",
+    "version": "0.2.2",
+    "license": "Apache-2.0",
+    "repository": "https://github.com/rbuckton/reflect-metadata.git"
   },
   {
     "name": "remark-gfm",
@@ -1168,6 +1282,12 @@
     "version": "0.28.0",
     "license": "MIT",
     "repository": "https://github.com/react/react.git"
+  },
+  {
+    "name": "selfsigned",
+    "version": "5.5.0",
+    "license": "MIT",
+    "repository": "git://github.com/jfromaniello/selfsigned.git"
   },
   {
     "name": "semver",
@@ -1294,6 +1414,24 @@
     "version": "2.2.0",
     "license": "MIT",
     "repository": "wooorm/trough"
+  },
+  {
+    "name": "tslib",
+    "version": "2.8.1",
+    "license": "0BSD",
+    "repository": "https://github.com/Microsoft/tslib.git"
+  },
+  {
+    "name": "tslib",
+    "version": "1.14.1",
+    "license": "0BSD",
+    "repository": "https://github.com/Microsoft/tslib.git"
+  },
+  {
+    "name": "tsyringe",
+    "version": "4.10.0",
+    "license": "MIT",
+    "repository": "git+https://github.com/Microsoft/tsyringe.git"
   },
   {
     "name": "tweetnacl",

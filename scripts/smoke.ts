@@ -66,6 +66,8 @@ async function main() {
     await workbenchSmoke(app, page, server);
     assert.equal(await page.evaluate(() => typeof (window as any).require), 'undefined');
     await page.getByRole('button', { name: '新建连接', exact: true }).first().click();
+    if (await page.getByRole('button', { name: '添加连接记录', exact: true }).isVisible())
+      await page.getByRole('button', { name: '添加连接记录', exact: true }).click();
     const dialog = page.locator('.editor-page:visible');
     assert.equal(await page.getByRole('dialog').count(), 0);
     assert.equal(await page.locator('.monitor-panel').count(), 0);
@@ -159,6 +161,8 @@ async function main() {
       ),
     );
     await page.getByRole('button', { name: '新建连接', exact: true }).first().click();
+    if (await page.getByRole('button', { name: '添加连接记录', exact: true }).isVisible())
+      await page.getByRole('button', { name: '添加连接记录', exact: true }).click();
     await page.locator('.editor-page:visible').getByLabel('保存到服务器列表').check();
     await page
       .locator('.editor-page:visible')

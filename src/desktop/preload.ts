@@ -1,6 +1,23 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { Bridge, SessionEvent } from '../shared/contracts';
 const bridge: Bridge = {
+  clientSetAccess: (options) => ipcRenderer.invoke('client:access', options),
+  clientConnectionInfo: (host) => ipcRenderer.invoke('client:info', host),
+  clientProbe: (endpoint) => ipcRenderer.invoke('client:probe', endpoint),
+  clientPasswordPair: (info, password) =>
+    ipcRenderer.invoke('client:password-pair', info, password),
+  openRdp: (endpoint) => ipcRenderer.invoke('connection:rdp', endpoint),
+  clientDownloadPage: () => ipcRenderer.invoke('client:download-page'),
+  clientTheme: (theme) => ipcRenderer.invoke('client:theme', theme),
+  clientDevices: () => ipcRenderer.invoke('client:devices'),
+  clientPair: (invitation) => ipcRenderer.invoke('client:pair', invitation),
+  clientForget: (id) => ipcRenderer.invoke('client:forget', id),
+  clientConnect: (id, shell) => ipcRenderer.invoke('client:connect', id, shell),
+  clientStatus: () => ipcRenderer.invoke('client:status'),
+  clientStart: (options) => ipcRenderer.invoke('client:start', options),
+  clientStop: () => ipcRenderer.invoke('client:stop'),
+  clientInvite: (options) => ipcRenderer.invoke('client:invite', options),
+  clientRevoke: (id) => ipcRenderer.invoke('client:revoke', id),
   activitySnapshot: () => ipcRenderer.invoke('activity:snapshot'),
   activityEnable: (enabled) => ipcRenderer.invoke('activity:enable', enabled),
   activityClear: () => ipcRenderer.invoke('activity:clear'),
@@ -33,18 +50,48 @@ const bridge: Bridge = {
   installUpdate: () => ipcRenderer.invoke('update:install'),
   applicationCatalog: () => ipcRenderer.invoke('applications:catalog'),
   wslDistributions: () => ipcRenderer.invoke('local-terminal:wsl'),
+  localTargets: () => ipcRenderer.invoke('local-terminal:targets'),
+  wslAccountStatus: (name) => ipcRenderer.invoke('local-terminal:wsl-account', name),
+  wslInitialize: (input) => ipcRenderer.invoke('local-terminal:wsl-initialize', input),
   wslInstall: (ubuntu) => ipcRenderer.invoke('local-terminal:wsl-install', ubuntu),
   wslInstallStatus: () => ipcRenderer.invoke('local-terminal:wsl-install-status'),
   localTerminal: (shell) => ipcRenderer.invoke('local-terminal:open', shell),
   localEnvironment: () => ipcRenderer.invoke('local-terminal:environment'),
   saveLocalEnvironment: (rows) => ipcRenderer.invoke('local-terminal:environment-save', rows),
   aiSnapshot: () => ipcRenderer.invoke('ai:snapshot'),
+  aiProviderTest: (p, key) => ipcRenderer.invoke('ai:provider-test', p, key),
+  onAiProvidersChanged: (listener) => {
+    const handler = () => listener();
+    ipcRenderer.on('ai:providers-changed', handler);
+    return () => ipcRenderer.removeListener('ai:providers-changed', handler);
+  },
+  onAiThread: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, thread: import('../shared/ai').AiThread) =>
+      listener(thread);
+    ipcRenderer.on('ai:thread', handler);
+    return () => ipcRenderer.removeListener('ai:thread', handler);
+  },
   aiExtractConnection: (text, providerId) =>
     ipcRenderer.invoke('ai:extract-connection', text, providerId),
   aiProviderSave: (p, key) => ipcRenderer.invoke('ai:provider-save', p, key),
   aiProviderDelete: (id) => ipcRenderer.invoke('ai:provider-delete', id),
+  onAiConnection: (listener) => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      value: { sessionId: string; profile: import('../shared/contracts').Profile },
+    ) => listener(value);
+    ipcRenderer.on('ai:connected', handler);
+    return () => ipcRenderer.removeListener('ai:connected', handler);
+  },
+  onMinimalHover: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, value: boolean) => listener(value);
+    ipcRenderer.on('window:minimal-hover', handler);
+    return () => ipcRenderer.removeListener('window:minimal-hover', handler);
+  },
   aiPolicySave: (p) => ipcRenderer.invoke('ai:policy', p),
   aiExtractionProviderSave: (id) => ipcRenderer.invoke('ai:extraction-provider', id),
+  aiText: (input) => ipcRenderer.invoke('ai:text', input),
+  aiTextProviderSave: (kind, id) => ipcRenderer.invoke('ai:text-provider', kind, id),
   aiPermissionSave: (p) => ipcRenderer.invoke('ai:permission', p),
   aiThreadCreate: (location, provider, mode, session) =>
     ipcRenderer.invoke('ai:create', location, provider, mode, session),

@@ -159,7 +159,11 @@ export class LocalTerminalProvider implements ManagedProvider {
         : shell === 'cmd'
           ? join(root, 'System32', 'cmd.exe')
           : join(root, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
-      distro ? ['--distribution', distro, '--cd', '~'] : shell === 'cmd' ? ['/d'] : ['-NoLogo'],
+      distro
+        ? ['--distribution', distro, '--cd', '~', '--exec', '/bin/bash', '-l']
+        : shell === 'cmd'
+          ? ['/d']
+          : ['-NoLogo'],
       { name: 'xterm-256color', cols: 100, rows: 30, cwd: homedir(), env, useConpty: true },
     );
     const id = randomUUID();

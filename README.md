@@ -164,3 +164,7 @@ Compose / Swarm 管理的容器不通过该入口重建，避免与部署声明�
 “偏好设置 → 本机终端”可查看继承的系统、用户环境变量并设置 CShell 覆盖值。新会话重新读取 Windows 环境；覆盖值在本机加密保存，不修改注册表、不混入外观方案，也不影响已运行的会话。
 
 “插件市场 → WSL Linux”提供本机 Linux 发行版发现与终端入口。需要 Windows 已启用 WSL 并安装发行版；插件不会自动启用系统组件或下载 Linux。没有可用环境时会显示安装命令入口。
+
+## CShell Client（开发中）
+
+Windows 受控端与 CShell 工作台使用独立的设备配对和加密直连通道，当前支持真实 CMD / PowerShell 终端。开发启动 `pnpm start:client`；使用步骤、权限与实验协议边界见 [Client 说明](docs/CLIENT.md)。本地开发能力不代表已发布版本支持。
