@@ -1,6 +1,6 @@
 # CShell Client Windows 开发预览
 
-CShell Client 是独立 Windows 受控端，通过 GitHub 分发；CShell 主程序提供发行页入口。本地预览不视为 GitHub 已发布版本。
+CShell Client 是独立 Windows 受控端，通过 GitHub 分发；CShell 主程序提供发行页入口。[0.1.0 Windows x64 安装包](https://github.com/Yeqi99/CShell/releases/download/v0.5.0/CShell-Client-0.1.0-win-x64.exe) 与主程序 0.5.0 一同发布，校验值见该版本 SHA256SUMS.txt。
 
 ## 连接流程
 
@@ -31,7 +31,7 @@ Client 使用 560 × 580 紧凑窗口；连接、授权控制端、活动与设�
 
 当前仅本机回环完成集成测试，未验证跨机器局域网、RDP 登录、休眠恢复和长期网络中断。没有 NAT 穿透、中继、无人值守 Windows 服务、文件传输、屏幕控制或 Client AI 工具。
 
-本次验证结果：59 项单元/集成测试通过；两端打包版双进程界面回归通过。Windows 本地预览包位于 release/client-password-preview 与 release/connection-types-preview，均未签名、未上传。
+本次验证结果：60 项单元/集成测试及两端打包版双进程界面回归通过，GitHub Windows 检查也已通过。Windows 包未代码签名；安装前可核对发行页校验值。
 
 ## 左侧列表统一管理
 

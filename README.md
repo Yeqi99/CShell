@@ -1,6 +1,6 @@
 # CShell
 
-CanpShell 是面向高频操作的 SSH 与 AI 计算工作台，采用 **MIT** 许可证。源码已开源，当前版本为 **0.4.0 预览版**；各平台下载以 GitHub Releases 中实际发布的附件为准。
+CanpShell 是面向高频操作的终端与 AI 工作台，采用 **MIT** 许可证。当前 Windows 版本为 **CShell 0.5.0 预览版**，独立受控端为 **CShell Client 0.1.0**；macOS、Linux 和 Android 本轮未更新，继续提供 0.4.7。
 
 [源码](https://github.com/Yeqi99/CShell) · [版本下载](https://github.com/Yeqi99/CShell/releases) · [问题反馈](https://github.com/Yeqi99/CShell/issues) · [构建状态](https://github.com/Yeqi99/CShell/actions)
 
@@ -10,12 +10,17 @@ CanpShell 是面向高频操作的 SSH 与 AI 计算工作台，采用 **MIT** �
 
 发行产物统一放到 [GitHub Releases](https://github.com/Yeqi99/CShell/releases)；市场目录固定到已发布的源码标签，不需要部署市场服务器。仓库为 [Yeqi99/CShell](https://github.com/Yeqi99/CShell)，以实际发布完成的附件为准。
 
+- [Windows 主程序 CShell 0.5.0](https://github.com/Yeqi99/CShell/releases/download/v0.5.0/CShell-0.5.0-win-x64.exe)
+- [Windows 受控端 CShell Client 0.1.0](https://github.com/Yeqi99/CShell/releases/download/v0.5.0/CShell-Client-0.1.0-win-x64.exe)
+- [SHA-256 校验文件](https://github.com/Yeqi99/CShell/releases/download/v0.5.0/SHA256SUMS.txt) · [0.5.0 发布说明](https://github.com/Yeqi99/CShell/releases/tag/v0.5.0)
+- [其他平台 0.4.7 下载](https://github.com/Yeqi99/CShell/releases/tag/v0.4.7)
+
 | 平台    | 格式 / 架构                           | 当前验证状态                                             |
 | ------- | ------------------------------------- | -------------------------------------------------------- |
-| Windows | NSIS `.exe`，x64                      | 云端构建及桌面回归通过                                   |
-| macOS   | `.dmg` / `.zip`，Apple Silicon、Intel | 云端测试及构建通过；真机交互待验收                       |
-| Linux   | `.AppImage` / `.deb`，x64、ARM64      | 云端测试及构建通过；真机交互待验收                       |
-| Android | 测试 `.apk`，Android 8+               | 编译与 lint 通过，持久化签名；真机待测试，功能不等同桌面 |
+| Windows | NSIS `.exe`，x64                      | 0.5.0：本机构建、60 项测试及两端打包版 Client 回归通过 |
+| macOS   | `.dmg` / `.zip`，Apple Silicon、Intel | 0.4.7：云端构建通过；真机交互待验收 |
+| Linux   | `.AppImage` / `.deb`，x64、ARM64      | 0.4.7：云端构建通过；真机交互待验收 |
+| Android | 测试 `.apk`，Android 8+               | 0.4.7：编译与 lint 通过，持久化签名；功能不等同桌面 |
 
 尚无商业代码签名证书，macOS 未公证。核对附件的 SHA256SUMS.txt。完整范围见 [发布说明](docs/RELEASE.md)，已执行的检查见 [验证记录](docs/VALIDATION.md)。
 
@@ -33,11 +38,17 @@ Android 默认进入概览首页，底部导航为首页、连接、终端、文
 
 顶栏“统计与历史”展示本设备真实记录：成功连接、文件操作请求、传输字节、AI 请求和活跃日期；支持日期/类型筛选、搜索、CSV/HTML 导出、暂停及清空。仅本机存储，最多一年/50,000 条，不采集终端输入、密码、文件路径或聊天正文，不伪造旧历史、Token 数或效率收益。
 
-连接生命周期与 Agent 工具采用 [Connection Provider Architecture](docs/CONNECTION-PROVIDERS.md)。本版迁移 SSH 的创建、断开、终端与文件列表，并提供声明清单及 Client 能力发现数据协议。Client、RDP、VNC、直连 Docker TLS 连接器尚未实现；现有 Docker 插件使用真实 Engine HTTP API，经 SSH socket 隧道访问。
+连接生命周期与 Agent 工具采用 [Connection Provider Architecture](docs/CONNECTION-PROVIDERS.md)。SSH、Windows 本机终端和 CShell Client 使用独立 Provider。Client 与 SSH 共用左侧服务器列表，支持命名、分组、收藏、编辑和双击连接，旧设备记录自动迁入。RDP 通过 Windows mstsc 打开独立窗口，暂不保存配置；VNC 与直连 Docker TLS 尚未实现。现有 Docker 插件使用真实 Engine HTTP API，经 SSH socket 隧道访问。
+
+### CShell Client
+
+Client 安装在被管理的 Windows 电脑上，与主程序独立运行。设置监听地址、端口、连接密码和允许的 CMD / PowerShell 后启动服务；在主程序新建连接中选择 CShell Client，填写信息或显式粘贴复制的信息，核对设备指纹后连接。复制内容不含密码，凭据独立加密保存，不进入外观方案。
+
+Client 默认不监听、不开放防火墙、不提升权限。本机回环连接已验证，跨机器局域网、休眠恢复与长期断网仍待验收；暂不提供文件传输、屏幕控制、中继、Windows 服务或 WSL 一键安装。详见 [Client 使用与安全边界](docs/CLIENT.md)。
 
 ## AI 智能体
 
-顶栏机器人入口管理多个 OpenAI 兼容 API URL、Key、模型和会话。可按工作台、终端、文件、Python 配置默认基座；按分组、机器和工具能力授权。支持全提示、限制执行、全放行三种审核等级。默认权限关闭，密钥与历史在本机加密保存，用户发送后消息及授权工具结果发送至选定供应商。详见 [基座、会话和权限](docs/AI.md)。
+顶栏机器人入口管理多个 OpenAI 兼容 API URL、Key、模型和会话。按应用能力与机器范围统一授权，支持单台机器覆盖；全提示、限制执行、全放行只改变审核方式，不扩大已授权范围。默认权限关闭，密钥与历史在本机加密保存。用户发送后，消息及授权工具结果发送至选定供应商。翻译、输入辅助与连接提取可选择各自基座，生成候选不会自动执行。详见 [基座、会话和权限](docs/AI.md) 与 [文字助手](docs/TEXT-ASSIST.md)。
 
 ## 开发与构建
 
@@ -52,7 +63,7 @@ pnpm test:desktop
 pnpm run dist
 ```
 
-`release/0.4.0/CShell-0.4.0-win-x64.exe` 为 NSIS 安装包，`release/0.4.0/win-unpacked/CShell.exe` 为目录版。macOS 使用 `pnpm exec electron-builder --mac --arm64 --publish never`，Linux 使用 `pnpm exec electron-builder --linux --x64 --publish never`。首次安装依赖和构建需要网络。
+`release/0.5.0/CShell-0.5.0-win-x64.exe` 为 NSIS 安装包，`release/0.5.0/win-unpacked/CShell.exe` 为目录版。使用 `pnpm dist:client` 构建独立受控端，产物位于 `release/client-0.1.0/`。macOS 使用 `pnpm exec electron-builder --mac --arm64 --publish never`，Linux 使用 `pnpm exec electron-builder --linux --x64 --publish never`；本轮未发布这些平台的新包。首次安装依赖和构建需要网络。
 
 ## 插件与应用
 
