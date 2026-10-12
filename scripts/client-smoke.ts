@@ -5,6 +5,8 @@ import { join } from 'node:path';
 import { createServer } from 'node:net';
 import assert from 'node:assert/strict';
 const data = await mkdtemp(join(tmpdir(), 'cshell-client-ui-'));
+await mkdir(join(data, 'client'));
+await mkdir(join(data, 'control'));
 const environment = (part: string) => {
   const env = { ...process.env, CSHELL_TEST_DATA: join(data, part) };
   delete env.ELECTRON_RUN_AS_NODE;
@@ -16,18 +18,20 @@ const port = (server.address() as any).port;
 await new Promise<void>((r) => server.close(() => r()));
 const client = await electron.launch({
   ...(process.env.CSHELL_CLIENT_EXECUTABLE
-    ? { executablePath: process.env.CSHELL_CLIENT_EXECUTABLE, args: [] }
+    ? { executablePath: process.env.CSHELL_CLIENT_EXECUTABLE, args: ['--disable-backgrounding-occluded-windows'] }
     : { args: ['.', '--client'] }),
   env: environment('client'),
 });
+const clientWindow = await client.firstWindow();
+await clientWindow.locator('.client-service-card').waitFor();
 const control = await electron.launch({
   ...(process.env.CSHELL_EXECUTABLE
-    ? { executablePath: process.env.CSHELL_EXECUTABLE, args: [] }
+    ? { executablePath: process.env.CSHELL_EXECUTABLE, args: ['--disable-backgrounding-occluded-windows'] }
     : { args: ['.'] }),
   env: environment('control'),
 });
 try {
-  const c = await client.firstWindow(),
+  const c = clientWindow,
     w = await control.firstWindow();
   c.setDefaultTimeout(20000);
   w.setDefaultTimeout(20000);
@@ -124,6 +128,7 @@ try {
   await c.locator('.client-dashboard').evaluate((el) => {
     el.scrollTop = 0;
   });
+  await c.bringToFront();
   await c.screenshot({ path: 'test-results/client-service.png' });
   await c.getByRole('button', { name: '设置', exact: true }).click();
   assert.equal(await c.getByLabel('端口', { exact: true }).inputValue(), String(port));
@@ -140,9 +145,11 @@ try {
     'PASS: independent Windows Client, explicit shell permission, password connection UI, real ConPTY over mutual TLS, encrypted identity, revocation and shutdown',
   );
 } catch (error) {
+  console.error('Client smoke failed:', error);
   for (const application of [client, control]) {
-    const page = await application.firstWindow();
-    console.error(await page.locator('[role="alert"]').allTextContents());
+    for (const page of application.windows()) {
+      console.error(await page.locator('[role="alert"]').allTextContents().catch(() => []));
+    }
   }
   throw error;
 } finally {

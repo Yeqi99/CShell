@@ -103,6 +103,10 @@ try {
     .first()
     .evaluate((el) => el.getBoundingClientRect().height);
   assert.ok(height <= 34);
+  await page.getByLabel('名称', { exact: true }).fill('Local UI fixture');
+  await page.getByLabel('API URL', { exact: true }).fill('http://127.0.0.1:9/v1');
+  await page.getByLabel('模型 ID', { exact: true }).fill('fixture');
+  await page.getByRole('button', { name: '保存基座', exact: true }).click();
   await page.getByRole('button', { name: '访问权限', exact: true }).click();
   await page.getByLabel('默认：资源监控', { exact: true }).waitFor();
   await page.getByRole('button', { name: '保存权限', exact: true }).waitFor();
