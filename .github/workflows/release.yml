@@ -225,6 +225,7 @@ jobs:
       - name: Upload draft, verify every asset, then publish
         env:
           GH_TOKEN: ${{ github.token }}
+          CSHELL_RELEASE_SHA: ${{ github.sha }}
         run: |
           VERSION="v$(node -p 'require("./package.json").version')"
           gh release create "$VERSION" packages/* --target "$GITHUB_SHA" --title "CShell $VERSION" --notes-file docs/RELEASE.md --prerelease --draft

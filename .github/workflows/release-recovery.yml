@@ -1,0 +1,83 @@
+name: Verify and publish uploaded draft
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Completed Release workflow containing verified packages
+        required: true
+        type: string
+      source_sha:
+        description: Exact source commit of those packages
+        required: true
+        type: string
+permissions:
+  contents: write
+  actions: read
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Require all original platform gates
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN: ${{ inputs.run_id }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          const runId = process.env.SOURCE_RUN;
+          const sha = process.env.SOURCE_SHA;
+          assert.match(runId, /^\d+$/);
+          assert.match(sha, /^[a-f0-9]{40}$/);
+          const get = async (path) => {
+            const r = await fetch(`https://api.github.com/repos/Yeqi99/CShell/${path}`, {
+              headers: {Authorization: `Bearer ${process.env.GH_TOKEN}`, 'User-Agent':'CShell-release-recovery'},
+              signal: AbortSignal.timeout(30000),
+            });
+            assert.equal(r.status, 200);
+            return r.json();
+          };
+          const run = await get(`actions/runs/${runId}`);
+          assert.equal(run.path, '.github/workflows/release.yml');
+          assert.equal(run.status, 'completed');
+          assert.equal(run.head_sha, sha);
+          const {jobs} = await get(`actions/runs/${runId}/jobs?per_page=100`);
+          for (const name of ['android', 'android-native (29)', 'android-native (35)',
+            'desktop (windows-latest, win, x64)', 'desktop (macos-latest, mac, arm64)',
+            'desktop (macos-15-intel, mac, x64)', 'desktop (ubuntu-latest, linux, x64)',
+            'desktop (ubuntu-24.04-arm, linux, arm64)']) {
+            assert.equal(jobs.filter(j => j.name === name && j.conclusion === 'success').length, 1, name);
+          }
+          console.log(`All original platform gates passed for ${sha}`);
+          JS
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: desktop-*
+          merge-multiple: false
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+      - name: Verify original packages and uploaded draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CSHELL_RELEASE_SHA: ${{ inputs.source_sha }}
+        run: |
+          pnpm exec tsx scripts/release-assets.ts artifacts packages
+          node scripts/verify-release-upload.mjs packages
+      - name: Publish verified draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="v$(node -p 'require("./package.json").version')"
+          ID="$(gh api 'repos/Yeqi99/CShell/releases?per_page=100' --jq ".[] | select(.tag_name == \"$VERSION\" and .draft == true) | .id")"
+          test -n "$ID"
+          gh api --method PATCH "repos/Yeqi99/CShell/releases/$ID" -F draft=false

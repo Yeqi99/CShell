@@ -14,14 +14,20 @@ const headers = {
   Accept: 'application/vnd.github+json',
   'User-Agent': 'CShell-release-verifier',
 };
-const response = await fetch(`${api}/releases/tags/v${version}`, {
+// The tag lookup does not expose a draft whose tag has not been published yet.
+const response = await fetch(`${api}/releases?per_page=100`, {
   headers,
   signal: AbortSignal.timeout(30000),
 });
 if (!response.ok) throw new Error(`Release lookup failed: ${response.status}`);
-const release = await response.json();
+const releases = await response.json();
+const matches = releases.filter((entry) => entry.tag_name === `v${version}` && entry.draft);
+if (matches.length !== 1) throw new Error('Expected exactly one matching release draft');
+const release = matches[0];
 if (release.tag_name !== `v${version}` || !release.draft)
   throw new Error('Expected an unpublished release draft');
+if (process.env.CSHELL_RELEASE_SHA && release.target_commitish !== process.env.CSHELL_RELEASE_SHA)
+  throw new Error('Draft source does not match the verified build');
 const directory = process.argv[2] || 'packages';
 const names = (await readdir(directory)).sort();
 if (!names.includes('SHA256SUMS.txt') || !names.length) throw new Error('Missing local checksums');
