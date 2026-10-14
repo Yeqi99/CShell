@@ -26,8 +26,12 @@ delete env.ELECTRON_RUN_AS_NODE;
 let app: Awaited<ReturnType<typeof electron.launch>> | undefined;
 try {
   app = await electron.launch({ executablePath, args: [], env, timeout: 60000 });
-  const page = await app.firstWindow();
+  // Attach through Chromium's existing page list as well as future page events.
+  // Electron's window event can precede Playwright's firstWindow registration.
+  const page =
+    app.context().pages()[0] ?? (await app.context().waitForEvent('page', { timeout: 60000 }));
   page.setDefaultTimeout(20000);
+  await page.waitForFunction(() => !!window.cshell);
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   const actual = await app.evaluate(({ app, BrowserWindow, dialog }) => {
@@ -72,6 +76,22 @@ try {
   console.log(
     `PASS: packaged ${actual.platform}/${actual.arch} ${actual.version}, sandbox, SSH terminal and SFTP`,
   );
+} catch (error) {
+  console.error(
+    'Packaged application diagnostics:',
+    await app
+      ?.evaluate(({ app, BrowserWindow }) => ({
+        ready: app.isReady(),
+        windows: BrowserWindow.getAllWindows().map((w) => ({
+          visible: w.isVisible(),
+          destroyed: w.isDestroyed(),
+          url: w.webContents.getURL(),
+          loading: w.webContents.isLoading(),
+        })),
+      }))
+      .catch(() => undefined),
+  );
+  throw error;
 } finally {
   await app?.close();
   await server.close();
