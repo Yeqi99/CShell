@@ -1,6 +1,6 @@
 # CShell
 
-CanpShell 是面向高频操作的终端与 AI 工作台，采用 **MIT** 许可证。当前开发版本为 **0.6.0 开发预览**，新增 HTTP 工作区与轻量独立 **CShell Agent**。本地构建不代表已发布；以下下载链接保留历史已上传版本。
+CanpShell 是面向高频操作的终端与 AI 工作台，采用 **MIT** 许可证。**0.6.0 开发预览已发布**，新增 HTTP 工作区与轻量独立 **CShell Agent**，提供 Windows、macOS、Linux 和 Android 下载。
 
 [源码](https://github.com/Yeqi99/CShell) · [版本下载](https://github.com/Yeqi99/CShell/releases) · [问题反馈](https://github.com/Yeqi99/CShell/issues) · [构建状态](https://github.com/Yeqi99/CShell/actions)
 
@@ -10,23 +10,34 @@ CanpShell 是面向高频操作的终端与 AI 工作台，采用 **MIT** 许可
 
 发行产物统一放到 [GitHub Releases](https://github.com/Yeqi99/CShell/releases)；市场目录固定到已发布的源码标签，不需要部署市场服务器。仓库为 [Yeqi99/CShell](https://github.com/Yeqi99/CShell)，以实际发布完成的附件为准。
 
-- [Windows 主程序 CShell 0.5.0](https://github.com/Yeqi99/CShell/releases/download/v0.5.0/CShell-0.5.0-win-x64.exe)
-- [历史独立受控端 CShell Client 0.1.0](https://github.com/Yeqi99/CShell/releases/download/v0.5.0/CShell-Client-0.1.0-win-x64.exe)
-- [SHA-256 校验文件](https://github.com/Yeqi99/CShell/releases/download/v0.5.0/SHA256SUMS.txt) · [0.5.0 发布说明](https://github.com/Yeqi99/CShell/releases/tag/v0.5.0)
-- [其他平台 0.4.7 下载](https://github.com/Yeqi99/CShell/releases/tag/v0.4.7)
+- [Windows 安装包](https://github.com/Yeqi99/CShell/releases/download/v0.6.0/CShell-0.6.0-win-x64.exe)
+- [Android APK](https://github.com/Yeqi99/CShell/releases/download/v0.6.0/CShell-0.6.0-android-test.apk)
+- [全部 0.6.0 下载与发布说明](https://github.com/Yeqi99/CShell/releases/tag/v0.6.0) · [SHA-256 校验文件](https://github.com/Yeqi99/CShell/releases/download/v0.6.0/SHA256SUMS.txt)
 
-| 平台    | 格式 / 架构                           | 当前验证状态                                           |
-| ------- | ------------------------------------- | ------------------------------------------------------ |
-| Windows | NSIS `.exe`，x64                      | 0.5.0：本机构建、60 项测试及两端打包版 Client 回归通过 |
-| macOS   | `.dmg` / `.zip`，Apple Silicon、Intel | 0.4.7：云端构建通过；真机交互待验收                    |
-| Linux   | `.AppImage` / `.deb`，x64、ARM64      | 0.4.7：云端构建通过；真机交互待验收                    |
-| Android | 测试 `.apk`，Android 8+               | 0.4.7：编译与 lint 通过，持久化签名；功能不等同桌面    |
+| 平台    | 格式 / 架构                           | 当前验证状态                                                        |
+| ------- | ------------------------------------- | ------------------------------------------------------------------- |
+| Windows | NSIS `.exe`，x64                      | 单测、桌面回归、成品 SSH/文件通过；本机安装验证                     |
+| macOS   | `.dmg` / `.zip`，Apple Silicon、Intel | 两种原生架构构建与成品 SSH/文件通过；真机交互待验收                 |
+| Linux   | `.AppImage` / `.deb`，x64、ARM64      | 两种原生架构构建与成品 SSH/文件通过                                 |
+| Android | 测试 `.apk`，Android 8+               | 编译、lint、持久签名校验和 API 29 / 35 原生连接测试通过；真机待验收 |
+
+独立 Agent 下载（无需安装完整 CShell）：
+
+| 平台        | 下载                                                                                                                                                                                                                  |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Windows x64 | [ZIP](https://github.com/Yeqi99/CShell/releases/download/v0.6.0/CShell-Agent-0.6.0-win-x64.zip)                                                                                                                       |
+| macOS       | [Apple Silicon](https://github.com/Yeqi99/CShell/releases/download/v0.6.0/CShell-Agent-0.6.0-mac-arm64.tar.gz) · [Intel](https://github.com/Yeqi99/CShell/releases/download/v0.6.0/CShell-Agent-0.6.0-mac-x64.tar.gz) |
+| Linux       | [x64](https://github.com/Yeqi99/CShell/releases/download/v0.6.0/CShell-Agent-0.6.0-linux-x64.tar.gz) · [ARM64](https://github.com/Yeqi99/CShell/releases/download/v0.6.0/CShell-Agent-0.6.0-linux-arm64.tar.gz)       |
+
+五种 Agent 成品均通过原生终端、TLS、权限拒绝及退出检查。解压后按包内说明使用命令行入口，尚未自动注册系统服务。构建来源和已知限制见 [整合验收](docs/RELEASE-CHECKLIST.md)。
 
 尚无商业代码签名证书，macOS 未公证。核对附件的 SHA256SUMS.txt。完整范围见 [发布说明](docs/RELEASE.md)，已执行的检查见 [验证记录](docs/VALIDATION.md)。
 
 ## Android 工作台与更新
 
 Android 默认进入概览首页，底部导航为首页、连接、终端、文件、设置。支持搜索、分组、会话切换与独立连接页。文件页绑定所选在线会话，支持目录浏览、只读文本预览、上传与下载；使用系统文件选择器，不请求整个设备存储权限。切页保留终端和未提交草稿，连接按钮固定在操作区；密码与私钥不落盘。设置中可切换明暗、检查和下载更新。
+
+0.6.0 支持 Agent 连接和真实终端环境选择，需要 Android 10+；SSH 仍支持 Android 8+。文件功能目前用于 SSH，Agent 暂无文件传输。原生测试覆盖身份拒绝、TLS/PTY、8 MiB 输出、撤权与取消；模拟器结果不代表真机输入法和后台恢复已经验收。
 
 桌面与 Android 均从 GitHub Releases 检查更新并校验 SHA256，随后进入系统安装流程。Linux 当前提供 AppImage 下载和文件位置，需要手动替换与授权执行。更新不会自动关闭正在操作的会话。
 
@@ -38,7 +49,7 @@ Android 默认进入概览首页，底部导航为首页、连接、终端、文
 
 顶栏“统计与历史”展示本设备真实记录：成功连接、文件操作请求、传输字节、AI 请求和活跃日期；支持日期/类型筛选、搜索、CSV/HTML 导出、暂停及清空。仅本机存储，最多一年/50,000 条，不采集终端输入、密码、文件路径或聊天正文，不伪造旧历史、Token 数或效率收益。
 
-连接生命周期与 Agent 工具采用 [Connection Provider Architecture](docs/CONNECTION-PROVIDERS.md)。SSH、Windows 本机终端和 CShell Client 使用独立 Provider。Client 与 SSH 共用左侧服务器列表，支持命名、分组、收藏、编辑和双击连接，旧设备记录自动迁入。RDP 通过 Windows mstsc 打开独立窗口，暂不保存配置；VNC 与直连 Docker TLS 尚未实现。现有 Docker 插件使用真实 Engine HTTP API，经 SSH socket 隧道访问。
+连接生命周期与 Agent 工具采用 [Connection Provider Architecture](docs/CONNECTION-PROVIDERS.md)。SSH、Windows 本机终端和 CShell Agent 使用独立 Provider。Agent 与 SSH 共用左侧服务器列表，支持命名、分组、收藏、编辑和双击连接，旧 Client 记录迁移保留身份、凭据与授权。RDP 通过 Windows mstsc 打开独立窗口，暂不保存配置；VNC 与直连 Docker TLS 尚未实现。现有 Docker 插件使用真实 Engine HTTP API，经 SSH socket 隧道访问。
 
 ### CShell Agent
 
