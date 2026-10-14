@@ -21,6 +21,12 @@ public final class AgentProtocolTest extends Instrumentation {
   @Override public void onStart() {
     String[] tests={"testRejectIdentityBeforeSendingSecret","testCancelBeforeConnect","testPinnedNativePtyReconnectAndRevocation"};
     int failures=0;StringBuilder report=new StringBuilder();
+    try {setUp();awaitFixtureNetwork(report);}
+    catch(Exception error) {
+      StringWriter detail=new StringWriter();error.printStackTrace(new PrintWriter(detail));
+      Bundle result=new Bundle();result.putString("stream",report + "SETUP FAILED: fixture network preflight\n" + detail + "\nFAILURES!!! Tests run: 0, setup failure: 1");
+      finish(Activity.RESULT_OK,result);return;
+    }
     for(int i=0;i<tests.length;i++) {
       Bundle status=new Bundle();status.putString("class",getClass().getName());status.putString("test",tests[i]);status.putInt("numtests",tests.length);status.putInt("current",i+1);status.putString("id","CShellAgentInstrumentation");sendStatus(1,status);
       try{setUp();getClass().getMethod(tests[i]).invoke(this);sendStatus(0,status);report.append("PASS ").append(tests[i]).append("\n");}
@@ -42,6 +48,41 @@ public final class AgentProtocolTest extends Instrumentation {
     port=Integer.parseInt(arguments.getString("agentPort","47839"));
     password=arguments.getString("agentPassword");fingerprint=arguments.getString("agentFingerprint");
     assertNotNull("Provide fixture password",password);assertNotNull("Provide fixture fingerprint",fingerprint);
+  }
+  /** Same UID as the TLS tests: emulator boot completion does not imply its network is ready. */
+  private void awaitFixtureNetwork(StringBuilder report) throws Exception {
+    long started=android.os.SystemClock.elapsedRealtime(),deadline=started+60000;
+    int attempts=0;java.io.IOException last=null;
+    while(android.os.SystemClock.elapsedRealtime()<deadline) {
+      int timeout=(int)Math.min(2000,deadline-android.os.SystemClock.elapsedRealtime());
+      if(timeout<=0)break;
+      attempts++;
+      try(java.net.Socket probe=new java.net.Socket()) {
+        probe.connect(new java.net.InetSocketAddress(host,port),timeout);
+        report.append("TCP fixture ready: uid=").append(android.os.Process.myUid())
+          .append(", API=").append(android.os.Build.VERSION.SDK_INT).append(", attempts=").append(attempts)
+          .append(", elapsedMs=").append(android.os.SystemClock.elapsedRealtime()-started).append('\n');
+        return;
+      } catch(java.io.IOException error) {
+        if(!transientNetworkFailure(error))throw error;
+        last=error;
+      }
+      long remaining=deadline-android.os.SystemClock.elapsedRealtime();
+      if(remaining>0)Thread.sleep(Math.min(500,remaining));
+    }
+    throw new java.io.IOException("Fixture TCP unreachable after 60 seconds: uid="+android.os.Process.myUid()
+      +", API="+android.os.Build.VERSION.SDK_INT+", endpoint="+host+":"+port+", attempts="+attempts,last);
+  }
+  private static boolean transientNetworkFailure(java.io.IOException error) {
+    for(Throwable cause=error;cause!=null;cause=cause.getCause()) {
+      if(cause instanceof android.system.ErrnoException) {
+        int errno=((android.system.ErrnoException)cause).errno;
+        return errno==android.system.OsConstants.ENETUNREACH || errno==android.system.OsConstants.EHOSTUNREACH
+          || errno==android.system.OsConstants.ECONNREFUSED || errno==android.system.OsConstants.ETIMEDOUT;
+      }
+    }
+    return error instanceof java.net.SocketTimeoutException || error instanceof java.net.NoRouteToHostException
+      || error instanceof java.net.ConnectException;
   }
   private boolean pin(byte[] cert) {
     try {StringBuilder result=new StringBuilder();for(byte b:MessageDigest.getInstance("SHA-256").digest(cert))result.append(String.format(Locale.ROOT,"%02x",b));return result.toString().equals(fingerprint.replace(":","").toLowerCase(Locale.ROOT));}

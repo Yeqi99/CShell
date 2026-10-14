@@ -188,6 +188,10 @@ jobs:
           api-level: ${{ matrix.api }}
           target: google_apis
           arch: x86_64
+          # Keep the isolated host-alias network used by the fixture, rather than
+          # the shared Wi-Fi stack introduced in Emulator 36.5.
+          # https://developer.android.com/studio/run/emulator-networking-interconnect
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -feature -WiFiPacketStream
           disable-animations: true
           script: pnpm exec tsx scripts/android-agent-instrumentation.ts
       - uses: actions/upload-artifact@v4
