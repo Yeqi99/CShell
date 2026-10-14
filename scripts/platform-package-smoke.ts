@@ -21,13 +21,21 @@ const executablePath =
   );
 const data = await mkdtemp(join(tmpdir(), 'cshell-package-'));
 const server = await fixture();
-const env = { ...process.env, CSHELL_TEST_DATA: data };
+const env = { ...process.env, CSHELL_TEST_DATA: data, CSHELL_TEST_START_GATE: '1' };
 delete env.ELECTRON_RUN_AS_NODE;
 let app: Awaited<ReturnType<typeof electron.launch>> | undefined;
 try {
-  app = await electron.launch({ executablePath, args: [], env, timeout: 60000 });
-  // Attach through Chromium's existing page list as well as future page events.
-  // Electron's window event can precede Playwright's firstWindow registration.
+  app = await electron.launch({
+    executablePath,
+    args: [],
+    env,
+    timeout: 60000,
+  });
+  assert.equal(
+    await app.evaluate(() => (globalThis as any).__cshellPackagedTestAttached),
+    true,
+    'The packaged test must attach Chromium before application readiness',
+  );
   const page =
     app.context().pages()[0] ?? (await app.context().waitForEvent('page', { timeout: 60000 }));
   page.setDefaultTimeout(20000);

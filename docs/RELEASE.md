@@ -32,4 +32,4 @@ Windows 与 macOS 包未使用开发者代码签名，macOS 未公证。Android 
 
 WSL 安装与账号初始化具有计划、确认及状态反馈，但本轮未在真实系统执行安装、重启或账号修改；现有发行版连接验证不代表已完成这些系统变更的验收。
 
-源码采用 MIT，依赖许可见所附第三方声明。验证记录与未完成项见 [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md)。
+源码采用 MIT，依赖许可见所附第三方声明。验证记录与未完成项见 [整合验收](https://github.com/Yeqi99/CShell/blob/main/docs/RELEASE-CHECKLIST.md)。

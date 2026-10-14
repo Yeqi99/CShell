@@ -1,4 +1,5 @@
 import { HttpWorkspaces } from '../core/http-workspaces';
+import { testStartGate } from './test-start-gate';
 import { registerAgent } from './agent';
 import { syncClientProfiles } from '../core/client/profiles';
 import { ConnectionAttempts } from '../core/connection-attempts';
@@ -85,6 +86,7 @@ else
   app
     .whenReady()
     .then(async () => {
+      await testStartGate;
       if (clientMode) return startClientApplication();
       const store = new Store(app.getPath('userData'), {
         encrypt: async (value) => {
