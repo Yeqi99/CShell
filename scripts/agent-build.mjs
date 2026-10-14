@@ -4,6 +4,7 @@ import { join, resolve, dirname, sep } from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
+import { preparePty } from './prepare-pty.mjs';
 const require = createRequire(import.meta.url);
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const version = JSON.parse(await readFile(join(root, 'package.json'), 'utf8')).version;
@@ -62,34 +63,10 @@ const checkNative = () =>
   });
 // N-API prebuilds may already match Node. Compile only in this stage when needed.
 if (process.env.CSHELL_AGENT_REBUILD_NATIVE === '1' || !(await checkNative())) {
-  await new Promise((resolveRun, reject) => {
-    const child = spawn(
-      process.platform === 'win32' ? 'cmd.exe' : 'npm',
-      process.platform === 'win32'
-        ? ['/d', '/s', '/c', 'npm rebuild node-pty --no-audit --no-fund']
-        : ['rebuild', 'node-pty', '--no-audit', '--no-fund'],
-      {
-        cwd: output,
-        stdio: 'inherit',
-        windowsHide: true,
-        env: {
-          ...process.env,
-          npm_config_runtime: 'node',
-          npm_config_target: process.versions.node,
-        },
-      },
-    );
-    child.once('error', reject);
-    child.once('exit', (code) =>
-      code === 0
-        ? resolveRun()
-        : reject(
-            new Error(
-              `Agent PTY rebuild failed (${code}); install npm and native build prerequisites on this target platform`,
-            ),
-          ),
-    );
-  });
+  preparePty(
+    join(output, 'node_modules', 'node-pty'),
+    process.env.CSHELL_AGENT_REBUILD_NATIVE === '1',
+  );
 }
 if (!(await checkNative())) throw new Error('Staged Agent native PTY cannot load in Node');
 const nodeName = process.platform === 'win32' ? 'node.exe' : 'node';

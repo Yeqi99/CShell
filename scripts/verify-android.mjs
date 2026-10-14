@@ -33,10 +33,14 @@ const signature = execFileSync(
   ['-jar', join(tools, 'lib', 'apksigner.jar'), 'verify', '--verbose', '--print-certs', apk],
   { encoding: 'utf8', windowsHide: true },
 );
-const certificate = /Signer #1 certificate SHA-256 digest: ([a-f0-9]+)/i.exec(signature)?.[1];
-if (!certificate) throw new Error('APK signer certificate missing');
-if (certificate.toLowerCase() !== identity.certificateSha256)
+const certificates = [...signature.matchAll(/certificate SHA-256 digest:\s*([a-f0-9]{64})/gi)].map(
+  (match) => match[1].toLowerCase(),
+);
+if (!certificates.length)
+  throw new Error('APK signer certificate missing: ' + signature.slice(-3000));
+if (certificates.some((certificate) => certificate !== identity.certificateSha256))
   throw new Error('APK signing identity changed; existing users could not upgrade in place');
+const certificate = certificates[0];
 console.log(
   JSON.stringify(
     {

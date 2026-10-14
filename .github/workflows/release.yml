@@ -33,7 +33,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Prepare the native PTY dependency for this runner
-        run: npm rebuild node-pty --foreground-scripts
+        run: node scripts/prepare-pty.mjs
       - run: pnpm build
       - run: pnpm test
       - if: matrix.platform == 'win'
@@ -169,7 +169,7 @@ jobs:
         with:
           gradle-version: '8.13'
       - run: pnpm install --frozen-lockfile
-      - run: npm rebuild node-pty --foreground-scripts
+      - run: node scripts/prepare-pty.mjs
       - run: node scripts/build-android.mjs
       - run: gradle -p android assembleDebug assembleDebugAndroidTest
       - uses: actions/download-artifact@v4
