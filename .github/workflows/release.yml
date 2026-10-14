@@ -29,7 +29,7 @@ jobs:
           version: 11.25.0
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 24.19.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Prepare the native PTY dependency for this runner
@@ -110,7 +110,7 @@ jobs:
           version: 11.25.0
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 24.19.0
           cache: pnpm
       - uses: actions/setup-java@v4
         with:
@@ -159,7 +159,7 @@ jobs:
           version: 11.25.0
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 24.19.0
           cache: pnpm
       - uses: actions/setup-java@v4
         with:
@@ -208,7 +208,7 @@ jobs:
           version: 11.25.0
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 24.19.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - uses: actions/download-artifact@v4

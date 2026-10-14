@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { z } from 'zod';
@@ -119,16 +119,57 @@ async function setup(reply: (request: any) => any | Promise<any>, runTimeoutMs?:
       ),
     cleanup: async () => {
       ai.dispose();
-      await until(() =>
-        ai.snapshot().threads.every((t) => !['running', 'approval'].includes(t.state)),
-      );
-      await new Promise((r) => setTimeout(r, 50));
+      await ai.flush();
       api.closeAllConnections();
       await new Promise<void>((r) => api.close(() => r()));
       await rm(directory, { recursive: true, force: true });
     },
   };
 }
+
+test('stopped approval waits for its final history write before cleanup', async () => {
+  const f = await setup(() => call('execute_command', { command: 'await review' }));
+  let release!: () => void;
+  const blocked = new Promise<void>((resolve) => (release = resolve));
+  let writing!: () => void;
+  const writeStarted = new Promise<void>((resolve) => (writing = resolve));
+  const encrypt = f.store.encryptPrivate.bind(f.store);
+  try {
+    await f.ai.mode(f.thread.id, 'review');
+    await f.ai.send(f.thread.id, 'inspect');
+    await until(() => !!f.ai.snapshot().threads[0].pending);
+    f.store.encryptPrivate = async (data) => {
+      const thread = JSON.parse(data).threads.find((t: any) => t.id === f.thread.id);
+      if (!['running', 'approval'].includes(thread.state)) {
+        writing();
+        await blocked;
+      }
+      return encrypt(data);
+    };
+    f.ai.dispose();
+    let flushed = false;
+    const draining = f.ai.flush().then(() => {
+      flushed = true;
+    });
+    await writeStarted;
+    // Yield the event loop while disk encryption is deliberately held: thread
+    // state is already terminal, but the completion barrier must remain pending.
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.ok(f.ai.snapshot().threads.every((t) => !['running', 'approval'].includes(t.state)));
+    assert.equal(flushed, false);
+    release();
+    await draining;
+    const saved = JSON.parse(
+      await f.store.decryptPrivate(await readFile(join(f.directory, 'ai.enc'), 'utf8')),
+    );
+    assert.equal(saved.threads[0].state, 'error');
+    assert.equal(saved.threads[0].pending, undefined);
+    assert.equal(f.executions(), 0);
+  } finally {
+    release();
+    await f.cleanup();
+  }
+});
 
 test('parent delegates, collects a child result and child cannot switch machines or review mode', async () => {
   const f = await setup((req) => {

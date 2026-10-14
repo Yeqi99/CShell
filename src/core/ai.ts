@@ -50,6 +50,8 @@ export class AiService {
   private textService = new AiTextService();
   private threads: AiThread[] = [];
   private writes: Promise<void> = Promise.resolve();
+  private completions = new Set<Promise<void>>();
+  private disposed = false;
   private runs = new Map<string, AbortController>();
   private approvals = new Map<string, { requestId: string; resolve: (allow: boolean) => void }>();
   constructor(
@@ -130,7 +132,14 @@ export class AiService {
     return child;
   }
   dispose() {
+    this.disposed = true;
     this.work.dispose();
+  }
+  /** After stopping work, wait for run finalizers and their queued history writes. */
+  async flush() {
+    await this.work.flush();
+    while (this.completions.size) await Promise.all(this.completions);
+    await this.writes;
   }
   async stopAndSave(id: string) {
     this.thread(id);
@@ -522,6 +531,7 @@ export class AiService {
     a.resolve(z.boolean().parse(allow));
   }
   async send(id: string, input: unknown) {
+    if (this.disposed) throw new Error('AI service has stopped');
     const t = this.thread(id),
       text = z.string().trim().min(1).max(32000).parse(input);
     if (this.runs.has(id)) throw new Error('Conversation is busy');
@@ -542,6 +552,13 @@ export class AiService {
     parentSignal?.addEventListener('abort', parentStopped, { once: true });
     this.childCounts.set(id, 0);
     this.work.begin(t);
+    let complete!: () => void;
+    const completion = new Promise<void>((resolve) => (complete = resolve));
+    this.completions.add(completion);
+    const settled = () => {
+      this.completions.delete(completion);
+      complete();
+    };
     try {
       await this.persist();
     } catch (e) {
@@ -549,7 +566,11 @@ export class AiService {
       parentSignal?.removeEventListener('abort', parentStopped);
       t.state = 'error';
       t.error = 'Could not save AI history';
-      await this.work.finish(t);
+      try {
+        await this.work.finish(t);
+      } finally {
+        settled();
+      }
       throw e;
     }
     const deadline = setTimeout(
@@ -570,11 +591,15 @@ export class AiService {
         this.approvals.delete(id);
         t.pending = undefined;
         if (t.state !== 'error') t.state = 'idle';
-        await this.work.finish(t);
-        await this.persist().catch(() => {
-          t.state = 'error';
-          t.error = 'Could not save AI history';
-        });
+        try {
+          await this.work.finish(t);
+          await this.persist().catch(() => {
+            t.state = 'error';
+            t.error = 'Could not save AI history';
+          });
+        } finally {
+          settled();
+        }
       });
   }
   private async loop(t: AiThread, signal: AbortSignal) {

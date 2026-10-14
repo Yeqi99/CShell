@@ -54,9 +54,14 @@ export async function registerAiHandlers(
   handle('ai:approve', (id, request, allow) => ai.approve(id, request, allow));
   handle('ai:stop', (id) => ai.stopAndSave(id));
   handle('ai:mode', (id, mode) => ai.mode(id, mode));
+  let disposal: Promise<void> | undefined;
   return () => {
+    if (disposal) return disposal;
+    ai.onThreadUpdate = undefined;
     ai.dispose();
     clearTimeout(timer);
     pending.clear();
+    disposal = ai.flush();
+    return disposal;
   };
 }

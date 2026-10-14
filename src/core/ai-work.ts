@@ -17,17 +17,23 @@ interface Host {
 /** One host timer; children share the provider transport, never create OS processes. */
 export class AiWork {
   private timer?: ReturnType<typeof setInterval>;
-  private ticking = false;
+  private ticking?: Promise<void>;
+  private disposed = false;
   private reports = new Set<string>();
   constructor(private host: Host) {}
   start() {
+    if (this.disposed) return;
     this.timer ??= setInterval(() => void this.tick().catch(() => {}), 5000);
     this.timer.unref();
   }
   dispose() {
+    this.disposed = true;
     clearInterval(this.timer);
     this.timer = undefined;
     for (const t of this.host.threads()) this.host.stop(t.id);
+  }
+  async flush() {
+    await this.ticking;
   }
   children(t: AiThread) {
     return this.host.threads().filter((c) => c.parentId === t.id);
@@ -116,35 +122,37 @@ export class AiWork {
     }
     this.reports.delete(t.id);
   }
-  async tick(now = Date.now()) {
-    if (this.ticking) return;
-    this.ticking = true;
-    try {
-      for (const t of this.host.threads()) {
-        if (
-          t.goal?.state !== 'active' ||
-          t.goal.nextRun === undefined ||
-          t.goal.nextRun > now ||
-          this.host.busy(t.id)
-        )
-          continue;
-        if (this.host.threads().filter((x) => this.host.busy(x.id)).length >= 4) break;
-        try {
-          if (!this.host.allowed(t, 'goals.manage')) throw new Error('定期目标权限已关闭');
-          this.host.checkTarget(t);
-          await this.host.send(
-            t.id,
-            `定期目标检查：${t.goal.objective}\n检查真实状态后调用 report_goal，报告 continue、complete 或 blocked，并给出事实依据。条件不清楚时报告 blocked，不猜测。`,
-          );
-        } catch (e) {
-          t.goal.state = 'blocked';
-          t.goal.nextRun = undefined;
-          this.note(t, 'blocked', (e as Error).message);
-          await this.host.save();
-        }
+  tick(now = Date.now()) {
+    if (this.disposed || this.ticking) return Promise.resolve();
+    const pending = this.tickOnce(now);
+    this.ticking = pending;
+    return pending.finally(() => {
+      this.ticking = undefined;
+    });
+  }
+  private async tickOnce(now: number) {
+    for (const t of this.host.threads()) {
+      if (
+        t.goal?.state !== 'active' ||
+        t.goal.nextRun === undefined ||
+        t.goal.nextRun > now ||
+        this.host.busy(t.id)
+      )
+        continue;
+      if (this.host.threads().filter((x) => this.host.busy(x.id)).length >= 4) break;
+      try {
+        if (!this.host.allowed(t, 'goals.manage')) throw new Error('定期目标权限已关闭');
+        this.host.checkTarget(t);
+        await this.host.send(
+          t.id,
+          `定期目标检查：${t.goal.objective}\n检查真实状态后调用 report_goal，报告 continue、complete 或 blocked，并给出事实依据。条件不清楚时报告 blocked，不猜测。`,
+        );
+      } catch (e) {
+        t.goal.state = 'blocked';
+        t.goal.nextRun = undefined;
+        this.note(t, 'blocked', (e as Error).message);
+        await this.host.save();
       }
-    } finally {
-      this.ticking = false;
     }
   }
   tools(t: AiThread): ConnectionTool[] {

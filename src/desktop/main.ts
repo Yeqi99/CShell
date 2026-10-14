@@ -467,7 +467,9 @@ else
         http,
       );
       registerPresetHandlers(handle, window, app.getPath('userData'), store, text);
-      window.once('closed', disposeAi);
+      window.once('closed', () => {
+        void disposeAi().catch((error) => console.error('AI shutdown failed', error));
+      });
       const mcp = new McpService(store, app.getPath('userData'), async (name, command) => {
         const result = await dialog.showMessageBox(window, {
           type: 'warning',
@@ -844,12 +846,16 @@ else
           });
       });
       let flushed = false;
-      app.on('before-quit', (event) => {
+      let flushing: Promise<void> | undefined;
+      // will-quit runs after window close confirmation, so cancelling a close
+      // never stops the user's AI tasks. Keep Electron alive until history lands.
+      app.on('will-quit', (event) => {
         if (!flushed) {
           event.preventDefault();
-          void activity
-            .flush()
-            .catch(() => {})
+          flushing ??= disposeAi()
+            .catch((error) => console.error('AI shutdown failed', error))
+            .then(() => activity.flush())
+            .catch((error) => console.error('Could not finish saving before exit', error))
             .finally(() => {
               flushed = true;
               app.quit();
