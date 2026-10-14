@@ -16,20 +16,50 @@ export function agentDirectory() {
   );
 }
 let sid: string | undefined;
+const protectionTimeoutMs = 15000;
+function protectionError(
+  stage: 'identity' | 'powershell-start' | 'acl-apply' | 'acl-complete',
+  error: unknown,
+  elapsedMs: number,
+  timedOut = false,
+) {
+  const details = error as { code?: unknown; signal?: unknown } | null;
+  const code =
+    typeof details?.code === 'number' && Number.isInteger(details.code)
+      ? String(details.code)
+      : typeof details?.code === 'string' && /^(?:E[A-Z0-9_]+|ERR_[A-Z0-9_]+)$/.test(details.code)
+        ? details.code.slice(0, 64)
+        : 'unknown';
+  const signal =
+    typeof details?.signal === 'string' && /^SIG[A-Z0-9]+$/.test(details.signal)
+      ? details.signal
+      : 'none';
+  // Never include the command, stdin, stderr, SID or path from an OS error.
+  return new Error(
+    `无法限制 Agent 私有文件权限 (stage=${stage}, kind=${timedOut ? 'timeout' : typeof details?.code === 'number' ? 'exit' : error ? 'process' : 'incomplete'}, elapsedMs=${Math.max(0, Math.round(elapsedMs))}, code=${code}, signal=${signal})`,
+  );
+}
 export async function protectPath(path: string, directory = false) {
   if (process.platform !== 'win32') {
     await chmod(path, directory ? 0o700 : 0o600);
     return;
   }
   if (!sid) {
+    const started = performance.now();
     const { stdout } = await exec('whoami.exe', ['/user', '/fo', 'csv', '/nh'], {
       windowsHide: true,
+      timeout: protectionTimeoutMs,
+    }).catch((error) => {
+      throw protectionError('identity', error, performance.now() - started);
     });
     sid = stdout.match(/S-1-\d+(?:-\d+)+/)?.[0];
     if (!sid) throw new Error('无法核实本机用户身份');
   }
-  const script = `$ErrorActionPreference='Stop';$p=[Console]::In.ReadToEnd();$sid=[Security.Principal.SecurityIdentifier]::new('${sid}');$acl=[Security.AccessControl.${directory ? 'DirectorySecurity' : 'FileSecurity'}]::new();$acl.SetOwner($sid);$acl.SetAccessRuleProtection($true,$false);$acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($sid,[Security.AccessControl.FileSystemRights]::FullControl,${directory ? "[Security.AccessControl.InheritanceFlags]'ContainerInherit,ObjectInherit'" : '[Security.AccessControl.InheritanceFlags]::None'},[Security.AccessControl.PropagationFlags]::None,[Security.AccessControl.AccessControlType]::Allow));Set-Acl -LiteralPath $p -AclObject $acl`;
+  const script = `$ErrorActionPreference='Stop';[Console]::InputEncoding=[Text.UTF8Encoding]::new($false);[Console]::Out.WriteLine('CSHELL_ACL_START');$p=[Console]::In.ReadToEnd();$sid=[Security.Principal.SecurityIdentifier]::new('${sid}');$acl=[Security.AccessControl.${directory ? 'DirectorySecurity' : 'FileSecurity'}]::new();$acl.SetOwner($sid);$acl.SetAccessRuleProtection($true,$false);$acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($sid,[Security.AccessControl.FileSystemRights]::FullControl,${directory ? "[Security.AccessControl.InheritanceFlags]'ContainerInherit,ObjectInherit'" : '[Security.AccessControl.InheritanceFlags]::None'},[Security.AccessControl.PropagationFlags]::None,[Security.AccessControl.AccessControlType]::Allow));Set-Acl -LiteralPath $p -AclObject $acl;[Console]::Out.WriteLine('CSHELL_ACL_DONE')`;
   await new Promise<void>((resolve, reject) => {
+    const started = performance.now();
+    let timedOut = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const child = execFile(
       join(
         process.env.SystemRoot || 'C:\\Windows',
@@ -41,7 +71,6 @@ export async function protectPath(path: string, directory = false) {
       ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', script],
       {
         windowsHide: true,
-        timeout: 15000,
         env: {
           ...process.env,
           PSModulePath: join(
@@ -53,8 +82,23 @@ export async function protectPath(path: string, directory = false) {
           ),
         },
       },
-      (error) => (error ? reject(new Error('无法限制 Agent 私有文件权限')) : resolve()),
+      (error, stdout) => {
+        clearTimeout(timer);
+        const stage = stdout.includes('CSHELL_ACL_DONE')
+          ? 'acl-complete'
+          : stdout.includes('CSHELL_ACL_START')
+            ? 'acl-apply'
+            : 'powershell-start';
+        if (error || timedOut || stage !== 'acl-complete')
+          reject(protectionError(stage, error, performance.now() - started, timedOut));
+        else resolve();
+      },
     );
+    timer = setTimeout(() => {
+      timedOut = true;
+      child.kill();
+    }, protectionTimeoutMs);
+    timer.unref();
     child.stdin!.on('error', () => {});
     child.stdin!.end(path);
   });
