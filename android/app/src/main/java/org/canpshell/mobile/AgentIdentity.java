@@ -20,7 +20,8 @@ final class AgentIdentity {
       KeyPairGenerator generator = KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_EC, "AndroidKeyStore");
       generator.initialize(new KeyGenParameterSpec.Builder(ALIAS, KeyProperties.PURPOSE_SIGN | KeyProperties.PURPOSE_VERIFY)
         .setAlgorithmParameterSpec(new ECGenParameterSpec("secp256r1"))
-        .setDigests(KeyProperties.DIGEST_SHA256, KeyProperties.DIGEST_SHA384, KeyProperties.DIGEST_SHA512)
+        // Conscrypt hashes the TLS transcript itself, then uses NONEwithECDSA in KeyStore.
+        .setDigests(KeyProperties.DIGEST_NONE, KeyProperties.DIGEST_SHA256, KeyProperties.DIGEST_SHA384, KeyProperties.DIGEST_SHA512)
         .setCertificateSubject(new X500Principal("CN=CShell Android"))
         .setCertificateSerialNumber(new BigInteger(128, new SecureRandom()).add(BigInteger.ONE))
         .setCertificateNotBefore(new Date(System.currentTimeMillis() - 86400000L))

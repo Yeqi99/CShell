@@ -62,12 +62,10 @@ const checkNative = () =>
     child.once('exit', (code) => resolveCheck(code === 0));
   });
 // N-API prebuilds may already match Node. Compile only in this stage when needed.
-if (process.env.CSHELL_AGENT_REBUILD_NATIVE === '1' || !(await checkNative())) {
-  preparePty(
-    join(output, 'node_modules', 'node-pty'),
-    process.env.CSHELL_AGENT_REBUILD_NATIVE === '1',
-  );
-}
+preparePty(
+  join(output, 'node_modules', 'node-pty'),
+  process.env.CSHELL_AGENT_REBUILD_NATIVE === '1',
+);
 if (!(await checkNative())) throw new Error('Staged Agent native PTY cannot load in Node');
 const nodeName = process.platform === 'win32' ? 'node.exe' : 'node';
 await cp(process.execPath, join(output, nodeName));

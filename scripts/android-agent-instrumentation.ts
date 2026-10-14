@@ -76,7 +76,10 @@ try {
     'org.canpshell.mobile.test/org.canpshell.mobile.AgentProtocolTest',
   ]);
   // Never persist fixture credentials, including in an unexpected instrumentation error.
-  const safeReport = report.replaceAll(settings.password, '[redacted]');
+  const safeReport = (report + '\nAgent TLS diagnostics:\n' + diagnostic).replaceAll(
+    settings.password,
+    '[redacted]',
+  );
   await mkdir('test-results', { recursive: true });
   await writeFile('test-results/android-agent-instrumentation.txt', safeReport);
   if (

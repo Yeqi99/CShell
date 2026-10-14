@@ -118,11 +118,16 @@ test(
         new AbortController().signal,
       );
       assert.equal(targetRuntime.terminal.size, 1);
-      controller.resolve(sessionId).terminal!.input('echo CSHELL_REVERSE_NATIVE_OK\r');
-      // ConPTY can move the cursor to the next prompt instead of emitting a newline.
-      // Require the result at the start of a line, so the echoed command cannot satisfy it.
-      const resultLine =
-        /(?:^|\n)(?:\x1b\[[0-?]*[ -/]*[@-~])*CSHELL_REVERSE_NATIVE_OK(?=\r|\n|\x1b|$)/;
+      const marker = 'CSHELL_REVERSE_NATIVE_OK';
+      const command =
+        process.platform === 'win32'
+          ? 'echo CSHELL_REVERSE_NATIVE_^OK\r'
+          : "printf '\\nCSHELL_REVERSE_NATIVE_%s\\n' OK\r";
+      // Require shell-generated output rather than matching the echoed input.
+      // POSIX prompts and ConPTY cursor movement need not begin a new line.
+      assert.ok(!command.includes(marker));
+      controller.resolve(sessionId).terminal!.input(command);
+      const resultLine = /CSHELL_REVERSE_NATIVE_OK(?=\r|\n|\x1b|$)/;
       await until(() => resultLine.test(output));
       assert.match(output, resultLine);
       assert.equal(targetRuntime.terminal.size, 1, 'native shell remains persistent after output');

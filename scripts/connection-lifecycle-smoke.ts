@@ -110,6 +110,7 @@ try {
   await page.keyboard.type('history-marker');
   await page.keyboard.press('Enter');
   await settled(() => server.shellInputs.join('').includes('history-marker'));
+  await terminal.locator('.xterm-rows').filter({ hasText: 'history-marker' }).waitFor();
   const sent = server.shellInputs.join('');
   await page.getByRole('button', { name: '偏好设置', exact: true }).first().click();
   server.disconnectAll();
@@ -139,6 +140,7 @@ try {
   const search = page.locator('.terminal-search:visible input');
   await search.fill('history-marker');
   await page.keyboard.press('Enter');
+  await terminal.locator('.xterm-selection div').first().waitFor({ state: 'attached' });
   assert.equal((await terminal.locator('.xterm-selection div').count()) > 0, true);
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: '切换为深色', exact: true }).click();

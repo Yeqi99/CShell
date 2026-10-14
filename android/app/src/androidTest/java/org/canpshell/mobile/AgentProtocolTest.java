@@ -105,9 +105,19 @@ public final class AgentProtocolTest extends Instrumentation {
     catch(Exception expected) {assertNotNull(expected.getMessage());}finally{revokedPeer.close();}
   }
   public void testRejectIdentityBeforeSendingSecret() throws Exception {
+    // Exercise the same prehashed signing operation Conscrypt needs for mutual TLS.
+    javax.net.ssl.X509ExtendedKeyManager manager=(javax.net.ssl.X509ExtendedKeyManager)AgentIdentity.managers()[0];
+    String alias=manager.chooseClientAlias(new String[]{"EC"},null,null);
+    assertNotNull("EC client identity must be available",alias);
+    byte[] digest=MessageDigest.getInstance("SHA-256").digest("CShell TLS identity test".getBytes(StandardCharsets.UTF_8));
+    java.security.Signature signer=java.security.Signature.getInstance("NONEwithECDSA");
+    signer.initSign(manager.getPrivateKey(alias));signer.update(digest);byte[] signature=signer.sign();
+    java.security.Signature verifier=java.security.Signature.getInstance("NONEwithECDSA");
+    verifier.initVerify(manager.getCertificateChain(alias)[0]);verifier.update(digest);
+    assertTrue("KeyStore must sign TLS transcript digests without exporting its key",verifier.verify(signature));
     AtomicBoolean asked=new AtomicBoolean();AgentConnection connection=new AgentConnection((type,value)->{});
     try{connection.connect(host,port,"never-send-this-secret",certificate->{asked.set(true);return false;});fail("Rejected pin must block authentication");}
-    catch(Exception expected){assertTrue(asked.get());}finally{connection.close();}
+    catch(Exception expected){if(!asked.get())throw new AssertionError("TLS handshake failed before the pin decision",expected);}finally{connection.close();}
   }
   public void testCancelBeforeConnect() throws Exception {
     AgentConnection connection=new AgentConnection((type,value)->{});connection.close();AtomicBoolean asked=new AtomicBoolean();

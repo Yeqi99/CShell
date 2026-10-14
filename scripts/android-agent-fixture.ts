@@ -6,6 +6,7 @@ import { randomBytes, createCipheriv, createDecipheriv } from 'node:crypto';
 import { ClientServer } from '../src/core/client/server';
 import { ClientVault } from '../src/core/client/identity';
 import { AgentTerminalProvider } from '../src/core/agent-terminal';
+import type { Server as TlsServer } from 'node:tls';
 const directory = await mkdtemp(join(tmpdir(), 'cshell-android-agent-test-'));
 const key = randomBytes(32);
 const codec = {
@@ -59,6 +60,15 @@ try {
     shells: process.platform === 'win32' ? ['cmd', 'powershell', 'wsl'] : ['bash', 'zsh', 'sh'],
   });
   await server.start({ bind: '127.0.0.1', port: 47839 });
+  // Test-only diagnostics: handshake failures contain no application credentials.
+  (server as unknown as { server: TlsServer }).server.on('tlsClientError', (error) => {
+    const tlsError = error as Error & { code?: string; reason?: string };
+    console.error(
+      'Agent fixture TLS handshake:',
+      tlsError.code || 'unknown',
+      tlsError.reason || tlsError.message,
+    );
+  });
   const output = process.argv[2] || 'test-results/android-agent-fixture.json';
   await mkdir(dirname(output), { recursive: true });
   await writeFile(

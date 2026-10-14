@@ -173,9 +173,17 @@ test('Agent runs a real native persistent PTY on this platform without SSH or El
   });
   try {
     const id = await provider.connect(preferred.id, undefined, new AbortController().signal);
-    provider.resolve(id).terminal!.input('echo CSHELL_AGENT_NATIVE_TEST\r');
+    const marker = 'CSHELL_AGENT_NATIVE_TEST';
+    const command =
+      process.platform === 'win32'
+        ? 'echo CSHELL_AGENT_NATIVE_^TEST\r'
+        : "printf '\\nCSHELL_AGENT_NATIVE_%s\\n' TEST\r";
+    // The input never contains the complete marker; only shell execution can
+    // produce it, including when a POSIX prompt precedes the result on a line.
+    assert.ok(!command.includes(marker));
+    provider.resolve(id).terminal!.input(command);
     const deadline = Date.now() + 10000;
-    const resultLine = /(?:^|\n)CSHELL_AGENT_NATIVE_TEST(?=\r|\n|\x1b|$)/;
+    const resultLine = /CSHELL_AGENT_NATIVE_TEST(?=\r|\n|\x1b|$)/;
     while (!resultLine.test(output) && Date.now() < deadline)
       await new Promise((resolve) => setTimeout(resolve, 50));
     assert.match(output, resultLine);

@@ -1,9 +1,20 @@
 import { createRequire } from 'node:module';
-import { dirname, resolve } from 'node:path';
+import { dirname, resolve, join } from 'node:path';
+import { chmodSync, existsSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
 export function preparePty(directory, force = false) {
+  // Package managers can strip the executable mode of the macOS prebuilt helper.
+  // Loading pty.node alone succeeds, but posix_spawnp then fails for every shell.
+  if (process.platform === 'darwin') {
+    for (const helper of [
+      join(directory, 'prebuilds', `darwin-${process.arch}`, 'spawn-helper'),
+      join(directory, 'build', 'Release', 'spawn-helper'),
+    ]) {
+      if (existsSync(helper)) chmodSync(helper, 0o755);
+    }
+  }
   const check = () =>
     spawnSync(process.execPath, ['-e', "require('./')"], {
       cwd: directory,
