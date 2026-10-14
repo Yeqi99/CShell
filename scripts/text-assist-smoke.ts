@@ -83,10 +83,10 @@ try {
   await page.getByRole('button', { name: '新建连接', exact: true }).click();
   await page.getByRole('heading', { name: '新建连接', exact: true }).waitFor();
   assert.equal(await page.getByLabel('主机地址', { exact: true }).isVisible(), false);
-  await page.getByRole('button', { name: '添加连接记录', exact: true }).click();
+  await page.getByRole('button', { name: 'SSH 终端', exact: true }).click();
   await page.getByLabel('主机地址', { exact: true }).fill('draft.example');
-  await page.getByRole('button', { name: '已有机器', exact: true }).click();
-  await page.getByRole('button', { name: '添加连接记录', exact: true }).click();
+  await page.getByRole('button', { name: '返回连接方式', exact: true }).click();
+  await page.getByRole('button', { name: 'SSH 终端', exact: true }).click();
   assert.equal(await page.getByLabel('主机地址', { exact: true }).inputValue(), 'draft.example');
   await page
     .locator('.sidebar')
@@ -98,8 +98,8 @@ try {
   assert.equal(await page.getByLabel('主机地址', { exact: true }).inputValue(), 'draft.example');
 
   // Use real selection and the context menu. No request is sent until the user submits.
-  await page.getByRole('button', { name: '已有机器', exact: true }).click();
-  const paragraph = page.locator('.connection-chooser header p');
+  await page.getByRole('button', { name: '返回连接方式', exact: true }).click();
+  const paragraph = page.locator('.connection-start-heading p');
   await paragraph.evaluate((el) => {
     const range = document.createRange();
     range.selectNodeContents(el);

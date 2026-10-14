@@ -13,6 +13,7 @@ import {
   Plus,
   Search,
   Server,
+  Globe,
   Star,
   Trash2,
   X,
@@ -72,8 +73,15 @@ export function ServerSidebar({
     );
   };
   const closeMenu = (restore = false) => {
+    const focused = document.activeElement;
+    const restoreFromMenu = restore && !!popup.current?.contains(focused);
     setMenu(null);
-    if (restore) requestAnimationFrame(() => trigger.current?.focus());
+    if (restoreFromMenu)
+      requestAnimationFrame(() => {
+        // A completed save must not steal focus after the user resumed another task.
+        if (document.activeElement === document.body || document.activeElement === focused)
+          trigger.current?.focus();
+      });
   };
   useEffect(() => {
     if (!menu) return;
@@ -366,15 +374,21 @@ export function ServerSidebar({
                         }
                       }}
                       onClick={() => closeMenu()}
-                      title={`${profile.protocol === 'client' ? 'Client · ' : profile.username + '@'}${profile.host}:${profile.port}`}
+                      title={
+                        profile.protocol === 'http'
+                          ? 'HTTP 请求工作区'
+                          : `${profile.protocol === 'client' ? 'Agent · ' : profile.username + '@'}${profile.host}:${profile.port}`
+                      }
                     >
                       <div className="server-glyph">
-                        <Server size={16} />
+                        {profile.protocol === 'http' ? <Globe size={16} /> : <Server size={16} />}
                       </div>
-                      <i className={`dot ${online.includes(profile.id) ? '' : 'off'}`} />
+                      {profile.protocol !== 'http' && (
+                        <i className={`dot ${online.includes(profile.id) ? '' : 'off'}`} />
+                      )}
                       <div>
                         <strong>{profile.name}</strong>
-                        <small>{profile.host}</small>
+                        <small>{profile.protocol === 'http' ? 'HTTP' : profile.host}</small>
                       </div>
                     </button>
                     <button

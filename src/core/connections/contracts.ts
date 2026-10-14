@@ -19,6 +19,11 @@ export interface ConnectionTool {
   invoke(input: unknown, signal: AbortSignal): Promise<string>;
 }
 export interface ProviderConnection {
+  readonly agent?: (call:import('../../shared/agent').AgentCall, signal:AbortSignal)=>Promise<unknown>;
+  readonly http?: (
+    request: import('../../shared/http').HttpWireRequest,
+    signal: AbortSignal,
+  ) => Promise<import('../../shared/http').HttpResponse>;
   readonly target: ConnectionTarget;
   /** Same instance for a live connection; reconnect must create a new instance. */
   readonly tools: readonly ConnectionTool[];

@@ -66,8 +66,8 @@ async function main() {
     await workbenchSmoke(app, page, server);
     assert.equal(await page.evaluate(() => typeof (window as any).require), 'undefined');
     await page.getByRole('button', { name: '新建连接', exact: true }).first().click();
-    if (await page.getByRole('button', { name: '添加连接记录', exact: true }).isVisible())
-      await page.getByRole('button', { name: '添加连接记录', exact: true }).click();
+    if (await page.getByRole('button', { name: 'SSH 终端', exact: true }).isVisible())
+      await page.getByRole('button', { name: 'SSH 终端', exact: true }).click();
     const dialog = page.locator('.editor-page:visible');
     assert.equal(await page.getByRole('dialog').count(), 0);
     assert.equal(await page.locator('.monitor-panel').count(), 0);
@@ -155,14 +155,60 @@ async function main() {
     await page.waitForFunction(() =>
       document.querySelector('.xterm-screen')?.textContent?.includes('after-group-move'),
     );
+    // Keep the save reply pending while the user resumes typing in the terminal.
+    await app.evaluate(({ ipcMain }) => {
+      const handlers = (
+        ipcMain as unknown as { _invokeHandlers: Map<string, (...args: any[]) => any> }
+      )._invokeHandlers;
+      const original = handlers.get('profile:save')!;
+      ipcMain.removeHandler('profile:save');
+      ipcMain.handle('profile:save', async (...args) => {
+        const result = await original(...args);
+        await new Promise<void>((resolve) => {
+          (globalThis as unknown as { releaseGroupSave: () => void }).releaseGroupSave = resolve;
+        });
+        ipcMain.removeHandler('profile:save');
+        ipcMain.handle('profile:save', original);
+        return result;
+      });
+    });
+    await page.getByRole('button', { name: '连接操作 · Local integration', exact: true }).click();
+    await page.getByRole('menuitem', { name: '移至分组', exact: true }).click();
+    await page.getByRole('menuitemradio', { name: 'Empty group', exact: true }).click();
+    await app.evaluate(async () => {
+      const state = globalThis as unknown as { releaseGroupSave?: () => void };
+      for (let i = 0; i < 100 && !state.releaseGroupSave; i++)
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      if (!state.releaseGroupSave) throw new Error('Group save did not reach the delayed reply');
+    });
+    await page.locator('.xterm-screen').click();
+    await page.keyboard.type('pending-save');
+    await app.evaluate(() => {
+      const state = globalThis as unknown as { releaseGroupSave?: () => void };
+      state.releaseGroupSave?.();
+      delete state.releaseGroupSave;
+    });
+    await page.getByRole('menu', { name: '连接操作', exact: true }).waitFor({ state: 'hidden' });
+    await page.evaluate(
+      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+    );
+    assert.equal(
+      await page.locator('.xterm-helper-textarea').evaluate((el) => document.activeElement === el),
+      true,
+      'A completed group save must not steal terminal focus',
+    );
+    await page.keyboard.type('save-complete');
+    await page.waitForFunction(() =>
+      document.querySelector('.xterm-screen')?.textContent?.includes('save-complete'),
+    );
     assert.ok(
       (await page.evaluate(() => window.cshell.config())).savedCredentials.includes(
         config.profiles[0].id,
       ),
     );
     await page.getByRole('button', { name: '新建连接', exact: true }).first().click();
-    if (await page.getByRole('button', { name: '添加连接记录', exact: true }).isVisible())
-      await page.getByRole('button', { name: '添加连接记录', exact: true }).click();
+    if (await page.getByRole('button', { name: 'SSH 终端', exact: true }).isVisible())
+      await page.getByRole('button', { name: 'SSH 终端', exact: true }).click();
     await page.locator('.editor-page:visible').getByLabel('保存到服务器列表').check();
     await page
       .locator('.editor-page:visible')
@@ -282,6 +328,25 @@ async function main() {
     console.log(
       'PASS: desktop rendering, profile persistence, password SSH, terminal input, SFTP, DPAPI, clipboard, bidirectional file clipboard transfers, monitoring, i18n/theme, compact layout',
     );
+  } catch (error) {
+    const failed = await app.firstWindow().catch(() => undefined);
+    await failed?.screenshot({ path: 'test-results/desktop-smoke-failed.png' }).catch(() => {});
+    if (failed) {
+      const state = await failed
+        .evaluate(() => ({
+          activeElement: document.activeElement?.outerHTML,
+          terminal: document.querySelector('.xterm-rows')?.textContent,
+          visibleMenus: [...document.querySelectorAll('[role="menu"]')].map(
+            (menu) => menu.textContent,
+          ),
+        }))
+        .catch(() => ({}));
+      await writeFile(
+        'test-results/desktop-smoke-failed.json',
+        JSON.stringify({ state, errors }, null, 2),
+      );
+    }
+    throw error;
   } finally {
     await app.close();
     await server.close();

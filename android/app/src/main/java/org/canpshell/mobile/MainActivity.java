@@ -25,12 +25,13 @@ public class MainActivity extends Activity {
   private final ExecutorService workers = Executors.newCachedThreadPool();
   private final Map<String, Connection> connections = new ConcurrentHashMap<>();
   private volatile boolean destroyed;
+  private final Object trustLock = new Object();
   private static class Connection {
-    Session session; ChannelShell shell; OutputStream output;
+    Session session; ChannelShell shell; OutputStream output; AgentConnection agent; String agentEndpoint;
     final ExecutorService files = Executors.newSingleThreadExecutor();
     final ExecutorService writer = Executors.newSingleThreadExecutor();
     final Semaphore outputSlots = new Semaphore(8);
-    synchronized void close() { files.shutdownNow(); writer.shutdownNow(); outputSlots.release(8); if (shell != null) shell.disconnect(); if (session != null) session.disconnect(); }
+    synchronized void close() { if (agent != null) agent.close(); files.shutdownNow(); writer.shutdownNow(); outputSlots.release(8); if (shell != null) shell.disconnect(); if (session != null) session.disconnect(); }
   }
   @Override public void onCreate(Bundle state) {
     super.onCreate(state);
@@ -73,20 +74,24 @@ public class MainActivity extends Activity {
     if (destroyed) return;
     runOnUiThread(() -> { if (!destroyed) web.evaluateJavascript("window.receive(" + JSONObject.quote(id) + "," + JSONObject.quote(type) + "," + JSONObject.quote(value) + ")", null); });
   }
-  private boolean trust(String endpoint, byte[] key) {
+  private boolean trust(String endpoint, byte[] key) { return trust(endpoint,key,()->!destroyed); }
+  private boolean trust(String endpoint, byte[] key, java.util.function.BooleanSupplier valid) {
     try {
+      if(!valid.getAsBoolean())return false;
       String fingerprint = "SHA256:" + Base64.encodeToString(MessageDigest.getInstance("SHA-256").digest(key), Base64.NO_WRAP | Base64.NO_PADDING);
+      if(endpoint.startsWith("agent:")) { StringBuilder hex=new StringBuilder(); for(byte b:MessageDigest.getInstance("SHA-256").digest(key)) { if(hex.length()>0)hex.append(":");hex.append(String.format(Locale.ROOT,"%02X",b)); } fingerprint="SHA256:"+hex; }
+      final String shownFingerprint=fingerprint;
       String stored = getSharedPreferences("hosts", MODE_PRIVATE).getString(endpoint, null);
       if (stored != null) return stored.equals(fingerprint);
       CountDownLatch answer = new CountDownLatch(1); boolean[] approved = {false};
       runOnUiThread(() -> {
         if (destroyed) { answer.countDown(); return; }
-        new AlertDialog.Builder(this).setTitle("核对服务器指纹").setMessage(endpoint + "\n" + fingerprint)
+        new AlertDialog.Builder(this).setTitle("核对服务器指纹").setMessage(endpoint + "\n" + shownFingerprint)
           .setPositiveButton("信任并连接", (dialog, which) -> { approved[0] = true; answer.countDown(); })
           .setNegativeButton("取消", (dialog, which) -> answer.countDown()).setOnCancelListener(dialog -> answer.countDown()).show();
       });
       if (!answer.await(90, TimeUnit.SECONDS) || !approved[0] || destroyed) return false;
-      return getSharedPreferences("hosts", MODE_PRIVATE).edit().putString(endpoint, fingerprint).commit();
+      synchronized(trustLock) { return valid.getAsBoolean() && getSharedPreferences("hosts", MODE_PRIVATE).edit().putString(endpoint, fingerprint).commit(); }
     } catch (Exception e) { return false; }
   }
   public class Bridge {
@@ -103,11 +108,19 @@ public class MainActivity extends Activity {
         }
       });
     }
+    @JavascriptInterface public boolean agentSupported() { return android.os.Build.VERSION.SDK_INT >= 29; }
     @JavascriptInterface public String version() { return updates.current(); }
     @JavascriptInterface public void checkUpdate() { updates.check(); }
     @JavascriptInterface public void installUpdate() { updates.install(); }
+    @JavascriptInterface public void openUpdatePage() {
+      runOnUiThread(() -> {
+        try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Yeqi99/CShell/releases"))); }
+        catch (android.content.ActivityNotFoundException e) { android.widget.Toast.makeText(MainActivity.this, "未找到可打开下载页的浏览器", android.widget.Toast.LENGTH_LONG).show(); }
+      });
+    }
     @JavascriptInterface public void connect(String json) {
       if (destroyed) return;
+      try { if (json.length() > 131072) return; if ("agent".equals(new JSONObject(json).optString("protocol"))) { connectAgent(json); return; } } catch (Exception ignored) { return; }
       workers.execute(() -> {
         String id = ""; Connection c = new Connection();
         try {
@@ -161,13 +174,58 @@ public class MainActivity extends Activity {
     @JavascriptInterface public void input(String id, String text) {
       if (text.length() > 65536 || destroyed) return;
       Connection c = connections.get(id); if (c == null) return;
+      if (c.agent != null) { c.agent.input(text); return; }
       try { c.writer.execute(() -> { synchronized(c) { try { if (c.output != null) { c.output.write(text.getBytes(StandardCharsets.UTF_8)); c.output.flush(); } } catch (IOException e) { event(id, "error", "输入失败"); } } }); } catch (RejectedExecutionException ignored) {}
     }
-    @JavascriptInterface public void acknowledge(String id) { Connection c = connections.get(id); if (c != null && c.outputSlots.availablePermits() < 8) c.outputSlots.release(); }
+    @JavascriptInterface public void acknowledge(String id) { Connection c = connections.get(id); if (c != null && c.agent != null) { c.agent.acknowledge(); return; } if (c != null && c.outputSlots.availablePermits() < 8) c.outputSlots.release(); }
     @JavascriptInterface public void resize(String id, int cols, int rows) {
-      Connection c = connections.get(id); if (c != null && c.shell != null && cols >= 2 && cols <= 1000 && rows >= 1 && rows <= 500) c.shell.setPtySize(cols, rows, 0, 0);
+      Connection c = connections.get(id); if (c != null && c.agent != null) { c.agent.resize(cols, rows); return; } if (c != null && c.shell != null && cols >= 2 && cols <= 1000 && rows >= 1 && rows <= 500) c.shell.setPtySize(cols, rows, 0, 0);
+    }
+    @JavascriptInterface public void resetAgentTrust(String host, int port) {
+      if (destroyed || !host.matches("[a-zA-Z0-9.:-]{1,253}") || port < 1024 || port > 65535) return;
+      final String endpoint="agent:"+host.toLowerCase(Locale.ROOT)+":"+port;
+      runOnUiThread(() -> {
+        if(destroyed)return;
+        new AlertDialog.Builder(MainActivity.this).setTitle("重新核对设备身份？")
+          .setMessage(host+":"+port+"\n此地址的 Agent 会话将断开，并清除本机记住的指纹。下次连接必须重新核对身份。不会删除连接配置或改变远端权限。")
+          .setNegativeButton("取消",null).setPositiveButton("清除指纹",(dialog,which)->{
+            synchronized(trustLock) {
+            for(Map.Entry<String,Connection> entry:connections.entrySet()) if(endpoint.equals(entry.getValue().agentEndpoint)) {
+              Connection c=entry.getValue();if(connections.remove(entry.getKey(),c)) workers.execute(c::close);
+            }
+            if(!getSharedPreferences("hosts",MODE_PRIVATE).edit().remove(endpoint).commit()) {
+              android.widget.Toast.makeText(MainActivity.this,"清除指纹失败，请重试",android.widget.Toast.LENGTH_LONG).show();return;
+            }
+            }
+            if(!destroyed)web.evaluateJavascript("window.agentTrustReset("+JSONObject.quote(host)+","+port+")",null);
+          }).show();
+      });
+    }
+    @JavascriptInterface public void openAgent(String id, int index) {
+      Connection c = connections.get(id); if (destroyed || c == null || c.agent == null) return;
+      workers.execute(() -> { try { c.agent.open(index); } catch(Exception e) { event(id,"error",e.getMessage()); c.close(); } });
     }
     @JavascriptInterface public void disconnect(String id) { Connection c = connections.remove(id); if (c != null) workers.execute(c::close); }
+  }
+  private void connectAgent(String json) {
+    workers.execute(() -> {
+      String id = ""; Connection c = new Connection();
+      try {
+        JSONObject p = new JSONObject(json); id = p.getString("id"); UUID.fromString(id);
+        String host = p.getString("host").trim(); int port = p.getInt("port");
+        if (!host.matches("[a-zA-Z0-9.:-]{1,253}") || port < 1024 || port > 65535 || connections.size() >= 12) throw new IOException("Agent 地址、端口无效或连接数已满");
+        String password=p.optString("password");if(password.length()>128)throw new IOException("凭证过长");
+        final String sessionId=id, endpoint="agent:"+host.toLowerCase(Locale.ROOT)+":"+port;
+        c.agentEndpoint=endpoint;
+        c.agent = new AgentConnection((type,value)->{
+          if(type.equals("closed")) { connections.remove(sessionId,c); c.files.shutdownNow(); c.writer.shutdownNow(); }
+          event(sessionId,type,value);
+        });
+        if(connections.putIfAbsent(id,c)!=null)throw new IOException("连接已存在");
+        c.agent.connect(host,port,password,certificate->trust(endpoint,certificate,()->!destroyed && connections.get(sessionId)==c));
+        if(destroyed || connections.get(id)!=c)c.close();
+      } catch(Exception e) { event(id,"error",e.getMessage()==null?"Agent 连接失败":e.getMessage()); c.close(); if(!id.isEmpty())connections.remove(id,c); }
+    });
   }
   private JSONObject pendingTransfer;
   private void fileResult(JSONObject request,JSONObject value) {

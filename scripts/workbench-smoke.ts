@@ -27,8 +27,8 @@ export async function workbenchSmoke(
   await mkdir(join(server.root, 'projects'));
   const connect = async () => {
     await page.getByRole('button', { name: '新建连接', exact: true }).first().click();
-    if (await page.getByRole('button', { name: '添加连接记录', exact: true }).isVisible())
-      await page.getByRole('button', { name: '添加连接记录', exact: true }).click();
+    if (await page.getByRole('button', { name: 'SSH 终端', exact: true }).isVisible())
+      await page.getByRole('button', { name: 'SSH 终端', exact: true }).click();
     const form = page.locator('.connection-editor:visible');
     await form.getByLabel('保存到服务器列表').uncheck();
     assert.equal(await form.getByLabel('名称', { exact: true }).count(), 0);

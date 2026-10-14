@@ -21,15 +21,19 @@ jobs:
       - run: pnpm test
       - run: pnpm test:desktop
       - run: pnpm exec tsx scripts/client-smoke.ts
+      - run: pnpm exec tsx scripts/http-agent-smoke.ts
       - run: pnpm exec tsx scripts/minimal-pin-smoke.ts
       - run: pnpm exec tsx scripts/refinement-smoke.ts
       - run: pnpm exec tsx scripts/saved-connect-smoke.ts
+      - run: pnpm exec tsx scripts/connection-lifecycle-smoke.ts
+      - run: pnpm exec tsx scripts/ai-work-smoke.ts
+      - run: pnpm exec tsx scripts/mcp-startup-smoke.ts
       - run: pnpm exec tsx scripts/settings-smoke.ts
       - run: pnpm exec tsx scripts/floating-smoke.ts
       - run: pnpm exec tsx scripts/extraction-smoke.ts
       - run: pnpm exec tsx scripts/activity-smoke.ts
+      - run: pnpm exec tsx scripts/update-smoke.ts
       - run: pnpm run dist
-      - run: pnpm dist:client
       - uses: actions/upload-artifact@v4
         if: always()
         with:

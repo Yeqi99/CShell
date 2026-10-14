@@ -816,7 +816,6 @@ export function TerminalPane({
           )}
         </div>
       )}
-      {closed && <div className="session-ended">{t('closedHint')}</div>}
     </section>
   );
 }

@@ -18,7 +18,7 @@ jobs:
         include:
           - { os: windows-latest, platform: win, arch: x64 }
           - { os: macos-latest, platform: mac, arch: arm64 }
-          - { os: macos-latest, platform: mac, arch: x64 }
+          - { os: macos-15-intel, platform: mac, arch: x64 }
           - { os: ubuntu-latest, platform: linux, arch: x64 }
           - { os: ubuntu-24.04-arm, platform: linux, arch: arm64 }
     runs-on: ${{ matrix.os }}
@@ -32,6 +32,8 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Prepare the native PTY dependency for this runner
+        run: npm rebuild node-pty --foreground-scripts
       - run: pnpm build
       - run: pnpm test
       - if: matrix.platform == 'win'
@@ -39,6 +41,11 @@ jobs:
       - if: matrix.platform == 'win'
         run: pnpm exec tsx scripts/activity-smoke.ts
       - run: pnpm run licenses
+      - name: Build the standalone Agent without Electron
+        run: node scripts/agent-build.mjs
+      - name: Verify the packaged Agent with a real native terminal
+        run: pnpm exec tsx scripts/agent-package-smoke.ts
+      - run: node scripts/package-agent.mjs
       - if: matrix.platform == 'win'
         run: pnpm test:desktop
       - if: matrix.platform == 'win'
@@ -48,6 +55,12 @@ jobs:
       - if: matrix.platform == 'win'
         run: pnpm exec tsx scripts/saved-connect-smoke.ts
       - if: matrix.platform == 'win'
+        run: pnpm exec tsx scripts/connection-lifecycle-smoke.ts
+      - if: matrix.platform == 'win'
+        run: pnpm exec tsx scripts/ai-work-smoke.ts
+      - if: matrix.platform == 'win'
+        run: pnpm exec tsx scripts/mcp-startup-smoke.ts
+      - if: matrix.platform == 'win'
         run: pnpm exec tsx scripts/settings-smoke.ts
       - if: matrix.platform == 'win'
         run: pnpm exec tsx scripts/floating-smoke.ts
@@ -56,12 +69,27 @@ jobs:
       - if: matrix.platform == 'win'
         run: pnpm exec tsx scripts/update-smoke.ts
       - if: matrix.platform == 'win'
+        run: pnpm exec tsx scripts/http-agent-smoke.ts
+      - if: matrix.platform == 'win'
         run: |
           node scripts/build-android.mjs
           pnpm exec tsx scripts/mobile-smoke.ts
       - run: pnpm exec electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - if: matrix.platform != 'linux'
+        run: pnpm exec tsx scripts/platform-package-smoke.ts
+      - if: matrix.platform == 'linux'
+        name: Verify packaged Linux application on its native architecture
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb gnome-keyring libsecret-1-0
+          dbus-run-session -- xvfb-run -a sh -c 'printf "cshell-ci\n" | gnome-keyring-daemon --unlock --components=secrets; pnpm exec tsx scripts/platform-package-smoke.ts'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verification-${{ matrix.platform }}-${{ matrix.arch }}
+          path: test-results/*.png
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.platform }}-${{ matrix.arch }}
@@ -72,6 +100,7 @@ jobs:
             release/*/*.zip
             release/*/*.AppImage
             release/*/*.deb
+            release/*/CShell-Agent-*.tar.gz
   android:
     runs-on: ubuntu-latest
     steps:
@@ -107,6 +136,7 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
       - name: Stage Android preview
         run: |
+          node scripts/verify-android.mjs
           mkdir -p android-artifacts
           VERSION=$(node -p 'require("./package.json").version')
           cp android/app/build/outputs/apk/release/app-release.apk "android-artifacts/CShell-${VERSION}-android-test.apk"
@@ -115,30 +145,83 @@ jobs:
           name: desktop-android-preview
           if-no-files-found: error
           path: android-artifacts/*.apk
+  android-native:
+    needs: android
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [29, 35]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - run: pnpm install --frozen-lockfile
+      - run: npm rebuild node-pty --foreground-scripts
+      - run: node scripts/build-android.mjs
+      - run: gradle -p android assembleDebug assembleDebugAndroidTest
+      - uses: actions/download-artifact@v4
+        with:
+          name: desktop-android-preview
+          path: signed-android
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        env:
+          CSHELL_ANDROID_RELEASE_DIR: signed-android
+        with:
+          api-level: ${{ matrix.api }}
+          arch: x86_64
+          disable-animations: true
+          script: pnpm exec tsx scripts/android-agent-instrumentation.ts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verification-android-api-${{ matrix.api }}
+          path: test-results/android-*.txt
   publish:
     if: startsWith(github.ref, 'refs/tags/v') || inputs.publish
-    needs: [desktop, android]
+    needs: [desktop, android, android-native]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
           pattern: desktop-*
-          merge-multiple: true
+          merge-multiple: false
       - name: Verify version and checksum artifacts
-        run: |
-          node -e 'if (process.env.GITHUB_REF_TYPE === "tag" && "v"+require("./package.json").version !== process.env.GITHUB_REF_NAME) process.exit(1)'
-          mkdir packages
-          find artifacts -type f -exec cp {} packages/ \;
-          test "$(find packages -type f | wc -l)" -eq 10
-          cd packages
-          find . -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt
-      - name: Publish GitHub release
+        run: pnpm exec tsx scripts/release-assets.ts artifacts packages
+      - name: Upload draft, verify every asset, then publish
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="v$(node -p 'require("./package.json").version')"
-          gh release create "$VERSION" packages/* --target "$GITHUB_SHA" --title "CShell $VERSION" --notes-file docs/RELEASE.md --prerelease
+          gh release create "$VERSION" packages/* --target "$GITHUB_SHA" --title "CShell $VERSION" --notes-file docs/RELEASE.md --prerelease --draft
+          node scripts/verify-release-upload.mjs packages
+          gh release edit "$VERSION" --draft=false

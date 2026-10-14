@@ -1,4 +1,4 @@
-import { app, shell, dialog, type BrowserWindow } from 'electron';
+import { app, shell, dialog, net, type BrowserWindow } from 'electron';
 import { mkdir, open, rename, rm, readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
@@ -6,6 +6,7 @@ import {
   checksumFor,
   compareVersion,
   releaseApi,
+  releasesPage,
   selectRelease,
   type UpdateRelease,
   type UpdateState,
@@ -22,7 +23,8 @@ export function registerUpdateHandlers(
     expected = '',
     busy = false;
   const request = async (url: string, timeout = 30000) => {
-    const response = await fetch(url, {
+    // Follow the OS proxy configuration, like the user's browser.
+    const response = await net.fetch(url, {
       headers: {
         'User-Agent': 'CShell/' + app.getVersion(),
         Accept: 'application/vnd.github+json',
@@ -32,15 +34,26 @@ export function registerUpdateHandlers(
     if (!response.ok) throw new Error('GitHub HTTP ' + response.status);
     return response;
   };
-  const fail = (e: unknown) => {
-    state = { ...state, phase: 'error', error: e instanceof Error ? e.message : String(e) };
+  const fail = (e: unknown, retry: 'check' | 'download') => {
+    state = { ...state, phase: 'error', retry, error: e instanceof Error ? e.message : String(e) };
     return state;
   };
   handle('update:state', () => state);
+  handle('update:open-page', () => shell.openExternal(releasesPage));
   handle('update:check', async () => {
     if (busy) return state;
     busy = true;
-    state = { ...state, phase: 'checking', error: undefined, progress: undefined };
+    release = undefined;
+    file = '';
+    expected = '';
+    state = {
+      ...state,
+      phase: 'checking',
+      error: undefined,
+      progress: undefined,
+      version: undefined,
+      retry: undefined,
+    };
     try {
       release = selectRelease(
         await (await request(releaseApi)).json(),
@@ -52,20 +65,28 @@ export function registerUpdateHandlers(
       state = {
         ...state,
         version: release?.version,
-        phase:
-          release && compareVersion(release.version, state.current) > 0 ? 'available' : 'current',
+        phase: !release
+          ? 'unavailable'
+          : compareVersion(release.version, state.current) > 0
+            ? 'available'
+            : 'current',
       };
     } catch (e) {
-      fail(e);
+      fail(e, 'check');
     } finally {
       busy = false;
     }
     return state;
   });
   handle('update:download', async () => {
-    if (busy || !release || !['available', 'error'].includes(state.phase)) return state;
+    if (
+      busy ||
+      !release ||
+      !(state.phase === 'available' || (state.phase === 'error' && state.retry === 'download'))
+    )
+      return state;
     busy = true;
-    state = { ...state, phase: 'downloading', progress: 0, error: undefined };
+    state = { ...state, phase: 'downloading', progress: 0, error: undefined, retry: undefined };
     const directory = join(app.getPath('userData'), 'updates'),
       target = join(directory, release.asset.name),
       part = target + '.part';
@@ -98,7 +119,7 @@ export function registerUpdateHandlers(
       state = { ...state, phase: 'ready', progress: 100 };
     } catch (e) {
       await rm(part, { force: true }).catch(() => {});
-      fail(e);
+      fail(e, 'download');
     } finally {
       busy = false;
     }
@@ -133,6 +154,10 @@ export function registerUpdateHandlers(
       }
       const error = await shell.openPath(file);
       if (error) throw new Error(error);
+    } catch (e) {
+      file = '';
+      fail(e, 'download');
+      throw e;
     } finally {
       busy = false;
     }

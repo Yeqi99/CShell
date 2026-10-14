@@ -22,6 +22,7 @@ export function registerExtensionHandlers(
   store: Store,
   ssh: SshService,
   connections: ConnectionManager,
+  beforeDisable?: (id: string) => Promise<void>,
 ) {
   const plugins = new PluginService(store),
     jobs = new RemoteJobs(ssh),
@@ -76,10 +77,17 @@ export function registerExtensionHandlers(
   });
   handle('plugins:list', () => store.plugins());
   handle('plugins:install', (id) => plugins.install(pluginId.parse(id)));
-  handle('plugins:toggle', (id, enabled) =>
-    plugins.toggle(pluginId.parse(id), z.boolean().parse(enabled)),
-  );
-  handle('plugins:remove', (id) => plugins.remove(pluginId.parse(id)));
+  handle('plugins:toggle', async (id, enabled) => {
+    pluginId.parse(id);
+    z.boolean().parse(enabled);
+    if (!enabled) await beforeDisable?.(id);
+    return plugins.toggle(id, enabled);
+  });
+  handle('plugins:remove', async (id) => {
+    pluginId.parse(id);
+    await beforeDisable?.(id);
+    return plugins.remove(id);
+  });
   handle('plugins:source', () => store.pluginSource());
   handle('plugins:catalog', (url) => plugins.catalog(z.string().max(2048).parse(url)));
   handle('plugins:download', (entry) => plugins.download(entry));

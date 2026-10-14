@@ -88,6 +88,21 @@ export class ConnectionRegistry {
       }
     });
   }
+  supportsHttp(id: string) {
+    try {
+      return !!this.connection(id).http;
+    } catch {
+      return false;
+    }
+  }
+  http(id: string) {
+    const connection = this.connection(id);
+    if (!connection.http) throw new Error('此发送方不支持 HTTP');
+    return (request: import('../../shared/http').HttpWireRequest, signal: AbortSignal) => {
+      if (this.connection(id) !== connection) throw new Error('发送方已改变');
+      return connection.http!(request, signal);
+    };
+  }
   terminal(id: string) {
     const terminal = this.connection(id).terminal;
     if (!terminal) throw new Error('Terminal capability unavailable');

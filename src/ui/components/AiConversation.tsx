@@ -1,4 +1,5 @@
 import { AiToolRecord, toolInput } from './AiToolRecord';
+import { AiTaskTree } from './AiWork';
 import { useEffect, useRef, useState } from 'react';
 import {
   ArrowDown,
@@ -14,6 +15,7 @@ import { CopyButton } from './AiCopyButton';
 import { AiMarkdown } from './AiMarkdown';
 import { type AiSnapshot, type AiLocation, type AiMode, type AiThread } from '../../shared/ai';
 export function AiConversation({
+  openThread,
   insertion,
   snapshot,
   thread,
@@ -28,6 +30,7 @@ export function AiConversation({
   run,
   configure,
 }: {
+  openThread: (id: string) => void;
   insertion: { id: string; text: string; threadId: string } | null;
   snapshot: AiSnapshot;
   thread?: AiThread;
@@ -113,6 +116,7 @@ export function AiConversation({
               : 'CShell · 未绑定机器'}
         </span>
       </div>
+      <AiTaskTree thread={thread} snapshot={snapshot} open={openThread} />
       <div className="agent-conversation">
         <div
           className="agent-messages"
@@ -291,7 +295,7 @@ export function AiConversation({
             <select
               aria-label="审核等级"
               title="执行审核策略；始终遵守已授权的机器与工具范围"
-              disabled={active || busy}
+              disabled={active || busy || !!thread?.parentId}
               value={thread?.mode ?? mode}
               onChange={(e) => {
                 const value = e.target.value as AiMode;

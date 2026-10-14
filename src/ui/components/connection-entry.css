@@ -1,0 +1,240 @@
+.connection-entry.connection-flow {
+  width: 100%;
+  min-height: 100%;
+  padding: 32px clamp(20px, 4vw, 56px);
+  box-sizing: border-box;
+}
+.connection-flow .connection-start {
+  max-width: 820px;
+  margin: 0 auto;
+}
+.connection-flow h1 {
+  font-size: 21px;
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: -0.3px;
+}
+.connection-flow .connection-start-heading p,
+.connection-flow .connection-detail-heading p {
+  margin: 7px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.connection-flow .connection-kind-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 26px 0 30px;
+}
+.connection-flow button.connection-kind {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  text-align: left;
+  gap: 9px;
+  padding: 20px 18px;
+  min-height: 156px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text);
+  transition:
+    border-color 0.12s,
+    background 0.12s;
+}
+.connection-flow button.connection-kind:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 5%, var(--panel));
+}
+.connection-flow button.connection-kind > svg:first-child {
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+.connection-flow .connection-kind strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+.connection-flow .connection-kind span {
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--muted);
+}
+.connection-flow .connection-kind-arrow {
+  position: absolute;
+  right: 15px;
+  top: 23px;
+  color: var(--muted);
+}
+.connection-flow button:focus-visible,
+.connection-flow summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.connection-flow .connection-local {
+  border-top: 1px solid var(--border);
+  padding-top: 20px;
+}
+.connection-flow .connection-local h2 {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+  margin: 0 0 12px;
+}
+.connection-flow .connection-local > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.connection-flow .connection-local button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 12px;
+}
+.connection-flow .connection-saved-list {
+  margin-top: 26px;
+  border-top: 1px solid var(--border);
+  padding-top: 18px;
+}
+.connection-flow summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--muted);
+  padding: 5px 0;
+}
+.connection-flow summary:hover {
+  color: var(--text);
+}
+.connection-flow summary span {
+  margin-left: 6px;
+}
+.connection-flow .connection-saved-list[open] summary {
+  margin-bottom: 12px;
+}
+.connection-flow .connection-detail {
+  max-width: 580px;
+  margin: 0 auto;
+}
+.connection-flow .connection-detail-heading {
+  display: flex;
+  gap: 13px;
+  align-items: flex-start;
+  margin-bottom: 26px;
+}
+.connection-flow .connection-detail-heading > button {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.connection-flow .connection-detail-heading h1 {
+  font-size: 19px;
+}
+.connection-flow .protocol-form {
+  padding: 0;
+  margin: 0;
+  max-width: none;
+}
+.connection-flow .protocol-client {
+  padding: 0;
+  overflow: visible;
+}
+.connection-flow .client-page input:not([type='checkbox']),
+.connection-flow .client-page select {
+  height: 36px;
+  padding: 7px 10px;
+  font-size: 13px;
+  border-radius: 6px;
+  background: var(--panel);
+  width: 100%;
+  box-sizing: border-box;
+}
+.connection-flow .client-page label {
+  font-size: 12px;
+  gap: 7px;
+  margin: 0 0 16px;
+}
+.connection-flow .client-connect-form fieldset {
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.connection-flow .client-connect-form fieldset > label {
+  margin: 0 0 16px;
+}
+.connection-flow .client-fields {
+  grid-template-columns: minmax(0, 1fr) 100px;
+  gap: 12px;
+  margin: 0;
+}
+.connection-flow .connection-form-tools {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.connection-flow .connection-form-tools button {
+  font-size: 12px;
+  padding: 6px 10px;
+  min-height: 30px;
+  background: transparent;
+  border-radius: 6px;
+}
+.connection-flow .connection-metadata {
+  border-top: 1px solid var(--border);
+  margin: 4px 0 18px;
+  padding-top: 10px;
+}
+.connection-flow .connection-metadata[open] summary {
+  margin-bottom: 12px;
+}
+.connection-flow .connection-metadata label.client-favorite {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.connection-flow .client-primary {
+  min-height: 36px;
+  border-radius: 6px;
+  padding: 7px 18px;
+  font-size: 13px;
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+.connection-flow .rdp-connect-form > p {
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--muted);
+  margin: 0 0 20px;
+}
+.connection-flow .rdp-connect-form > label:nth-of-type(2) {
+  width: 110px;
+}
+.connection-flow .rdp-connect-form [role='status'] {
+  margin-top: 14px;
+}
+.connection-flow .connection-editor {
+  margin: 0;
+  padding: 0;
+  max-width: none;
+}
+@media (max-width: 850px) {
+  .connection-flow .connection-kind-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .connection-flow button.connection-kind {
+    min-height: 0;
+    padding: 16px 46px 16px 54px;
+    gap: 4px;
+  }
+  .connection-flow button.connection-kind > svg:first-child {
+    position: absolute;
+    left: 17px;
+    top: 19px;
+  }
+}

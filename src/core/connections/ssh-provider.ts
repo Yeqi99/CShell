@@ -1,3 +1,4 @@
+import { executeHttp } from '../http-transport';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { profileSchema, type Profile } from '../../shared/contracts';
@@ -37,7 +38,11 @@ export class SshConnectionProvider implements ManagedProvider {
       })
       .strict()
       .parse(credentials);
-    const result = await this.ssh.connect(profileSchema.parse(configuration), secret);
+    const checked = profileSchema.parse(configuration);
+    if (checked.protocol && checked.protocol !== 'ssh') throw new Error('Not an SSH target');
+    if (!checked.host || !checked.username || !checked.port)
+      throw new Error('SSH target incomplete');
+    const result = await this.ssh.connect(profileSchema.parse(configuration), secret, signal);
     if (signal.aborted) {
       this.ssh.disconnect(result.sessionId);
       signal.throwIfAborted();
@@ -131,7 +136,27 @@ export class SshConnectionProvider implements ManagedProvider {
       },
     ];
     const p = session.profile;
-    const connection = {
+    const connection: ProviderConnection = {
+      http: (request, signal) =>
+        executeHttp(
+          request,
+          signal,
+          (host, port, abort) =>
+            new Promise((resolve, reject) => {
+              abort.throwIfAborted();
+              const cancelled = () => reject(new Error('HTTP 已取消'));
+              abort.addEventListener('abort', cancelled, { once: true });
+              session.client.forwardOut('127.0.0.1', 0, host, port, (error, stream) => {
+                abort.removeEventListener('abort', cancelled);
+                if (error) return reject(error);
+                if (abort.aborted) {
+                  stream.destroy();
+                  return reject(new Error('HTTP 已取消'));
+                }
+                resolve(stream);
+              });
+            }),
+        ),
       target: Object.freeze({
         providerId: this.id,
         resourceId: p.id,

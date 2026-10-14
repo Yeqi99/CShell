@@ -8,6 +8,9 @@ declare global {
     CShellNative: {
       fileRequest(data: string): void;
       connect(data: string): void;
+      openAgent(id: string, index: number): void;
+      agentSupported(): boolean;
+      resetAgentTrust(host: string, port: number): void;
       input(id: string, data: string): void;
       acknowledge(id: string): void;
       resize(id: string, cols: number, rows: number): void;
@@ -15,8 +18,10 @@ declare global {
       checkUpdate(): void;
       installUpdate(): void;
       version(): string;
+      openUpdatePage(): void;
       setTheme(dark: boolean): void;
     };
+    agentTrustReset(host: string, port: number): void;
     fileEvent(json: string): void;
     receive(id: string, type: string, value: string): void;
     updateEvent(json: string): void;
@@ -54,6 +59,9 @@ document.querySelector('.brand-mark')!.innerHTML =
 const form = $('connect') as HTMLFormElement;
 const field = (name: string) => form.elements.namedItem(name) as HTMLInputElement;
 type Profile = {
+  protocol?: 'ssh' | 'agent';
+  favorite?: boolean;
+  agentAuthorized?: boolean;
   id: string;
   host: string;
   username: string;
@@ -89,6 +97,74 @@ let active = '',
   editing = '',
   auth: 'password' | 'key' = 'password',
   ctrl = false;
+let protocol: '' | 'ssh' | 'agent' = '';
+const protocolDrafts = new Map<string, Record<string, string>>();
+function chooseProtocol(value: '' | 'ssh' | 'agent', resetPort = false) {
+  if (resetPort && protocol)
+    protocolDrafts.set(editing + ':' + protocol, {
+      ...Object.fromEntries(new FormData(form)),
+      auth,
+    } as Record<string, string>);
+  if (resetPort) {
+    const draft = protocolDrafts.get(editing + ':' + value);
+    for (const name of ['host', 'username', 'password', 'privateKey', 'passphrase'])
+      field(name).value = draft?.[name] || (name === 'username' ? 'root' : '');
+    setAuth(draft?.auth === 'key' ? 'key' : 'password');
+    field('port').value = draft?.port || (value === 'agent' ? '47831' : '22');
+  }
+  protocol = value;
+  $('connection-fields').hidden = !value;
+  $('protocol-label').textContent = value === 'agent' ? 'Agent' : value === 'ssh' ? 'SSH' : '';
+  $('username-field').hidden = value !== 'ssh';
+  field('username').required = value === 'ssh';
+  $('ssh-auth').hidden = value !== 'ssh';
+  field('password').placeholder =
+    value === 'agent' ? '访问密码，已授权的设备可留空' : '输入登录密码';
+  $('agent-identity').hidden = value !== 'agent' || !editing;
+  if (value === 'agent') setAuth('password');
+  field('port').min = value === 'agent' ? '1024' : '1';
+  for (const kind of ['ssh', 'agent']) {
+    $('protocol-' + kind).classList.toggle('selected', kind === value);
+    $('protocol-' + kind).setAttribute('aria-pressed', String(kind === value));
+  }
+  for (const button of $('connect-actions').querySelectorAll<HTMLButtonElement>('button'))
+    button.disabled = !value;
+  if (value) profileFields();
+}
+$('protocol-ssh').onclick = () => chooseProtocol('ssh', true);
+$('protocol-agent').onclick = () => chooseProtocol('agent', true);
+if (window.CShellNative?.agentSupported?.() === false) {
+  ($('protocol-agent') as HTMLButtonElement).disabled = true;
+  $('protocol-agent').title = '需要 Android 10 或更新版本';
+  $('protocol-agent').textContent = 'Agent · Android 10+';
+}
+$('agent-reset-trust').onclick = () => {
+  if (protocol !== 'agent' || !field('host').reportValidity() || !field('port').reportValidity())
+    return;
+  window.CShellNative.resetAgentTrust(field('host').value.trim(), Number(field('port').value));
+};
+window.agentTrustReset = (host, port) => {
+  profiles = profiles.map((p) =>
+    p.protocol === 'agent' && p.host.toLowerCase() === host.toLowerCase() && Number(p.port) === port
+      ? { ...p, agentAuthorized: false }
+      : p,
+  );
+  try {
+    localStorage.setItem('profiles', JSON.stringify(profiles));
+  } catch {
+    /* Native pin was still cleared; metadata is not authority. */
+  }
+  if (
+    page === 'connect' &&
+    protocol === 'agent' &&
+    field('host').value.trim().toLowerCase() === host.toLowerCase() &&
+    Number(field('port').value) === port
+  ) {
+    field('password').value = '';
+    $('form-error').textContent = '已清除保存的指纹。下次连接需重新核对身份，并按需填写凭证。';
+  }
+  render();
+};
 const drafts = new Map<string, Record<string, string>>();
 let dark = localStorage.getItem('theme') === 'dark';
 const theme = () => ({
@@ -108,6 +184,8 @@ function captureDraft() {
     drafts.set(editing, {
       ...Object.fromEntries(new FormData(form)),
       auth,
+      protocol,
+      favorite: String(field('favorite').checked),
       remember: String(($('remember') as HTMLInputElement).checked),
     } as Record<string, string>);
 }
@@ -175,6 +253,7 @@ function openForm(p?: Profile) {
   ])
     if (data && name in data) field(name).value = (data as Record<string, string>)[name];
   setAuth(data?.auth === 'key' ? 'key' : 'password');
+  field('favorite').checked = data?.favorite === true || data?.favorite === 'true';
   ($('remember') as HTMLInputElement).checked =
     !data || !('remember' in data) || data.remember !== 'false';
   profileFields();
@@ -184,6 +263,11 @@ function openForm(p?: Profile) {
   // Current draft has already been captured; don't overwrite it while switching editors.
   page = '';
   navigate('connect');
+  chooseProtocol(data?.protocol === 'agent' ? 'agent' : data ? 'ssh' : '');
+}
+function activateProfile(profile: Profile) {
+  openForm(profile);
+  if (profile.protocol === 'agent' && profile.agentAuthorized) form.requestSubmit();
 }
 function resize() {
   const s = sessions.get(active);
@@ -202,6 +286,8 @@ function select(id: string) {
   if (id) {
     navigate('terminals');
     $('status').textContent = sessions.get(id)!.state;
+    $('terminal-protocol').textContent =
+      (sessions.get(id)!.profile.protocol === 'agent' ? 'Agent' : 'SSH') + ' · UTF-8';
   } else navigate('session-page');
 }
 function row(name: string, detail: string, action: () => void, symbol = 'server') {
@@ -234,7 +320,7 @@ function render() {
     $('recent-connections').append(
       row(p.name, p.host, () => {
         const live = [...sessions].find(([, s]) => s.profile.id === p.id && s.state === '已连接');
-        live ? select(live[0]) : openForm(p);
+        live ? select(live[0]) : activateProfile(p);
       }),
     );
   $('home-empty').hidden = profiles.length > 0;
@@ -261,8 +347,10 @@ function render() {
     $('server-list').append(h);
     for (const p of list) {
       const live = [...sessions].find(([, s]) => s.profile.id === p.id && s.state === '已连接');
-      const r = row(p.name, p.username + '@' + p.host + ' · ' + p.port, () =>
-        live ? select(live[0]) : openForm(p),
+      const r = row(
+        (p.favorite ? '★ ' : '') + p.name,
+        (p.protocol === 'agent' ? 'Agent · ' : p.username + '@') + p.host + ' · ' + p.port,
+        () => (live ? select(live[0]) : openForm(p)),
       );
       if (live) {
         const indicator = document.createElement('span');
@@ -291,7 +379,10 @@ function render() {
     $('session-list').append(
       row(
         s.profile.name,
-        s.profile.username + '@' + s.profile.host + ' · ' + s.state,
+        (s.profile.protocol === 'agent' ? 'Agent · ' : s.profile.username + '@') +
+          s.profile.host +
+          ' · ' +
+          s.state,
         () => select(id),
         'terminal',
       ),
@@ -306,6 +397,16 @@ function readProfile(): Profile {
     name: field('name').value.trim() || field('host').value.trim(),
     group: field('group').value.trim(),
     auth,
+    protocol: protocol === 'agent' ? 'agent' : 'ssh',
+    favorite: field('favorite').checked,
+    agentAuthorized: profiles.some(
+      (p) =>
+        p.id === editing &&
+        p.protocol === 'agent' &&
+        p.host === field('host').value.trim() &&
+        p.port === field('port').value &&
+        p.agentAuthorized,
+    ),
   };
 }
 function persist(p: Profile) {
@@ -315,7 +416,7 @@ function persist(p: Profile) {
   render();
 }
 $('save').onclick = () => {
-  if (!form.reportValidity()) return;
+  if (!protocol || !form.reportValidity()) return;
   try {
     persist(readProfile());
     drafts.delete(editing);
@@ -393,7 +494,7 @@ form.onsubmit = (e) => {
     return;
   }
   const p = readProfile();
-  if (!p.host || !p.username) {
+  if (!protocol || !p.host || (protocol === 'ssh' && !p.username)) {
     $('form-error').textContent = '请填写主机地址和用户名。';
     return;
   }
@@ -459,6 +560,8 @@ form.onsubmit = (e) => {
       : { password: field('password').value };
   for (const name of ['password', 'privateKey', 'passphrase']) field(name).value = '';
   drafts.delete(editing);
+  protocolDrafts.delete(editing + ':agent');
+  protocolDrafts.delete(editing + ':ssh');
   page = '';
   select(id);
   window.CShellNative.connect(JSON.stringify({ ...p, ...credentials, id, port: Number(p.port) }));
@@ -466,6 +569,52 @@ form.onsubmit = (e) => {
 window.receive = (id, type, value) => {
   const s = sessions.get(id);
   if (!s) return;
+  if (type === 'environments') {
+    try {
+      const saved = profiles.find(
+        (p) =>
+          p.id === s.profile.id &&
+          p.protocol === 'agent' &&
+          p.host === s.profile.host &&
+          p.port === s.profile.port,
+      );
+      if (saved) {
+        try {
+          persist({ ...saved, agentAuthorized: true });
+        } catch {
+          /* Connection remains usable if metadata storage is full. */
+        }
+      }
+      const choices = JSON.parse(value) as {
+        shell: string;
+        label: string;
+        distribution?: string;
+      }[];
+      const picker = document.createElement('section');
+      picker.className = 'agent-environments';
+      const title = document.createElement('h2');
+      title.textContent = '选择终端环境';
+      const target = document.createElement('p');
+      target.textContent = s.profile.name + ' · ' + s.profile.host;
+      picker.append(title, target);
+      choices.forEach((choice, index) => {
+        const button = document.createElement('button');
+        button.textContent = choice.distribution ? choice.distribution + ' · WSL' : choice.label;
+        button.onclick = () => {
+          for (const b of picker.querySelectorAll('button')) b.disabled = true;
+          s.state = '正在打开终端';
+          $('status').textContent = s.state;
+          window.CShellNative.openAgent(id, index);
+        };
+        picker.append(button);
+      });
+      s.element.append(picker);
+      s.state = '选择终端环境';
+    } catch {
+      s.state = '环境列表无效';
+      window.CShellNative.disconnect(id);
+    }
+  }
   if (type === 'data')
     s.terminal.write(
       Uint8Array.from(atob(value), (c) => c.charCodeAt(0)),
@@ -473,10 +622,16 @@ window.receive = (id, type, value) => {
     );
   if (type === 'connected') {
     s.state = '已连接';
+    s.element.querySelector('.agent-environments')?.remove();
+    if (s.profile.protocol === 'agent' && value) {
+      s.profile = { ...s.profile, name: s.profile.name + ' / ' + value };
+      s.tab.querySelector('button')!.textContent = s.profile.name;
+    }
     if (active === id) resize();
   }
   if (type === 'closed' || type === 'error') {
     s.state = '已断开';
+    s.element.querySelector('.agent-environments')?.remove();
     if (type === 'error') s.terminal.writeln('\r\n' + value.replace(/[\x00-\x1f\x7f]/g, ' '));
   }
   if (active === id) $('status').textContent = s.state;
@@ -484,8 +639,24 @@ window.receive = (id, type, value) => {
   render();
 };
 $('version').textContent = '当前版本 ' + (window.CShellNative?.version?.() || '开发预览');
-$('check-update').onclick = () => window.CShellNative.checkUpdate();
-$('install-update').onclick = () => window.CShellNative.installUpdate();
+$('check-update').onclick = () => {
+  window.updateEvent(JSON.stringify({ message: '正在检查更新…', busy: true }));
+  try {
+    window.CShellNative.checkUpdate();
+  } catch {
+    window.updateEvent(
+      JSON.stringify({ message: '无法启动更新检查，请重新打开应用后重试。', busy: false }),
+    );
+  }
+};
+$('install-update').onclick = () => {
+  try {
+    window.CShellNative.installUpdate();
+  } catch {
+    window.updateEvent(JSON.stringify({ message: '无法启动更新，请重新检查更新。', busy: false }));
+  }
+};
+$('update-page').onclick = () => window.CShellNative.openUpdatePage();
 window.updateEvent = (json) => {
   const state = JSON.parse(json);
   $('update-status').textContent = state.message;
@@ -506,7 +677,9 @@ let fileSession = '',
 const pendingFiles = new Map<string, { session: string; operation: string }>();
 function syncFileSessions() {
   const select = $('files-session') as HTMLSelectElement;
-  const live = [...sessions].filter(([, s]) => s.state === '已连接');
+  const live = [...sessions].filter(
+    ([, s]) => s.state === '已连接' && s.profile.protocol !== 'agent',
+  );
   const previous = fileSession;
   if (!live.some(([id]) => id === fileSession))
     fileSession = live.some(([id]) => id === active) ? active : live[0]?.[0] || '';
@@ -522,7 +695,10 @@ function syncFileSessions() {
   for (const id of ['files-upload', 'files-refresh', 'files-up'])
     ($(id) as HTMLButtonElement).disabled = !fileSession;
   if (!fileSession) {
-    $('files-status').textContent = '连接服务器后浏览文件';
+    $('files-status').textContent =
+      sessions.get(active)?.profile.protocol === 'agent'
+        ? '此 Agent 连接尚未提供文件能力'
+        : '连接服务器后浏览文件';
     $('files-list').replaceChildren();
     $('file-preview').hidden = true;
   } else if (previous !== fileSession || !$('files-list').childElementCount)

@@ -3,13 +3,22 @@ import type { SessionEvent } from '../shared/contracts';
 const backlog = new Map<string, { data: string; sequence: number }>();
 const listeners = new Map<string, (data: string, sequence: number) => void>();
 const closed = new Set<string>();
+const closeReasons = new Map<string, string>();
+export function terminalCloseReason(id: string) {
+  return closeReasons.get(id);
+}
 export function terminalClosed(id: string) {
   return closed.has(id);
 }
 export function terminalEvent(event: SessionEvent) {
   if (event.type === 'closed') {
     closed.add(event.sessionId);
-    if (closed.size > 1000) closed.delete(closed.values().next().value!);
+    if (event.error) closeReasons.set(event.sessionId, event.error);
+    if (closed.size > 1000) {
+      const oldest = closed.values().next().value!;
+      closed.delete(oldest);
+      closeReasons.delete(oldest);
+    }
   }
   if (event.type !== 'data') return;
   const listener = listeners.get(event.sessionId);

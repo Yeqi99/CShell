@@ -1,6 +1,8 @@
+import './extension-market.css';
+import { AgentWorkbench } from './AgentWorkbench';
 import { WslPlugin } from './WslPlugin';
 import type { LocalShell } from '../../shared/local-terminal';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { pluginCatalogUrl } from '../../shared/market';
 import {
   Blocks,
@@ -57,9 +59,9 @@ export function ExtensionWorkbench({
 }) {
   const { locale } = useI18n(),
     zh = locale === 'zh-CN';
-  const [section, setSection] = useState<'plugins' | 'apps' | 'environment' | 'python' | 'wsl'>(
-    'plugins',
-  );
+  const [section, setSection] = useState<
+    'plugins' | 'apps' | 'environment' | 'python' | 'wsl' | 'agent'
+  >('plugins');
   const [settingsPlugin, setSettingsPlugin] = useState<string | null>(null);
   const views = availablePluginViews(plugins);
   const currentView = views.find((view) => view.id === section);
@@ -123,7 +125,7 @@ export function ExtensionWorkbench({
       .map((p) => p.manifest),
   ];
   return (
-    <div className="extension-workbench">
+    <div className="extension-workbench" data-section={section}>
       <nav className="extension-nav" aria-label={zh ? '扩展导航' : 'Extension navigation'}>
         <h2>{zh ? '扩展' : 'Extensions'}</h2>
         {(
@@ -141,11 +143,6 @@ export function ExtensionWorkbench({
             {label}
           </button>
         ))}
-        <div className="extension-nav-note">
-          {zh
-            ? '插件扩展工作台\n应用安装到服务器'
-            : 'Plugins extend the workbench.\nApplications run on servers.'}
-        </div>
       </nav>
       <div className="extension-main">
         <header className="extension-heading">
@@ -170,21 +167,27 @@ export function ExtensionWorkbench({
                       : 'Anaconda environments'
                     : section === 'wsl'
                       ? 'WSL Linux'
-                      : 'Python'}
+                      : section === 'agent'
+                        ? 'CShell Agent'
+                        : 'Python'}
             </h1>
             <p>
               {section === 'plugins'
                 ? zh
                   ? '按需添加，随时停用。'
                   : 'Add the tools you need.'
-                : section === 'wsl'
-                  ? '本机 Linux 环境 · Windows WSL'
-                  : zh
-                    ? '操作仅作用于所选连接。'
-                    : 'Actions belong to the selected connection.'}
+                : section === 'agent'
+                  ? zh
+                    ? '配置所选 Agent 的连接、权限与服务。'
+                    : 'Manage connections, permissions and services on the selected Agent.'
+                  : section === 'wsl'
+                    ? '本机 Linux 环境 · Windows WSL'
+                    : zh
+                      ? '操作仅作用于所选连接。'
+                      : 'Actions belong to the selected connection.'}
             </p>
           </div>
-          {section !== 'plugins' && section !== 'wsl' && (
+          {section !== 'plugins' && section !== 'wsl' && section !== 'agent' && (
             <label className="extension-server">
               {zh ? '目标服务器' : 'Target server'}
               <select
@@ -241,7 +244,7 @@ export function ExtensionWorkbench({
                 const installed = plugins.find((i) => i.manifest.id === p.id),
                   entry = catalog.find((c) => c.manifest.id === p.id);
                 return (
-                  <article className="plugin-row" key={p.id}>
+                  <article className="plugin-row" data-provider={p.provider} key={p.id}>
                     <div className="plugin-symbol">
                       {p.provider === 'python' ? (
                         <Code2 size={22} />
@@ -331,6 +334,7 @@ export function ExtensionWorkbench({
                               else await window.cshell.pluginInstall(p.id);
                               await onChange();
                               if (p.provider === 'wsl') setSection('wsl');
+                              if (p.provider === 'agent') setSection('agent');
                             })
                           }
                         >
@@ -373,8 +377,9 @@ export function ExtensionWorkbench({
             </form>
           </details>
         </div>
+        {section === 'agent' && currentView && <AgentWorkbench />}
         {section === 'wsl' && currentView && <WslPlugin onOpen={onLocal} />}
-        {section !== 'plugins' && section !== 'wsl' && !target && (
+        {section !== 'plugins' && section !== 'wsl' && section !== 'agent' && !target && (
           <div className="extension-empty">
             {zh
               ? '先连接一台服务器，再选择安装或管理环境。'
@@ -385,11 +390,19 @@ export function ExtensionWorkbench({
           <div
             className="extension-session"
             key={s.id}
-            hidden={section === 'plugins' || section === 'wsl' || target !== s.id}
+            hidden={
+              section === 'plugins' || section === 'wsl' || section === 'agent' || target !== s.id
+            }
           >
             <ServerExtensions
               session={s}
-              active={visible && target === s.id && section !== 'plugins' && section !== 'wsl'}
+              active={
+                visible &&
+                target === s.id &&
+                section !== 'plugins' &&
+                section !== 'wsl' &&
+                section !== 'agent'
+              }
               section={section === 'wsl' ? 'plugins' : section}
               plugins={plugins}
               appRequest={appRequest}
@@ -431,9 +444,14 @@ function ServerExtensions({
     [busy, setBusy] = useState(false);
   const [notebook, setNotebook] = useState<{ running: boolean; port?: number }>({ running: false });
   const [appCatalog, setAppCatalog] = useState(applications);
+  const [appQuery, setAppQuery] = useState('');
+  const detail = useRef<HTMLElement>(null);
   const [jobs, setJobs] = useState<RemoteJob[]>([]),
     [app, setApp] = useState<ApplicationId>('miniconda'),
     [plan, setPlan] = useState<InstallationPlan | null>(null);
+  useEffect(() => {
+    if (detail.current) detail.current.scrollTop = 0;
+  }, [app]);
   const [name, setName] = useState('cshell-python'),
     [version, setVersion] = useState<'3.11' | '3.12' | '3.13' | '3.14'>('3.12'),
     [packages, setPackages] = useState(''),
@@ -567,35 +585,57 @@ function ServerExtensions({
         </div>
       )}
       <div hidden={section !== 'apps'} className="application-market">
-        <button
-          disabled={busy}
-          className="secondary"
-          onClick={() =>
-            void run(async () => setAppCatalog(await window.cshell.applicationCatalog()))
-          }
-        >
-          <RefreshCw size={14} />
-          {zh ? '从 GitHub 更新应用目录' : 'Refresh GitHub catalog'}
-        </button>
-        <div className="application-list">
-          {appCatalog.map((a) => (
-            <button
-              key={a.id}
-              className={app === a.id ? 'selected' : ''}
-              onClick={() => {
-                setApp(a.id);
-                setPlan(null);
-              }}
-            >
-              <Package size={18} />
-              <span>
-                <strong>{a.name}</strong>
-                <small>{a.description}</small>
-              </span>
-            </button>
-          ))}
+        <div className="application-toolbar">
+          <label className="extension-search">
+            <Search size={15} />
+            <input
+              aria-label={zh ? '搜索应用' : 'Search applications'}
+              placeholder={zh ? '搜索应用' : 'Search applications'}
+              value={appQuery}
+              onChange={(e) => setAppQuery(e.target.value)}
+            />
+          </label>
+          <button
+            disabled={busy}
+            className="icon"
+            title={zh ? '更新应用目录' : 'Refresh application catalog'}
+            aria-label={zh ? '更新应用目录' : 'Refresh application catalog'}
+            onClick={() =>
+              void run(async () => setAppCatalog(await window.cshell.applicationCatalog()))
+            }
+          >
+            <RefreshCw size={14} />
+          </button>
         </div>
-        <section className="application-detail">
+        <div className="application-list">
+          {appCatalog
+            .filter((a) =>
+              `${a.name} ${a.description}`.toLowerCase().includes(appQuery.toLowerCase()),
+            )
+            .map((a) => (
+              <button
+                key={a.id}
+                className={app === a.id ? 'selected' : ''}
+                aria-pressed={app === a.id}
+                disabled={busy}
+                onClick={() => {
+                  setApp(a.id);
+                  setPlan(null);
+                }}
+              >
+                <Package size={18} />
+                <span>
+                  <strong>{a.name}</strong>
+                  <small>{a.description}</small>
+                </span>
+              </button>
+            ))}
+        </div>
+        <section
+          className="application-detail"
+          ref={detail}
+          aria-label={zh ? '应用详情' : 'Application details'}
+        >
           <h2>{appCatalog.find((a) => a.id === app)?.name}</h2>
           {['python', 'jedi', 'jupyter'].includes(app) && interpreter}
           {app === 'python' && (
@@ -652,7 +692,7 @@ function ServerExtensions({
             }
           >
             <RefreshCw size={14} />
-            {zh ? '检查安装条件' : 'Check installation'}
+            {busy ? (zh ? '处理中…' : 'Working…') : zh ? '检查安装条件' : 'Check installation'}
           </button>
           {plan && (
             <div className="installation-plan">

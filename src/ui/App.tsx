@@ -1,3 +1,4 @@
+import { HttpWorkbench, HttpCreate } from './components/HttpWorkbench';
 import { WslAccount } from './components/WslAccount';
 import type { LocalConnectionTarget } from '../shared/local-terminal';
 import { ConnectionEntry } from './components/ConnectionEntry';
@@ -59,15 +60,22 @@ import { Modal } from './components/Modal';
 import { TerminalPane } from './components/TerminalPane';
 import { ServerSidebar } from './components/ServerSidebar';
 import { SavedConnection } from './components/SavedConnection';
+import { connectRequest } from './connect-request';
+import { connectionErrorMessage } from '../shared/connection-errors';
 import { LocalDock } from './components/LocalDock';
 import { ToolsPanel } from './components/ToolsPanel';
 import { SessionTab } from './components/SessionTab';
 import { shortcutFor } from './shortcuts';
-import { terminalEvent, terminalClosed, terminalSnapshot } from './terminalBus';
+import {
+  terminalEvent,
+  terminalClosed,
+  terminalCloseReason,
+  terminalSnapshot,
+} from './terminalBus';
 import brandMark from '../../assets/icon.svg';
 
 type Tab = {
-  client?: { device: ClientDevice; shell: ClientShell };
+  client?: { device: ClientDevice; shell: ClientShell; distribution?: string };
   local?: LocalShell;
   id: string;
   profile: Profile;
@@ -115,7 +123,36 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
   useEffect(
     () =>
       window.cshell.onAiConnection(({ sessionId, profile }) => {
-        connectedSessions.current.add(sessionId);
+        if (profile.protocol === 'client') {
+          void window.cshell
+            .clientDevices()
+            .then((devices) => {
+              const device = devices.find((d) => d.deviceId === profile.id);
+              if (device) {
+                setTabs((items) =>
+                  items.some((t) => t.id === sessionId)
+                    ? items
+                    : [
+                        ...items,
+                        {
+                          id: sessionId,
+                          profile,
+                          closed: terminalClosed(sessionId),
+                          client: {
+                            device,
+                            shell: profile.clientShell ?? 'powershell',
+                            distribution: profile.clientDistribution,
+                          },
+                        },
+                      ],
+                );
+                setActive(sessionId);
+                setSurface('terminal');
+              }
+            })
+            .catch(onError);
+          return;
+        }
         setTabs((items) =>
           items.some((t) => t.id === sessionId)
             ? items
@@ -140,7 +177,6 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
     window.addEventListener('cshell:open-ai', open);
     return () => window.removeEventListener('cshell:open-ai', open);
   }, []);
-  const connectedSessions = useRef(new Set<string>());
   const [activityOpen, setActivityOpen] = useState(false);
   const openActivity = () => {
     setActivityOpen(true);
@@ -195,14 +231,18 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
   };
   const [quickConnections, setQuickConnections] = useState<Profile[]>([]);
   const [quickId, setQuickId] = useState('');
-  const [quickBusy, setQuickBusy] = useState<string[]>([]);
   const openSaved = (profile: Profile) => {
     if (profile.protocol === 'client') {
       void (async () => {
         const device = (await window.cshell.clientDevices()).find((d) => d.deviceId === profile.id);
         if (!device) throw new Error('Client identity unavailable');
         const shell = profile.clientShell ?? 'powershell';
-        await addClient(await window.cshell.clientConnect(device.deviceId, shell), device, shell);
+        await addClient(
+          await window.cshell.clientConnect(device.deviceId, shell, profile.clientDistribution),
+          device,
+          shell,
+          profile.clientDistribution,
+        );
       })().catch((e) => {
         openConnection(profile);
         setError((e as Error).message);
@@ -216,6 +256,10 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
     setSurface('quick');
   };
   const openConnection = (profile: Profile | 'new') => {
+    if (profile !== 'new' && profile.protocol === 'http') {
+      openSaved(profile);
+      return;
+    }
     setDrafts((items) =>
       items.some(
         (item) => (item === 'new' ? 'new' : item.id) === (profile === 'new' ? 'new' : profile.id),
@@ -230,6 +274,14 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
     );
     setSurface('connection');
   };
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const profile = config.profiles.find((p) => p.id === (event as CustomEvent<string>).detail);
+      if (profile && profile.protocol !== 'http') openSaved(profile);
+    };
+    window.addEventListener('cshell:open-sender', handler);
+    return () => window.removeEventListener('cshell:open-sender', handler);
+  }, [config.profiles]);
   const openSettings = () => {
     setThemeRequest(null);
     setSettings(true);
@@ -248,7 +300,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
   };
   const closeSettings = () => {
     setSettings(false);
-    if (surface === 'settings') setSurface('terminal');
+    setSurface((current) => (current === 'settings' ? 'terminal' : current));
   };
   const onError = useCallback(
     (e: unknown) =>
@@ -268,8 +320,6 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
         setTabs((current) =>
           current.map((tab) => (tab.id === event.sessionId ? { ...tab, closed: true } : tab)),
         );
-        const wasConnected = connectedSessions.current.delete(event.sessionId);
-        if (event.error && wasConnected) onError(event.error);
       }
       if (event.type === 'transfer')
         setTransfers((current) =>
@@ -376,39 +426,42 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
     );
     await refresh();
   };
-  async function connect(profile: Profile, credentials: Credentials, persist: boolean) {
-    const result = await (persist
-      ? window.cshell.connect(profile.id, credentials)
-      : window.cshell.connectTemporary(profile, credentials));
-    connectedSessions.current.add(result.sessionId);
+  async function connect(
+    profile: Profile,
+    credentials: Credentials,
+    persist: boolean,
+    signal?: AbortSignal,
+  ) {
+    const result = await connectRequest(window.cshell, profile, credentials, persist, signal);
     setTabs((v) => [
       ...v,
       { id: result.sessionId, profile, closed: terminalClosed(result.sessionId) },
     ]);
     setActive(result.sessionId);
     setSurface('terminal');
-    await refresh();
+    void refresh().catch(onError);
   }
   async function addClient(
     result: { sessionId: string; name: string },
     device: ClientDevice,
     shell: ClientShell,
+    distribution?: string,
   ) {
     const latest = await window.cshell.config();
     setConfig(latest);
     const saved = latest.profiles.find((p) => p.id === device.deviceId);
-    connectedSessions.current.add(result.sessionId);
     setTabs((items) => [
       ...items,
       {
         id: result.sessionId,
-        client: { device, shell },
+        client: { device, shell, distribution },
         closed: terminalClosed(result.sessionId),
         profile: {
           id: device.deviceId,
           name: result.name,
           protocol: 'client',
           clientShell: shell,
+          clientDistribution: distribution,
           host: device.host,
           port: device.port,
           username: '',
@@ -432,7 +485,6 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
       return;
     }
     const result = await window.cshell.localTerminal(shell);
-    connectedSessions.current.add(result.sessionId);
     setTabs((tabs) => [
       ...tabs,
       {
@@ -763,7 +815,6 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
                   </button>
                   <button
                     className="icon"
-                    disabled={quickBusy.includes(profile.id)}
                     title={t('close')}
                     aria-label={`${t('close')} ${profile.name}`}
                     onClick={(e) => {
@@ -957,21 +1008,23 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
               className="workspace-editor"
               hidden={surface !== 'quick' || quickId !== profile.id}
             >
-              <SavedConnection
-                profile={profile}
-                saved={config.savedCredentials.includes(profile.id)}
-                onConnect={connect}
-                onDone={() =>
-                  setQuickConnections((items) => items.filter((item) => item.id !== profile.id))
-                }
-                onBusy={(busy) =>
-                  setQuickBusy((items) =>
-                    busy
-                      ? [...items.filter((id) => id !== profile.id), profile.id]
-                      : items.filter((id) => id !== profile.id),
-                  )
-                }
-              />
+              {profile.protocol === 'http' ? (
+                <HttpWorkbench
+                  profile={config.profiles.find((p) => p.id === profile.id) ?? profile}
+                  enabled={pluginEnabled(config.plugins, 'http')}
+                  onSaveProfile={saveProfile}
+                />
+              ) : (
+                <SavedConnection
+                  profile={profile}
+                  saved={config.savedCredentials.includes(profile.id)}
+                  persist={config.profiles.some((p) => p.id === profile.id)}
+                  onConnect={connect}
+                  onDone={() =>
+                    setQuickConnections((items) => items.filter((item) => item.id !== profile.id))
+                  }
+                />
+              )}
             </div>
           ))}
           {drafts.map((draft) => (
@@ -982,6 +1035,19 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
             >
               {draft === 'new' ? (
                 <ConnectionEntry
+                  http={
+                    pluginEnabled(config.plugins, 'http') ? (
+                      <HttpCreate
+                        groups={config.groups}
+                        onCreated={async (id) => {
+                          const latest = await window.cshell.config();
+                          setConfig(latest);
+                          closeEditor('new');
+                          openSaved(latest.profiles.find((p) => p.id === id)!);
+                        }}
+                      />
+                    ) : undefined
+                  }
                   onClient={addClient}
                   onLocal={openLocal}
                   profiles={config.profiles}
@@ -1044,7 +1110,6 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
                   onTerminal={(parent, id, name, python) => {
                     const source = tabs.find((t) => t.id === parent);
                     if (!source) return;
-                    if (!terminalClosed(id)) connectedSessions.current.add(id);
                     setTabs((old) => [
                       ...old,
                       {
@@ -1078,22 +1143,41 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
               />
             </div>
           )}
-          {current?.closed && (
-            <div className="disconnected-session-bar">
-              <span>{t('disconnected')}</span>
+          {surface === 'terminal' && current?.closed && (
+            <div className="disconnected-session-bar" role="status">
+              <span>
+                <strong>{t('disconnected')}</strong>
+                {' · '}
+                {terminalCloseReason(current.id)
+                  ? connectionErrorMessage(
+                      terminalCloseReason(current.id),
+                      config.preferences.locale,
+                    )
+                  : t('remoteSessionEnded')}
+                <small>{t('reconnectHint')}</small>
+              </span>
               <button
                 onClick={() =>
                   current.client
                     ? run(
                         window.cshell
-                          .clientConnect(current.client.device.deviceId, current.client.shell)
+                          .clientConnect(
+                            current.client.device.deviceId,
+                            current.client.shell,
+                            current.client.distribution,
+                          )
                           .then((result) =>
-                            addClient(result, current.client!.device, current.client!.shell),
+                            addClient(
+                              result,
+                              current.client!.device,
+                              current.client!.shell,
+                              current.client!.distribution,
+                            ),
                           ),
                       )
                     : current.local
                       ? run(openLocal(current.local))
-                      : openConnection(current.profile)
+                      : openSaved(current.profile)
                 }
               >
                 {t('reconnect')}
@@ -1155,7 +1239,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
               onChange={(fileWidth) => onLayout({ ...layout, fileWidth })}
             />
             {tabs
-              .filter((tab) => !tab.closed)
+              .filter((tab) => !tab.closed && !tab.client && !tab.local)
               .map((tab) => (
                 <div
                   className="session-tools"
@@ -1185,7 +1269,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
         <div className="ai-panel-slot" hidden={!aiVisible || minimal}>
           <AiPanel
             visible={aiVisible && !minimal}
-            sessionId={current && !current.closed && !current.client ? current.id : undefined}
+            sessionId={current && !current.closed ? current.id : undefined}
             profiles={config.profiles}
             groups={config.groups}
             onClose={() => setAiVisible(false)}

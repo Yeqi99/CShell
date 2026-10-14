@@ -13,7 +13,18 @@ export const pluginManifestSchema = z
     description: z.string().max(300),
     descriptionEn: z.string().max(300).optional(),
     publisher: z.string().min(1).max(80),
-    provider: z.enum(['vim', 'nano', 'commands', 'docker', 'conda', 'python', 'snippets', 'wsl']),
+    provider: z.enum([
+      'vim',
+      'nano',
+      'commands',
+      'docker',
+      'conda',
+      'python',
+      'snippets',
+      'wsl',
+      'http',
+      'agent',
+    ]),
     permissions: z
       .array(z.enum(['terminal.input', 'remote.read', 'remote.execute', 'remote.forward']))
       .max(4),
@@ -67,6 +78,13 @@ const builtin = (
   commands: [],
 });
 export const builtinPlugins = [
+  builtin('http', 'HTTP', '编辑请求、多目标、切换发送方与请求历史，可供智能体调用。', 'http', [
+    'remote.forward',
+  ]),
+  builtin('agent', 'CShell Agent', '配置此电脑的受控访问、监听地址与权限。', 'agent', [
+    'remote.execute',
+    'remote.forward',
+  ]),
   builtin('wsl', 'WSL Linux', '发现本机 Linux 发行版，在标签中打开 WSL 终端。', 'wsl', [
     'terminal.input',
   ]),

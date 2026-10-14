@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { McpSettings as Settings, McpStatus, Profile } from '../../shared/contracts';
 import { useI18n } from '../i18n';
-export function McpSettings() {
-  const { t } = useI18n();
+export function useMcpSettings() {
   const [status, setStatus] = useState<McpStatus | null>(null),
     [draft, setDraft] = useState<Settings | null>(null),
     [profiles, setProfiles] = useState<Profile[]>([]),
@@ -18,6 +17,16 @@ export function McpSettings() {
       })
       .catch((e) => setError(e.message));
   }, []);
+  const save = async (retry = false) => {
+    // Appearance imports never supply MCP grants. Only this explicit draft is saved.
+    if (!draft || !status) return;
+    if (JSON.stringify(draft) === JSON.stringify(status.settings) && !(retry && status.error))
+      return;
+    const next = await window.cshell.mcpConfigure(draft);
+    setStatus(next);
+    setDraft(next.settings);
+    if (next.error) throw new Error(next.error);
+  };
   const run = async (fn: () => Promise<unknown>) => {
     setBusy(true);
     setError('');
@@ -29,12 +38,36 @@ export function McpSettings() {
       setBusy(false);
     }
   };
+  return {
+    status,
+    setStatus,
+    draft,
+    setDraft,
+    profiles,
+    error,
+    busy,
+    copied,
+    setCopied,
+    run,
+    save,
+  };
+}
+export function McpSettings({
+  state,
+  saving,
+}: {
+  state: ReturnType<typeof useMcpSettings>;
+  saving: boolean;
+}) {
+  const { t, locale } = useI18n();
+  const { status, setStatus, draft, setDraft, profiles, error, busy, copied, setCopied, run } =
+    state;
   return (
     <section className="mcp-settings">
       <h2>{t('mcpService')}</h2>
       <p className="muted">{t('mcpHint')}</p>
       {draft && (
-        <fieldset disabled={busy}>
+        <fieldset disabled={busy || saving}>
           <label className="checkbox">
             <input
               type="checkbox"
@@ -58,23 +91,25 @@ export function McpSettings() {
           </p>
           <p className="muted">{t('mcpScope')}</p>
           <div className="mcp-profiles">
-            {profiles.map((profile) => (
-              <label className="checkbox" key={profile.id}>
-                <input
-                  type="checkbox"
-                  checked={draft.allowedProfiles.includes(profile.id)}
-                  onChange={(e) =>
-                    setDraft({
-                      ...draft,
-                      allowedProfiles: e.target.checked
-                        ? [...draft.allowedProfiles, profile.id]
-                        : draft.allowedProfiles.filter((id) => id !== profile.id),
-                    })
-                  }
-                />
-                {profile.name} · {profile.host}
-              </label>
-            ))}
+            {profiles
+              .filter((p) => !p.protocol || p.protocol === 'ssh')
+              .map((profile) => (
+                <label className="checkbox" key={profile.id}>
+                  <input
+                    type="checkbox"
+                    checked={draft.allowedProfiles.includes(profile.id)}
+                    onChange={(e) =>
+                      setDraft({
+                        ...draft,
+                        allowedProfiles: e.target.checked
+                          ? [...draft.allowedProfiles, profile.id]
+                          : draft.allowedProfiles.filter((id) => id !== profile.id),
+                      })
+                    }
+                  />
+                  {profile.name} · {profile.host}
+                </label>
+              ))}
           </div>
           <label className="checkbox">
             <input
@@ -85,19 +120,6 @@ export function McpSettings() {
             {t('mcpCommands')}
           </label>
           <div className="preset-row">
-            <button
-              type="button"
-              className="secondary"
-              onClick={() =>
-                void run(async () => {
-                  const next = await window.cshell.mcpConfigure(draft);
-                  setStatus(next);
-                  if (next.error) setError(next.error);
-                })
-              }
-            >
-              {t('mcpApply')}
-            </button>
             <button
               type="button"
               onClick={() =>
@@ -122,6 +144,11 @@ export function McpSettings() {
               {t('rotateToken')}
             </button>
           </div>
+          <p className="muted">
+            {locale === 'zh-CN'
+              ? '修改后点击底部“保存”生效。'
+              : 'Click Save below to apply changes.'}
+          </p>
         </fieldset>
       )}
       {status && <p role="status">{status.running ? t('mcpRunning') : t('mcpStopped')}</p>}

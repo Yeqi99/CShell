@@ -4,9 +4,13 @@ import { z } from 'zod';
 import { clientShellSchema } from '../../shared/client';
 const derive = promisify(scrypt);
 export const accessSchema = z.object({
+  allowHttp: z.boolean().default(false),
+  allowManage: z.boolean().default(false),
+  allowHosting: z.boolean().default(false),
+  allowRelay: z.boolean().default(false),
   salt: z.string().regex(/^[a-f0-9]{32}$/),
   hash: z.string().regex(/^[a-f0-9]{64}$/),
-  shells: z.array(clientShellSchema).min(1).max(2),
+  shells: z.array(clientShellSchema).min(1).max(6),
 });
 export async function hashPassword(password: string) {
   const salt = randomBytes(16).toString('hex');

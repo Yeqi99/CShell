@@ -33,14 +33,16 @@ export function applicationTools(
       needsReview: () => false,
       invoke: async () => {
         const snapshot = store.snapshot();
-        const machines = snapshot.profiles.map(({ id, name, host, port, username, group }) => ({
-          id,
-          name,
-          host,
-          port,
-          username,
-          group,
-        }));
+        const machines = snapshot.profiles
+          .filter((p) => p.protocol !== 'http')
+          .map(({ id, name, host, port, username, group }) => ({
+            id,
+            name,
+            host,
+            port,
+            username,
+            group,
+          }));
         return JSON.stringify({ total: machines.length, groups: snapshot.groups, machines });
       },
     },

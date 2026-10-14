@@ -10,8 +10,9 @@ export async function registerAiHandlers(
   connections: ConnectionRegistry,
   connectHost?: AiConnectionHost,
   publish?: (channel: string, value?: unknown) => void,
+  http?: import('../core/http-workspaces').HttpWorkspaces,
 ) {
-  const ai = new AiService(directory, store, connections, connectHost);
+  const ai = new AiService(directory, store, connections, connectHost, { http });
   const pending = new Map<string, AiThread>();
   let timer: ReturnType<typeof setTimeout> | undefined;
   ai.onThreadUpdate = (thread) => {
@@ -23,6 +24,9 @@ export async function registerAiHandlers(
     }, 40);
   };
   await ai.load();
+  ai.work.start();
+  handle('ai:goal-save', (id, input) => ai.saveGoal(id, input));
+  handle('ai:goal-action', (id, action, session) => ai.goalAction(id, action, session));
   handle('ai:text', (input) => ai.text(input));
   handle('ai:text-provider', (kind, id) => ai.setTextProvider(kind, id));
   handle('ai:policy', (p) => ai.savePolicy(p));
@@ -48,6 +52,11 @@ export async function registerAiHandlers(
   handle('ai:delete', (id) => ai.remove(id));
   handle('ai:send', (id, text) => ai.send(id, text));
   handle('ai:approve', (id, request, allow) => ai.approve(id, request, allow));
-  handle('ai:stop', (id) => ai.stop(id));
+  handle('ai:stop', (id) => ai.stopAndSave(id));
   handle('ai:mode', (id, mode) => ai.mode(id, mode));
+  return () => {
+    ai.dispose();
+    clearTimeout(timer);
+    pending.clear();
+  };
 }

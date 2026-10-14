@@ -18,7 +18,10 @@ const port = (server.address() as any).port;
 await new Promise<void>((r) => server.close(() => r()));
 const client = await electron.launch({
   ...(process.env.CSHELL_CLIENT_EXECUTABLE
-    ? { executablePath: process.env.CSHELL_CLIENT_EXECUTABLE, args: ['--disable-backgrounding-occluded-windows'] }
+    ? {
+        executablePath: process.env.CSHELL_CLIENT_EXECUTABLE,
+        args: ['--disable-backgrounding-occluded-windows'],
+      }
     : { args: ['.', '--client'] }),
   env: environment('client'),
 });
@@ -26,7 +29,10 @@ const clientWindow = await client.firstWindow();
 await clientWindow.locator('.client-service-card').waitFor();
 const control = await electron.launch({
   ...(process.env.CSHELL_EXECUTABLE
-    ? { executablePath: process.env.CSHELL_EXECUTABLE, args: ['--disable-backgrounding-occluded-windows'] }
+    ? {
+        executablePath: process.env.CSHELL_EXECUTABLE,
+        args: ['--disable-backgrounding-occluded-windows'],
+      }
     : { args: ['.'] }),
   env: environment('control'),
 });
@@ -66,20 +72,23 @@ try {
   await c.screenshot({ path: 'test-results/client-narrow.png' });
   await client.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(560, 580));
   await w.getByRole('button', { name: '新建连接', exact: true }).first().click();
-  await w.getByRole('button', { name: '添加连接记录', exact: true }).click();
-  await w.getByLabel('连接方式', { exact: true }).selectOption('client');
+  await w.getByRole('button', { name: 'CShell Agent', exact: true }).click();
+  await w.locator('.connection-metadata summary').click();
   const clientForm = w.locator('.protocol-form .client-connect-form');
   await clientForm.getByLabel('名称', { exact: true }).fill('Client 本机测试');
   await clientForm.getByLabel('分组', { exact: true }).fill('测试分组');
   await clientForm.getByLabel('收藏', { exact: true }).check();
   await clientForm.getByRole('button', { name: '粘贴连接信息' }).click();
   await clientForm.getByLabel('连接密码', { exact: true }).fill(password);
-  await clientForm.getByLabel('终端', { exact: true }).selectOption('cmd');
   await clientForm.getByLabel('我已核对设备身份').check();
-  await w.getByLabel('连接方式', { exact: true }).selectOption('ssh');
-  await w.getByLabel('连接方式', { exact: true }).selectOption('client');
+  await w.getByRole('button', { name: '返回连接方式' }).click();
+  await w.getByRole('button', { name: 'SSH 终端', exact: true }).click();
+  await w.getByRole('button', { name: '返回连接方式' }).click();
+  await w.getByRole('button', { name: 'CShell Agent', exact: true }).click();
   assert.equal(await clientForm.getByLabel('连接密码', { exact: true }).inputValue(), password);
   await w.screenshot({ path: 'test-results/client-new-connection.png' });
+  await clientForm.getByRole('button', { name: '验证并读取终端', exact: true }).click();
+  await clientForm.getByLabel('终端', { exact: true }).selectOption('cmd|');
   await clientForm.getByRole('button', { name: '连接', exact: true }).click();
   await w.locator('.session-tab').waitFor();
   // Use the visible xterm input; do not inject through a shell helper.
@@ -95,12 +104,13 @@ try {
   await row.locator('.server-open').waitFor();
   assert.equal(await row.locator('.dot.off').count(), 0);
   await row.locator('.favorite-button').click();
+  await w.waitForFunction(() => !document.querySelector('.server-item .favorite-button.starred'));
   await row.locator('.server-more').click();
   await w.getByRole('menuitem', { name: /编辑/ }).click();
   const editor = w.locator('.client-profile-editor');
   await editor.getByLabel('名称', { exact: true }).fill('Client 已重命名');
   await editor.getByLabel('分组', { exact: true }).fill('办公电脑');
-  await editor.getByLabel('默认终端', { exact: true }).selectOption('powershell');
+  await editor.getByLabel('默认终端', { exact: true }).selectOption('powershell|');
   await editor.getByRole('button', { name: '保存', exact: true }).click();
   await editor.getByText('已保存', { exact: true }).waitFor();
   await w.locator('.server-open').filter({ hasText: 'Client 已重命名' }).first().dblclick();
@@ -148,11 +158,18 @@ try {
   console.error('Client smoke failed:', error);
   for (const application of [client, control]) {
     for (const page of application.windows()) {
-      console.error(await page.locator('[role="alert"]').allTextContents().catch(() => []));
+      console.error(
+        await page
+          .locator('[role="alert"]')
+          .allTextContents()
+          .catch(() => []),
+      );
     }
   }
   throw error;
 } finally {
+  await control.evaluate(({ app }) => app.exit(0)).catch(() => {});
+  await client.evaluate(({ app }) => app.exit(0)).catch(() => {});
   await control.close();
   await client.close();
   await rm(data, { recursive: true, force: true, maxRetries: 5 });

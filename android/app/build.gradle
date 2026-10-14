@@ -1,8 +1,13 @@
 plugins { id 'com.android.application' }
+def releaseVersion = new groovy.json.JsonSlurper().parse(file('../../package.json')).version
+if (!(releaseVersion ==~ /\d+\.\d+\.\d+/)) throw new GradleException('Invalid package.json version')
+def versionParts = releaseVersion.tokenize('.').collect { it.toInteger() }
+if (versionParts.any { it > 999 }) throw new GradleException('Version components must be <= 999')
+def releaseCode = versionParts[0] * 1000000 + versionParts[1] * 1000 + versionParts[2]
 android {
     namespace 'org.canpshell.mobile'
     compileSdk 36
-    defaultConfig { applicationId 'org.canpshell.mobile'; minSdk 26; targetSdk 36; versionCode 6; versionName '0.4.0' }
+    defaultConfig { applicationId 'org.canpshell.mobile'; minSdk 26; targetSdk 36; versionCode releaseCode; versionName releaseVersion; testInstrumentationRunner 'org.canpshell.mobile.AgentProtocolTest' }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     signingConfigs {
         release {

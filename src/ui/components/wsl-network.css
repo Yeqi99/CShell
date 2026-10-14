@@ -1,0 +1,53 @@
+.wsl-network {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.wsl-network summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 4px 0;
+}
+.wsl-network p {
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--muted);
+  max-width: 580px;
+}
+.wsl-network fieldset {
+  border: 0;
+  padding: 0;
+  margin: 16px 0 0;
+}
+.wsl-network label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12px;
+  margin-bottom: 16px;
+  max-width: 420px;
+}
+.wsl-network select {
+  height: 36px;
+  font-size: 13px;
+}
+.wsl-network .wsl-network-check {
+  flex-direction: row;
+  align-items: center;
+}
+.wsl-network .wsl-network-note {
+  border-left: 2px solid var(--accent);
+  padding-left: 12px;
+}
+.wsl-network-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+.wsl-network-actions button {
+  font-size: 12px;
+  min-height: 32px;
+  padding: 6px 12px;
+}

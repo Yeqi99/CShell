@@ -6,10 +6,19 @@ import { generateKeyPairSync, randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, sep, posix } from 'node:path';
-export async function fixture() {
+export async function fixture(
+  options: {
+    stallAuthentication?: boolean;
+    stallShell?: boolean;
+    writeFailure?: 'full' | 'permission';
+  } = {},
+) {
   const docker = dockerFixture();
   const extensions = extensionsFixture();
   const shellInputs: string[] = [];
+  const shells = new Set<import('ssh2').ServerChannel>();
+  let authenticationRequests = 0,
+    shellRequests = 0;
   const root = await fs.mkdtemp(join(tmpdir(), 'cshell-ssh-'));
   const hostKey = generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey.export({
     type: 'pkcs1',
@@ -31,6 +40,8 @@ export async function fixture() {
     client.on('error', () => {});
     client.on('close', () => clients.delete(client));
     client.on('authentication', (ctx) => {
+      authenticationRequests++;
+      if (options.stallAuthentication) return;
       if (ctx.username !== 'tester') return ctx.reject();
       if (ctx.method === 'password' && ctx.password === password) return ctx.accept();
       if (
@@ -47,7 +58,11 @@ export async function fixture() {
         session.on('pty', (acceptPty) => acceptPty?.());
         session.on('window-change', (acceptChange) => acceptChange?.());
         session.on('shell', (acceptShell) => {
+          shellRequests++;
+          if (options.stallShell) return;
           const shell = acceptShell();
+          shells.add(shell);
+          shell.on('close', () => shells.delete(shell));
           shell.on('error', () => {});
           const banner = Buffer.from('CShell integration server\r\n你好 🌏\r\n$ ');
           shell.write(banner.subarray(0, 29));
@@ -139,6 +154,10 @@ export async function fixture() {
             );
           });
           handler('OPEN', async (id, path, flags) => {
+            if (options.writeFailure === 'permission' && flags & 2) {
+              sftp.status(id, 3, 'Permission denied');
+              return;
+            }
             const key = randomUUID();
             const file = await fs.open(local(path), utils.sftp.flagsToString(flags)!);
             handles.set(key, { file, path: local(path) });
@@ -153,6 +172,10 @@ export async function fixture() {
             else sftp.data(id, data.subarray(0, bytesRead));
           });
           handler('WRITE', async (id, handle, offset, data) => {
+            if (options.writeFailure === 'full') {
+              sftp.status(id, 4, 'No space left on device');
+              return;
+            }
             await handles.get(handle.toString())!.file!.write(data, 0, data.length, offset);
             sftp.status(id, 0);
           });
@@ -211,6 +234,16 @@ export async function fixture() {
     password,
     privateKey,
     port: (server.address() as { port: number }).port,
+    connectionsCount: () => clients.size,
+    authenticationRequests: () => authenticationRequests,
+    shellRequests: () => shellRequests,
+    writeOutput: (data: string) => {
+      for (const shell of shells) shell.write(data);
+    },
+    disconnectAll: () => {
+      for (const client of clients)
+        (client as unknown as { _sock: import('node:net').Socket })._sock.destroy();
+    },
     close: async () => {
       for (const client of clients) client.end();
       await new Promise<void>((r) => server.close(() => r()));

@@ -48,8 +48,8 @@ try {
   };
 
   await page.getByRole('button', { name: '新建连接', exact: true }).first().click();
-  if (await page.getByRole('button', { name: '添加连接记录', exact: true }).isVisible())
-    await page.getByRole('button', { name: '添加连接记录', exact: true }).click();
+  if (await page.getByRole('button', { name: 'SSH 终端', exact: true }).isVisible())
+    await page.getByRole('button', { name: 'SSH 终端', exact: true }).click();
   const form = page.locator('.connection-editor:visible');
   await form.getByLabel('主机地址').fill('manual.example');
   await form.getByRole('button', { name: '从文本填写', exact: true }).click();

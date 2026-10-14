@@ -11,6 +11,8 @@ import {
 import type { Profile, Credentials } from '../../shared/contracts';
 import { useI18n } from '../i18n';
 import { ConnectionExtractor } from './ConnectionExtractor';
+import { useConnectionAttempt } from '../use-connection-attempt';
+import { connectionErrorMessage, isConnectionCancelled } from '../../shared/connection-errors';
 
 type Field = 'name' | 'host' | 'port' | 'username';
 
@@ -29,9 +31,10 @@ export function ConnectionForm({
   saved: boolean;
   onClose: () => void;
   onSave: (p: Profile) => Promise<void>;
-  onConnect: (p: Profile, c: Credentials, persist: boolean) => Promise<void>;
+  onConnect: (p: Profile, c: Credentials, persist: boolean, signal?: AbortSignal) => Promise<void>;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const attempt = useConnectionAttempt();
   const id = useId();
   const form = useRef<HTMLFormElement>(null);
   const [value, setValue] = useState<Profile>(
@@ -55,6 +58,7 @@ export function ConnectionForm({
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState<'save' | 'connect' | null>(null);
   const [error, setError] = useState('');
+  const [cancelled, setCancelled] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [extraction, setExtraction] = useState<'done' | null>(null);
   const [invalid, setInvalid] = useState<Partial<Record<Field, boolean>>>({});
@@ -98,6 +102,7 @@ export function ConnectionForm({
     };
     setInvalid(nextInvalid);
     setError('');
+    setCancelled(false);
     const first = (['name', 'host', 'port', 'username'] as const).find((f) => nextInvalid[f]);
     if (first) {
       form.current?.querySelector<HTMLInputElement>('[name="' + first + '"]')?.focus();
@@ -119,23 +124,28 @@ export function ConnectionForm({
         group: value.group.trim(),
         port: Number(connectionPort),
       };
-      if (!connect || persist) await onSave(next);
-      if (connect) {
-        connectionStarted = true;
-        await onConnect(
-          next,
-          {
-            password: value.auth === 'password' ? password || undefined : undefined,
-            passphrase: value.auth === 'key' ? passphrase || undefined : undefined,
-            keyToken: value.auth === 'key' ? key?.token : undefined,
-            remember: persist && remember,
-          },
-          persist,
-        );
-      }
+      await attempt.run(async (signal) => {
+        if (!connect || persist) await onSave(next);
+        signal.throwIfAborted();
+        if (connect) {
+          connectionStarted = true;
+          await onConnect(
+            next,
+            {
+              password: value.auth === 'password' ? password || undefined : undefined,
+              passphrase: value.auth === 'key' ? passphrase || undefined : undefined,
+              keyToken: value.auth === 'key' ? key?.token : undefined,
+              remember: persist && remember,
+            },
+            persist,
+            signal,
+          );
+        }
+      });
       onClose();
     } catch (e) {
-      setError((e as Error).message.replace(/^Error invoking remote method '[^']+': Error: /, ''));
+      setCancelled(isConnectionCancelled(e));
+      setError(connectionErrorMessage(e, locale));
       // The backend consumes a selected key token when a connection is attempted.
       if (connectionStarted) setKey(null);
     } finally {
@@ -379,12 +389,20 @@ export function ConnectionForm({
           </div>
         </fieldset>
         {error && (
-          <p className="form-error connection-error" role="alert">
+          <p
+            className={cancelled ? 'connection-notice' : 'form-error connection-error'}
+            role={cancelled ? 'status' : 'alert'}
+          >
             {error}
           </p>
         )}
         <footer className="connection-footer">
           <div className="connection-actions">
+            {busy === 'connect' && (
+              <button type="button" className="secondary" onClick={attempt.cancel}>
+                {t('cancelConnection')}
+              </button>
+            )}
             <button type="submit" className="primary" disabled={!!busy}>
               {busy === 'connect' ? (
                 <LoaderCircle size={15} className="connection-spinner" aria-hidden="true" />

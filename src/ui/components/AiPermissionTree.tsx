@@ -3,6 +3,10 @@ import { Check, ShieldCheck, Server, Monitor } from 'lucide-react';
 import { aiCapabilities, type AiPolicy, type AiSnapshot } from '../../shared/ai';
 import type { Profile } from '../../shared/contracts';
 const names = {
+  'http.send': '从此机器发送 HTTP 请求',
+  'agent.manage': '管理 Agent 与系统环境',
+  'agent.hosting': '管理 Agent HTTP 服务',
+  'agent.relay': '管理 Agent 中继',
   'metrics.read': '资源监控',
   'files.read': '读取文件',
   'commands.execute': '执行命令 / 修改文件',
@@ -72,6 +76,7 @@ export function AiPermissionTree({
             查询连接目标、分组与会话
           </label>
           <small>可查询尚未连接的目标；不会读取凭据或连接机器。</small>
+          <label><input type="checkbox" checked={p.application.includes('http.use')} onChange={e => edit({ ...p, application: toggle(p.application, 'http.use', e.target.checked) })} />使用 HTTP 扩展工具</label><small>需同时勾选允许的 HTTP 工作区；远端发送还需授权发送方机器的 HTTP 能力。</small>
           <label>
             <input
               type="checkbox"
@@ -86,6 +91,24 @@ export function AiPermissionTree({
             为授权机器新建连接
           </label>
           <small>使用已保存的凭据打开终端，后续操作仍受机器权限限制。</small>
+          {(
+            [
+              ['agents.manage', '分配与管理子任务'],
+              ['goals.manage', '管理定期目标'],
+            ] as const
+          ).map(([id, label]) => (
+            <label key={id}>
+              <input
+                type="checkbox"
+                checked={p.application.includes(id)}
+                onChange={(e) =>
+                  edit({ ...p, application: toggle(p.application, id, e.target.checked) })
+                }
+              />
+              {label}
+            </label>
+          ))}
+          <small>默认关闭。子任务和定期目标不会增加机器或操作权限。</small>
         </section>
         <section className="permission-global-section">
           <h4>

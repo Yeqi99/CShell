@@ -2,26 +2,35 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, FileKey2, LoaderCircle } from 'lucide-react';
 import type { Credentials, Profile } from '../../shared/contracts';
 import { useI18n } from '../i18n';
+import { useConnectionAttempt } from '../use-connection-attempt';
+import { connectionErrorMessage, isConnectionCancelled } from '../../shared/connection-errors';
 
 export function SavedConnection({
   profile,
   saved,
+  persist = true,
   onConnect,
   onDone,
-  onBusy,
 }: {
   profile: Profile;
   saved: boolean;
-  onConnect: (profile: Profile, credentials: Credentials, persist: boolean) => Promise<void>;
+  persist?: boolean;
+  onConnect: (
+    profile: Profile,
+    credentials: Credentials,
+    persist: boolean,
+    signal?: AbortSignal,
+  ) => Promise<void>;
   onDone: () => void;
-  onBusy: (busy: boolean) => void;
 }) {
   const { t, locale } = useI18n();
+  const attempt = useConnectionAttempt();
   const cn = locale === 'zh-CN';
   const started = useRef(false),
     running = useRef(false);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState('');
+  const [cancelled, setCancelled] = useState(false);
   const [secret, setSecret] = useState(''),
     [remember, setRemember] = useState(saved);
   const [key, setKey] = useState<{ token: string; name: string } | null>(null);
@@ -29,29 +38,30 @@ export function SavedConnection({
     if (running.current) return;
     running.current = true;
     setBusy(true);
-    onBusy(true);
     setError('');
+    setCancelled(false);
     try {
-      await onConnect(
-        profile,
-        {
-          ...(profile.auth === 'password'
-            ? { password: secret || undefined }
-            : { passphrase: secret || undefined, keyToken: key?.token }),
-          remember,
-        },
-        true,
+      await attempt.run((signal) =>
+        onConnect(
+          profile,
+          {
+            ...(profile.auth === 'password'
+              ? { password: secret || undefined }
+              : { passphrase: secret || undefined, keyToken: key?.token }),
+            remember: persist && remember,
+          },
+          persist,
+          signal,
+        ),
       );
       onDone();
     } catch (e) {
-      setError(
-        String((e as Error).message).replace(/^Error invoking remote method '[^']+': Error: /, ''),
-      );
+      setCancelled(isConnectionCancelled(e));
+      setError(connectionErrorMessage(e, locale));
       setKey(null);
     } finally {
       running.current = false;
       setBusy(false);
-      onBusy(false);
     }
   };
   useEffect(() => {
@@ -69,6 +79,9 @@ export function SavedConnection({
         <div className="saved-connection-progress" role="status">
           <LoaderCircle size={18} className="connection-spinner" />
           {t('connecting')}
+          <button className="secondary" onClick={attempt.cancel}>
+            {t('cancelConnection')}
+          </button>
         </div>
       ) : (
         <form
@@ -105,16 +118,21 @@ export function SavedConnection({
               onChange={(e) => setSecret(e.target.value)}
             />
           </label>
-          <label className="connection-check">
-            <input
-              type="checkbox"
-              checked={remember}
-              onChange={(e) => setRemember(e.target.checked)}
-            />
-            {t('remember')}
-          </label>
+          {persist && (
+            <label className="connection-check">
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+              />
+              {t('remember')}
+            </label>
+          )}
           {error && (
-            <p className="form-error" role="alert">
+            <p
+              className={cancelled ? 'connection-notice' : 'form-error'}
+              role={cancelled ? 'status' : 'alert'}
+            >
               {error}
             </p>
           )}

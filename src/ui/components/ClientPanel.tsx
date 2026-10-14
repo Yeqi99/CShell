@@ -5,7 +5,7 @@ import type { ClientShell, ClientStatus } from '../../shared/client';
 import './client.css';
 const words = {
   'zh-CN': {
-    title: 'CShell Client',
+    title: 'CShell Agent',
     access: '连接',
     settings: '设置',
     password: '连接密码',
@@ -13,11 +13,10 @@ const words = {
     saveAccess: '保存访问设置',
     configured: '已设置连接密码',
     setupFirst: '先在设置中配置密码和开放权限',
-    connectionHint: '在 CShell 新建连接，选择 CShell Client，填写地址、端口和密码。',
+    connectionHint: '在 CShell 新建连接，选择 CShell Agent，填写地址、端口和密码。',
     subtitle: '管理此电脑的远程访问',
-    download: '获取 CShell Client',
-    downloadHint:
-      '在被管理电脑安装独立 Client，填写连接信息和密码。安装包通过 GitHub Releases 分发。',
+    download: '获取 CShell Agent',
+    downloadHint: '在被管理电脑的 CShell 插件市场启用 Agent，再配置地址、端口和权限。',
     github: '打开 GitHub 发行页面',
     network: '连接设置',
     identity: '设备指纹',
@@ -67,7 +66,7 @@ const words = {
     waiting: '处理中…',
   },
   'en-US': {
-    title: 'CShell Client',
+    title: 'CShell Agent',
     access: 'Connection',
     settings: 'Settings',
     password: 'Connection password',
@@ -76,9 +75,9 @@ const words = {
     configured: 'Connection password configured',
     setupFirst: 'Configure a password and permissions in Settings first',
     connectionHint:
-      'Create a connection in CShell, choose CShell Client, then enter the address, port and password.',
+      'Create a connection in CShell, choose CShell Agent, then enter the address, port and password.',
     subtitle: 'Manage remote access to this computer',
-    download: 'Get CShell Client',
+    download: 'Get CShell Agent',
     downloadHint:
       'Install the standalone Client on the managed computer, then connect with its address and password. Installers are distributed through GitHub Releases.',
     github: 'Open GitHub releases',
@@ -132,7 +131,8 @@ const words = {
     waiting: 'Working…',
   },
 };
-export function ClientApplication() {
+export function ClientApplication({ embedded = false }: { embedded?: boolean }) {
+  const [allowHttp, setAllowHttp] = useState(false);
   const [locale, setLocale] = useState<'zh-CN' | 'en-US'>(() =>
     localStorage.getItem('client-locale') === 'en-US' ? 'en-US' : 'zh-CN',
   );
@@ -144,6 +144,7 @@ export function ClientApplication() {
     localStorage.getItem('client-theme') === 'dark' ? 'dark' : 'light',
   );
   useEffect(() => {
+    if (embedded) return;
     document.documentElement.dataset.theme = theme;
     localStorage.setItem('client-theme', theme);
     void window.cshell.clientTheme(theme as 'light' | 'dark').catch((e) => setError(e.message));
@@ -167,10 +168,11 @@ export function ClientApplication() {
       loaded.current = true;
       if (s.bind) {
         setBind(s.bind);
-        setHost(s.bind);
+        setHost(s.advertisedHost ?? s.bind);
       }
       if (s.port) setPort(String(s.port));
       setShells(s.allowedShells ?? []);
+      setAllowHttp(s.allowHttp ?? false);
     }
     if (s.interfaces) setInterfaces(s.interfaces);
   };
@@ -192,8 +194,8 @@ export function ClientApplication() {
     }
   };
   return (
-    <div className="client-app">
-      <header className="topbar">
+    <div className={embedded ? 'client-app agent-embedded' : 'client-app'}>
+      <header className="topbar" hidden={embedded}>
         <img className="client-brand" src={brandMark} alt="" />
         <strong>{t.title}</strong>
       </header>
@@ -213,7 +215,8 @@ export function ClientApplication() {
               setCopied(false);
               if (status?.running) await window.cshell.clientStop();
               else if (!status?.passwordConfigured) setView('settings');
-              else await window.cshell.clientStart({ bind, port: Number(port) });
+              else
+                await window.cshell.clientStart({ bind, port: Number(port), advertisedHost: host });
             })
           }
         >
@@ -243,7 +246,7 @@ export function ClientApplication() {
               {status?.passwordConfigured ? t.connectionHint : t.setupFirst}
             </p>
             <p>
-              <strong>CShell Client</strong> · {bind}:{port}
+              <strong>CShell Agent</strong> · {bind}:{port}
             </p>
             {status?.running && (
               <>
@@ -354,6 +357,14 @@ export function ClientApplication() {
             </label>
           </div>
           <label>
+            对外地址（IP / 域名）
+            <input
+              value={host}
+              disabled={status?.running || busy}
+              onChange={(e) => setHost(e.target.value)}
+            />
+          </label>
+          <label>
             {t.password}
             <input
               type="password"
@@ -384,13 +395,22 @@ export function ClientApplication() {
               </label>
             ))}
           </fieldset>
+          <label className="agent-http-permission">
+            <input
+              type="checkbox"
+              checked={allowHttp}
+              disabled={status?.running || busy}
+              onChange={(e) => setAllowHttp(e.target.checked)}
+            />
+            允许通过此电脑发送 HTTP 请求
+          </label>
           <p className="client-permission-note">{t.notice}</p>
           <button
             className="client-primary"
             disabled={busy || status?.running || password.length < 12 || !shells.length}
             onClick={() =>
               void run(async () => {
-                await window.cshell.clientSetAccess({ password, shells });
+                await window.cshell.clientSetAccess({ password, shells, allowHttp });
                 setPassword('');
                 setView('access');
               })
@@ -405,7 +425,7 @@ export function ClientApplication() {
         </section>
         {error && <p role="alert">{error}</p>}
       </main>
-      <footer className="client-footer">
+      <footer className="client-footer" hidden={embedded}>
         <select
           aria-label="Language"
           value={locale}

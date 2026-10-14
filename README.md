@@ -1,6 +1,6 @@
 # CShell
 
-CanpShell 是面向高频操作的终端与 AI 工作台，采用 **MIT** 许可证。当前 Windows 版本为 **CShell 0.5.0 预览版**，独立受控端为 **CShell Client 0.1.0**；macOS、Linux 和 Android 本轮未更新，继续提供 0.4.7。
+CanpShell 是面向高频操作的终端与 AI 工作台，采用 **MIT** 许可证。当前开发版本为 **0.6.0 开发预览**，新增 HTTP 工作区与轻量独立 **CShell Agent**。本地构建不代表已发布；以下下载链接保留历史已上传版本。
 
 [源码](https://github.com/Yeqi99/CShell) · [版本下载](https://github.com/Yeqi99/CShell/releases) · [问题反馈](https://github.com/Yeqi99/CShell/issues) · [构建状态](https://github.com/Yeqi99/CShell/actions)
 
@@ -11,16 +11,16 @@ CanpShell 是面向高频操作的终端与 AI 工作台，采用 **MIT** 许可
 发行产物统一放到 [GitHub Releases](https://github.com/Yeqi99/CShell/releases)；市场目录固定到已发布的源码标签，不需要部署市场服务器。仓库为 [Yeqi99/CShell](https://github.com/Yeqi99/CShell)，以实际发布完成的附件为准。
 
 - [Windows 主程序 CShell 0.5.0](https://github.com/Yeqi99/CShell/releases/download/v0.5.0/CShell-0.5.0-win-x64.exe)
-- [Windows 受控端 CShell Client 0.1.0](https://github.com/Yeqi99/CShell/releases/download/v0.5.0/CShell-Client-0.1.0-win-x64.exe)
+- [历史独立受控端 CShell Client 0.1.0](https://github.com/Yeqi99/CShell/releases/download/v0.5.0/CShell-Client-0.1.0-win-x64.exe)
 - [SHA-256 校验文件](https://github.com/Yeqi99/CShell/releases/download/v0.5.0/SHA256SUMS.txt) · [0.5.0 发布说明](https://github.com/Yeqi99/CShell/releases/tag/v0.5.0)
 - [其他平台 0.4.7 下载](https://github.com/Yeqi99/CShell/releases/tag/v0.4.7)
 
-| 平台    | 格式 / 架构                           | 当前验证状态                                             |
-| ------- | ------------------------------------- | -------------------------------------------------------- |
+| 平台    | 格式 / 架构                           | 当前验证状态                                           |
+| ------- | ------------------------------------- | ------------------------------------------------------ |
 | Windows | NSIS `.exe`，x64                      | 0.5.0：本机构建、60 项测试及两端打包版 Client 回归通过 |
-| macOS   | `.dmg` / `.zip`，Apple Silicon、Intel | 0.4.7：云端构建通过；真机交互待验收 |
-| Linux   | `.AppImage` / `.deb`，x64、ARM64      | 0.4.7：云端构建通过；真机交互待验收 |
-| Android | 测试 `.apk`，Android 8+               | 0.4.7：编译与 lint 通过，持久化签名；功能不等同桌面 |
+| macOS   | `.dmg` / `.zip`，Apple Silicon、Intel | 0.4.7：云端构建通过；真机交互待验收                    |
+| Linux   | `.AppImage` / `.deb`，x64、ARM64      | 0.4.7：云端构建通过；真机交互待验收                    |
+| Android | 测试 `.apk`，Android 8+               | 0.4.7：编译与 lint 通过，持久化签名；功能不等同桌面    |
 
 尚无商业代码签名证书，macOS 未公证。核对附件的 SHA256SUMS.txt。完整范围见 [发布说明](docs/RELEASE.md)，已执行的检查见 [验证记录](docs/VALIDATION.md)。
 
@@ -40,11 +40,17 @@ Android 默认进入概览首页，底部导航为首页、连接、终端、文
 
 连接生命周期与 Agent 工具采用 [Connection Provider Architecture](docs/CONNECTION-PROVIDERS.md)。SSH、Windows 本机终端和 CShell Client 使用独立 Provider。Client 与 SSH 共用左侧服务器列表，支持命名、分组、收藏、编辑和双击连接，旧设备记录自动迁入。RDP 通过 Windows mstsc 打开独立窗口，暂不保存配置；VNC 与直连 Docker TLS 尚未实现。现有 Docker 插件使用真实 Engine HTTP API，经 SSH socket 隧道访问。
 
-### CShell Client
+### CShell Agent
 
-Client 安装在被管理的 Windows 电脑上，与主程序独立运行。设置监听地址、端口、连接密码和允许的 CMD / PowerShell 后启动服务；在主程序新建连接中选择 CShell Client，填写信息或显式粘贴复制的信息，核对设备指纹后连接。复制内容不含密码，凭据独立加密保存，不进入外观方案。
+在被管理电脑上独立安装 Agent，无需完整 CShell、Electron、Chromium 或 SSH 服务。运行 Agent 后，CShell 的 Agent 插件可以发现本机服务，也可以管理明确选择且具有管理授权的远程 Agent。插件配置监听地址、端口、密码及能力权限；安装和发现不自动授权远程控制。
 
-Client 默认不监听、不开放防火墙、不提升权限。本机回环连接已验证，跨机器局域网、休眠恢复与长期断网仍待验收；暂不提供文件传输、屏幕控制、中继、Windows 服务或 WSL 一键安装。详见 [Client 使用与安全边界](docs/CLIENT.md)。
+控制端新建连接选择 CShell Agent，填写信息或显式粘贴，核对设备指纹后连接。普通复制信息不含密码，凭据独立加密保存，不进入外观方案。连接共用左侧命名、分组、收藏和双击操作。
+
+Agent 提供 Windows CMD / PowerShell 与 Linux、macOS 的原生 Shell；Windows Agent 的 WSL 管理作用于目标机器。HTTP 服务托管、中继与管理权限独立控制，默认关闭。当前分发可直接运行的命令行包，尚未自动注册系统服务；暂不提供 Agent 文件传输或屏幕控制。跨机器、休眠恢复与长期运行的验证边界见 [Agent 使用说明](docs/CLIENT.md) 和 [整合验收](docs/RELEASE-CHECKLIST.md)。
+
+## HTTP 扩展
+
+安装 HTTP 后可新建请求工作区，保存多个目标、请求和历史，选择本机、SSH 或支持 HTTP 的 Agent 发送。人工与智能体共用执行及历史；工具默认勾选，但调用仍须授权。详见 [HTTP 使用与边界](docs/HTTP.md)。
 
 ## AI 智能体
 
@@ -63,7 +69,7 @@ pnpm test:desktop
 pnpm run dist
 ```
 
-`release/0.5.0/CShell-0.5.0-win-x64.exe` 为 NSIS 安装包，`release/0.5.0/win-unpacked/CShell.exe` 为目录版。使用 `pnpm dist:client` 构建独立受控端，产物位于 `release/client-0.1.0/`。macOS 使用 `pnpm exec electron-builder --mac --arm64 --publish never`，Linux 使用 `pnpm exec electron-builder --linux --x64 --publish never`；本轮未发布这些平台的新包。首次安装依赖和构建需要网络。
+`release/0.6.0/CShell-0.6.0-win-x64.exe` 为当前 NSIS 构建目标，`release/0.6.0/win-unpacked/CShell.exe` 为目录版。独立 Agent 使用 `node scripts/agent-build.mjs` 构建，并通过 `node scripts/package-agent.mjs` 打包；在对应操作系统和架构上构建及验证。macOS 使用 `pnpm exec electron-builder --mac --arm64 --publish never`，Linux 使用 `pnpm exec electron-builder --linux --x64 --publish never`。首次安装依赖和构建需要网络。
 
 ## 插件与应用
 
@@ -115,7 +121,19 @@ Compose / Swarm 管理的容器不通过该入口重建，避免与部署声明�
 
 依据：[Docker Engine API](https://docs.docker.com/reference/api/engine/)、[端口发布](https://docs.docker.com/engine/network/port-publishing/)。
 
-## MCP
+## 子智能体与定期目标（本地开发构建）
+
+智能体“基座与权限”增加独立的“分配与管理子任务”和“管理定期目标”能力，默认关闭。主智能体可通过 `spawn_agent`、`list_agents`、`wait_agent`、`send_agent`、`stop_agent` 分配、观察、继续与汇总子任务；对话内提供紧凑任务树，点击查看输出或处理授权。子任务固定继承目标连接、模型与审核模式，权限取创建时上限和当前授权的交集；不能自行换机器，父任务停止或结束会停止尚未完成的子任务。
+
+通过智能体的“目标管理”创建、编辑、立即检查、暂停、恢复或移除目标，也可在对话里请求模型调用 `set_goal`（保存前确认）。默认每 15 分钟执行，间隔可调整；`get_goal` 查询，`report_goal` 报告继续、达成或缺少条件，`pause_goal` 暂停。每个目标固定目标机器，同一目标不重叠运行。完成、缺少条件、接口失败或没有明确结果报告时停止；不会自动猜密码、切换机器或重连。重启后须连接同一机器并显式恢复，不补跑错过的检查。目标和记录保存在加密 AI 存储中，不随外观方案导出。
+
+例如：“每 15 分钟检查这台机器上带 `cleanup=true` 标签的容器，只删除已退出超过 7 天的容器，不删卷，持续检查。”未说明“不活跃”的范围、状态和时长时，模型应先询问；低 CPU 不等于可删除。远端命令仍使用原有机器权限和审核策略，全放行只减少已授权操作的审核，不增加权限。未配置的目标不会自行执行清理。
+
+用户修改权限后，目标管理中的“恢复 / 立即检查”会按当前授权重新确定该目标的权限上限，目标机器不变；模型和子任务不能自行扩大上限。
+
+轻量限制：全局最多 6 个运行中的智能体，每个父任务最多 3 个并行子任务、两层嵌套，每轮最多创建 8 个直属子任务；单轮最多 5 分钟、16 次模型调用。最多 20 个目标，每个目标保留最近 30 条检查摘要，子任务保留最近记录。只在 CShell 运行时调度，不安装系统服务。
+
+## MCP 服务
 
 默认关闭，偏好设置中可启用本机 MCP 服务、配置端口、选择授权服务器和复制令牌。命令执行单独授权且逐条确认。详见 [接入说明](docs/MCP.md)。
 
@@ -160,9 +178,11 @@ Compose / Swarm 管理的容器不通过该入口重建，避免与部署声明�
 
 ## 已知边界
 
-详见 [路线图](docs/ROADMAP.md) 和 [验证记录](docs/VALIDATION.md)。未完成能力包括：标签内多终端拆分、SSH Agent/系统密钥发现、SSH Config 导入、系统级远端拖出、断点续传、跨盘移动回退、递归删除、连接超时前主动取消、代理/跳板机、主机指纹管理界面、正式签名、真实 Linux 服务器和长时间压力验收、Web 嵌入、Android 桌面功能补齐。界面没有为这些能力放置不可用入口。macOS/Linux 已打包，真机交互验证尚未完成。
+详见 [路线图](docs/ROADMAP.md) 和 [验证记录](docs/VALIDATION.md)。未完成能力包括：标签内多终端拆分、SSH Agent/系统密钥发现、SSH Config 导入、系统级远端拖出、断点续传、跨盘移动回退、递归删除、代理/跳板机、主机指纹管理界面、正式签名、真实 Linux 服务器和长时间压力验收、Web 嵌入、Android 桌面功能补齐。界面没有为这些能力放置不可用入口。macOS/Linux 已打包，真机交互验证尚未完成。
 
-本预览版不适用于不可信多租户 Web 嵌入。未来浏览器版本必须通过授权服务端网关连接 SSH，详情见 [架构决策](docs/ARCHITECTURE.md)。AI 不在后台自动读取终端输入；只有用户发送任务后才会请求配置的基座与已授权工具。
+本地开发构建已支持 SSH 连接取消、关闭连接页停止请求，以及保留旧输出的显式重连；切换工作区不会取消连接。重连创建新会话，不恢复远端进程，也不重发旧命令。
+
+本预览版不适用于不可信多租户 Web 嵌入。未来浏览器版本必须通过授权服务端网关连接 SSH，详情见 [架构决策](docs/ARCHITECTURE.md)。AI 不在后台自动读取终端输入；只有用户发送任务或显式启用定期目标后，才会请求配置的基座与已授权工具。
 
 ## 许可证
 
@@ -176,6 +196,6 @@ Compose / Swarm 管理的容器不通过该入口重建，避免与部署声明�
 
 “插件市场 → WSL Linux”提供本机 Linux 发行版发现与终端入口。需要 Windows 已启用 WSL 并安装发行版；插件不会自动启用系统组件或下载 Linux。没有可用环境时会显示安装命令入口。
 
-## CShell Client（开发中）
+## 旧 Client 兼容开发入口
 
 Windows 受控端与 CShell 工作台使用独立的设备配对和加密直连通道，当前支持真实 CMD / PowerShell 终端。开发启动 `pnpm start:client`；使用步骤、权限与实验协议边界见 [Client 说明](docs/CLIENT.md)。本地开发能力不代表已发布版本支持。

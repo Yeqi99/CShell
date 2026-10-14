@@ -5,7 +5,7 @@ import { useEffect, useLayoutEffect, useState } from 'react';
 import { defaults, type Preferences } from '../../shared/contracts';
 import { useI18n } from '../i18n';
 import { PresetControls } from './PresetControls';
-import { McpSettings } from './McpSettings';
+import { McpSettings, useMcpSettings } from './McpSettings';
 import { FontPicker } from './FontPicker';
 export function Settings({
   value,
@@ -41,6 +41,7 @@ export function Settings({
   const [fonts, setFonts] = useState<string[]>([]),
     [fontState, setFontState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [busy, setBusy] = useState(false);
+  const mcp = useMcpSettings();
   useLayoutEffect(() => {
     if (themeRequest) {
       setDraft((current) => ({ ...current, theme: themeRequest.theme }));
@@ -119,8 +120,12 @@ export function Settings({
           hidden={!['appearance', 'terminal'].includes(category)}
           onSubmit={(e) => {
             e.preventDefault();
+            if (busy || mcp.busy) return;
             setBusy(true);
-            void onSave(draft)
+            setError('');
+            void mcp
+              .save(category === 'security')
+              .then(() => onSave(draft))
               .then(onClose)
               .catch((e) => setError(e.message))
               .finally(() => setBusy(false));
@@ -343,7 +348,7 @@ export function Settings({
                 : 'Manage providers, sessions & server permissions'}
             </button>
           </section>
-          <McpSettings />
+          <McpSettings state={mcp} saving={busy} />
         </div>
       </div>
       <footer className="settings-savebar">
@@ -351,14 +356,14 @@ export function Settings({
           {error ||
             (['appearance', 'terminal', 'workspace'].includes(category) ? t('previewHint') : '')}
         </span>
-        <button type="button" className="secondary" onClick={onClose}>
+        <button type="button" className="secondary" disabled={busy || mcp.busy} onClick={onClose}>
           {t('cancel')}
         </button>
         <button
           hidden={category === 'local'}
           className="primary"
           form="workspace-preferences-form"
-          disabled={busy}
+          disabled={busy || mcp.busy || (category === 'security' && !mcp.draft)}
         >
           {t('save')}
         </button>

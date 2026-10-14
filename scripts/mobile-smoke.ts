@@ -38,10 +38,36 @@ try {
       connect: (data: string) => {
         const p = JSON.parse(data);
         calls.push(p);
+        if (p.protocol === 'agent') {
+          setTimeout(
+            () =>
+              (window as any).receive(
+                p.id,
+                'environments',
+                JSON.stringify([
+                  { shell: 'powershell', label: 'PowerShell' },
+                  { shell: 'wsl', distribution: 'Ubuntu', label: 'WSL · Ubuntu' },
+                ]),
+              ),
+            50,
+          );
+          return;
+        }
         setTimeout(() => {
           (window as any).receive(p.id, 'connected', '');
           (window as any).receive(p.id, 'data', btoa('test-session$ '));
         }, 50);
+      },
+      resetAgentTrust: (host: string, port: number) => {
+        calls.push({ resetTrust: host, port });
+        for (const call of calls)
+          if (call.protocol === 'agent' && call.host === host && Number(call.port) === port)
+            (window as any).receive(call.id, 'closed', '');
+        (window as any).agentTrustReset(host, port);
+      },
+      openAgent: (id: string, index: number) => {
+        calls.push({ openAgent: id, index });
+        (window as any).receive(id, 'connected', index === 1 ? 'WSL · Ubuntu' : 'PowerShell');
       },
       fileRequest: (data: string) => {
         const r = JSON.parse(data);
@@ -67,10 +93,15 @@ try {
       acknowledge: () => {},
       disconnect: () => {},
       checkUpdate: () => {
-        (window as any).updateEvent(
-          JSON.stringify({ message: '当前已是最新可用版本', busy: false }),
+        setTimeout(
+          () =>
+            (window as any).updateEvent(
+              JSON.stringify({ message: '当前已是最新可用版本', busy: false }),
+            ),
+          500,
         );
       },
+      openUpdatePage: () => calls.push('update-page'),
       installUpdate: () => {},
     };
   });
@@ -79,6 +110,8 @@ try {
   assert.equal(await page.locator('#connect').isVisible(), false);
   await page.screenshot({ path: 'test-results/android-home.png' });
   await page.locator('#home-new').click();
+  assert.equal(await page.locator('#connection-fields').isVisible(), false);
+  await page.locator('#protocol-ssh').click();
   assert.equal(await page.locator('#connect-actions').isVisible(), true);
   await page.locator('[name=host]').fill('test.example');
   await page.locator('[name=name]').fill('测试连接');
@@ -138,6 +171,11 @@ try {
   await page.locator('[data-page=settings]').click();
   await page.locator('#theme').click();
   await page.locator('#check-update').click();
+  assert.equal(await page.locator('#check-update').isDisabled(), true);
+  assert.equal(await page.locator('#update-status').textContent(), '正在检查更新…');
+  await page.getByText('当前已是最新可用版本', { exact: true }).waitFor();
+  await page.locator('#update-page').click();
+  assert.ok(await page.evaluate(() => (window as any).nativeCalls.includes('update-page')));
   assert.equal(await page.locator('#update-status').innerText(), '当前已是最新可用版本');
   await page.setViewportSize({ width: 393, height: 852 });
   await page.screenshot({ path: 'test-results/android-settings-dark.png' });
@@ -145,6 +183,52 @@ try {
   await page.locator('#home').waitFor();
   assert.equal(await page.locator('#server-list .server-open').count(), 1);
   assert.equal(await page.locator('body.dark').count(), 1);
+  await page.locator('#new').click();
+  await page.locator('#protocol-agent').click();
+  assert.equal(await page.locator('#username-field').isVisible(), false);
+  assert.equal(await page.locator('#ssh-auth').isVisible(), false);
+  assert.equal(await page.locator('[name=port]').inputValue(), '47831');
+  await page.locator('[name=host]').fill('agent.test');
+  await page.locator('[name=name]').fill('我的电脑');
+  await page.locator('[name=password]').fill('agent-secret-not-persisted');
+  await page.locator('[name=favorite]').check();
+  await page.locator('button[type=submit]').click();
+  await page.getByRole('button', { name: 'Ubuntu · WSL', exact: true }).waitFor();
+  await page.screenshot({ path: 'test-results/android-agent-environments.png' });
+  await page.getByRole('button', { name: 'Ubuntu · WSL', exact: true }).click();
+  assert.equal(await page.locator('#status').innerText(), '已连接');
+  assert.ok((await page.locator('#tabs').innerText()).includes('WSL · Ubuntu'));
+  assert.ok(
+    await page.evaluate(() =>
+      (window as any).nativeCalls.some((c: any) => c.index === 1 && c.openAgent),
+    ),
+  );
+  await page.locator('#navigation [data-page=files]').click();
+  assert.equal(await page.locator('#files-status').innerText(), '此 Agent 连接尚未提供文件能力');
+  assert.equal(await page.locator('#files-upload').isDisabled(), true);
+  assert.ok(
+    !(await page.evaluate(() => localStorage.getItem('profiles')))?.includes(
+      'agent-secret-not-persisted',
+    ),
+  );
+  await page.locator('#navigation [data-page=connections]').click();
+  await page.getByRole('button', { name: '编辑 我的电脑', exact: true }).click();
+  await page.locator('#agent-identity summary').click();
+  await page.getByRole('button', { name: '重新核对设备身份', exact: true }).click();
+  assert.ok(
+    await page.evaluate(() =>
+      (window as any).nativeCalls.some(
+        (c: any) => c.resetTrust === 'agent.test' && c.port === 47831,
+      ),
+    ),
+  );
+  assert.ok((await page.locator('#form-error').innerText()).includes('下次连接需重新核对身份'));
+  const resetProfiles = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('profiles') || '[]'),
+  );
+  assert.equal(resetProfiles.length, 2);
+  assert.equal(resetProfiles.find((p: any) => p.protocol === 'agent').agentAuthorized, false);
+  assert.equal(resetProfiles.find((p: any) => p.protocol === 'agent').favorite, true);
   assert.deepEqual(errors, []);
   console.log(
     'Android web workbench: navigation, persistence, drafts, sessions, minimal mode, narrow/landscape, update feedback passed. Native SSH/installer require device validation.',

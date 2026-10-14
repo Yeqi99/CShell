@@ -22,7 +22,7 @@ final class AppUpdates {
   private final ExecutorService worker;
   private final Consumer<String> emit;
   private volatile boolean busy;
-  private String url, sums, name, version;
+  private String url, sums, name, version, readyHash;
   private long size;
   private File ready;
   AppUpdates(Activity activity, ExecutorService worker, Consumer<String> emit) {
@@ -51,7 +51,7 @@ final class AppUpdates {
       HttpURLConnection c=(HttpURLConnection)u.openConnection();c.setConnectTimeout(20000);c.setReadTimeout(30000);c.setInstanceFollowRedirects(false);c.setRequestProperty("User-Agent","CShell/"+current());
       int status=c.getResponseCode();
       if(status>=300&&status<400){String location=c.getHeaderField("Location");c.disconnect();address=new URL(u,location).toString();continue;}
-      if(status!=200){c.disconnect();throw new IOException("GitHub HTTP "+status);}return c;
+      if(status!=200){c.disconnect();throw new IOException(status==403||status==429?"GitHub 限制了当前网络的请求，请稍后重试或打开下载页":"GitHub HTTP "+status);}return c;
     }
     throw new IOException("下载重定向过多");
   }
@@ -62,24 +62,27 @@ final class AppUpdates {
     }finally{c.disconnect();}
   }
   synchronized void check() {
-    if(busy)return;busy=true;ready=null;url=null;state("正在检查更新…",false,-1);
+    if(busy)return;busy=true;ready=null;readyHash=null;url=null;sums=null;name=null;version=null;state("正在检查更新…",false,-1);
     worker.execute(()->{
       try{
         JSONArray list=new JSONArray(text("https://api.github.com/repos/Yeqi99/CShell/releases?per_page=30",2000000));
-        String best=current();
+        String best=current();boolean compatible=false;
+        String selectedUrl=null,selectedSums=null,selectedName=null,selectedVersion=null;long selectedSize=0;
         for(int i=0;i<list.length();i++){
           JSONObject r=list.getJSONObject(i);String tag=r.optString("tag_name");
-          if(r.optBoolean("draft")||!tag.matches("v[0-9]+\\.[0-9]+\\.[0-9]+")||compare(tag,best)<=0)continue;
+          if(r.optBoolean("draft")||!tag.matches("v[0-9]+\\.[0-9]+\\.[0-9]+"))continue;
           String expected="CShell-"+tag.substring(1)+"-android-test.apk",base="https://github.com/Yeqi99/CShell/releases/download/"+tag+"/";
           JSONObject apk=null,checksum=null;JSONArray assets=r.getJSONArray("assets");
           for(int j=0;j<assets.length();j++){JSONObject a=assets.getJSONObject(j);if(expected.equals(a.optString("name")))apk=a;if("SHA256SUMS.txt".equals(a.optString("name")))checksum=a;}
           if(apk==null||checksum==null)continue;
           if(!(base+expected).equals(apk.optString("browser_download_url"))||!(base+"SHA256SUMS.txt").equals(checksum.optString("browser_download_url")))throw new IOException("发布附件地址无效");
           long length=apk.getLong("size");if(length<=0||length>150000000)throw new IOException("安装包大小无效");
-          best=tag;version=tag.substring(1);name=expected;url=base+expected;sums=base+"SHA256SUMS.txt";size=length;
+          compatible=true;if(compare(tag,best)<=0)continue;
+          best=tag;selectedVersion=tag.substring(1);selectedName=expected;selectedUrl=base+expected;selectedSums=base+"SHA256SUMS.txt";selectedSize=length;
         }
-        busy=false;state(url==null?"当前已是最新可用版本":"发现新版本 "+version,url!=null,-1);
-      }catch(Exception e){busy=false;state("检查失败："+e.getMessage(),false,-1);}
+        url=selectedUrl;sums=selectedSums;name=selectedName;version=selectedVersion;size=selectedSize;
+        busy=false;state(!compatible?"尚未找到完整的 Android 安装包":url==null?"当前已是最新可用版本":"发现新版本 "+version,url!=null,-1);
+      }catch(Exception e){url=null;busy=false;state("检查失败："+errorMessage(e),false,-1);}
     });
   }
   synchronized void install() {
@@ -103,9 +106,14 @@ final class AppUpdates {
         }finally{c.disconnect();}
         StringBuilder actual=new StringBuilder();for(byte b:digest.digest())actual.append(String.format(Locale.ROOT,"%02x",b));
         if(done!=size||!hash.equalsIgnoreCase(actual.toString()))throw new IOException("SHA256 校验失败");
-        verifyPackage(file);ready=file;busy=false;state("下载已校验，点击安装更新。安装将结束当前会话。",true,100);
-      }catch(Exception e){file.delete();ready=null;busy=false;state("更新失败："+e.getMessage(),true,-1);}
+        verifyPackage(file);ready=file;readyHash=hash;busy=false;state("下载已校验，点击安装更新。安装将结束当前会话。",true,100);
+      }catch(Exception e){file.delete();ready=null;readyHash=null;busy=false;state("更新失败："+errorMessage(e),true,-1);}
     });
+  }
+  private String errorMessage(Exception e) {
+    if(e instanceof java.net.SocketTimeoutException)return "连接 GitHub 超时，请检查网络后重试或打开下载页";
+    if(e instanceof java.net.UnknownHostException || e instanceof java.net.ConnectException)return "无法连接 GitHub，请检查网络后重试或打开下载页";
+    return e.getMessage()==null?"更新失败，请重试":e.getMessage();
   }
   @SuppressWarnings("deprecation")
   private void verifyPackage(File file) throws Exception {
@@ -113,6 +121,7 @@ final class AppUpdates {
     int flags=Build.VERSION.SDK_INT>=28?PackageManager.GET_SIGNING_CERTIFICATES:PackageManager.GET_SIGNATURES;
     PackageInfo downloaded=pm.getPackageArchiveInfo(file.getAbsolutePath(),flags),installed=pm.getPackageInfo(activity.getPackageName(),flags);
     if(downloaded==null||!activity.getPackageName().equals(downloaded.packageName))throw new IOException("安装包身份无效");
+    if(!version.equals(downloaded.versionName))throw new IOException("安装包版本与发布版本不一致");
     long next=Build.VERSION.SDK_INT>=28?downloaded.getLongVersionCode():downloaded.versionCode;
     long current=Build.VERSION.SDK_INT>=28?installed.getLongVersionCode():installed.versionCode;
     if(next<=current)throw new IOException("安装包版本未递增");
@@ -121,9 +130,18 @@ final class AppUpdates {
     if(!Arrays.equals(a,b))throw new IOException("此预览版签名与已安装版本不同，无法覆盖更新。请从 GitHub 手动安装；卸载会清除本地配置");
   }
   private void launch() {
-    activity.runOnUiThread(()->{
+    busy=true;state("正在核对安装包…",true,-1);
+    worker.execute(()->{
       try{
+        MessageDigest digest=MessageDigest.getInstance("SHA-256");
+        try(InputStream in=new FileInputStream(ready)){byte[] buffer=new byte[32768];int n;while((n=in.read(buffer))!=-1)digest.update(buffer,0,n);}
+        StringBuilder actual=new StringBuilder();for(byte b:digest.digest())actual.append(String.format(Locale.ROOT,"%02x",b));
+        if(readyHash==null||!readyHash.equalsIgnoreCase(actual.toString())){ready=null;throw new IOException("安装包已变化，请重新下载");}
         verifyPackage(ready);
+      }catch(Exception e){ready=null;readyHash=null;busy=false;state("无法安装："+errorMessage(e),true,-1);return;}
+      activity.runOnUiThread(()->{
+        busy=false;
+        try{
         if(!activity.getPackageManager().canRequestPackageInstalls()){
           state("请允许 CShell 安装更新，返回后再次点击安装。",true,-1);
           activity.startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,Uri.parse("package:"+activity.getPackageName())));return;
@@ -132,6 +150,7 @@ final class AppUpdates {
         Intent intent=new Intent(Intent.ACTION_VIEW).setDataAndType(uri,"application/vnd.android.package-archive").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         activity.startActivity(intent);state("已打开系统安装程序；取消后可再次点击安装。",true,-1);
       }catch(Exception e){state("无法安装："+e.getMessage(),true,-1);}
+      });
     });
   }
 }

@@ -1,0 +1,210 @@
+.agent-hosting {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  color: var(--text);
+  background: var(--panel);
+}
+.agent-hosting > header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.hosting-target {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  opacity: 0.75;
+}
+.hosting-layout {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+}
+.hosting-layout > nav {
+  padding: 8px;
+  overflow: auto;
+  border-right: 1px solid var(--border);
+}
+.hosting-layout > nav > button {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 9px;
+  margin-bottom: 4px;
+  text-align: left;
+}
+.hosting-layout > nav > button small {
+  font-size: 11px;
+  opacity: 0.75;
+  overflow-wrap: anywhere;
+}
+.hosting-layout > nav > button.selected {
+  border-color: var(--accent);
+  background: var(--hover);
+}
+.hosting-editor {
+  padding: 12px;
+  overflow: auto;
+  min-width: 0;
+}
+.hosting-actions,
+.hosting-fields,
+.hosting-confirm,
+.hosting-headers > div {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.hosting-actions {
+  margin-bottom: 12px;
+}
+.hosting-actions > strong {
+  flex: 1;
+}
+.hosting-editor fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.hosting-editor label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 8px 0;
+  font-size: 12px;
+}
+.hosting-fields {
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.hosting-fields > label {
+  flex: 1;
+  min-width: 100px;
+}
+.hosting-fields > label:last-of-type {
+  max-width: 180px;
+}
+.hosting-editor input,
+.hosting-editor select,
+.hosting-editor textarea {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+.hosting-editor textarea {
+  resize: vertical;
+  font-family: Consolas, monospace;
+  line-height: 1.5;
+  background: var(--field);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+}
+.hosting-editor textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.hosting-editor .hosting-check {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 7px;
+  line-height: 1.5;
+}
+.hosting-editor .hosting-check input {
+  width: auto;
+  flex: none;
+}
+.hosting-editor small,
+.hosting-hint {
+  font-size: 12px;
+  opacity: 0.75;
+  line-height: 1.5;
+}
+.hosting-routes {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0 10px;
+  align-items: center;
+}
+.hosting-routes > [role='tablist'] {
+  display: flex;
+  flex: 1;
+  gap: 4px;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.hosting-routes [aria-selected='true'] {
+  border-color: var(--accent);
+}
+.hosting-route {
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
+}
+.hosting-route > label > input[type='number'] {
+  max-width: 120px;
+}
+.hosting-headers {
+  margin: 10px 0;
+}
+.hosting-headers > div {
+  margin: 5px 0;
+}
+.hosting-headers strong {
+  flex: 1;
+  font-size: 12px;
+}
+.hosting-empty {
+  padding: 24px;
+  font-size: 13px;
+  opacity: 0.75;
+}
+.agent-hosting > p {
+  margin: 8px 12px;
+  font-size: 12px;
+}
+.hosting-error {
+  color: var(--danger, #b42318);
+}
+.hosting-confirm {
+  padding: 8px;
+  border: 1px solid var(--border);
+  margin-bottom: 10px;
+}
+.hosting-confirm span {
+  flex: 1;
+}
+.hosting-logs details {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.hosting-logs pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 240px;
+  overflow: auto;
+}
+.hosting-code-consent {
+  padding: 8px;
+  border: 1px solid var(--border);
+}
+@media (max-width: 850px) {
+  .hosting-layout {
+    grid-template-columns: 135px minmax(0, 1fr);
+  }
+  .hosting-editor {
+    padding: 8px;
+  }
+}

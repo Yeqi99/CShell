@@ -6,15 +6,23 @@ export async function mcpDesktopSmoke(app: ElectronApplication, page: Page) {
   await new Promise<void>((resolve) => probe.listen(0, '127.0.0.1', resolve));
   const port = (probe.address() as { port: number }).port;
   await new Promise<void>((resolve) => probe.close(() => resolve()));
-  await page.locator('.topbar button').last().click();
-  await page
-    .getByRole('navigation', { name: '设置分类' })
-    .getByRole('button', { name: 'AI 与安全', exact: true })
-    .click();
+  const openSettings = async () => {
+    await page.locator('.topbar button').last().click();
+    await page
+      .getByRole('navigation', { name: '设置分类' })
+      .getByRole('button', { name: 'AI 与安全', exact: true })
+      .click();
+  };
+  const save = () =>
+    page.locator('.settings-savebar').getByRole('button', { name: '保存', exact: true }).click();
+  await openSettings();
   const panel = page.locator('.mcp-settings');
   await panel.getByLabel('在本机启用 MCP').check();
   await panel.getByLabel('端口', { exact: true }).fill(String(port));
-  await panel.getByRole('button', { name: '应用 MCP 设置', exact: true }).click();
+  await save();
+  await page.locator('.settings-savebar').waitFor({ state: 'hidden' });
+  await openSettings();
+  assert.equal(await panel.getByLabel('在本机启用 MCP').isChecked(), true);
   await panel.getByText('MCP 正在运行', { exact: true }).waitFor();
   await panel.getByRole('button', { name: '复制访问令牌', exact: true }).click();
   await panel.getByRole('button', { name: '已复制', exact: true }).waitFor();
@@ -43,7 +51,10 @@ export async function mcpDesktopSmoke(app: ElectronApplication, page: Page) {
   assert.equal((await response.json()).result.serverInfo.name, 'CShell');
   await panel.screenshot({ path: 'test-results/mcp-settings.png' });
   await panel.getByLabel('在本机启用 MCP').uncheck();
-  await panel.getByRole('button', { name: '应用 MCP 设置', exact: true }).click();
+  await save();
+  await page.locator('.settings-savebar').waitFor({ state: 'hidden' });
+  await openSettings();
+  assert.equal(await panel.getByLabel('在本机启用 MCP').isChecked(), false);
   await panel.getByText('MCP 已停止', { exact: true }).waitFor();
   await page
     .locator('.editor-page:visible')

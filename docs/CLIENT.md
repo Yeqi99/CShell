@@ -1,4 +1,20 @@
-# CShell Client Windows 开发预览
+# CShell Agent（0.6.0 开发版）
+
+Agent 是独立轻量受控端，使用 Node 与原生 PTY，不携带 Electron/Chromium。CShell 的 **Agent 扩展**负责配置本机或已连接的远端 Agent；关闭 CShell 不会退出独立 Agent。控制端新建连接选择 CShell Agent；内部保留兼容的 `client` 协议标识。
+
+运行 Agent 的 `run` 命令启动本机受限管理入口，远程监听仍关闭。在 CShell 插件页配置监听 IP、端口、对外地址、密码和权限，再显式启动远程访问。终端选择只列出真实环境：Windows CMD/PowerShell/WSL 发行版，Linux/macOS Bash/Zsh/Sh。首次连接先核对证书身份，再发送密码；之后使用设备证书连接。监听或密码变更会断开连接，需明确确认。CLI 的 `recover` 提供本机恢复说明。
+
+本机通过仅当前用户可读的发现文件和随机凭证接入回环控制接口，不扫描局域网、不自动授权。旧 Windows Client 可在新 Agent 首次配置前，从插件页显式导入旧身份、加密凭据和授权；旧数据保留，不自动监听。新增 HTTP 请求、远程管理、服务托管、中继权限默认关闭。控制端已有连接名称、分组、收藏不变。
+
+HTTP 请求工具调用接口；Agent 的 HTTP 服务模块提供接口，两者职责分开。服务默认回环监听，支持固定响应、回调记录、自定义代码。代码在有限时/有限输出的独立工作进程运行，拥有 Agent 系统账户权限，**不是权限沙箱**；启动需单独确认代码。人工和 AI 共用后端权限、配置版本与启停日志。当前托管运行于 Agent 主机，不冒充 WSL 环境。
+
+可选中继支持 A 可达目标的直连转发，以及内网 B 主动连接 A 的反向通道。注册凭证与控制端转发凭证分开；中继核验外层身份，控制端仍在内层 TLS 核验目标 Agent 身份。默认关闭、限制连接数/流量、凭证单独复制，不自动改防火墙。安装包与公网/各平台验证状态以发布记录为准。
+
+Windows Agent 的 WSL 页在目标机器检查、生成安装计划、执行安装和初始化真实 Linux 用户。需要管理员时由用户在目标机器明确操作，不静默提权或重启；网络代理配置也只修改目标 Windows。Agent 连接选择具体发行版，命令执行绑定该环境；WSL 终端连接不提供冒充 Windows 主机的 HTTP 发送能力。详见 [HTTP 联动](HTTP.md)。
+
+以下为旧独立 Client 0.1.0 的历史说明，不是新版安装流程。
+
+## 历史：独立 Client
 
 CShell Client 是独立 Windows 受控端，通过 GitHub 分发；CShell 主程序提供发行页入口。[0.1.0 Windows x64 安装包](https://github.com/Yeqi99/CShell/releases/download/v0.5.0/CShell-Client-0.1.0-win-x64.exe) 与主程序 0.5.0 一同发布，校验值见该版本 SHA256SUMS.txt。
 

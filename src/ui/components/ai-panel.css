@@ -790,3 +790,132 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.agent-goals-page {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: var(--terminal);
+}
+.agent-goals {
+  padding: 14px;
+  font-size: 12px;
+}
+.agent-goals .ai-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.agent-goals h3 {
+  margin: 0;
+  font-size: 13px;
+}
+.agent-goals .ai-section-note {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+  margin: 10px 0;
+}
+.agent-goals small {
+  color: var(--muted);
+  font-size: 10px;
+}
+.agent-goals button {
+  font-size: 11px;
+  padding: 6px 9px;
+  min-height: 28px;
+}
+.agent-goal-card > header button {
+  padding-left: 0;
+}
+.agent-goal-card strong {
+  font-size: 12px;
+  font-weight: 600;
+}
+.agent-goal-editor textarea {
+  font: inherit;
+  width: 100%;
+  background: var(--field);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+}
+.agent-goal-editor textarea:focus-visible {
+  outline: 2px solid var(--accent);
+}
+.agent-goal-editor {
+  display: grid;
+  gap: 10px;
+  padding: 10px 0;
+}
+.agent-goal-editor label {
+  display: grid;
+  gap: 5px;
+}
+.agent-goal-editor textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+.agent-goal-editor footer,
+.agent-goal-card footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 8px;
+}
+.agent-goal-card {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+.agent-goal-card > header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.agent-goal-card > header button {
+  text-align: left;
+  min-width: 0;
+}
+.agent-goal-card > header small {
+  flex-shrink: 0;
+}
+.agent-goal-card p {
+  margin: 8px 0;
+}
+.agent-goal-card details {
+  margin-top: 10px;
+}
+.agent-task-tree {
+  max-height: 150px;
+  overflow: auto;
+  padding: 0 12px;
+  flex-shrink: 0;
+}
+.agent-task-tree > small {
+  display: flex;
+  gap: 5px;
+  padding: 5px 0;
+}
+.agent-task-tree summary,
+.agent-goal-card summary {
+  cursor: pointer;
+  padding: 5px 0;
+}
+.agent-task-tree details button {
+  display: flex;
+  width: 100%;
+  gap: 8px;
+  justify-content: space-between;
+  padding: 5px;
+}
+.agent-task-tree details button span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.agent-task-tree details button small {
+  flex-shrink: 0;
+}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { WslNetwork } from './WslNetwork';
 import { Terminal, RefreshCw, Copy, ShieldCheck } from 'lucide-react';
 import type { LocalShell, WslSetupState } from '../../shared/local-terminal';
 export function WslPlugin({ onOpen }: { onOpen: (shell: LocalShell) => Promise<void> }) {
@@ -98,6 +99,7 @@ export function WslPlugin({ onOpen }: { onOpen: (shell: LocalShell) => Promise<v
         </div>
       ))}
       {!state && <p role="status">正在检测 WSL…</p>}
+      {state?.available && <WslNetwork />}
       {state && !state.distributions.length && (
         <div className="ai-provider-empty">
           <div>

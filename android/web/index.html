@@ -55,7 +55,7 @@
             <span data-icon="folder"></span><span>文件<small>浏览与传输</small></span>
           </button>
           <button id="home-new">
-            <span data-icon="plus"></span><span>新建连接<small>SSH 服务器</small></span>
+            <span data-icon="plus"></span><span>新建连接<small>SSH / Agent</small></span>
           </button>
         </div>
         <div class="section-heading">
@@ -166,81 +166,98 @@
             <p class="eyebrow">连接配置</p>
             <h1 id="form-title">新建连接</h1>
           </div>
-          <span class="protocol">SSH</span>
+          <span id="protocol-label" class="protocol"></span>
         </div>
-        <div class="form-section">
-          <h2>连接信息</h2>
-          <label
-            >主机地址<input
-              name="host"
-              required
-              maxlength="255"
-              placeholder="主机名或 IP 地址"
-              autocomplete="off"
-              autocapitalize="none"
-              spellcheck="false"
-          /></label>
-          <div class="row">
+        <div class="segments" id="protocol-choices" aria-label="连接方式">
+          <button id="protocol-ssh" type="button">SSH 终端</button
+          ><button id="protocol-agent" type="button">CShell Agent</button>
+        </div>
+        <div id="connection-fields" hidden>
+          <div class="form-section">
+            <h2>连接信息</h2>
             <label
-              >用户名<input
-                name="username"
-                value="root"
+              >主机地址<input
+                name="host"
                 required
                 maxlength="255"
+                placeholder="主机名或 IP 地址"
+                autocomplete="off"
                 autocapitalize="none"
-                spellcheck="false" /></label
-            ><label class="port"
-              >端口<input
-                name="port"
-                value="22"
-                type="number"
-                min="1"
-                max="65535"
-                required
-                inputmode="numeric"
-            /></label>
-          </div>
-        </div>
-        <div class="form-section">
-          <h2>身份验证</h2>
-          <div class="segments" aria-label="认证方式">
-            <button id="auth-password" type="button" class="selected" aria-pressed="true">
-              密码</button
-            ><button id="auth-key" type="button" aria-pressed="false">私钥</button>
-          </div>
-          <label id="password-field"
-            >密码<input
-              name="password"
-              type="password"
-              autocomplete="off"
-              placeholder="输入登录密码"
-          /></label>
-          <div id="key-fields" hidden>
-            <label
-              >私钥内容<textarea
-                name="privateKey"
                 spellcheck="false"
-                autocapitalize="none"
-                placeholder="粘贴 PEM / OpenSSH 私钥"
-              ></textarea></label
-            ><label>私钥口令<input name="passphrase" type="password" autocomplete="off" /></label>
+            /></label>
+            <div class="row">
+              <label id="username-field"
+                >用户名<input
+                  name="username"
+                  value="root"
+                  required
+                  maxlength="255"
+                  autocapitalize="none"
+                  spellcheck="false" /></label
+              ><label class="port"
+                >端口<input
+                  name="port"
+                  value="22"
+                  type="number"
+                  min="1"
+                  max="65535"
+                  required
+                  inputmode="numeric"
+              /></label>
+            </div>
+          </div>
+          <div class="form-section">
+            <h2>身份验证</h2>
+            <div id="ssh-auth" class="segments" aria-label="认证方式">
+              <button id="auth-password" type="button" class="selected" aria-pressed="true">
+                密码</button
+              ><button id="auth-key" type="button" aria-pressed="false">私钥</button>
+            </div>
+            <label id="password-field"
+              >密码<input
+                name="password"
+                type="password"
+                autocomplete="off"
+                placeholder="输入登录密码"
+            /></label>
+            <div id="key-fields" hidden>
+              <label
+                >私钥内容<textarea
+                  name="privateKey"
+                  spellcheck="false"
+                  autocapitalize="none"
+                  placeholder="粘贴 PEM / OpenSSH 私钥"
+                ></textarea></label
+              ><label>私钥口令<input name="passphrase" type="password" autocomplete="off" /></label>
+            </div>
+          </div>
+          <div class="form-section">
+            <label class="check"
+              ><input id="remember" type="checkbox" checked />保存到服务器列表</label
+            >
+            <div id="profile-fields">
+              <label
+                >名称<input
+                  name="name"
+                  maxlength="80"
+                  placeholder="可选，默认使用主机地址" /></label
+              ><label
+                >分组<input
+                  name="group"
+                  maxlength="80"
+                  list="groups"
+                  placeholder="未分组" /><datalist id="groups"></datalist
+              ></label>
+            </div>
+            <label class="check"><input name="favorite" type="checkbox" />收藏</label>
+            <p class="muted caption">密码不保存；Agent 授权身份由系统安全存储。</p>
           </div>
         </div>
-        <div class="form-section">
-          <label class="check"
-            ><input id="remember" type="checkbox" checked />保存到服务器列表</label
-          >
-          <div id="profile-fields">
-            <label
-              >名称<input name="name" maxlength="80" placeholder="可选，默认使用主机地址" /></label
-            ><label
-              >分组<input name="group" maxlength="80" list="groups" placeholder="未分组" /><datalist
-                id="groups"
-              ></datalist
-            ></label>
-          </div>
-          <p class="muted caption">仅保存连接信息，密码和私钥不落盘。</p>
-        </div>
+        <details id="agent-identity" hidden>
+          <summary>设备身份</summary>
+          <button id="agent-reset-trust" type="button">重新核对设备身份</button>
+          <p class="muted caption">重装 Agent 或设备身份改变时使用。</p>
+        </details>
         <p id="form-error" role="alert" class="error"></p>
         <button id="delete-profile" class="danger" type="button" hidden>删除此连接配置</button>
       </form>
@@ -272,6 +289,7 @@
           <div class="form-actions">
             <button id="check-update">检查更新</button
             ><button id="install-update" class="primary" hidden>下载更新</button>
+            <button id="update-page">打开 GitHub 下载页</button>
           </div>
           <p class="muted caption">当前包含预览版。下载校验后由 Android 确认安装。</p>
         </div>
@@ -293,7 +311,7 @@
         ><button data-key="\u001b[C" aria-label="右">→</button>
       </div>
       <div class="terminal-status">
-        <span id="status" role="status">就绪</span><span>SSH · UTF-8</span>
+        <span id="status" role="status">就绪</span><span id="terminal-protocol">UTF-8</span>
       </div>
     </footer>
     <nav id="navigation" aria-label="工作台导航">

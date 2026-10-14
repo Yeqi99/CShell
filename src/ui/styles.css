@@ -3049,6 +3049,15 @@ input[type='radio']:focus-visible {
 .disconnected-session-bar button {
   color: var(--accent);
   font-size: 11px;
+  flex-shrink: 0;
+}
+.disconnected-session-bar > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.disconnected-session-bar small {
+  display: block;
+  margin-top: 2px;
 }
 .terminal-host {
   padding-top: 12px;
@@ -4642,6 +4651,11 @@ input[type='radio']:focus-visible {
   align-items: center;
   gap: 10px;
   color: var(--muted);
+}
+.connection-notice {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 10px 0;
 }
 .editor-exit-controls {
   position: relative;

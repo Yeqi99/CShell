@@ -1,6 +1,14 @@
 import { z } from 'zod';
 export const aiLocations = ['workspace', 'terminal', 'files', 'python'] as const;
-export const aiCapabilities = ['metrics.read', 'files.read', 'commands.execute'] as const;
+export const aiCapabilities = [
+  'metrics.read',
+  'files.read',
+  'commands.execute',
+  'http.send',
+  'agent.manage',
+  'agent.hosting',
+  'agent.relay',
+] as const;
 export const aiProviderSchema = z
   .object({
     id: z.string().uuid(),
@@ -35,7 +43,9 @@ export const aiPermissionSchema = z
   .strict();
 export const aiPolicySchema = z
   .object({
-    application: z.array(z.enum(['connections.read', 'connections.open'])),
+    application: z.array(
+      z.enum(['connections.read', 'connections.open', 'agents.manage', 'goals.manage', 'http.use']),
+    ),
     allMachines: z.boolean(),
     profiles: z.array(z.string().uuid()).max(1000),
     groups: z.array(z.string().max(100)).max(1000),
@@ -75,6 +85,10 @@ export type AiThread = {
   sessionId?: string;
   target?: string;
   mode: AiMode;
+  parentId?: string;
+  permissionCeiling?: AiPolicy;
+  boundIdentity?: string;
+  goal?: import('./ai-work').AiGoal;
   messages: AiMessage[];
   state: 'idle' | 'running' | 'approval' | 'error';
   error?: string;
@@ -89,6 +103,12 @@ export interface AiSnapshot {
   threads: AiThread[];
 }
 export interface AiBridge {
+  aiGoalSave(id: string, input: import('./ai-work').GoalInput): Promise<void>;
+  aiGoalAction(
+    id: string,
+    action: 'pause' | 'resume' | 'run' | 'remove',
+    sessionId?: string,
+  ): Promise<void>;
   onAiProvidersChanged(listener: () => void): () => void;
   onAiThread(listener: (thread: AiThread) => void): () => void;
   aiProviderTest(

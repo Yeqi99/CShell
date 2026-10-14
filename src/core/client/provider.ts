@@ -1,7 +1,19 @@
+import { httpResponseSchema, type HttpWireRequest } from '../../shared/http';
+import { agentRelayConnectionSchema, type AgentRelayConnection } from '../../shared/agent-relay';
+import { openRelayTunnel } from '../../agent/relay';
+import { hostingConfigSchema } from '../../shared/agent-hosting';
+import {
+  agentCallSchema,
+  agentMethods,
+  agentCapability,
+  type AgentCall,
+  type AgentShellOption,
+} from '../../shared/agent';
 import {
   clientInfoSchema,
   clientEndpointSchema,
   clientPasswordSchema,
+  clientExecSchema,
   type ClientInfo,
 } from '../../shared/client';
 import { connect, type TLSSocket } from 'node:tls';
@@ -14,7 +26,9 @@ import type { ManagedProvider } from '../connections/manager';
 import type { ProviderConnection } from '../connections/contracts';
 import { ClientVault, fingerprint, type ClientIdentity } from './identity';
 import { frames, send, textChunks } from './wire';
-const deviceSchema = clientInvitationSchema.omit({ token: true, expires: true });
+const deviceSchema = clientInvitationSchema
+  .omit({ token: true, expires: true })
+  .extend({ relay: agentRelayConnectionSchema.optional() });
 type Device = z.infer<typeof deviceSchema>;
 class ClientChannel {
   certificate = '';
@@ -24,6 +38,7 @@ class ClientChannel {
       resolve: (v: unknown) => void;
       reject: (e: Error) => void;
       timer: ReturnType<typeof setTimeout>;
+      chunks?: string;
     }
   >();
   private heartbeat?: ReturnType<typeof setInterval>;
@@ -49,6 +64,8 @@ class ClientChannel {
           error: z.string().max(200).optional(),
           event: z.enum(['data', 'closed']).optional(),
           data: z.string().max(65536).optional(),
+          chunk: z.string().max(32768).optional(),
+          complete: z.literal(true).optional(),
         })
         .strict()
         .parse(raw);
@@ -59,13 +76,28 @@ class ClientChannel {
       }
       const pending = value.id && this.pending.get(value.id);
       if (!pending) return;
+      if (value.chunk !== undefined) {
+        pending.chunks = (pending.chunks ?? '') + value.chunk;
+        if (
+          [...this.pending.values()].reduce((n, p) => n + Buffer.byteLength(p.chunks ?? ''), 0) >
+          4 * 1024 * 1024
+        )
+          this.socket.destroy();
+        return;
+      }
       this.pending.delete(value.id!);
       clearTimeout(pending.timer);
       if (value.error) pending.reject(new Error(value.error));
-      else pending.resolve(value.result);
+      else if (value.complete) {
+        try {
+          pending.resolve(JSON.parse(pending.chunks ?? ''));
+        } catch {
+          pending.reject(new Error('Malformed Agent result'));
+        }
+      } else pending.resolve(value.result);
     });
   }
-  request(op: string, payload?: unknown) {
+  request(op: string, payload?: unknown, timeoutMs = 15000) {
     return new Promise<unknown>((resolve, reject) => {
       if (this.socket.destroyed || this.pending.size >= 64) {
         reject(new Error('Client disconnected or busy'));
@@ -75,7 +107,7 @@ class ClientChannel {
         timer = setTimeout(() => {
           this.socket.destroy();
           reject(new Error('Client request timed out; not replayed'));
-        }, 15000);
+        }, timeoutMs);
       this.pending.set(id, { resolve, reject, timer });
       try {
         send(this.socket, { id, op, payload });
@@ -94,14 +126,16 @@ class ClientChannel {
   }
 }
 async function dial(
-  device: { host: string; port: number; certificate?: string },
+  device: { host: string; port: number; certificate?: string; relay?: AgentRelayConnection },
   identity: ClientIdentity,
   event: (e: string, data?: string) => void,
   signal: AbortSignal,
 ) {
   signal.throwIfAborted();
   const expected = device.certificate ? fingerprint(device.certificate) : undefined;
+  const tunnel = device.relay ? await openRelayTunnel({ ...device.relay, signal }) : undefined;
   const socket = connect({
+    ...(tunnel ? { socket: tunnel } : {}),
     host: device.host,
     port: device.port,
     key: identity.key,
@@ -148,9 +182,20 @@ async function dial(
 export class ClientProvider implements ManagedProvider {
   readonly id = 'cshell.client';
   readonly version = '0.1.0';
-  readonly capabilities = ['terminal.interactive'];
+  readonly capabilities = [
+    'terminal.interactive',
+    'commands.execute',
+    'http.send',
+    'agent.manage',
+    'agent.hosting',
+    'agent.relay',
+  ];
   readonly configuration = z
-    .object({ deviceId: z.string().uuid(), shell: clientShellSchema })
+    .object({
+      deviceId: z.string().uuid(),
+      shell: clientShellSchema,
+      distribution: z.string().min(1).max(100).optional(),
+    })
     .strict();
   private identity?: Promise<ClientIdentity>;
   private devices: Device[] = [];
@@ -163,13 +208,15 @@ export class ClientProvider implements ManagedProvider {
     this.devices = (await this.vault.read('devices', z.array(deviceSchema).max(100))) ?? [];
   }
   list(): ClientDevice[] {
-    return this.devices.map(({ certificate, ...d }) => ({
+    return this.devices.map(({ certificate, relay: _relay, ...d }) => ({
       ...d,
       fingerprint: fingerprint(certificate),
     }));
   }
   async probe(value: unknown): Promise<ClientInfo> {
-    const endpoint = clientEndpointSchema.parse(value);
+    const endpoint = clientEndpointSchema
+      .extend({ relay: agentRelayConnectionSchema.optional() })
+      .parse(value);
     const channel = await dial(
       endpoint,
       await (this.identity ??= this.vault.identity()),
@@ -244,7 +291,16 @@ export class ClientProvider implements ManagedProvider {
         protocol: z.literal(1),
         deviceId: z.literal(deviceId),
         shells: z.array(clientShellSchema),
-        capabilities: z.array(z.literal('terminal.interactive')),
+        capabilities: z.array(
+          z.enum([
+            'terminal.interactive',
+            'commands.execute',
+            'http.send',
+            'agent.manage',
+            'agent.hosting',
+            'agent.relay',
+          ]),
+        ),
       })
       .strict()
       .parse(value);
@@ -256,6 +312,62 @@ export class ClientProvider implements ManagedProvider {
     const next = this.devices.filter((d) => d.deviceId !== id);
     await this.vault.write('devices', next);
     this.devices = next;
+  }
+  async call(
+    deviceId: string,
+    input: AgentCall,
+    signal: AbortSignal = new AbortController().signal,
+  ) {
+    const device = this.devices.find((d) => d.deviceId === deviceId);
+    if (!device) throw new Error('Agent 尚未连接并核对身份');
+    const call = agentCallSchema.parse(input);
+    const channel = await dial(
+      device,
+      await (this.identity ??= this.vault.identity()),
+      () => {},
+      signal,
+    );
+    try {
+      const auth = this.verifyAuth(await channel.request('auth', { name: hostname() }), deviceId);
+      if (
+        call.method !== 'agent.shells' &&
+        !auth.capabilities.includes(agentCapability(call.method))
+      )
+        throw new Error('受控端未授予此管理权限');
+      return await channel.request('manage', call, 60000);
+    } finally {
+      channel.socket.destroy();
+    }
+  }
+  async shells(deviceId: string): Promise<AgentShellOption[]> {
+    try {
+      return z
+        .array(
+          z.object({
+            shell: clientShellSchema,
+            label: z.string(),
+            distribution: z.string().optional(),
+          }),
+        )
+        .parse(await this.call(deviceId, { method: 'agent.shells' }));
+    } catch {
+      // Legacy Client has no management operation; its granted shells are authoritative.
+      const device = this.devices.find((d) => d.deviceId === deviceId);
+      if (!device) throw new Error('Agent unavailable');
+      const channel = await dial(
+        device,
+        await (this.identity ??= this.vault.identity()),
+        () => {},
+        new AbortController().signal,
+      );
+      try {
+        return this.verifyAuth(await channel.request('auth', { name: hostname() }), deviceId)
+          .shells.filter((shell) => shell !== 'wsl')
+          .map((shell) => ({ shell, label: shell }));
+      } finally {
+        channel.socket.destroy();
+      }
+    }
   }
   async connect(value: unknown, _credentials: unknown, signal: AbortSignal) {
     const config = this.configuration.parse(value),
@@ -291,26 +403,225 @@ export class ClientProvider implements ManagedProvider {
         device.deviceId,
       );
       if (!auth.shells.includes(config.shell)) throw new Error('Client 未授权此 Shell');
-      await channel.request('open', config.shell);
+      await channel.request(
+        'open',
+        config.distribution
+          ? { shell: config.shell, distribution: config.distribution }
+          : config.shell,
+      );
       signal.throwIfAborted();
       if (channel.socket.destroyed) throw new Error('Client disconnected');
       const fire = (op: string, payload: unknown) => {
         void channel.request(op, payload).catch(() => channel.socket.destroy());
+      };
+      let pendingAck = 0,
+        ackSending = false;
+      const acknowledge = (count: number) => {
+        if (channel.socket.destroyed || !Number.isSafeInteger(count) || count <= 0) return;
+        pendingAck += count;
+        if (pendingAck > 4 * 1024 * 1024) {
+          channel.socket.destroy();
+          pendingAck = 0;
+          return;
+        }
+        if (ackSending) return;
+        ackSending = true;
+        void (async () => {
+          try {
+            while (pendingAck > 0 && !channel.socket.destroyed) {
+              const next = Math.min(pendingAck, 1048576);
+              pendingAck -= next;
+              await channel.request('ack', next);
+            }
+          } catch {
+            channel.socket.destroy();
+          } finally {
+            ackSending = false;
+          }
+        })();
       };
       const connection: ProviderConnection = {
         target: {
           providerId: this.id,
           resourceId: device.deviceId,
           identity: fingerprint(device.certificate),
-          label: `${device.name} · ${config.shell}`,
+          label: `${device.name} · ${config.distribution ?? config.shell}`,
         },
-        tools: [],
+        http:
+          auth.capabilities.includes('http.send') && config.shell !== 'wsl'
+            ? async (request: HttpWireRequest, abort: AbortSignal) => {
+                const exchange = await dial(
+                  device,
+                  await (this.identity ??= this.vault.identity()),
+                  () => {},
+                  abort,
+                );
+                try {
+                  const grant = this.verifyAuth(
+                    await exchange.request('auth', { name: hostname() }),
+                    device.deviceId,
+                  );
+                  if (!grant.capabilities.includes('http.send'))
+                    throw new Error('Agent HTTP 权限已撤销');
+                  return httpResponseSchema.parse(
+                    await exchange.request('http', request, request.timeoutMs + 5000),
+                  );
+                } finally {
+                  exchange.socket.destroy();
+                }
+              }
+            : undefined,
+        agent: (call, abort) => this.call(device.deviceId, call, abort),
+        tools: [
+          ...(auth.capabilities.includes('commands.execute')
+            ? [
+                {
+                  name: 'execute_command',
+                  capability: 'commands.execute',
+                  description: `Execute a command in an independent process on ${device.name}, environment ${config.distribution ?? config.shell}. Does not write to the user's terminal.`,
+                  input: z
+                    .object({
+                      command: z.string().min(1).max(32768),
+                      timeoutMs: z.number().int().min(1).max(60000).default(30000),
+                    })
+                    .strict(),
+                  needsReview: () => true,
+                  invoke: async (value: unknown, abort: AbortSignal) => {
+                    const request = clientExecSchema.parse({
+                      ...(value as object),
+                      shell: config.shell,
+                      distribution: config.distribution,
+                    });
+                    const exchange = await dial(
+                      device,
+                      await (this.identity ??= this.vault.identity()),
+                      () => {},
+                      abort,
+                    );
+                    try {
+                      const grant = this.verifyAuth(
+                        await exchange.request('auth', { name: hostname() }),
+                        device.deviceId,
+                      );
+                      if (
+                        !grant.capabilities.includes('commands.execute') ||
+                        !grant.shells.includes(config.shell)
+                      )
+                        throw new Error('命令执行权限已撤销');
+                      return JSON.stringify(
+                        await exchange.request('exec', request, request.timeoutMs + 5000),
+                      );
+                    } finally {
+                      exchange.socket.destroy();
+                    }
+                  },
+                },
+              ]
+            : []),
+          ...(['agent.manage', 'agent.hosting', 'agent.relay'] as const)
+            .filter((cap) => auth.capabilities.includes(cap))
+            .map((cap) => ({
+              name: cap.replace('.', '_'),
+              capability: cap,
+              description: `Manage the explicitly authorized Agent (${device.name}), ${cap}. Inspect before changing. Hosting code runs with this machine's account permissions; it is not sandboxed.`,
+              input:
+                cap === 'agent.hosting'
+                  ? z.discriminatedUnion('method', [
+                      z.object({ method: z.literal('hosting.list') }),
+                      z.object({
+                        method: z.literal('hosting.save'),
+                        params: z.object({ config: hostingConfigSchema }),
+                      }),
+                      z.object({
+                        method: z.literal('hosting.start'),
+                        params: z
+                          .object({
+                            id: z.string().uuid(),
+                            expectedRevision: z.number().int().positive(),
+                            allowCode: z.boolean().default(false),
+                            reviewedConfig: hostingConfigSchema,
+                          })
+                          .describe(
+                            'First use hosting.list. Include the exact reviewed configuration, revision, code and listener address.',
+                          ),
+                      }),
+                      ...(['hosting.stop', 'hosting.logs', 'hosting.remove'] as const).map(
+                        (method) =>
+                          z.object({
+                            method: z.literal(method),
+                            params: z.object({ id: z.string().uuid() }),
+                          }),
+                      ),
+                    ])
+                  : z
+                      .object({
+                        method: z.enum(
+                          agentMethods.filter(
+                            (m) =>
+                              agentCapability(m) === cap &&
+                              ![
+                                'client.access',
+                                'client.reconfigure',
+                                'relay.revealCredential',
+                                'relay.rotateCredential',
+                                'relay.registrationCredential',
+                                'relay.rotateRegistrationCredential',
+                              ].includes(m),
+                          ) as [string, ...string[]],
+                        ),
+                        params: z.unknown().optional(),
+                      })
+                      .strict(),
+              needsReview: (value: unknown) =>
+                !/(\.status|\.list|\.logs|\.check|\.plan|\.shells)$/.test(
+                  (value as AgentCall).method,
+                ),
+              invoke: async (value: unknown, abort: AbortSignal) => {
+                const call = agentCallSchema.parse(value);
+                if (call.method === 'hosting.start') {
+                  const params = z
+                    .object({
+                      id: z.string().uuid(),
+                      expectedRevision: z.number().int().positive(),
+                      allowCode: z.boolean(),
+                      reviewedConfig: hostingConfigSchema,
+                    })
+                    .parse(call.params);
+                  const services = (await this.call(
+                    device.deviceId,
+                    { method: 'hosting.list' },
+                    abort,
+                  )) as { config: unknown }[];
+                  const current = services.find(
+                    (s) => hostingConfigSchema.parse(s.config).id === params.id,
+                  );
+                  if (
+                    !current ||
+                    hostingConfigSchema.parse(current.config).revision !==
+                      params.expectedRevision ||
+                    JSON.stringify(hostingConfigSchema.parse(current.config)) !==
+                      JSON.stringify(params.reviewedConfig)
+                  )
+                    throw new Error('服务配置已改变，请重新查看并审核');
+                  call.params = {
+                    id: params.id,
+                    expectedRevision: params.expectedRevision,
+                    allowCode: params.allowCode,
+                  };
+                }
+                return JSON.stringify(await this.call(device.deviceId, call, abort)).slice(
+                  0,
+                  24000,
+                );
+              },
+            })),
+        ],
         terminal: {
           input: (data) => {
             for (const chunk of textChunks(data)) fire('input', chunk);
           },
           resize: (cols, rows) => fire('resize', { cols, rows }),
-          acknowledge: (count) => fire('ack', count),
+          acknowledge,
         },
       };
       this.sessions.set(id, { channel, connection });

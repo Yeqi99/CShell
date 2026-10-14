@@ -7,8 +7,8 @@ export async function designSmoke(app: ElectronApplication, page: Page) {
   await page.getByRole('button', { name: '切换为深色', exact: true }).click();
   await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
   await page.getByRole('button', { name: '新建连接', exact: true }).first().click();
-  if (await page.getByRole('button', { name: '添加连接记录', exact: true }).isVisible())
-    await page.getByRole('button', { name: '添加连接记录', exact: true }).click();
+  if (await page.getByRole('button', { name: 'SSH 终端', exact: true }).isVisible())
+    await page.getByRole('button', { name: 'SSH 终端', exact: true }).click();
   const editor = page.locator('.connection-editor:visible');
   await editor.getByLabel('保存到服务器列表').uncheck();
   const name = editor.getByLabel('主机地址', { exact: true });

@@ -7,10 +7,13 @@ import {
   type ClientShell,
 } from '../../shared/client';
 import { useI18n } from '../i18n';
+import type { AgentShellOption } from '../../shared/agent';
+import type { AgentRelayConnection } from '../../shared/agent-relay';
 export type ClientConnected = (
   result: { sessionId: string; name: string },
   device: ClientDevice,
   shell: ClientShell,
+  distribution?: string,
 ) => void | Promise<void>;
 export function ClientConnectForm({
   onConnect,
@@ -25,6 +28,17 @@ export function ClientConnectForm({
     [port, setPort] = useState(String(profile?.port ?? 47831)),
     [password, setPassword] = useState('');
   const [shell, setShell] = useState<ClientShell>(profile?.clientShell ?? 'powershell');
+  const [distribution, setDistribution] = useState(profile?.clientDistribution);
+  const [device, setDevice] = useState<ClientDevice>();
+  const [shells, setShells] = useState<AgentShellOption[]>([]);
+  const [relayEnabled, setRelayEnabled] = useState(false);
+  const [relay, setRelay] = useState<AgentRelayConnection>({
+    host: '',
+    port: 22444,
+    fingerprint: '',
+    credential: '',
+    targetId: '',
+  });
   const [name, setName] = useState(profile?.name ?? ''),
     [group, setGroup] = useState(profile?.group ?? ''),
     [favorite, setFavorite] = useState(profile?.favorite ?? false);
@@ -37,6 +51,8 @@ export function ClientConnectForm({
     setInfo(undefined);
     setTrusted(false);
     setFingerprint('');
+    setDevice(undefined);
+    setShells([]);
   };
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
@@ -72,16 +88,31 @@ export function ClientConnectForm({
         void run(async () => {
           if (!info) {
             await describe(
-              await window.cshell.clientProbe({ host: host.trim(), port: Number(port) }),
+              await window.cshell.clientProbe({
+                host: host.trim(),
+                port: Number(port),
+                ...(relayEnabled ? { relay } : {}),
+              }),
             );
             return;
           }
           if (!trusted) return;
-          const device = await window.cshell.clientPasswordPair(info, password);
+          if (!device) {
+            const next = await window.cshell.clientPasswordPair(info, password);
+            const choices = await window.cshell.clientShells(next.deviceId);
+            if (!choices.length) throw new Error('Agent 未开放可用终端');
+            setDevice(next);
+            setShells(choices);
+            setShell(choices[0].shell as ClientShell);
+            setDistribution(choices[0].distribution);
+            setPassword('');
+            return;
+          }
           await window.cshell.saveProfile({
             id: device.deviceId,
             protocol: 'client',
             clientShell: shell,
+            clientDistribution: distribution,
             name: profile?.name ?? (name.trim() || device.name),
             group: profile?.group ?? group.trim(),
             favorite: profile?.favorite ?? favorite,
@@ -91,63 +122,45 @@ export function ClientConnectForm({
             auth: 'password',
           });
           setPassword('');
-          await onConnect(await window.cshell.clientConnect(device.deviceId, shell), device, shell);
+          await onConnect(
+            await window.cshell.clientConnect(device.deviceId, shell, distribution),
+            device,
+            shell,
+            distribution,
+          );
         });
       }}
     >
-      <button
-        type="button"
-        onClick={() =>
-          void run(async () => {
-            await window.cshell.clientDownloadPage();
-          })
-        }
-      >
-        {cn ? '获取 CShell Client' : 'Get CShell Client'}
-      </button>
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() =>
-          void run(async () => {
-            const text = await window.cshell.pasteText();
-            if (text.length > 16384)
-              throw new Error(cn ? '连接信息过长' : 'Connection info too large');
-            const next = clientInfoSchema.parse(JSON.parse(text));
-            setHost(next.host);
-            setPort(String(next.port));
-            await describe(next);
-          })
-        }
-      >
-        {cn ? '粘贴连接信息' : 'Paste connection info'}
-      </button>
+      <div className="connection-form-tools">
+        <button
+          type="button"
+          onClick={() =>
+            void run(async () => {
+              window.dispatchEvent(new Event('cshell:open-extensions'));
+            })
+          }
+        >
+          {cn ? '打开插件市场' : 'Open plugin marketplace'}
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() =>
+            void run(async () => {
+              const text = await window.cshell.pasteText();
+              if (text.length > 16384)
+                throw new Error(cn ? '连接信息过长' : 'Connection info too large');
+              const next = clientInfoSchema.parse(JSON.parse(text));
+              setHost(next.host);
+              setPort(String(next.port));
+              await describe(next);
+            })
+          }
+        >
+          {cn ? '粘贴连接信息' : 'Paste connection info'}
+        </button>
+      </div>
       <fieldset disabled={busy}>
-        {!profile && (
-          <>
-            <label>
-              {cn ? '名称' : 'Name'}
-              <input
-                value={name}
-                maxLength={255}
-                onChange={(e) => setName(e.target.value)}
-                placeholder={cn ? '可选，默认使用设备名称' : 'Optional, defaults to device name'}
-              />
-            </label>
-            <label>
-              {cn ? '分组' : 'Group'}
-              <input value={group} maxLength={100} onChange={(e) => setGroup(e.target.value)} />
-            </label>
-            <label className="client-favorite">
-              <input
-                type="checkbox"
-                checked={favorite}
-                onChange={(e) => setFavorite(e.target.checked)}
-              />
-              {cn ? '收藏' : 'Favorite'}
-            </label>
-          </>
-        )}
         <div className="client-fields">
           <label>
             {cn ? '主机地址' : 'Host'}
@@ -178,7 +191,7 @@ export function ClientConnectForm({
         <label>
           {cn ? '连接密码' : 'Connection password'}
           <input
-            required
+            required={!device}
             type="password"
             autoComplete="current-password"
             minLength={12}
@@ -187,17 +200,90 @@ export function ClientConnectForm({
             onChange={(e) => setPassword(e.target.value)}
           />
         </label>
-        <label>
-          {cn ? '终端' : 'Terminal'}
-          <select
-            aria-label={cn ? '终端' : 'Terminal'}
-            value={shell}
-            onChange={(e) => setShell(e.target.value as ClientShell)}
-          >
-            <option value="powershell">PowerShell</option>
-            <option value="cmd">CMD</option>
-          </select>
-        </label>
+        {!!shells.length && (
+          <label>
+            {cn ? '终端' : 'Terminal'}
+            <select
+              aria-label={cn ? '终端' : 'Terminal'}
+              value={shell + '|' + (distribution ?? '')}
+              onChange={(e) => {
+                const choice = shells.find(
+                  (s) => s.shell + '|' + (s.distribution ?? '') === e.target.value,
+                )!;
+                setShell(choice.shell as ClientShell);
+                setDistribution(choice.distribution);
+              }}
+            >
+              {shells.map((s) => (
+                <option
+                  key={s.shell + '|' + (s.distribution ?? '')}
+                  value={s.shell + '|' + (s.distribution ?? '')}
+                >
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        <details>
+          <summary>{cn ? '通过中继连接' : 'Relay connection'}</summary>
+          <label>
+            <input
+              type="checkbox"
+              checked={relayEnabled}
+              onChange={(e) => {
+                setRelayEnabled(e.target.checked);
+                reset();
+              }}
+            />
+            {cn ? '使用已授权中继' : 'Use an authorized relay'}
+          </label>
+          {relayEnabled &&
+            (['host', 'port', 'fingerprint', 'targetId', 'credential'] as const).map(
+              (key, index) => (
+                <label key={key}>
+                  {['中继地址', '中继端口', '中继指纹', '目标标识', '中继凭证'][index]}
+                  <input
+                    type={key === 'credential' ? 'password' : key === 'port' ? 'number' : 'text'}
+                    value={relay[key]}
+                    onChange={(e) => {
+                      setRelay({
+                        ...relay,
+                        [key]: key === 'port' ? Number(e.target.value) : e.target.value,
+                      });
+                      reset();
+                    }}
+                  />
+                </label>
+              ),
+            )}
+        </details>
+        {!profile && (
+          <details className="connection-metadata">
+            <summary>{cn ? '名称、分组与收藏' : 'Name, group and favorite'}</summary>
+            <label>
+              {cn ? '名称' : 'Name'}
+              <input
+                value={name}
+                maxLength={255}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={cn ? '可选，默认使用设备名称' : 'Optional, defaults to device name'}
+              />
+            </label>
+            <label>
+              {cn ? '分组' : 'Group'}
+              <input value={group} maxLength={100} onChange={(e) => setGroup(e.target.value)} />
+            </label>
+            <label className="client-favorite">
+              <input
+                type="checkbox"
+                checked={favorite}
+                onChange={(e) => setFavorite(e.target.checked)}
+              />
+              {cn ? '收藏' : 'Favorite'}
+            </label>
+          </details>
+        )}
         {info && (
           <div className="client-trust">
             <p>
@@ -224,8 +310,12 @@ export function ClientConnectForm({
               : 'Connecting…'
             : info
               ? cn
-                ? '连接'
-                : 'Connect'
+                ? device
+                  ? '连接'
+                  : '验证并读取终端'
+                : device
+                  ? 'Connect'
+                  : 'Verify and load terminals'
               : cn
                 ? '检查设备'
                 : 'Check device'}
@@ -244,6 +334,7 @@ export function RdpConnectForm() {
     [busy, setBusy] = useState(false);
   return (
     <form
+      className="rdp-connect-form"
       onSubmit={(e) => {
         e.preventDefault();
         setBusy(true);
@@ -279,7 +370,9 @@ export function RdpConnectForm() {
           onChange={(e) => setPort(e.target.value)}
         />
       </label>
-      <button disabled={busy}>{cn ? '打开远程桌面' : 'Open Remote Desktop'}</button>
+      <button className="client-primary" disabled={busy}>
+        {cn ? '打开远程桌面' : 'Open Remote Desktop'}
+      </button>
       <p role="status">{message}</p>
     </form>
   );

@@ -1,6 +1,20 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { Bridge, SessionEvent } from '../shared/contracts';
 const bridge: Bridge = {
+  httpCreate: (name, group) => ipcRenderer.invoke('http:create', name, group),
+  httpWorkspace: (id) => ipcRenderer.invoke('http:workspace', id),
+  httpSave: (value) => ipcRenderer.invoke('http:save', value),
+  httpSenders: () => ipcRenderer.invoke('http:senders'),
+  httpSend: (id, request, runId) => ipcRenderer.invoke('http:send', id, request, runId),
+  httpHistory: (id) => ipcRenderer.invoke('http:history', id),
+  httpCancel: (id) => ipcRenderer.invoke('http:cancel', id),
+  onHttpChanged: (listener) => {
+    const fn = (_e: unknown, id: string) => listener(id);
+    ipcRenderer.on('http:changed', fn);
+    return () => {
+      ipcRenderer.removeListener('http:changed', fn);
+    };
+  },
   clientSetAccess: (options) => ipcRenderer.invoke('client:access', options),
   clientConnectionInfo: (host) => ipcRenderer.invoke('client:info', host),
   clientProbe: (endpoint) => ipcRenderer.invoke('client:probe', endpoint),
@@ -12,7 +26,11 @@ const bridge: Bridge = {
   clientDevices: () => ipcRenderer.invoke('client:devices'),
   clientPair: (invitation) => ipcRenderer.invoke('client:pair', invitation),
   clientForget: (id) => ipcRenderer.invoke('client:forget', id),
-  clientConnect: (id, shell) => ipcRenderer.invoke('client:connect', id, shell),
+  clientConnect: (id, shell, distribution) => ipcRenderer.invoke('client:connect', id, shell, distribution),
+  clientShells: (id) => ipcRenderer.invoke('agent:shells',id),
+  agentTargets: () => ipcRenderer.invoke('agent:targets'),
+  agentCall: (target,call) => ipcRenderer.invoke('agent:call',target,call),
+  agentImportLegacy: () => ipcRenderer.invoke('agent:import'),
   clientStatus: () => ipcRenderer.invoke('client:status'),
   clientStart: (options) => ipcRenderer.invoke('client:start', options),
   clientStop: () => ipcRenderer.invoke('client:stop'),
@@ -48,8 +66,12 @@ const bridge: Bridge = {
   checkUpdate: () => ipcRenderer.invoke('update:check'),
   downloadUpdate: () => ipcRenderer.invoke('update:download'),
   installUpdate: () => ipcRenderer.invoke('update:install'),
+  openUpdatePage: () => ipcRenderer.invoke('update:open-page'),
   applicationCatalog: () => ipcRenderer.invoke('applications:catalog'),
   wslDistributions: () => ipcRenderer.invoke('local-terminal:wsl'),
+  wslNetwork: () => ipcRenderer.invoke('local-terminal:wsl-network'),
+  saveWslNetwork: (input) => ipcRenderer.invoke('local-terminal:wsl-network-save', input),
+  restartWsl: () => ipcRenderer.invoke('local-terminal:wsl-restart'),
   localTargets: () => ipcRenderer.invoke('local-terminal:targets'),
   wslAccountStatus: (name) => ipcRenderer.invoke('local-terminal:wsl-account', name),
   wslInitialize: (input) => ipcRenderer.invoke('local-terminal:wsl-initialize', input),
@@ -59,6 +81,9 @@ const bridge: Bridge = {
   localEnvironment: () => ipcRenderer.invoke('local-terminal:environment'),
   saveLocalEnvironment: (rows) => ipcRenderer.invoke('local-terminal:environment-save', rows),
   aiSnapshot: () => ipcRenderer.invoke('ai:snapshot'),
+  aiGoalSave: (id, input) => ipcRenderer.invoke('ai:goal-save', id, input),
+  aiGoalAction: (id, action, sessionId) =>
+    ipcRenderer.invoke('ai:goal-action', id, action, sessionId),
   aiProviderTest: (p, key) => ipcRenderer.invoke('ai:provider-test', p, key),
   onAiProvidersChanged: (listener) => {
     const handler = () => listener();
@@ -147,9 +172,11 @@ const bridge: Bridge = {
   manageGroup: (action) => ipcRenderer.invoke('group:manage', action),
   preferences: (value) => ipcRenderer.invoke('preferences', value),
   pickKey: () => ipcRenderer.invoke('key:pick'),
-  connect: (id, credentials) => ipcRenderer.invoke('connect', id, credentials),
-  connectTemporary: (profile, credentials) =>
-    ipcRenderer.invoke('connect:temporary', profile, credentials),
+  connect: (id, credentials, requestId) =>
+    ipcRenderer.invoke('connect', id, credentials, requestId),
+  connectTemporary: (profile, credentials, requestId) =>
+    ipcRenderer.invoke('connect:temporary', profile, credentials, requestId),
+  cancelConnect: (requestId) => ipcRenderer.invoke('connect:cancel', requestId),
   disconnect: (id) => ipcRenderer.invoke('disconnect', id),
   input: (id, data) => ipcRenderer.invoke('input', id, data),
   acknowledge: (id, characters) => ipcRenderer.invoke('acknowledge', id, characters),

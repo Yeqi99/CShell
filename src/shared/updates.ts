@@ -1,17 +1,28 @@
 export interface UpdateState {
   current: string;
-  phase: 'idle' | 'checking' | 'current' | 'available' | 'downloading' | 'ready' | 'error';
+  phase:
+    | 'idle'
+    | 'checking'
+    | 'current'
+    | 'unavailable'
+    | 'available'
+    | 'downloading'
+    | 'ready'
+    | 'error';
   version?: string;
   progress?: number;
   error?: string;
   platform: string;
+  retry?: 'check' | 'download';
 }
 export interface UpdateBridge {
   updateState(): Promise<UpdateState>;
   checkUpdate(): Promise<UpdateState>;
   downloadUpdate(): Promise<UpdateState>;
   installUpdate(): Promise<void>;
+  openUpdatePage(): Promise<void>;
 }
+export const releasesPage = 'https://github.com/Yeqi99/CShell/releases';
 export const releaseApi = 'https://api.github.com/repos/Yeqi99/CShell/releases?per_page=30';
 export function compareVersion(a: string, b: string): number {
   const parse = (v: string) => /^v?(\d+)\.(\d+)\.(\d+)$/.exec(v);

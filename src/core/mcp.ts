@@ -163,7 +163,10 @@ export class McpService {
       !this.store.mcpSettings().allowedProfiles.includes(profileId)
     )
       throw new Error('Profile is not authorized for MCP');
-    return this.store.profile(profileId);
+    const profile = this.store.profile(profileId);
+    if (profile.protocol && profile.protocol !== 'ssh')
+      throw new Error('MCP SSH tools require an SSH target');
+    return profile;
   }
   private session(id: string) {
     const profileId = this.connections.get(id);
@@ -212,7 +215,11 @@ export class McpService {
         run('list_servers', () =>
           this.store
             .snapshot()
-            .profiles.filter((p) => this.store.mcpSettings().allowedProfiles.includes(p.id))
+            .profiles.filter(
+              (p) =>
+                (!p.protocol || p.protocol === 'ssh') &&
+                this.store.mcpSettings().allowedProfiles.includes(p.id),
+            )
             .map(({ id, name, host, port, username }) => ({ id, name, host, port, username })),
         ),
     );

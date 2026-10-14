@@ -1,4 +1,6 @@
 import { AiPermissionTree } from './AiPermissionTree';
+import { AiGoals } from './AiWork';
+import { Target } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Plus, History, Settings2, MessageSquare, X, Trash2, Cpu, ShieldCheck } from 'lucide-react';
 import {
@@ -32,7 +34,7 @@ export function AiPanel({
     extractionProviderId: null,
     threads: [],
   });
-  const [page, setPage] = useState<'chat' | 'settings' | 'history'>('chat');
+  const [page, setPage] = useState<'chat' | 'settings' | 'history' | 'goals'>('chat');
   const [location] = useState<AiLocation>('terminal');
   const [providerId, setProviderId] = useState(''),
     [threadId, setThreadId] = useState('');
@@ -183,6 +185,15 @@ export function AiPanel({
           >
             <Settings2 size={16} />
           </button>
+          <button
+            className="icon"
+            title="目标管理"
+            aria-label="目标管理"
+            aria-pressed={page === 'goals'}
+            onClick={() => setPage(page === 'goals' ? 'chat' : 'goals')}
+          >
+            <Target size={16} />
+          </button>
           <button className="icon" title="折叠智能体" aria-label="折叠智能体" onClick={onClose}>
             <X size={16} />
           </button>
@@ -195,6 +206,10 @@ export function AiPanel({
       )}
       <div className="agent-chat-page" hidden={page !== 'chat'}>
         <AiConversation
+          openThread={(id) => {
+            setThreadId(id);
+            setPage('chat');
+          }}
           insertion={insertion}
           snapshot={snapshot}
           thread={thread}
@@ -210,6 +225,19 @@ export function AiPanel({
           configure={() => {
             setPage('settings');
             setSettingsTab('models');
+          }}
+        />
+      </div>
+      <div hidden={page !== 'goals'} className="agent-goals-page">
+        <AiGoals
+          snapshot={snapshot}
+          sessionId={sessionId}
+          create={create}
+          run={run}
+          busy={busy}
+          open={(id) => {
+            setThreadId(id);
+            setPage('chat');
           }}
         />
       </div>

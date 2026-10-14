@@ -1,5 +1,13 @@
+import { executeHttp } from '../http-transport';
+import { httpWireSchema } from '../../shared/http';
 import { accessSchema, hashPassword, verifyPassword } from './password';
-import { clientAccessSchema, clientEndpointSchema } from '../../shared/client';
+import {
+  clientAccessSchema,
+  clientEndpointSchema,
+  clientOpenSchema,
+  clientExecSchema,
+} from '../../shared/client';
+import { agentCallSchema, type AgentShellOption } from '../../shared/agent';
 import { createServer, type Server, type TLSSocket } from 'node:tls';
 import { randomBytes, timingSafeEqual, X509Certificate } from 'node:crypto';
 import { hostname, networkInterfaces } from 'node:os';
@@ -8,16 +16,32 @@ import { clientShellSchema, type ClientShell, type ClientStatus } from '../../sh
 import type { SessionEvent } from '../../shared/contracts';
 import type { ManagedProvider } from '../connections/manager';
 import { ClientVault, fingerprint, type ClientIdentity } from './identity';
-import { frames, send, textChunks } from './wire';
+import { frames, send, reply, textChunks } from './wire';
 const peerSchema = z.object({
+  allowHttp: z.boolean().default(false),
+  allowManage: z.boolean().default(false),
+  allowHosting: z.boolean().default(false),
+  allowRelay: z.boolean().default(false),
   fingerprint: z.string(),
   name: z.string().min(1).max(80),
-  shells: z.array(clientShellSchema).min(1).max(2),
+  shells: z.array(clientShellSchema).min(1).max(6),
 });
 const requestSchema = z
   .object({
     id: z.string().uuid(),
-    op: z.enum(['info', 'auth', 'open', 'input', 'resize', 'ack', 'close', 'ping']),
+    op: z.enum([
+      'info',
+      'auth',
+      'open',
+      'input',
+      'resize',
+      'ack',
+      'close',
+      'ping',
+      'http',
+      'manage',
+      'exec',
+    ]),
     payload: z.unknown().optional(),
   })
   .strict();
@@ -35,17 +59,28 @@ export class ClientServer {
   private changingAccess = false;
   private port?: number;
   private bind?: string;
+  private advertisedHost?: string;
   constructor(
     private vault: ClientVault,
     private terminal: ManagedProvider,
+    private options: {
+      manage?: (method: string, params: unknown, signal: AbortSignal) => Promise<unknown>;
+      shells?: () => Promise<AgentShellOption[]>;
+      execute?: (input: unknown, signal: AbortSignal) => Promise<unknown>;
+    } = {},
   ) {}
   async load() {
     this.identity = await this.vault.identity();
     const listener = await this.vault.read(
       'listener',
-      z.object({ bind: z.string(), port: z.number().int().min(1024).max(65535) }),
+      z.object({
+        bind: z.string(),
+        port: z.number().int().min(1024).max(65535),
+        advertisedHost: clientEndpointSchema.shape.host.optional(),
+      }),
     );
     this.bind = listener?.bind;
+    this.advertisedHost = listener?.advertisedHost;
     this.port = listener?.port;
     this.access = (await this.vault.read('access', accessSchema)) ?? undefined;
     this.peers = (await this.vault.read('peers', z.array(peerSchema).max(32))) ?? [];
@@ -64,11 +99,16 @@ export class ClientServer {
     return {
       passwordConfigured: !!this.access,
       allowedShells: this.access?.shells ?? [],
+      allowHttp: this.access?.allowHttp ?? false,
+      allowManage: this.access?.allowManage ?? false,
+      allowHosting: this.access?.allowHosting ?? false,
+      allowRelay: this.access?.allowRelay ?? false,
       running: !!this.server,
       deviceId: this.identity.id,
       fingerprint: fingerprint(this.identity.certificate),
       port: this.port,
       bind: this.bind,
+      advertisedHost: this.advertisedHost,
       peers: this.peers.map((p) => ({
         ...p,
         connected: [...this.channels].filter((c) => c.peer?.fingerprint === p.fingerprint).length,
@@ -81,7 +121,14 @@ export class ClientServer {
     if (this.server || this.changingAccess) throw new Error('请先停止服务再修改密码与权限');
     this.changingAccess = true;
     try {
-      const next = { ...(await hashPassword(input.password)), shells: [...new Set(input.shells)] };
+      const next = {
+        ...(await hashPassword(input.password)),
+        shells: [...new Set(input.shells)],
+        allowHttp: input.allowHttp,
+        allowManage: input.allowManage,
+        allowHosting: input.allowHosting,
+        allowRelay: input.allowRelay,
+      };
       // Clear certificate grants before committing a new password. A crash cannot retain old grants.
       await this.vault.write('peers', []);
       this.peers = [];
@@ -107,7 +154,11 @@ export class ClientServer {
   async start(options: unknown) {
     if (this.changingAccess) throw new Error('Access configuration busy');
     const input = z
-      .object({ bind: z.string(), port: z.number().int().min(1024).max(65535) })
+      .object({
+        bind: z.string(),
+        port: z.number().int().min(1024).max(65535),
+        advertisedHost: clientEndpointSchema.shape.host.optional(),
+      })
       .strict()
       .parse(options);
     const addresses = [
@@ -143,6 +194,7 @@ export class ClientServer {
     this.server = server;
     this.port = input.port;
     this.bind = input.bind;
+    this.advertisedHost = input.advertisedHost;
     await this.vault.write('listener', input);
     await this.record('service.started', input.bind);
     return this.status();
@@ -165,7 +217,7 @@ export class ClientServer {
           .min(1)
           .max(253)
           .regex(/^[a-zA-Z0-9.:-]+$/),
-        shells: z.array(clientShellSchema).min(1).max(2),
+        shells: z.array(clientShellSchema).min(1).max(6),
       })
       .strict()
       .parse(options);
@@ -245,7 +297,7 @@ export class ClientServer {
           if (!c.alive) return;
           try {
             const result = await this.handle(c, cert.fingerprint256, req.op, req.payload);
-            if (c.alive) send(socket, { id: req.id, result });
+            if (c.alive) await reply(socket, req.id, result);
           } catch {
             if (c.alive) send(socket, { id: req.id, error: 'Client request denied or failed' });
             if (!c.peer) socket.end();
@@ -301,7 +353,15 @@ export class ClientServer {
           shells = invite.shells;
         }
         if (this.peers.length >= 32) throw new Error('Peer limit');
-        peer = { fingerprint: fp, name: value.name, shells };
+        peer = {
+          fingerprint: fp,
+          name: value.name,
+          shells,
+          allowHttp: value.password !== undefined && !!this.access?.allowHttp,
+          allowManage: value.password !== undefined && !!this.access?.allowManage,
+          allowHosting: value.password !== undefined && !!this.access?.allowHosting,
+          allowRelay: value.password !== undefined && !!this.access?.allowRelay,
+        };
         this.peers.push(peer);
         try {
           await this.vault.write('peers', this.peers);
@@ -318,20 +378,89 @@ export class ClientServer {
         protocol: 1,
         deviceId: this.identity.id,
         shells: peer.shells,
-        capabilities: ['terminal.interactive'],
+        capabilities: [
+          'terminal.interactive',
+          ...(this.options.execute ? ['commands.execute'] : []),
+          ...(peer.allowHttp ? ['http.send'] : []),
+          ...(peer.allowManage ? ['agent.manage'] : []),
+          ...(peer.allowHosting ? ['agent.hosting'] : []),
+          ...(peer.allowRelay ? ['agent.relay'] : []),
+        ],
       };
     }
     if (!c.peer || !this.peers.includes(c.peer)) throw new Error('Not paired');
     if (op === 'ping') return {};
+    if (op === 'exec') {
+      const input = clientExecSchema.parse(payload);
+      if (!this.options.execute || !c.peer.shells.includes(input.shell))
+        throw new Error('Shell execution denied');
+      await this.record('command.execute.' + (input.distribution ?? input.shell), fp);
+      const abort = new AbortController(),
+        closed = () => abort.abort();
+      c.socket.once('close', closed);
+      try {
+        if (!c.alive || !this.peers.includes(c.peer)) throw new Error('Revoked');
+        return await this.options.execute(input, abort.signal);
+      } finally {
+        c.socket.off('close', closed);
+      }
+    }
+    if (op === 'manage') {
+      const call = agentCallSchema.parse(payload);
+      if (call.method === 'agent.shells')
+        return this.options.shells
+          ? (await this.options.shells()).filter((s) =>
+              c.peer!.shells.includes(clientShellSchema.parse(s.shell)),
+            )
+          : c.peer.shells.map((shell) => ({ shell, label: shell }));
+      const permission = call.method.startsWith('hosting.')
+        ? 'allowHosting'
+        : call.method.startsWith('relay.')
+          ? 'allowRelay'
+          : 'allowManage';
+      if (!c.peer[permission] || !this.access?.[permission] || !this.options.manage)
+        throw new Error('Management permission denied');
+      await this.record(call.method, fp);
+      const abort = new AbortController(),
+        closed = () => abort.abort();
+      c.socket.once('close', closed);
+      try {
+        if (
+          !c.alive ||
+          !this.peers.includes(c.peer) ||
+          !c.peer[permission] ||
+          !this.access?.[permission]
+        )
+          throw new Error('Management permission revoked');
+        return await this.options.manage(call.method, call.params, abort.signal);
+      } finally {
+        c.socket.off('close', closed);
+      }
+    }
+    if (op === 'http') {
+      if (!c.peer.allowHttp || !this.access?.allowHttp) throw new Error('HTTP denied');
+      const request = httpWireSchema.parse(payload);
+      await this.record('http.send', fp);
+      const abort = new AbortController(),
+        closed = () => abort.abort();
+      c.socket.once('close', closed);
+      try {
+        if (!c.alive || !this.peers.includes(c.peer)) throw new Error('Revoked');
+        return await executeHttp(request, abort.signal, undefined, 65536);
+      } finally {
+        c.socket.off('close', closed);
+      }
+    }
     if (op === 'open') {
-      const shell = clientShellSchema.parse(payload);
+      const config = clientOpenSchema.parse(payload);
+      const shell = typeof config === 'string' ? config : config.shell;
       if (c.terminal || !c.peer.shells.includes(shell)) throw new Error('Shell denied');
       await this.record('terminal.open.' + shell, fp);
       const abort = new AbortController();
       const closed = () => abort.abort();
       c.socket.once('close', closed);
       try {
-        const id = await this.terminal.connect(shell, undefined, abort.signal);
+        const id = await this.terminal.connect(config, undefined, abort.signal);
         if (!c.alive || !this.peers.includes(c.peer)) {
           await this.terminal.disconnect(id);
           throw new Error('Revoked');

@@ -1,0 +1,137 @@
+.agent-relay-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.agent-relay-panel fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.agent-relay-heading,
+.agent-relay-actions,
+.agent-relay-sharing,
+.agent-relay-confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.agent-relay-heading > div:first-child {
+  flex: 1;
+  min-width: 0;
+}
+.agent-relay-heading small {
+  display: block;
+  opacity: 0.7;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+.agent-relay-heading > strong {
+  flex: 1;
+}
+.agent-relay-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+.agent-relay-panel label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+  min-width: 0;
+}
+.agent-relay-panel label.agent-relay-check {
+  flex-direction: row;
+  align-items: center;
+  gap: 7px;
+}
+.agent-relay-panel input:not([type='checkbox']) {
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+}
+.agent-relay-panel input[type='checkbox'] {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  margin: 0;
+}
+.agent-relay-target {
+  display: grid;
+  grid-template-columns: minmax(90px, 1fr) 125px minmax(110px, 1.4fr) 75px 30px;
+  gap: 8px;
+  align-items: end;
+}
+.agent-relay-registration {
+  grid-column: 3 / 5;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12px;
+}
+.agent-relay-panel select {
+  min-width: 0;
+  width: 100%;
+}
+.agent-relay-target .icon {
+  margin-bottom: 3px;
+}
+.agent-relay-panel p {
+  font-size: 12px;
+  margin: 0;
+}
+.agent-relay-note {
+  opacity: 0.7;
+  line-height: 1.5;
+}
+.agent-relay-error {
+  color: #bd3737;
+  overflow-wrap: anywhere;
+}
+.agent-relay-panel details summary {
+  cursor: pointer;
+  font-size: 12px;
+  padding: 4px 0;
+}
+.agent-relay-panel details[open] summary {
+  margin-bottom: 8px;
+}
+.agent-relay-sharing {
+  align-items: end;
+  margin-top: 4px;
+}
+.agent-relay-sharing > label {
+  flex: 1;
+  min-width: 180px;
+}
+.agent-relay-sharing button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.agent-relay-confirm {
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  padding: 10px;
+  font-size: 12px;
+}
+.agent-relay-confirm span {
+  flex: 1;
+  min-width: 200px;
+}
+@media (max-width: 600px) {
+  .agent-relay-target {
+    grid-template-columns: minmax(80px, 1fr) minmax(110px, 2fr);
+  }
+  .agent-relay-registration {
+    grid-column: 1 / -1;
+  }
+}

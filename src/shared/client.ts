@@ -1,6 +1,21 @@
 import { z } from 'zod';
-export const clientShellSchema = z.enum(['cmd', 'powershell']);
+import { agentRelayConnectionSchema, type AgentRelayConnection } from './agent-relay';
+export const clientShellSchema = z.enum(['cmd', 'powershell', 'bash', 'zsh', 'sh', 'wsl']);
+export const clientOpenSchema = z.union([
+  clientShellSchema,
+  z
+    .object({ shell: clientShellSchema, distribution: z.string().min(1).max(100).optional() })
+    .strict(),
+]);
 export type ClientShell = z.infer<typeof clientShellSchema>;
+export const clientExecSchema = z
+  .object({
+    shell: clientShellSchema,
+    distribution: z.string().min(1).max(100).optional(),
+    command: z.string().min(1).max(32768),
+    timeoutMs: z.number().int().min(1).max(60000).default(30000),
+  })
+  .strict();
 export const clientEndpointSchema = z
   .object({
     host: z
@@ -28,19 +43,35 @@ export type ClientDevice = Omit<ClientInvitation, 'token' | 'expires' | 'certifi
 export type ClientStatus = {
   passwordConfigured?: boolean;
   allowedShells?: ClientShell[];
+  allowHttp?: boolean;
+  allowManage?: boolean;
+  allowHosting?: boolean;
+  allowRelay?: boolean;
   interfaces?: string[];
   running: boolean;
   deviceId: string;
   fingerprint: string;
   port?: number;
   bind?: string;
+  advertisedHost?: string;
   peers: { fingerprint: string; name: string; shells: ClientShell[]; connected: number }[];
   audit: { time: string; action: string; peer: string }[];
 };
 export interface ClientBridge {
-  clientSetAccess(options: { password: string; shells: ClientShell[] }): Promise<ClientStatus>;
+  clientSetAccess(options: {
+    password: string;
+    shells: ClientShell[];
+    allowHttp?: boolean;
+    allowManage?: boolean;
+    allowHosting?: boolean;
+    allowRelay?: boolean;
+  }): Promise<ClientStatus>;
   clientConnectionInfo(host: string): Promise<string>;
-  clientProbe(endpoint: { host: string; port: number }): Promise<ClientInfo>;
+  clientProbe(endpoint: {
+    host: string;
+    port: number;
+    relay?: AgentRelayConnection;
+  }): Promise<ClientInfo>;
   clientPasswordPair(info: ClientInfo, password: string): Promise<ClientDevice>;
   openRdp(endpoint: { host: string; port: number }): Promise<void>;
   clientDownloadPage(): Promise<void>;
@@ -48,9 +79,17 @@ export interface ClientBridge {
   clientDevices(): Promise<ClientDevice[]>;
   clientPair(invitation: string): Promise<ClientDevice>;
   clientForget(deviceId: string): Promise<void>;
-  clientConnect(deviceId: string, shell: ClientShell): Promise<{ sessionId: string; name: string }>;
+  clientConnect(
+    deviceId: string,
+    shell: ClientShell,
+    distribution?: string,
+  ): Promise<{ sessionId: string; name: string }>;
   clientStatus(): Promise<ClientStatus>;
-  clientStart(options: { bind: string; port: number }): Promise<ClientStatus>;
+  clientStart(options: {
+    bind: string;
+    port: number;
+    advertisedHost?: string;
+  }): Promise<ClientStatus>;
   clientStop(): Promise<ClientStatus>;
   clientInvite(options: { host: string; shells: ClientShell[] }): Promise<string>;
   clientRevoke(fingerprint: string): Promise<ClientStatus>;
@@ -58,7 +97,16 @@ export interface ClientBridge {
 
 export const clientPasswordSchema = z.string().min(12).max(128);
 export const clientAccessSchema = z
-  .object({ password: clientPasswordSchema, shells: z.array(clientShellSchema).min(1).max(2) })
+  .object({
+    password: clientPasswordSchema,
+    shells: z.array(clientShellSchema).min(1).max(6),
+    allowHttp: z.boolean().default(false),
+    allowManage: z.boolean().default(false),
+    allowHosting: z.boolean().default(false),
+    allowRelay: z.boolean().default(false),
+  })
   .strict();
-export const clientInfoSchema = clientInvitationSchema.omit({ token: true, expires: true });
+export const clientInfoSchema = clientInvitationSchema
+  .omit({ token: true, expires: true })
+  .extend({ relay: agentRelayConnectionSchema.optional() });
 export type ClientInfo = z.infer<typeof clientInfoSchema>;

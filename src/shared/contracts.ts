@@ -1,3 +1,6 @@
+import type { HttpBridge } from './http';
+import type { AgentBridge } from './agent';
+import { clientShellSchema } from './client';
 import type { ClientBridge } from './client';
 import type { LocalTerminalBridge } from './local-terminal';
 import type { ActivityBridge } from './activity';
@@ -19,17 +22,25 @@ const text = z.string().trim().min(1).max(255);
 export const profileSchema = z
   .object({
     id: z.string().uuid(),
-    protocol: z.enum(['ssh', 'client']).optional(),
-    clientShell: z.enum(['cmd', 'powershell']).optional(),
+    protocol: z.enum(['ssh', 'client', 'http']).optional(),
+    clientShell: clientShellSchema.optional(),
+    clientDistribution: z.string().min(1).max(100).optional(),
     name: text,
-    host: text,
-    port: z.number().int().min(1).max(65535),
-    username: text,
+    host: z.string().trim().max(8192),
+    port: z.number().int().min(0).max(65535),
+    username: z.string().trim().max(255),
     group: z.string().trim().max(100),
     favorite: z.boolean(),
     auth: z.enum(['password', 'key']),
   })
-  .strict();
+  .strict()
+  .superRefine((p, ctx) => {
+    if (p.protocol === 'http') {
+      if (p.host || p.username || p.port !== 0 || p.auth !== 'password' || p.clientShell || p.clientDistribution)
+        ctx.addIssue({ code: 'custom', message: 'HTTP workspace has no machine endpoint' });
+    } else if (!p.host || p.host.length > 255 || !p.username || p.port < 1)
+      ctx.addIssue({ code: 'custom', message: 'Machine endpoint is incomplete' });
+  });
 export type Profile = z.infer<typeof profileSchema>;
 export const groupNameSchema = z.string().trim().min(1).max(100);
 export const groupActionSchema = z.discriminatedUnion('type', [
@@ -197,6 +208,8 @@ export type SessionEvent =
   | { type: 'transfer'; transfer: Transfer };
 export interface Bridge
   extends
+    AgentBridge,
+    HttpBridge,
     ClientBridge,
     LocalTerminalBridge,
     ExtensionBridge,
@@ -229,8 +242,17 @@ export interface Bridge
   manageGroup(action: GroupAction): Promise<void>;
   preferences(value: Preferences): Promise<void>;
   pickKey(): Promise<{ token: string; name: string } | null>;
-  connect(profileId: string, credentials: Credentials): Promise<{ sessionId: string }>;
-  connectTemporary(profile: Profile, credentials: Credentials): Promise<{ sessionId: string }>;
+  connect(
+    profileId: string,
+    credentials: Credentials,
+    requestId?: string,
+  ): Promise<{ sessionId: string }>;
+  connectTemporary(
+    profile: Profile,
+    credentials: Credentials,
+    requestId?: string,
+  ): Promise<{ sessionId: string }>;
+  cancelConnect(requestId: string): Promise<void>;
   disconnect(sessionId: string): Promise<void>;
   input(sessionId: string, data: string): Promise<void>;
   acknowledge(sessionId: string, characters: number): Promise<void>;

@@ -5,6 +5,7 @@ import { performance } from 'node:perf_hooks';
 import type { FileEntry, Metrics, Profile, SessionEvent } from '../shared/contracts';
 import { childPath, remotePath } from './paths';
 import { metricsCommand, parseMetrics, type CpuSample } from './metrics';
+import { CONNECTION_CANCELLED, CONNECTION_TIMEOUT } from '../shared/connection-errors';
 
 export interface Session {
   profile: Profile;
@@ -27,12 +28,19 @@ export class SshService {
   }
   constructor(
     private emit: (event: SessionEvent) => void,
-    private verify: (profile: Profile, fingerprint: string) => Promise<boolean>,
+    private verify: (
+      profile: Profile,
+      fingerprint: string,
+      signal: AbortSignal,
+    ) => Promise<boolean>,
+    private options: { connectTimeoutMs?: number } = {},
   ) {}
   async connect(
     profile: Profile,
     credentials: Pick<ConnectConfig, 'password' | 'privateKey' | 'passphrase'>,
+    signal?: AbortSignal,
   ) {
+    signal?.throwIfAborted();
     if (profile.protocol === 'client') throw new Error('Client connections cannot use SSH');
     const client = new ssh2.Client();
     const session: Session = {
@@ -46,17 +54,31 @@ export class SshService {
     this.sessions.set(session.id, session);
     const decoder = new StringDecoder('utf8'),
       stderrDecoder = new StringDecoder('utf8');
+    const controller = new AbortController();
+    let established = false;
+    let rejectPending: (error: Error) => void = () => {};
     const close = (error?: string) => {
       if (session.closed) return;
       session.closed = true;
+      if (!established) controller.abort(new Error(error || 'SSH connection closed'));
       this.sessions.delete(session.id);
       session.sftp?.end();
       session.shell?.destroy();
       client.destroy();
       this.emit({ type: 'closed', sessionId: session.id, error });
     };
+    const abort = () => {
+      rejectPending(controller.signal.reason);
+      close();
+    };
+    const cancel = () => controller.abort(new Error(CONNECTION_CANCELLED));
+    controller.signal.addEventListener('abort', abort, { once: true });
+    signal?.addEventListener('abort', cancel, { once: true });
+    const timeoutMs = this.options.connectTimeoutMs ?? 120000;
+    const timer = setTimeout(() => controller.abort(new Error(CONNECTION_TIMEOUT)), timeoutMs);
     try {
       await new Promise<void>((resolve, reject) => {
+        rejectPending = reject;
         client.once('ready', resolve);
         client.on('error', (error) => {
           reject(error);
@@ -71,24 +93,36 @@ export class SshService {
           port: profile.port,
           username: profile.username,
           ...credentials,
-          readyTimeout: 120000,
+          readyTimeout: timeoutMs,
           keepaliveInterval: 15000,
           keepaliveCountMax: 3,
           hostVerifier: (key: Buffer, callback: (valid: boolean) => void) => {
             const fingerprint =
               'SHA256:' + createHash('sha256').update(key).digest('base64').replace(/=+$/, '');
-            this.verify(profile, fingerprint).then(
-              (ok) => callback(ok && !session.closed),
-              () => callback(false),
+            if (controller.signal.aborted) return;
+            this.verify(profile, fingerprint, controller.signal).then(
+              (ok) => {
+                if (!session.closed) callback(ok && !controller.signal.aborted);
+              },
+              () => {
+                if (!session.closed) callback(false);
+              },
             );
           },
         });
       });
-      session.shell = await new Promise<ClientChannel>((resolve, reject) =>
-        client.shell({ term: 'xterm-256color', cols: 100, rows: 30 }, (error, stream) =>
-          error ? reject(error) : resolve(stream),
-        ),
-      );
+      controller.signal.throwIfAborted();
+      session.shell = await new Promise<ClientChannel>((resolve, reject) => {
+        rejectPending = reject;
+        client.shell({ term: 'xterm-256color', cols: 100, rows: 30 }, (error, stream) => {
+          if (error) return reject(error);
+          if (controller.signal.aborted || session.closed) {
+            stream.destroy();
+            reject(controller.signal.reason ?? new Error('SSH connection closed'));
+          } else resolve(stream);
+        });
+      });
+      controller.signal.throwIfAborted();
       const output = (data: Buffer, decoderForStream: StringDecoder) => {
         const text = decoderForStream.write(data);
         session.outstanding += text.length;
@@ -102,10 +136,15 @@ export class SshService {
       session.shell.stderr.on('data', (data: Buffer) => output(data, stderrDecoder));
       session.shell.once('close', () => close());
       session.shell.on('error', (error: Error) => close(error.message));
+      established = true;
       return { sessionId: session.id };
     } catch (error) {
       close();
       throw error;
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', cancel);
+      controller.signal.removeEventListener('abort', abort);
     }
   }
   get(id: string) {

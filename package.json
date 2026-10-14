@@ -1,7 +1,7 @@
 {
   "name": "canpshell",
   "productName": "CShell",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "description": "CanpShell offline-first terminal workbench",
   "author": "CanpShell contributors",
@@ -16,7 +16,8 @@
     "dist": "pnpm run licenses && pnpm build && electron-builder --win nsis --x64 --publish never",
     "licenses": "node scripts/licenses.mjs",
     "start:client": "electron . --client",
-    "dist:client": "pnpm run licenses && pnpm build && electron-builder --config scripts/client-builder.cjs --win nsis --x64 --publish never"
+    "start:agent": "tsx src/agent/cli.ts run",
+    "build:agent": "node scripts/agent-build.mjs"
   },
   "dependencies": {
     "@codemirror/autocomplete": "6.20.3",
@@ -61,7 +62,7 @@
     "appId": "org.canpshell.desktop",
     "productName": "CShell",
     "directories": {
-      "output": "release/0.5.0"
+      "output": "release/0.6.0"
     },
     "files": [
       "dist/**/*",
