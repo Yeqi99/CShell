@@ -1,4 +1,5 @@
 import './extension-market.css';
+import { WechatPlugin } from './WechatPlugin';
 import { AgentWorkbench } from './AgentWorkbench';
 import { WslPlugin } from './WslPlugin';
 import type { LocalShell } from '../../shared/local-terminal';
@@ -60,7 +61,7 @@ export function ExtensionWorkbench({
   const { locale } = useI18n(),
     zh = locale === 'zh-CN';
   const [section, setSection] = useState<
-    'plugins' | 'apps' | 'environment' | 'python' | 'wsl' | 'agent'
+    'plugins' | 'apps' | 'environment' | 'python' | 'wsl' | 'agent' | 'wechat'
   >('plugins');
   const [settingsPlugin, setSettingsPlugin] = useState<string | null>(null);
   const views = availablePluginViews(plugins);
@@ -169,14 +170,14 @@ export function ExtensionWorkbench({
                       ? 'WSL Linux'
                       : section === 'agent'
                         ? 'CShell Agent'
-                        : 'Python'}
+                        : section === 'wechat' ? '微信（实验）' : 'Python'}
             </h1>
             <p>
               {section === 'plugins'
                 ? zh
                   ? '按需添加，随时停用。'
                   : 'Add the tools you need.'
-                : section === 'agent'
+                : section === 'wechat' ? '本机微信 · 独立授权' : section === 'agent'
                   ? zh
                     ? '配置所选 Agent 的连接、权限与服务。'
                     : 'Manage connections, permissions and services on the selected Agent.'
@@ -187,7 +188,7 @@ export function ExtensionWorkbench({
                       : 'Actions belong to the selected connection.'}
             </p>
           </div>
-          {section !== 'plugins' && section !== 'wsl' && section !== 'agent' && (
+          {section !== 'plugins' && section !== 'wsl' && section !== 'agent' && section !== 'wechat' && (
             <label className="extension-server">
               {zh ? '目标服务器' : 'Target server'}
               <select
@@ -378,8 +379,9 @@ export function ExtensionWorkbench({
           </details>
         </div>
         {section === 'agent' && currentView && <AgentWorkbench />}
+        {section === 'wechat' && currentView && <WechatPlugin />}
         {section === 'wsl' && currentView && <WslPlugin onOpen={onLocal} />}
-        {section !== 'plugins' && section !== 'wsl' && section !== 'agent' && !target && (
+        {section !== 'plugins' && section !== 'wsl' && section !== 'agent' && section !== 'wechat' && !target && (
           <div className="extension-empty">
             {zh
               ? '先连接一台服务器，再选择安装或管理环境。'
@@ -391,7 +393,7 @@ export function ExtensionWorkbench({
             className="extension-session"
             key={s.id}
             hidden={
-              section === 'plugins' || section === 'wsl' || section === 'agent' || target !== s.id
+              section === 'plugins' || section === 'wsl' || section === 'agent' || section === 'wechat' || target !== s.id
             }
           >
             <ServerExtensions
@@ -401,9 +403,10 @@ export function ExtensionWorkbench({
                 target === s.id &&
                 section !== 'plugins' &&
                 section !== 'wsl' &&
+                section !== 'wechat' &&
                 section !== 'agent'
               }
-              section={section === 'wsl' ? 'plugins' : section}
+              section={section === 'wsl' || section === 'wechat' ? 'plugins' : section}
               plugins={plugins}
               appRequest={appRequest}
               fileRequest={request?.sessionId === s.id ? request : null}

@@ -39,6 +39,7 @@ export class SshService {
     profile: Profile,
     credentials: Pick<ConnectConfig, 'password' | 'privateKey' | 'passphrase'>,
     signal?: AbortSignal,
+    ready?: (id: string) => void,
   ) {
     signal?.throwIfAborted();
     if (profile.protocol === 'client') throw new Error('Client connections cannot use SSH');
@@ -132,6 +133,7 @@ export class SshService {
           session.shell?.stderr.pause();
         }
       };
+      ready?.(session.id);
       session.shell.on('data', (data: Buffer) => output(data, decoder));
       session.shell.stderr.on('data', (data: Buffer) => output(data, stderrDecoder));
       session.shell.once('close', () => close());
@@ -153,15 +155,33 @@ export class SshService {
       throw new Error('Session is not connected');
     return session;
   }
-  async openEnvironment(parentId: string, command: string) {
+  async openEnvironment(
+    parentId: string,
+    command: string,
+    signal?: AbortSignal,
+    ready?: (id: string) => void,
+  ) {
+    signal?.throwIfAborted();
     const parent = this.get(parentId);
-    const stream = await new Promise<ClientChannel>((resolve, reject) =>
+    const stream = await new Promise<ClientChannel>((resolve, reject) => {
+      const aborted = () => reject(signal?.reason);
+      signal?.addEventListener('abort', aborted, { once: true });
       parent.client.exec(
         command,
         { pty: { term: 'xterm-256color', cols: 100, rows: 30 } },
-        (error, stream) => (error ? reject(error) : resolve(stream)),
-      ),
-    );
+        (error, stream) => {
+          signal?.removeEventListener('abort', aborted);
+          if (error) return reject(error);
+          if (signal?.aborted || parent.closed || parent.disconnecting) {
+            stream.signal('TERM');
+            stream.close();
+            reject(new Error('Environment terminal opening cancelled'));
+            return;
+          }
+          resolve(stream);
+        },
+      );
+    });
     const child: Session = {
       profile: { ...parent.profile },
       id: randomUUID(),
@@ -173,6 +193,15 @@ export class SshService {
       outstanding: 0,
     };
     this.sessions.set(child.id, child);
+    try {
+      signal?.throwIfAborted();
+      ready?.(child.id);
+    } catch (error) {
+      this.sessions.delete(child.id);
+      stream.signal('TERM');
+      stream.close();
+      throw error;
+    }
     const decoder = new StringDecoder('utf8');
     const close = () => {
       if (child.closed) return;
@@ -234,14 +263,34 @@ export class SshService {
     const session = this.get(id);
     if (session.sftp) return session.sftp;
     if (!session.sftpPending)
-      session.sftpPending = new Promise<SFTPWrapper>((resolve, reject) =>
-        session.client.sftp((error, sftp) => (error ? reject(error) : resolve(sftp))),
-      );
+      session.sftpPending = new Promise<SFTPWrapper>((resolve, reject) => {
+        session.client.sftp((error, sftp) => {
+          if (error) return reject(error);
+          if (session.closed || session.disconnecting || this.sessions.get(id) !== session) {
+            sftp.end();
+            return reject(new Error('SSH session closed while opening SFTP'));
+          }
+          const invalidate = () => {
+            if (session.sftp === sftp) session.sftp = undefined;
+          };
+          sftp.once('close', invalidate);
+          sftp.once('end', invalidate);
+          sftp.once('error', () => {
+            invalidate();
+            sftp.end();
+          });
+          session.sftp = sftp;
+          resolve(sftp);
+        });
+      });
+    const pending = session.sftpPending;
     try {
-      session.sftp = await session.sftpPending;
-      return session.sftp;
+      const sftp = await pending;
+      if (session.closed || session.disconnecting || session.sftp !== sftp)
+        throw new Error('SFTP channel closed while opening');
+      return sftp;
     } finally {
-      session.sftpPending = undefined;
+      if (session.sftpPending === pending) session.sftpPending = undefined;
     }
   }
   async list(id: string, path: string) {

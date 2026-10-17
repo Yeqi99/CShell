@@ -1,6 +1,12 @@
 import { useState } from 'react';
 import { Check, ShieldCheck, Server, Monitor } from 'lucide-react';
-import { aiCapabilities, type AiPolicy, type AiSnapshot } from '../../shared/ai';
+import {
+  aiCapabilities,
+  aiPolicySchema,
+  emptyAiPolicy,
+  type AiPolicy,
+  type AiSnapshot,
+} from '../../shared/ai';
 import type { Profile } from '../../shared/contracts';
 const names = {
   'http.send': '从此机器发送 HTTP 请求',
@@ -9,6 +15,7 @@ const names = {
   'agent.relay': '管理 Agent 中继',
   'metrics.read': '资源监控',
   'files.read': '读取文件',
+  'files.create': '创建文件（不覆盖）',
   'commands.execute': '执行命令 / 修改文件',
 };
 export function AiPermissionTree({
@@ -57,6 +64,26 @@ export function AiPermissionTree({
         <ShieldCheck size={16} />
       </div>
       <p className="ai-section-note">所有会话共用。审核模式只决定操作是否需要确认。</p>
+      <div className="permission-bulk-actions">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() =>
+            edit({
+              ...emptyAiPolicy(),
+              application: [...aiPolicySchema.shape.application.element.options],
+              capabilities: [...aiCapabilities],
+              profiles: profiles.map((profile) => profile.id),
+            })
+          }
+        >
+          全选
+        </button>
+        <button type="button" disabled={busy} onClick={() => edit(emptyAiPolicy())}>
+          全取消
+        </button>
+        <small>全选包含当前已保存的目标和全部能力，不包含以后新增的机器；保存后生效。</small>
+      </div>
       <fieldset disabled={busy} className="permission-tree-nodes">
         <section className="permission-global-section">
           <h4>
@@ -76,7 +103,17 @@ export function AiPermissionTree({
             查询连接目标、分组与会话
           </label>
           <small>可查询尚未连接的目标；不会读取凭据或连接机器。</small>
-          <label><input type="checkbox" checked={p.application.includes('http.use')} onChange={e => edit({ ...p, application: toggle(p.application, 'http.use', e.target.checked) })} />使用 HTTP 扩展工具</label><small>需同时勾选允许的 HTTP 工作区；远端发送还需授权发送方机器的 HTTP 能力。</small>
+          <label>
+            <input
+              type="checkbox"
+              checked={p.application.includes('http.use')}
+              onChange={(e) =>
+                edit({ ...p, application: toggle(p.application, 'http.use', e.target.checked) })
+              }
+            />
+            使用 HTTP 扩展工具
+          </label>
+          <small>需同时勾选允许的 HTTP 工作区；远端发送还需授权发送方机器的 HTTP 能力。</small>
           <label>
             <input
               type="checkbox"
@@ -95,6 +132,10 @@ export function AiPermissionTree({
             [
               ['agents.manage', '分配与管理子任务'],
               ['goals.manage', '管理定期目标'],
+              ['ai.providers.manage', '查询、添加与测试 AI 基座'],
+              ['wechat.read', '读取本机微信状态、联系人与授权消息'],
+              ['wechat.send', '向授权联系人发送微信文本'],
+              ['wechat.contacts.manage', '修改授权微信联系人的备注'],
             ] as const
           ).map(([id, label]) => (
             <label key={id}>
@@ -109,6 +150,7 @@ export function AiPermissionTree({
             </label>
           ))}
           <small>默认关闭。子任务和定期目标不会增加机器或操作权限。</small>
+          <small>基座保存需确认地址、模型与密钥来源；密钥由后端保管，不返回对话。</small>
         </section>
         <section className="permission-global-section">
           <h4>

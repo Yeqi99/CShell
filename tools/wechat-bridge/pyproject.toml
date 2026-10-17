@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cshell-wechat-bridge"
+version = "0.1.0"
+description = "Version-pinned local WeChat adapter for CShell Agent"
+requires-python = ">=3.11"
+license = "MIT"
+dependencies = ["frida==17.24.0", "pefile==2024.8.26", "zstandard==0.23.0"]
+
+[project.optional-dependencies]
+maintenance = ["capstone==5.0.9"]
+
+[project.scripts]
+cshell-wechat = "cshell_wechat.cli:main"
+
+[tool.setuptools.package-data]
+cshell_wechat = ["native/*.c", "native/*.js", "profiles/*.json"]
+
+[tool.setuptools.packages.find]
+include = ["cshell_wechat*"]

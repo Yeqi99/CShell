@@ -11,8 +11,9 @@ export async function registerAiHandlers(
   connectHost?: AiConnectionHost,
   publish?: (channel: string, value?: unknown) => void,
   http?: import('../core/http-workspaces').HttpWorkspaces,
+  wechat?: import('../core/wechat').WechatService,
 ) {
-  const ai = new AiService(directory, store, connections, connectHost, { http });
+  const ai = new AiService(directory, store, connections, connectHost, { http, wechat });
   const pending = new Map<string, AiThread>();
   let timer: ReturnType<typeof setTimeout> | undefined;
   ai.onThreadUpdate = (thread) => {

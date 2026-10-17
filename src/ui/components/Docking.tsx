@@ -142,14 +142,14 @@ export function PanelResizer({
   onChange,
   reverse,
 }: {
-  panel: 'servers' | 'files';
+  panel: 'servers' | 'files' | 'agent';
   width: number;
   onChange: (width: number) => void;
   reverse: boolean;
 }) {
   const { t } = useI18n();
-  const minimum = panel === 'servers' ? 170 : 240,
-    maximum = panel === 'servers' ? 500 : 600;
+  const minimum = panel === 'agent' ? 320 : panel === 'servers' ? 170 : 240,
+    maximum = panel === 'agent' ? 900 : panel === 'servers' ? 500 : 600;
   return (
     <div
       className={`panel-resizer ${reverse ? 'on-left' : ''}`}
@@ -162,22 +162,25 @@ export function PanelResizer({
       aria-valuemax={maximum}
       aria-valuenow={width}
       onPointerDown={(event) => {
+        if (event.button !== 0) return;
         const element = event.currentTarget,
-          start = event.clientX;
-        let next = width;
+          start = event.clientX,
+          initialWidth = element.parentElement!.getBoundingClientRect().width;
+        let next = initialWidth;
         element.setPointerCapture(event.pointerId);
         const move = (e: PointerEvent) => {
           next = Math.max(
             minimum,
-            Math.min(maximum, width + (e.clientX - start) * (reverse ? -1 : 1)),
+            Math.min(maximum, initialWidth + (e.clientX - start) * (reverse ? -1 : 1)),
           );
           element.parentElement!.style.width = `${next}px`;
         };
-        const finish = () => {
+        const finish = (e: PointerEvent) => {
           element.removeEventListener('pointermove', move);
           element.removeEventListener('pointerup', finish);
           element.removeEventListener('pointercancel', finish);
-          onChange(next);
+          if (e.type === 'pointercancel') element.parentElement!.style.width = `${width}px`;
+          else onChange(next);
         };
         element.addEventListener('pointermove', move);
         element.addEventListener('pointerup', finish);

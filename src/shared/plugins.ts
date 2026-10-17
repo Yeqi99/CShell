@@ -24,6 +24,7 @@ export const pluginManifestSchema = z
       'wsl',
       'http',
       'agent',
+      'wechat',
     ]),
     permissions: z
       .array(z.enum(['terminal.input', 'remote.read', 'remote.execute', 'remote.forward']))
@@ -78,6 +79,7 @@ const builtin = (
   commands: [],
 });
 export const builtinPlugins = [
+  builtin('wechat', '微信（实验）', '绑定本机 Windows 微信，授权智能体读取联系人、收发文本。实验适配可能导致微信崩溃。', 'wechat', []),
   builtin('http', 'HTTP', '编辑请求、多目标、切换发送方与请求历史，可供智能体调用。', 'http', [
     'remote.forward',
   ]),

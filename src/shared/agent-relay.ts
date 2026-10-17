@@ -67,6 +67,7 @@ export interface AgentRelayEndpoint {
   fingerprint: string;
 }
 export interface AgentRelayStatus {
+  revision?: string;
   running: boolean;
   config: AgentRelayConfig;
   fingerprint: string;
@@ -91,6 +92,7 @@ export const agentReverseRelayConfigSchema = z
   );
 export type AgentReverseRelayConfig = z.infer<typeof agentReverseRelayConfigSchema>;
 export interface AgentReverseRelayStatus {
+  revision?: string;
   running: boolean;
   connected: boolean;
   activeConnections: number;

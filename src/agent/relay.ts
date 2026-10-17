@@ -145,7 +145,10 @@ export class AgentRelayService {
   async configure(input: unknown) {
     return this.serial(async () => {
       this.requireLoaded();
-      const config = agentRelayConfigSchema.parse(input);
+      const { expectedRevision, ...raw } = z.object({ expectedRevision: z.string().regex(/^[a-f0-9]{64}$/).optional() }).passthrough().parse(input);
+      if (expectedRevision !== undefined && expectedRevision !== this.configurationRevision)
+        throw new Error('Relay configuration changed; reload status before saving');
+      const config = agentRelayConfigSchema.parse(raw);
       const registrations = Object.fromEntries(
         config.targets
           .filter((target) => target.mode === 'reverse')
@@ -157,6 +160,7 @@ export class AgentRelayService {
       await this.persist(config, this.credential, registrations);
       await this.stopNow();
       this.config = config;
+      this.configurationRevision = randomBytes(32).toString('hex');
       this.registrationCredentials = registrations;
       return this.status();
     });
@@ -197,8 +201,10 @@ export class AgentRelayService {
       return next;
     });
   }
+  private configurationRevision = randomBytes(32).toString('hex');
   status(): AgentRelayStatus {
     return {
+      revision: this.configurationRevision,
       running: !!this.server?.listening,
       config: structuredClone(this.config),
       fingerprint: fingerprint(this.options.identity.certificate),

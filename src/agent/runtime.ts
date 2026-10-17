@@ -15,8 +15,8 @@ import { WslNetworkSettings } from './wsl-network';
 import { HostingService } from './hosting';
 import { AgentRelayService } from './relay';
 import { AgentReverseRelayService } from './relay-reverse';
-import { agentRelayConfigSchema } from '../shared/agent-relay';
 import { hostingConfigSchema } from '../shared/agent-hosting';
+import { AgentApplicationService } from './applications';
 
 const legacySchema = z
   .object({
@@ -88,11 +88,14 @@ export async function createAgentRuntime(
       ...(s.distribution ? { distribution: s.distribution } : {}),
     }));
   server = new ClientServer(vault, terminal, {
-    manage: (method, params, signal) => dispatch(method, params, signal, false),
+    manage: (method, params, signal, owner) => dispatch(method, params, signal, false, owner),
     shells,
     execute: (input, signal) => terminal.execute(input, signal),
   });
   await server.load();
+  const applications = new AgentApplicationService(vault, (owner) =>
+    server.managementAllowed(owner));
+  await applications.load();
   const hosting = new HostingService(join(directory, 'hosting'));
   await hosting.load();
   let relay = new AgentRelayService({ vault, identity: await vault.identity() });
@@ -130,9 +133,14 @@ export async function createAgentRuntime(
     params: unknown,
     signal = new AbortController().signal,
     local = true,
+    owner = 'local',
   ): Promise<unknown> {
     signal.throwIfAborted();
     if (closed) throw new Error('Agent 已关闭');
+    if (!local && owner === 'local' && method.startsWith('applications.')) throw new Error('缺少控制端身份');
+    if (method === 'applications.list') return applications.list(owner);
+    if (method === 'applications.status') return applications.status(params, owner);
+    if (method === 'applications.plan') return applications.plan(params, owner, signal);
     if (method === 'agent.shells' || method === 'agent.environments') return shells();
     if (method === 'client.status')
       return {
@@ -189,6 +197,18 @@ export async function createAgentRuntime(
     return serialized(async () => {
       signal.throwIfAborted();
       if (closed) throw new Error('Agent 已关闭');
+      if (method === 'applications.configure') {
+        if (!local) throw new Error('仅目标 Agent 本机可修改应用安装授权');
+        const result = await applications.configure(params);
+        await recordManagement('applications.configure');
+        return result;
+      }
+      if (method === 'applications.cancel') return applications.cancel(params, owner);
+      if (method === 'applications.install') {
+        await recordManagement('applications.install');
+        signal.throwIfAborted();
+        return applications.install(params, owner);
+      }
       if (method === 'client.access') {
         const result = await server.setAccess(params);
         canImportLegacy = false;
@@ -289,7 +309,7 @@ export async function createAgentRuntime(
       if (method === 'hosting.stop') return hosting.stop(idInput(params));
       if (method === 'hosting.remove') return hosting.remove(idInput(params));
       if (method === 'relay.configure')
-        return relay.configure(agentRelayConfigSchema.parse(params));
+        return relay.configure(params);
       if (method === 'relay.start') return relay.start();
       if (method === 'relay.stop') return relay.stop();
       if (method === 'relay.rotateCredential') return relay.rotateCredential();
@@ -351,6 +371,7 @@ export async function createAgentRuntime(
     closed = true;
     await control?.close();
     await mutation;
+    await applications.dispose();
     await wsl.dispose();
     await hosting.dispose();
     await reverseRelay.stop();

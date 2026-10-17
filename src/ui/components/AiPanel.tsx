@@ -20,12 +20,16 @@ export function AiPanel({
   profiles,
   groups,
   onClose,
+  executionVisible,
+  onExecutionVisible,
 }: {
   visible: boolean;
   sessionId?: string;
   profiles: Profile[];
   groups: string[];
   onClose: () => void;
+  executionVisible: boolean;
+  onExecutionVisible: (visible: boolean) => Promise<void>;
 }) {
   const [snapshot, setSnapshot] = useState<AiSnapshot>({
     providers: [],
@@ -39,7 +43,7 @@ export function AiPanel({
   const [providerId, setProviderId] = useState(''),
     [threadId, setThreadId] = useState('');
   const [mode, setMode] = useState<AiMode>('review');
-  const [settingsTab, setSettingsTab] = useState<'models' | 'permissions'>('models');
+  const [settingsTab, setSettingsTab] = useState<'models' | 'permissions' | 'execution'>('models');
   const [historySearch, setHistorySearch] = useState('');
   const [error, setError] = useState(''),
     [busy, setBusy] = useState(false);
@@ -206,6 +210,7 @@ export function AiPanel({
       )}
       <div className="agent-chat-page" hidden={page !== 'chat'}>
         <AiConversation
+          executionVisible={executionVisible}
           openThread={(id) => {
             setThreadId(id);
             setPage('chat');
@@ -310,6 +315,12 @@ export function AiPanel({
       )}
       <div className="ai-settings" hidden={page !== 'settings'}>
         <nav className="agent-settings-tabs" aria-label="智能体设置分类">
+          <button
+            aria-pressed={settingsTab === 'execution'}
+            onClick={() => setSettingsTab('execution')}
+          >
+            执行过程
+          </button>
           <button aria-pressed={settingsTab === 'models'} onClick={() => setSettingsTab('models')}>
             <Cpu size={14} />
             模型基座
@@ -323,6 +334,23 @@ export function AiPanel({
             访问权限
           </button>
         </nav>
+        <div hidden={settingsTab !== 'execution'}>
+          <h3>指令过程显示</h3>
+          <label className="permission-model">
+            显示方式
+            <select
+              value={executionVisible ? 'visible' : 'silent'}
+              disabled={busy}
+              onChange={(e) => void run(() => onExecutionVisible(e.target.value === 'visible'))}
+            >
+              <option value="visible">可见：显示命令和实时返回内容</option>
+              <option value="silent">静默：仅显示回复与授权提示</option>
+            </select>
+          </label>
+          <p className="ai-section-note">
+            可见模式在对应机器的左侧工作区显示实际执行过程。设置会自动保存。
+          </p>
+        </div>
         <div hidden={settingsTab !== 'models'}>
           <div className="ai-section-heading">
             <h3>API 基座</h3>

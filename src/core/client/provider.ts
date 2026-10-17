@@ -1,10 +1,12 @@
+import { agentManageInput, agentRelayInput } from '../api/agent-inputs';
+import { agentMethodOutputs, agentOutputContract } from '../api/agent-outputs';
+import { ApiError } from '../api/errors';
 import { httpResponseSchema, type HttpWireRequest } from '../../shared/http';
 import { agentRelayConnectionSchema, type AgentRelayConnection } from '../../shared/agent-relay';
 import { openRelayTunnel } from '../../agent/relay';
 import { hostingConfigSchema } from '../../shared/agent-hosting';
 import {
   agentCallSchema,
-  agentMethods,
   agentCapability,
   type AgentCall,
   type AgentShellOption,
@@ -369,7 +371,12 @@ export class ClientProvider implements ManagedProvider {
       }
     }
   }
-  async connect(value: unknown, _credentials: unknown, signal: AbortSignal) {
+  async connect(
+    value: unknown,
+    _credentials: unknown,
+    signal: AbortSignal,
+    onReady?: (id: string) => void,
+  ) {
     const config = this.configuration.parse(value),
       device = this.devices.find((d) => d.deviceId === config.deviceId);
     if (!device) throw new Error('Client device not paired');
@@ -478,6 +485,8 @@ export class ClientProvider implements ManagedProvider {
                 {
                   name: 'execute_command',
                   capability: 'commands.execute',
+                  jsonOutput: z.object({ stdout: z.string(), stderr: z.string(), exitCode: z.number().int(), truncated: z.boolean(), environment: z.string(), distribution: z.string().optional() }).strict(),
+                  examples: [{ input: { command: 'echo cshell', timeoutMs: 5000 }, explanation: 'Use syntax supported by this connection shell. Inspect exitCode and truncated; this independent process does not inherit the interactive terminal working directory or state.' }],
                   description: `Execute a command in an independent process on ${device.name}, environment ${config.distribution ?? config.shell}. Does not write to the user's terminal.`,
                   input: z
                     .object({
@@ -523,6 +532,7 @@ export class ClientProvider implements ManagedProvider {
             .map((cap) => ({
               name: cap.replace('.', '_'),
               capability: cap,
+              jsonOutput: agentOutputContract(cap),
               description: `Manage the explicitly authorized Agent (${device.name}), ${cap}. Inspect before changing. Hosting code runs with this machine's account permissions; it is not sandboxed.`,
               input:
                 cap === 'agent.hosting'
@@ -553,30 +563,23 @@ export class ClientProvider implements ManagedProvider {
                           }),
                       ),
                     ])
-                  : z
-                      .object({
-                        method: z.enum(
-                          agentMethods.filter(
-                            (m) =>
-                              agentCapability(m) === cap &&
-                              ![
-                                'client.access',
-                                'client.reconfigure',
-                                'relay.revealCredential',
-                                'relay.rotateCredential',
-                                'relay.registrationCredential',
-                                'relay.rotateRegistrationCredential',
-                              ].includes(m),
-                          ) as [string, ...string[]],
-                        ),
-                        params: z.unknown().optional(),
-                      })
-                      .strict(),
+                  : cap === 'agent.manage' ? agentManageInput : agentRelayInput,
+              examples: [{ input: { method: cap === 'agent.manage' ? 'client.status' : cap === 'agent.relay' ? 'relay.status' : 'hosting.list' }, explanation: 'Inspect the actual target state first. Read the selected method contract before changing configuration. WSL plans and revisions must come from this same Windows Agent; listener or relay changes may disconnect this session.' }],
               needsReview: (value: unknown) =>
                 !/(\.status|\.list|\.logs|\.check|\.plan|\.shells)$/.test(
                   (value as AgentCall).method,
                 ),
+              conflictDomain: (value: unknown) => {
+                const call = value as AgentCall;
+                if (/(\.status|\.list|\.logs|\.check|\.plan|\.shells)$/.test(call.method)) return;
+                const params = call.params as { id?: string; config?: { id?: string } } | undefined;
+                if (cap === 'agent.hosting')
+                  return `hosting:${params?.id ?? params?.config?.id ?? 'configuration'}`;
+                // Listener/relay transitions share state; arbitrary commands declare no inferred locks.
+                return cap;
+              },
               invoke: async (value: unknown, abort: AbortSignal) => {
+                if (cap === 'agent.relay') agentRelayInput.parse(value);
                 const call = agentCallSchema.parse(value);
                 if (call.method === 'hosting.start') {
                   const params = z
@@ -609,10 +612,12 @@ export class ClientProvider implements ManagedProvider {
                     allowCode: params.allowCode,
                   };
                 }
-                return JSON.stringify(await this.call(device.deviceId, call, abort)).slice(
-                  0,
-                  24000,
-                );
+                // Keep valid, complete JSON. The Agent protocol bounds assembled results;
+                // callers with smaller retention limits must report that limit explicitly.
+                const result = (await this.call(device.deviceId, call, abort)) ?? null;
+                if (!agentMethodOutputs[call.method]?.safeParse(result).success)
+                  throw new ApiError('OUTCOME_UNKNOWN', 'Agent result did not match its method contract.', 'Inspect the target before another action; do not replay a mutation.');
+                return JSON.stringify(result);
               },
             })),
         ],
@@ -625,6 +630,7 @@ export class ClientProvider implements ManagedProvider {
         },
       };
       this.sessions.set(id, { channel, connection });
+      onReady?.(id);
       ready = true;
       channel.pulse();
       for (const data of early) this.emit({ type: 'data', sessionId: id, data });

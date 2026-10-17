@@ -1,4 +1,5 @@
 import { connect, type Socket } from 'node:net';
+import { randomBytes } from 'node:crypto';
 import type { TLSSocket } from 'node:tls';
 import { z } from 'zod';
 import { ClientVault } from '../core/client/identity';
@@ -12,6 +13,7 @@ export interface AgentReverseRelayOptions {
 
 /** B only makes outbound connections to A. The local Agent remains the TLS endpoint. */
 export class AgentReverseRelayService {
+  private configurationRevision = randomBytes(32).toString('hex');
   private config = agentReverseRelayConfigSchema.parse({});
   private loaded = false;
   private connected = false;
@@ -46,6 +48,7 @@ export class AgentReverseRelayService {
       targetId: relay.targetId,
     };
     return {
+      revision: this.configurationRevision,
       running: !!this.abort,
       connected: this.connected,
       activeConnections: this.active.size,
@@ -56,11 +59,14 @@ export class AgentReverseRelayService {
   async configure(input: unknown) {
     return this.serial(async () => {
       if (!this.loaded) throw new Error('Reverse relay is not loaded');
+      const { expectedRevision, ...raw } = z.object({ expectedRevision: z.string().regex(/^[a-f0-9]{64}$/).optional() }).passthrough().parse(input);
+      if (expectedRevision !== undefined && expectedRevision !== this.configurationRevision)
+        throw new Error('Reverse relay configuration changed; reload status before saving');
       // A blank password keeps the existing credential only for the exact same relay identity and target.
       const incoming = z
         .object({ relay: z.record(z.string(), z.unknown()).optional() })
         .passthrough()
-        .parse(input);
+        .parse(raw);
       const old = this.config.relay;
       if (
         incoming.relay &&
@@ -75,6 +81,7 @@ export class AgentReverseRelayService {
       await this.options.vault.write('relay-reverse', next);
       await this.stopNow();
       this.config = next;
+      this.configurationRevision = randomBytes(32).toString('hex');
       this.error = undefined;
       return this.status();
     });

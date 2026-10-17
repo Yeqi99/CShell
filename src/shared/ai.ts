@@ -3,6 +3,7 @@ export const aiLocations = ['workspace', 'terminal', 'files', 'python'] as const
 export const aiCapabilities = [
   'metrics.read',
   'files.read',
+  'files.create',
   'commands.execute',
   'http.send',
   'agent.manage',
@@ -44,7 +45,17 @@ export const aiPermissionSchema = z
 export const aiPolicySchema = z
   .object({
     application: z.array(
-      z.enum(['connections.read', 'connections.open', 'agents.manage', 'goals.manage', 'http.use']),
+      z.enum([
+        'connections.read',
+        'connections.open',
+        'agents.manage',
+        'goals.manage',
+        'http.use',
+        'ai.providers.manage',
+        'wechat.read',
+        'wechat.send',
+        'wechat.contacts.manage',
+      ]),
     ),
     allMachines: z.boolean(),
     profiles: z.array(z.string().uuid()).max(1000),
@@ -78,6 +89,13 @@ export type AiMessage = {
   tool?: { name: string; input: string; output: string; target?: string };
 };
 export type AiThread = {
+  execution?: {
+    id: string;
+    sessionId: string;
+    input: string;
+    output: string;
+    state: 'running' | 'finished' | 'error';
+  };
   id: string;
   title: string;
   location: AiLocation;

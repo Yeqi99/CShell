@@ -195,17 +195,24 @@ test('remote environments, semantic analysis, installation jobs and disconnect u
     const saved = await files.save(sessionId, '/sample.py', 'print(3)\n', fresh.revision);
     assert.equal((await files.read(sessionId, '/sample.py')).code, 'print(3)\n');
     assert.notEqual(saved.revision, fresh.revision);
+    const cancelledStart = env.startJupyter(sessionId, python, 8888);
+    const cancelledResult = assert.rejects(cancelledStart, /stopped|abort|cancel/i);
+    env.stopJupyter(sessionId, python);
+    await cancelledResult;
+    assert.equal(env.jupyterStatus(sessionId, python).running, false);
     const notebookUrl = await env.startJupyter(sessionId, python, 8888);
     assert.equal(new URL(notebookUrl).hostname, '127.0.0.1');
     assert.equal(new URL(notebookUrl).searchParams.get('token')?.length, 64);
     assert.equal(await (await fetch(notebookUrl)).text(), 'Jupyter');
     assert.equal(env.jupyterStatus(sessionId, python).running, true);
+    assert.equal(await env.startJupyter(sessionId, python, 8888), notebookUrl);
+    await assert.rejects(env.startJupyter(sessionId, python, 8889), /different port/);
     assert.ok(
       server.extensions.commands.some(
         (c) => c.includes('--ServerApp.ip=127.0.0.1') && c.includes('--ServerApp.port_retries=0'),
       ),
     );
-    env.stopJupyter(sessionId, python);
+    env.stopAllJupyter();
     assert.equal(env.jupyterStatus(sessionId, python).running, false);
     const disconnected = jobs.start(sessionId, 'disconnect', '# cshell:wait');
     ssh.disconnect(sessionId);

@@ -9,6 +9,16 @@ const replySchema = z.object({
   tool_calls: z.array(callSchema).max(16).nullish(),
 });
 export const pseudoToolCall = (text: string) => /<tool_call\b|<function\s*=/i.test(text);
+// Only explicit short progress announcements get one continuation, never arbitrary answers.
+export const progressOnly = (text: string) =>
+  text.length < 320 &&
+  /^(先|我先|我会|接下来我|让我|I'll |I will |Let me )/.test(text.trim()) &&
+  !/[?？]/.test(text);
+function checkFinish(reason: unknown) {
+  if (reason === 'length')
+    throw new Error('模型输出达到长度上限，本轮未完成；请继续或调整基座输出限制。');
+  if (reason === 'content_filter') throw new Error('基座过滤了响应，本轮未完成。');
+}
 export async function readAiResponse(response: Response, onContent: (content: string) => void) {
   if (!response.body) throw new Error('AI 返回了空响应');
   const reader = response.body.getReader(),
@@ -35,7 +45,10 @@ export async function readAiResponse(response: Response, onContent: (content: st
     if (value.error) throw new Error('AI 流式响应出错，请重试');
     const choice = value.choices?.find((c: any) => c.index === 0) ?? value.choices?.[0];
     if (!choice) return;
-    if (choice.finish_reason) finished = true;
+    if (choice.finish_reason) {
+      checkFinish(choice.finish_reason);
+      finished = true;
+    }
     const delta = choice.delta ?? {};
     if (typeof delta.content === 'string') {
       content += delta.content;
@@ -76,9 +89,11 @@ export async function readAiResponse(response: Response, onContent: (content: st
       if (chunk.done) break;
     }
     if (!streaming) {
+      const value = JSON.parse(raw);
+      checkFinish(value.choices?.[0]?.finish_reason);
       const parsed = z
         .object({ choices: z.array(z.object({ message: replySchema })).min(1) })
-        .parse(JSON.parse(raw));
+        .parse(value);
       return parsed.choices[0].message;
     }
     if (pending.trim()) event(pending.replace(/\r\n/g, '\n'));

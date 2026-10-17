@@ -1,8 +1,10 @@
 import type { HttpBridge } from './http';
+import type { WechatBridge } from './wechat';
 import type { AgentBridge } from './agent';
 import { clientShellSchema } from './client';
 import type { ClientBridge } from './client';
 import type { LocalTerminalBridge } from './local-terminal';
+import { localShellSchema } from './local-terminal';
 import type { ActivityBridge } from './activity';
 import type { FloatingBridge } from './floating';
 import type { ExtensionBridge, InstalledPlugin } from './plugins';
@@ -36,7 +38,14 @@ export const profileSchema = z
   .strict()
   .superRefine((p, ctx) => {
     if (p.protocol === 'http') {
-      if (p.host || p.username || p.port !== 0 || p.auth !== 'password' || p.clientShell || p.clientDistribution)
+      if (
+        p.host ||
+        p.username ||
+        p.port !== 0 ||
+        p.auth !== 'password' ||
+        p.clientShell ||
+        p.clientDistribution
+      )
         ctx.addIssue({ code: 'custom', message: 'HTTP workspace has no machine endpoint' });
     } else if (!p.host || p.host.length > 255 || !p.username || p.port < 1)
       ctx.addIssue({ code: 'custom', message: 'Machine endpoint is incomplete' });
@@ -67,18 +76,114 @@ export const layoutSchema = z
       .default(['servers', 'terminal', 'files']),
     serverWidth: z.number().min(170).max(500).default(218),
     fileWidth: z.number().min(240).max(600).default(340),
+    agentWidth: z.number().min(320).max(900).default(500),
   })
   .strict();
+export const apiCapabilitySchema = z.enum([
+  'files.read',
+  'files.create',
+  'files.write',
+  'directories.create',
+  'directories.manage',
+  'files.rename',
+  'files.delete',
+  'terminal.read',
+  'terminal.input',
+  'metrics.read',
+  'agent.manage',
+  'agent.hosting',
+  'agent.relay',
+  'http.use',
+  'http.send',
+  'http.send.local',
+  'environments.read',
+  'environments.manage',
+  'applications.read',
+  'applications.install',
+  'docker.read',
+  'docker.manage',
+]);
+export const apiTargetPolicySchema = z
+  .object({
+    allowCommands: z.boolean(),
+    capabilities: z.array(apiCapabilitySchema).max(32),
+    review: z.enum(['always', 'mutations', 'authorized']),
+  })
+  .strict();
+const apiTargetPoliciesSchema = z
+  .record(z.string().uuid(), apiTargetPolicySchema)
+  .refine((v) => Object.keys(v).length <= 1000)
+  .optional();
+export const apiLocalFileRootSchema = z.object({
+  id: z.string().uuid(),
+  path: z.string().min(1).max(4096),
+  name: z.string().min(1).max(255),
+  identity: z.string().min(1).max(128),
+  mutations: z.array(z.enum(['create', 'write', 'rename', 'delete', 'mkdir', 'rmdir', 'renameDirectory'])).max(7).optional(),
+}).strict();
+const apiLocalFileRoots = z.array(apiLocalFileRootSchema).max(32).refine((roots) => new Set(roots.map((root) => root.id)).size === roots.length).optional();
+export const apiClientSchema = z
+  .object({
+    id: z.string().uuid(),
+    name: z.string().trim().min(1).max(80),
+    enabled: z.boolean(),
+    allowedProfiles: z.array(z.string().uuid()).max(1000),
+    allowCommands: z.boolean(),
+    allowedLocalShells: z.array(localShellSchema).max(100).optional(),
+    localFileRoots: apiLocalFileRoots,
+    applicationCapabilities: z
+      .array(z.enum(['plugins.read', 'plugins.manage']))
+      .max(2)
+      .optional(),
+    targetPolicies: apiTargetPoliciesSchema,
+    capabilities: z.array(apiCapabilitySchema).max(32),
+    review: z.enum(['always', 'mutations', 'authorized']),
+    disclosure: z
+      .object({
+        mode: z.enum(['full', 'progressive', 'adaptive']),
+        level: z.enum(['names', 'summary', 'contract', 'guide']),
+        budgetBytes: z.number().int().min(1024).max(262144),
+      })
+      .strict(),
+  })
+  .strict();
+export type ApiClient = z.infer<typeof apiClientSchema>;
 export const mcpSettingsSchema = z
   .object({
     enabled: z.boolean(),
     port: z.number().int().min(1024).max(65535),
     allowedProfiles: z.array(z.string().uuid()).max(1000),
     allowCommands: z.boolean(),
+    allowedLocalShells: z.array(localShellSchema).max(100).optional(),
+    localFileRoots: apiLocalFileRoots,
+    applicationCapabilities: z
+      .array(z.enum(['plugins.read', 'plugins.manage']))
+      .max(2)
+      .optional(),
+    targetPolicies: apiTargetPoliciesSchema,
+    clients: z
+      .array(apiClientSchema)
+      .max(20)
+      .refine(
+        (values) => new Set(values.map((v) => v.id)).size === values.length,
+        'Duplicate API client',
+      )
+      .optional(),
+    capabilities: z.array(apiCapabilitySchema).max(32).optional(),
+    review: z.enum(['always', 'mutations', 'authorized']).optional(),
+    disclosure: z
+      .object({
+        mode: z.enum(['full', 'progressive', 'adaptive']),
+        level: z.enum(['names', 'summary', 'contract', 'guide']),
+        budgetBytes: z.number().int().min(1024).max(262144),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export type McpSettings = z.infer<typeof mcpSettingsSchema>;
 export interface McpStatus {
+  revision: string;
   settings: McpSettings;
   running: boolean;
   error?: string;
@@ -92,6 +197,7 @@ export const preferencesSchema = z
       fileVisible: true,
       serverWidth: 218,
       fileWidth: 340,
+      agentWidth: 500,
     }),
     locale: z.enum(['zh-CN', 'en-US']),
     theme: z.enum(['dark', 'light']),
@@ -105,6 +211,7 @@ export const preferencesSchema = z
     backgroundOpacity: z.number().min(0).max(0.5).default(0.15),
     backgroundBlur: z.number().min(0).max(20).default(0),
     backgroundFit: z.enum(['cover', 'contain']).default('cover'),
+    showAiExecution: z.boolean().default(true),
   })
   .strict();
 export type Preferences = z.infer<typeof preferencesSchema>;
@@ -115,6 +222,7 @@ export const defaults: Preferences = {
     fileVisible: true,
     serverWidth: 218,
     fileWidth: 340,
+    agentWidth: 500,
   },
   locale: 'zh-CN',
   theme: 'light',
@@ -128,6 +236,7 @@ export const defaults: Preferences = {
   backgroundOpacity: 0.15,
   backgroundBlur: 0,
   backgroundFit: 'cover',
+  showAiExecution: true,
 };
 export const presetSchema = z
   .object({
@@ -210,6 +319,7 @@ export interface Bridge
   extends
     AgentBridge,
     HttpBridge,
+    WechatBridge,
     ClientBridge,
     LocalTerminalBridge,
     ExtensionBridge,
@@ -232,9 +342,10 @@ export interface Bridge
   exportPreset(preferences: Preferences): Promise<boolean>;
   importPreset(): Promise<WorkspacePreset | null>;
   mcpStatus(): Promise<McpStatus>;
-  mcpConfigure(settings: McpSettings): Promise<McpStatus>;
-  mcpCopyToken(): Promise<void>;
-  mcpRotateToken(): Promise<void>;
+  mcpConfigure(settings: McpSettings, expectedRevision: string): Promise<McpStatus>;
+  mcpChooseFileRoot(): Promise<z.infer<typeof apiLocalFileRootSchema> | null>;
+  mcpCopyToken(clientId?: string): Promise<void>;
+  mcpRotateToken(clientId?: string): Promise<void>;
   importAppearance(kind: 'font' | 'background', token?: string): Promise<AppearanceAsset | null>;
   appearanceData(id: string): Promise<string>;
   saveProfile(profile: Profile): Promise<void>;

@@ -38,11 +38,14 @@ export class LocalFiles {
     }
     return target;
   }
-  async list(root: string, path: string) {
+  async list(root: string, path: string, check: () => void = () => {}, limit = 50000) {
     const canonical = posix.resolve('/', path),
       target = await this.resolve(root, canonical);
     const entries: FileEntry[] = [];
-    for (const name of await readdir(target)) {
+    const names = await readdir(target);
+    if (names.length > limit) throw new Error('Directory exceeds entry limit');
+    for (const name of names) {
+      check();
       const stat = await lstat(join(target, name));
       entries.push({
         name,

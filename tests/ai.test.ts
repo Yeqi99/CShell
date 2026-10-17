@@ -96,6 +96,10 @@ test('agent connects a saved machine then discovers its tools, with scope and ap
     model: 'fixture',
     url: `http://127.0.0.1:${(api.address() as any).port}/v1`,
   };
+  const executionUpdates: NonNullable<import('../src/shared/ai').AiThread['execution']>[] = [];
+  ai.onThreadUpdate = (thread) => {
+    if (thread.execution) executionUpdates.push(structuredClone(thread.execution));
+  };
   try {
     await store.saveProfile(profile);
     await ai.saveProvider(provider, 'private-key');
@@ -118,6 +122,11 @@ test('agent connects a saved machine then discovers its tools, with scope and ap
       ),
     );
     assert.equal(JSON.stringify(requests).includes(remote.password), false);
+    assert.ok(executionUpdates.some((event) => event.state === 'running' && event.input === 'pwd'));
+    assert.ok(executionUpdates.some((event) => event.state === 'running' && event.output.length > 0));
+    assert.equal(result.execution?.state, 'finished');
+    assert.equal(result.execution?.sessionId, result.sessionId);
+    const executionCount = new Set(executionUpdates.map((event) => event.id)).size;
     await ai.savePolicy({ ...ai.snapshot().policy, profiles: [] });
     const denied = await ai.create('workspace', provider.id, 'allow');
     await ai.send(denied.id, '连接');
@@ -136,6 +145,9 @@ test('agent connects a saved machine then discovers its tools, with scope and ap
       ai.snapshot().threads[0].messages.find((m) => m.tool)!.content,
       /configuration changed/,
     );
+    assert.equal(new Set(executionUpdates.map((event) => event.id)).size, executionCount);
+    const saved = JSON.parse(await store.decryptPrivate(await readFile(join(directory, 'ai.enc'), 'utf8')));
+    assert.ok(saved.threads.every((thread: any) => !thread.execution));
   } finally {
     for (const t of manager.tools.activeTargets()) await manager.disconnect(t.sessionId);
     await remote.close();
@@ -181,6 +193,7 @@ test('agent enforces target/capability, review, revocation, stop and encrypted p
     );
   const requests: any[] = [];
   let requestedCommand = 'pwd';
+  let requestedTool = 'execute_command';
   const api = createServer(async (req, res) => {
     let data = '';
     for await (const c of req) data += c;
@@ -202,8 +215,12 @@ test('agent enforces target/capability, review, revocation, stop and encrypted p
                         id: randomUUID(),
                         type: 'function',
                         function: {
-                          name: 'execute_command',
-                          arguments: JSON.stringify({ command: requestedCommand }),
+                          name: requestedTool,
+                          arguments: JSON.stringify(
+                            requestedTool === 'create_file'
+                              ? { path: 'ai-created.txt', bodyBase64: 'aGVsbG8K' }
+                              : { command: requestedCommand },
+                          ),
                         },
                       },
                     ],
@@ -320,6 +337,34 @@ test('agent enforces target/capability, review, revocation, stop and encrypted p
         .at(-1)!.content,
       /__CPU__/,
     );
+    requestedTool = 'create_file';
+    const current = () => ai.snapshot().threads.find((t) => t.id === thread.id)!;
+    await ai.send(thread.id, 'create without a grant');
+    await until(() => current().state === 'idle');
+    await assert.rejects(readFile(join(remote.root, 'ai-created.txt')));
+    assert.ok(!requests.at(-1).tools.some((t: any) => t.function.name === 'create_file'));
+    await ai.savePolicy({ ...ai.snapshot().policy, capabilities: ['files.create'], overrides: [] });
+    await ai.savePolicy({
+      ...ai.snapshot().policy,
+      overrides: [{ profileId: profile.id, capabilities: [] }],
+    });
+    await ai.send(thread.id, 'create on a machine with an explicit deny override');
+    await until(() => current().state === 'idle');
+    await assert.rejects(readFile(join(remote.root, 'ai-created.txt')));
+    await ai.savePolicy({ ...ai.snapshot().policy, overrides: [] });
+    await ai.mode(thread.id, 'restricted');
+    await ai.send(thread.id, 'create a file with review');
+    await until(() => current().state === 'approval');
+    await ai.savePolicy({ ...ai.snapshot().policy, capabilities: [] });
+    ai.approve(thread.id, current().pending!.id, true);
+    await until(() => current().state === 'idle');
+    await assert.rejects(readFile(join(remote.root, 'ai-created.txt')));
+    await ai.savePolicy({ ...ai.snapshot().policy, capabilities: ['files.create'] });
+    await ai.send(thread.id, 'create the authorized file');
+    await until(() => current().state === 'approval');
+    ai.approve(thread.id, current().pending!.id, true);
+    await until(() => current().state === 'idle');
+    assert.equal(await readFile(join(remote.root, 'ai-created.txt'), 'utf8'), 'hello\n');
     // Ensure pending writes completed before reading/reopening.
     await ai.permission(permission);
     const stored = await readFile(join(directory, 'ai.enc'), 'utf8');

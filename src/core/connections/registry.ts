@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ApiError } from '../api/errors';
 import type {
   ConnectionProvider,
   ConnectionTarget,
@@ -21,6 +22,7 @@ export class ConnectionRegistry {
   private providers = new Map<string, ConnectionProvider>();
   private owners = new Map<string, string>();
   private generations = new Map<string, number>();
+  private generation = 0;
   private registrations = new Map<string, symbol>();
   constructor(
     private scopeFor: (target: ConnectionTarget) => ResourceScope | undefined,
@@ -47,11 +49,12 @@ export class ConnectionRegistry {
     const connection = this.providers.get(provider)!.resolve(connectionId);
     if (connection.target.providerId !== provider) throw new Error('Provider identity mismatch');
     this.owners.set(connectionId, provider);
-    this.generations.set(connectionId, (this.generations.get(connectionId) || 0) + 1);
+    this.generations.set(connectionId, ++this.generation);
   }
   unbind(connectionId: string) {
-    this.owners.set(connectionId, '');
-    this.generations.set(connectionId, (this.generations.get(connectionId) || 0) + 1);
+    if (this.legacyProvider) this.owners.set(connectionId, '');
+    else this.owners.delete(connectionId);
+    this.generations.delete(connectionId);
   }
   private connection(id: string): ProviderConnection {
     const owner = this.owners.has(id) ? this.owners.get(id) : this.legacyProvider;
@@ -135,7 +138,11 @@ export class ConnectionRegistry {
     return Object.freeze({
       capability: tool.capability,
       needsReview: tool.needsReview(args),
-      execute: async (authorize: () => boolean, signal: AbortSignal) => {
+      execute: async (
+        authorize: () => boolean,
+        signal: AbortSignal,
+        output?: (text: string) => void,
+      ) => {
         if (used) throw new Error('Invocation already consumed');
         used = true;
         signal.throwIfAborted();
@@ -151,7 +158,19 @@ export class ConnectionRegistry {
         if (!authorize()) throw new Error('Capability or resource scope revoked');
         signal.throwIfAborted();
         // No retry: a remote timeout may have happened after a side effect.
-        return tool.invoke(args, signal);
+        const result = await tool.invoke(args, signal, output);
+        if (tool.jsonOutput) {
+          try {
+            tool.jsonOutput.parse(JSON.parse(result));
+          } catch {
+            throw new ApiError(
+              'OUTCOME_UNKNOWN',
+              'Provider result did not match its declared contract.',
+              'Inspect the target before retrying a mutation; execution may already have completed.',
+            );
+          }
+        }
+        return result;
       },
     });
   }

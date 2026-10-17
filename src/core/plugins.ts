@@ -16,11 +16,15 @@ function trustedBuiltin(entry: CatalogEntry) {
   );
 }
 
-export async function httpsText(address: string, limit = 512_000) {
+export async function httpsText(address: string, limit = 512_000, signal?: AbortSignal) {
   const url = new URL(address);
   if (url.protocol !== 'https:' || url.username || url.password)
     throw new Error('HTTPS URL required');
-  const response = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(15000) });
+  const deadline = AbortSignal.timeout(15000);
+  const response = await fetch(url, {
+    redirect: 'error',
+    signal: signal ? AbortSignal.any([signal, deadline]) : deadline,
+  });
   if (!response.ok) throw new Error(`Download failed: HTTP ${response.status}`);
   const chunks: Uint8Array[] = [];
   let size = 0;
@@ -47,16 +51,18 @@ export class PluginService {
     this.writes = next;
     return next;
   }
-  install(id: string) {
+  install(id: string, beforeWrite?: () => void) {
     return this.serial(async () => {
+      beforeWrite?.();
       const manifest = builtinPlugins.find((p) => p.id === id);
       if (!manifest) throw new Error('Unknown bundled plugin');
       const plugins = this.store.plugins().filter((p) => p.manifest.id !== id);
       await this.store.setPlugins([...plugins, { manifest, enabled: true, source: 'bundled' }]);
     });
   }
-  toggle(id: string, enabled: boolean) {
+  toggle(id: string, enabled: boolean, beforeWrite?: () => void) {
     return this.serial(async () => {
+      beforeWrite?.();
       const plugins = this.store.plugins();
       const item = plugins.find((p) => p.manifest.id === id);
       if (!item) throw new Error('Plugin is not installed');
@@ -64,13 +70,14 @@ export class PluginService {
       await this.store.setPlugins(plugins);
     });
   }
-  remove(id: string) {
-    return this.serial(() =>
-      this.store.setPlugins(this.store.plugins().filter((p) => p.manifest.id !== id)),
-    );
+  remove(id: string, beforeWrite?: () => void) {
+    return this.serial(() => {
+      beforeWrite?.();
+      return this.store.setPlugins(this.store.plugins().filter((p) => p.manifest.id !== id));
+    });
   }
-  async catalog(url: string) {
-    const entries = catalogSchema.parse(JSON.parse(await httpsText(url))).plugins;
+  async catalog(url: string, signal?: AbortSignal) {
+    const entries = catalogSchema.parse(JSON.parse(await httpsText(url, 512_000, signal))).plugins;
     if (
       new Set(entries.map((e) => e.manifest.id)).size !== entries.length ||
       entries.some(
@@ -82,12 +89,13 @@ export class PluginService {
       )
     )
       throw new Error('Unsupported or duplicate plugin in external catalog');
+    signal?.throwIfAborted();
     await this.store.setPluginSource({ url, entries });
     return entries;
   }
-  async download(input: CatalogEntry) {
+  async download(input: CatalogEntry, signal?: AbortSignal) {
     const entry = catalogSchema.shape.plugins.element.parse(input);
-    const text = await httpsText(entry.url);
+    const text = await httpsText(entry.url, 512_000, signal);
     if (createHash('sha256').update(text).digest('hex') !== entry.sha256)
       throw new Error('Plugin checksum mismatch');
     const manifest = pluginManifestSchema.parse(JSON.parse(text));
@@ -100,11 +108,12 @@ export class PluginService {
         manifest.permissions.some((p) => p !== 'terminal.input'))
     )
       throw new Error('External packages may only contribute command snippets');
-    await this.serial(async () =>
-      this.store.setPlugins([
+    await this.serial(async () => {
+      signal?.throwIfAborted();
+      await this.store.setPlugins([
         ...this.store.plugins().filter((p) => p.manifest.id !== manifest.id),
         { manifest, enabled: true, source: entry.url },
-      ]),
-    );
+      ]);
+    });
   }
 }

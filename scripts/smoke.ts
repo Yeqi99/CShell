@@ -10,6 +10,7 @@ import { workbenchSmoke } from './workbench-smoke';
 import { appearanceSmoke } from './appearance-smoke';
 import { fixture } from '../tests/fixture';
 import { groupsSmoke } from './groups-smoke';
+import { apiTerminalResponseSmoke } from './api-terminal-response-smoke';
 
 async function main() {
   const data = await mkdtemp(join(tmpdir(), 'cshell-desktop-'));
@@ -143,6 +144,7 @@ async function main() {
       document.querySelector('.xterm-screen')?.textContent?.includes('desktop-echo'),
     );
     const connectedId = await page.locator('.session-tab').getAttribute('data-session');
+    await apiTerminalResponseSmoke(app, page);
     await page.getByRole('button', { name: '连接操作 · Local integration', exact: true }).click();
     await page.getByRole('menuitem', { name: '移至分组', exact: true }).click();
     await page.getByRole('menuitemradio', { name: 'Empty group', exact: true }).click();

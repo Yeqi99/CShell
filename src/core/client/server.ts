@@ -64,7 +64,7 @@ export class ClientServer {
     private vault: ClientVault,
     private terminal: ManagedProvider,
     private options: {
-      manage?: (method: string, params: unknown, signal: AbortSignal) => Promise<unknown>;
+      manage?: (method: string, params: unknown, signal: AbortSignal, owner: string) => Promise<unknown>;
       shells?: () => Promise<AgentShellOption[]>;
       execute?: (input: unknown, signal: AbortSignal) => Promise<unknown>;
     } = {},
@@ -115,6 +115,9 @@ export class ClientServer {
       })),
       audit: [...this.audit].reverse(),
     };
+  }
+  managementAllowed(owner: string) {
+    return !!this.access?.allowManage && this.peers.some((p) => p.fingerprint === owner && p.allowManage);
   }
   async setAccess(options: unknown) {
     const input = clientAccessSchema.parse(options);
@@ -432,7 +435,7 @@ export class ClientServer {
           !this.access?.[permission]
         )
           throw new Error('Management permission revoked');
-        return await this.options.manage(call.method, call.params, abort.signal);
+        return await this.options.manage(call.method, call.params, abort.signal, fp);
       } finally {
         c.socket.off('close', closed);
       }

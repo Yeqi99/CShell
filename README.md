@@ -4,6 +4,8 @@ CanpShell 是面向高频操作的终端与 AI 工作台，采用 **MIT** 许可
 
 [源码](https://github.com/Yeqi99/CShell) · [版本下载](https://github.com/Yeqi99/CShell/releases) · [问题反馈](https://github.com/Yeqi99/CShell/issues) · [构建状态](https://github.com/Yeqi99/CShell/actions)
 
+Windows 0.6.1 预览的功能与安装步骤见 [发布说明](docs/RELEASE-0.6.1-WINDOWS.md)，下载以 [Windows 专项发行页](https://github.com/Yeqi99/CShell/releases/tag/v0.6.1) 的实际附件为准。其他平台继续使用下方 0.6.0 附件。
+
 白色默认界面、多标签终端、可收纳文件和资源侧栏；暗色可在右下角切换。极简模式仅保留标签与终端，并提供还原按钮。窗口依据当前屏幕可用区域缩放，切换工作区保留会话、滚动历史和草稿。SSH、配置和随包插件可离线使用，无产品账号、云同步、遥测或在线授权。
 
 ## 版本与下载
@@ -146,7 +148,7 @@ Compose / Swarm 管理的容器不通过该入口重建，避免与部署声明�
 
 ## MCP 服务
 
-默认关闭，偏好设置中可启用本机 MCP 服务、配置端口、选择授权服务器和复制令牌。命令执行单独授权且逐条确认。详见 [接入说明](docs/MCP.md)。
+默认关闭。偏好设置中配置本机服务、独立客户端令牌、机器与本机环境范围、能力授权及审核策略；审核策略不扩大权限。版本化 API 与 MCP 共用能力目录，支持按预算渐进发现、异步任务、终端与实际 Provider 工具。详见 [API 与 MCP 接入说明](docs/API.md) 和 [当前覆盖及验证边界](docs/API-IMPLEMENTATION.md)。
 
 ## 当前功能
 

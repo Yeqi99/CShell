@@ -1,7 +1,10 @@
 import { readAiResponse } from './ai-response';
 
 /** A real, isolated completion probe. No conversation, tools, or user context is sent. */
-export async function testAiProvider(p: { url: string; model: string; key: string }) {
+export async function testAiProvider(
+  p: { url: string; model: string; key: string },
+  signal?: AbortSignal,
+) {
   const started = Date.now();
   let firstTokenMs: number | null = null;
   const base = p.url.replace(/\/+$/, '');
@@ -11,7 +14,7 @@ export async function testAiProvider(p: { url: string; model: string; key: strin
       {
         method: 'POST',
         redirect: 'error',
-        signal: AbortSignal.timeout(20000),
+        signal: AbortSignal.any([AbortSignal.timeout(20000), ...(signal ? [signal] : [])]),
         headers: {
           'Content-Type': 'application/json',
           ...(p.key ? { Authorization: `Bearer ${p.key}` } : {}),

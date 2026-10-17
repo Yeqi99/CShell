@@ -1,5 +1,10 @@
 import { z } from 'zod';
 export const agentMethods = [
+  'applications.list',
+  'applications.plan',
+  'applications.install',
+  'applications.status',
+  'applications.cancel',
   'agent.shells',
   'agent.environments',
   'client.status',

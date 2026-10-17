@@ -71,10 +71,12 @@ export class ApplicationService {
     this.plans.set(plan.id, plan);
     return { ...plan };
   }
-  install(id: string) {
+  install(id: string, sessionId?: string) {
     const plan = this.plans.get(id);
     if (!plan || plan.expires < Date.now())
       throw new Error('Installation plan expired; check the server again');
+    if (sessionId !== undefined && plan.sessionId !== sessionId)
+      throw new Error('Installation plan belongs to another session');
     const job = this.jobs.start(plan.sessionId, plan.label, plan.command);
     this.plans.delete(id);
     return job;
