@@ -16,14 +16,21 @@ try{
  await page.getByLabel('微信发送授权').fill('*');
  await page.getByLabel('微信发送黑名单').fill('wxid_blocked123');
  assert.deepEqual((await page.evaluate(()=>window.cshell.wechatStatus())).config.send,[]);
- await page.getByLabel('微信备注授权').fill('wxid_fixture123');
+ await page.getByLabel('微信备注授权').fill('*');
+ await page.getByLabel('微信接收授权').fill('*');
+ await page.getByLabel('微信历史授权').fill('invalid nickname');
+ await page.getByRole('button',{name:'保存',exact:true}).click();
+ await page.getByRole('status').filter({hasText:'历史授权格式不正确'}).waitFor();
+ assert.deepEqual((await page.evaluate(()=>window.cshell.wechatStatus())).config.send,[]);
+ assert.equal(await page.getByLabel('微信备注授权').inputValue(),'*');
+ await page.getByLabel('微信历史授权').fill('*');
  await page.getByRole('button',{name:'保存',exact:true}).click();
  await page.getByRole('status').filter({hasText:'已保存'}).waitFor();
  const status=await page.evaluate(()=>window.cshell.wechatStatus());
- assert.equal(status.config.enabled,false);assert.deepEqual(status.config.sendBlocked,['wxid_blocked123']);assert.deepEqual(status.config.send,['*']);assert.deepEqual(status.config.remarks,['wxid_fixture123']);
+ assert.equal(status.config.enabled,false);assert.deepEqual(status.config.receive,['*']);assert.deepEqual(status.config.history,['*']);assert.deepEqual(status.config.sendBlocked,['wxid_blocked123']);assert.deepEqual(status.config.send,['*']);assert.deepEqual(status.config.remarks,['*']);
  assert.equal(await page.getByText('先连接一台服务器，再选择安装或管理环境。',{exact:true}).count(),0);
  await page.screenshot({path:'test-results/wechat-extension.png'});
  await page.reload();
- const persisted=await page.evaluate(()=>window.cshell.wechatStatus());assert.deepEqual(persisted.config.sendBlocked,['wxid_blocked123']);assert.deepEqual(persisted.config.send,['*']);assert.deepEqual(persisted.config.remarks,['wxid_fixture123']);
+ const persisted=await page.evaluate(()=>window.cshell.wechatStatus());assert.deepEqual(persisted.config.receive,['*']);assert.deepEqual(persisted.config.history,['*']);assert.deepEqual(persisted.config.sendBlocked,['wxid_blocked123']);assert.deepEqual(persisted.config.send,['*']);assert.deepEqual(persisted.config.remarks,['*']);
  console.log('PASS: installed plugin; opened inline view; saved disabled draft; persistence; no remote target placeholder');
 }finally{await app.close();await rm(data,{recursive:true,force:true});}

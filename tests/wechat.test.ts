@@ -79,7 +79,43 @@ test('Wildcard sending respects deny precedence, exact IDs, persistence and inde
     await assert.rejects(invoke('wxid_allowed'),/授权列表/);
     await service.save({...config,sendBlocked:[]});await invoke('filehelper');
     await assert.rejects(service.save({...config,sendBlocked:['*']}));
-    await assert.rejects(service.save({...config,receive:['*']}));
+    await assert.rejects(service.save({...config,receive:['wxid_*']}));
     await service.save({...config,enabled:false});await assert.rejects(invoke('wxid_allowed'));
+  }finally{await rm(directory,{recursive:true,force:true});}
+});
+
+test('Receive, history and remarks wildcard grants persist but operations require concrete targets',async()=>{
+  if(process.platform!=='win32')return;
+  const directory=await mkdtemp(join(tmpdir(),'cshell-wechat-all-scopes-'));
+  const manifest=builtinPlugins.find(p=>p.id==='cshell.wechat')!;
+  const store={plugins:()=>[{manifest,enabled:true,source:'bundled'}]} as unknown as Store;
+  const service=new WechatService(directory,store);let calls=0;
+  (service as any).run=async()=>{calls++;return {processes:[{pid:42,binding:{pid:42}}]};};
+  const config={enabled:true,experimental:true,pid:42,readContacts:false,send:[],receive:['*'],history:['*'],remarks:['*']};
+  const signal=new AbortController().signal;
+  const invoke=(name:string,args:any)=>service.tools().find(t=>t.name===name)!.invoke(args,signal);
+  try{
+    await service.save(config);
+    await invoke('wechat_receive',{targets:['wxid_example','123456@chatroom'],seconds:1});
+    await invoke('wechat_history',{target:'filehelper'});
+    await invoke('wechat_get_remark',{target:'wxid_example'});
+    await invoke('wechat_set_remark',{target:'wxid_example',remark:'fixture',expectedRemark:'',idempotencyKey:'mock-key-123'});
+    const before=calls;
+    for(const name of ['wechat_history','wechat_get_remark','wechat_set_remark'])await assert.rejects(invoke(name,{target:'*'}));
+    await assert.rejects(invoke('wechat_receive',{targets:['*']}));
+    await assert.rejects(invoke('wechat_receive',{targets:[]}));
+    await assert.rejects(invoke('wechat_set_remark',{target:'123456@chatroom'}));
+    await assert.rejects(invoke('wechat_send_text',{recipient:'wxid_example'}));
+    assert.equal(calls,before);
+    await assert.rejects(service.save({...config,history:['nickname']}),/历史授权格式不正确/);
+    assert.equal(calls,before);
+    const loaded=new WechatService(directory,store);await loaded.load();
+    (loaded as any).run=async()=>({processes:[]});
+    const saved=(await loaded.status()).config;
+    for(const scope of ['receive','history','remarks'] as const)assert.deepEqual(saved[scope],['*']);
+    await service.save({...config,receive:[],history:[],remarks:[]});
+    await assert.rejects(invoke('wechat_receive',{targets:['wxid_example']}));
+    await assert.rejects(invoke('wechat_history',{target:'wxid_example'}));
+    await assert.rejects(invoke('wechat_set_remark',{target:'wxid_example'}));
   }finally{await rm(directory,{recursive:true,force:true});}
 });

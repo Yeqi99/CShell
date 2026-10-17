@@ -6,7 +6,7 @@ import { z } from 'zod';
 import type { Store } from './store';
 import type { ConnectionTool } from './connections/contracts';
 import { pluginEnabled } from '../shared/plugins';
-import { emptyWechatConfig,wechatConfigSchema,wechatTargetSchema } from '../shared/wechat';
+import { emptyWechatConfig,wechatConfigSchema,wechatTargetSchema,wechatFriendSchema,parseWechatConfig } from '../shared/wechat';
 
 export class WechatService {
   private config=emptyWechatConfig();
@@ -20,7 +20,7 @@ export class WechatService {
   async status(){this.requirePlugin();try{const result=await this.run({method:'discover'},new AbortController().signal);return {config:this.config,processes:result.processes};}catch(error){return {config:this.config,processes:[],error:String(error)};}}
   async save(input:unknown){
     this.requirePlugin();if(this.busy)throw new Error('请先停止正在进行的微信操作');
-    const config=wechatConfigSchema.parse(input);
+    const config=parseWechatConfig(input);
     let binding:unknown=null;
     if(config.enabled){
       if(!config.experimental||!config.pid)throw new Error('请选择微信进程并确认实验风险');
@@ -40,12 +40,12 @@ export class WechatService {
     });
     return [
       tool('wechat_status','status','wechat.read',z.object({}).strict(),'Inspect WeChat on THIS Windows computer, independent of the conversation remote machine. Shows exact supported processes and local grant settings.'),
-      tool('wechat_get_remark','remark_read','wechat.read',z.object({target:z.string().regex(/^wxid_[A-Za-z0-9_]{3,64}$/)}).strict(),'Read the current local remark for one explicitly remark-authorized individual. Read before requesting a change. Does not enumerate contacts or confirm server persistence.'),
-      tool('wechat_set_remark','remark_set','wechat.contacts.manage',z.object({target:z.string().regex(/^wxid_[A-Za-z0-9_]{3,64}$/),remark:z.string().max(64).refine(s=>Buffer.byteLength(s,'utf8')<=128&&!/[\x00-\x1f\x7f]/.test(s)),expectedRemark:z.string().max(64).refine(s=>Buffer.byteLength(s,'utf8')<=128&&!/[\x00-\x1f\x7f]/.test(s)),idempotencyKey:z.string().regex(/^[A-Za-z0-9_-]{8,128}$/)}).strict(),'Set an explicitly authorized individual contact remark on THIS computer. First read with wechat_get_remark and provide exact expectedRemark; conflict means no change submitted. Empty remark clears it. Native return is not server confirmation; read back and report uncertainty. Not atomic against other devices. Never retry unknown outcomes with a new key. Experimental native adapter may crash WeChat.',true),
+      tool('wechat_get_remark','remark_read','wechat.read',z.object({target:z.string().regex(/^wxid_[A-Za-z0-9_]{3,64}$/)}).strict(),'Read the current local remark for one remark-authorized individual (saved remarks * allows all individuals; target must be an exact wxid). Read before requesting a change. Does not enumerate contacts or confirm server persistence.'),
+      tool('wechat_set_remark','remark_set','wechat.contacts.manage',z.object({target:z.string().regex(/^wxid_[A-Za-z0-9_]{3,64}$/),remark:z.string().max(64).refine(s=>Buffer.byteLength(s,'utf8')<=128&&!/[\x00-\x1f\x7f]/.test(s)),expectedRemark:z.string().max(64).refine(s=>Buffer.byteLength(s,'utf8')<=128&&!/[\x00-\x1f\x7f]/.test(s)),idempotencyKey:z.string().regex(/^[A-Za-z0-9_-]{8,128}$/)}).strict(),'A saved remarks * allows all individuals but target must be one exact wxid. Set an authorized individual contact remark on THIS computer. First read with wechat_get_remark and provide exact expectedRemark; conflict means no change submitted. Empty remark clears it. Native return is not server confirmation; read back and report uncertainty. Not atomic against other devices. Never retry unknown outcomes with a new key. Experimental native adapter may crash WeChat.',true),
       tool('wechat_contacts','contacts','wechat.read',z.object({}).strict(),'Read bounded loaded contact candidates from the locally bound WeChat. Incomplete; never infer a unique recipient from a nickname. Native experimental adapter can crash WeChat.'),
       tool('wechat_send_text','send','wechat.send',z.object({recipient:wechatTargetSchema,text:z.string().min(1).max(4096),idempotencyKey:z.string().regex(/^[A-Za-z0-9_-]{8,128}$/)}).strict(),'Send one real text through locally bound WeChat to an allowed internal ID or filehelper. A saved * send grant allows all valid recipients; sendBlocked always denies matching IDs. The recipient argument must be one exact ID, never *. Never retry unknown outcomes with a new key. native_returned is not delivery confirmation. Experimental; may crash WeChat.',true),
-      tool('wechat_receive','receive','wechat.read',z.object({targets:z.array(z.string().max(80)).min(1).max(20),seconds:z.number().int().min(1).max(30).default(15)}).strict(),'Listen for new messages from explicitly allowed IDs on THIS computer for up to 30 seconds; no history replay. Experimental; may crash WeChat.'),
-      tool('wechat_history','history','wechat.read',z.object({target:z.string().max(80),limit:z.number().int().min(1).max(30).default(20),direction:z.enum(['latest','before','after']).default('latest'),cursor:z.string().max(2048).optional()}).strict(),'Read real local WeChat message_0.db history for an explicitly allowed target. Use olderCursor with before, newerCursor with after; save the cursor after processing and deduplicate by deduplicationKey after restart. Rebind the process after restart. Other database shards and remote/deleted history are NOT covered; inspect gap, complete and contentStatus. No automatic sending or background sync. Experimental native read may require conversation activity and can crash WeChat.'),
+      tool('wechat_receive','receive','wechat.read',z.object({targets:z.array(wechatTargetSchema).min(1).max(20),seconds:z.number().int().min(1).max(30).default(15)}).strict(),'A saved receive * grants any exact ID, not an unfiltered global listener. Supply 1–20 exact targets. Listen for new messages from allowed IDs on THIS computer for up to 30 seconds; no history replay. Experimental; may crash WeChat.'),
+      tool('wechat_history','history','wechat.read',z.object({target:wechatTargetSchema,limit:z.number().int().min(1).max(30).default(20),direction:z.enum(['latest','before','after']).default('latest'),cursor:z.string().max(2048).optional()}).strict(),'Read real local WeChat message_0.db history for one exact target allowed by history grants (including saved *). Never pass * as target. Use olderCursor with before, newerCursor with after; save the cursor after processing and deduplicate by deduplicationKey after restart. Rebind the process after restart. Other database shards and remote/deleted history are NOT covered; inspect gap, complete and contentStatus. No automatic sending or background sync. Experimental native read may require conversation activity and can crash WeChat.'),
     ];
   }
   private async invoke(method:string,args:any,signal:AbortSignal){
@@ -58,9 +58,18 @@ export class WechatService {
       if(this.config.sendBlocked.includes(args.recipient))throw new Error('收件人在微信发送黑名单中');
       if(!this.config.send.includes('*')&&!this.config.send.includes(args.recipient))throw new Error('收件人不在微信发送授权列表');
     }
-    if(method==='receive'&&args.targets.some((id:string)=>!this.config.receive.includes(id)))throw new Error('接收目标不在授权列表');
-    if(method==='history'&&!this.config.history.includes(args.target))throw new Error('历史读取目标不在授权列表');
-    if(method.startsWith('remark_')&&!this.config.remarks.includes(args.target))throw new Error('联系人不在微信备注授权列表');
+    if(method==='receive'){
+      z.array(wechatTargetSchema).min(1).max(20).parse(args.targets);
+      if(!this.config.receive.includes('*')&&args.targets.some((id:string)=>!this.config.receive.includes(id)))throw new Error('接收目标不在授权列表');
+    }
+    if(method==='history'){
+      wechatTargetSchema.parse(args.target);
+      if(!this.config.history.includes('*')&&!this.config.history.includes(args.target))throw new Error('历史读取目标不在授权列表');
+    }
+    if(method.startsWith('remark_')){
+      wechatFriendSchema.parse(args.target);
+      if(!this.config.remarks.includes('*')&&!this.config.remarks.includes(args.target))throw new Error('联系人不在微信备注授权列表');
+    }
     const revision=this.revision;this.busy=true;
     try{return await this.run({method,params:args,binding:this.binding,experimental:true},signal,()=>revision===this.revision&&pluginEnabled(this.store.plugins(),'wechat')&&this.config.enabled);}
     finally{this.busy=false;}
