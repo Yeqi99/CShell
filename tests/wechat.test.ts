@@ -13,6 +13,21 @@ test('WeChat grants are independent and disabled by default',()=>{
   assert(aiPolicySchema.parse({...p,application:['wechat.read','wechat.send']}));
   assert(!p.application.includes('wechat.contacts.manage'));
 });
+test('Active reads reject an older runtime before requesting native data',async()=>{
+  if(process.platform!=='win32')return;
+  const directory=await mkdtemp(join(tmpdir(),'cshell-wechat-runtime-'));
+  const manifest=builtinPlugins.find(p=>p.id==='cshell.wechat')!;
+  const store={plugins:()=>[{manifest,enabled:true,source:'bundled'}]} as unknown as Store;
+  const service=new WechatService(directory,store);const methods:string[]=[];
+  (service as any).run=async(request:any)=>{methods.push(request.method);return {processes:[{pid:42,binding:{pid:42}}]};};
+  try{
+    await service.save({enabled:true,experimental:true,pid:42,readContacts:true,send:[],receive:[],history:['filehelper']});
+    for(const [name,args] of [['wechat_contacts',{}],['wechat_history',{target:'filehelper'}]] as const){
+      await assert.rejects(service.tools().find(t=>t.name===name)!.invoke(args,new AbortController().signal),/工具包 0.1.1/);
+    }
+    assert.deepEqual(methods,['discover','discover','discover']);
+  }finally{await rm(directory,{recursive:true,force:true});}
+});
 test('WeChat plugin gates tools and exact recipient allowlists before subprocess',async()=>{
   const directory=await mkdtemp(join(tmpdir(),'cshell-wechat-test-'));
   let enabled=false;
@@ -53,7 +68,7 @@ test('Wildcard sending respects deny precedence, exact IDs, persistence and inde
   const store={plugins:()=>[{manifest,enabled:true,source:'bundled'}]} as unknown as Store;
   let calls=0;
   const service=new WechatService(directory,store);
-  (service as any).run=async()=>{calls++;return {processes:[{pid:42,binding:{pid:42}}]};};
+  (service as any).run=async()=>{calls++;return {readProtocolVersion:2,processes:[{pid:42,binding:{pid:42}}]};};
   const config={enabled:true,experimental:true,pid:42,readContacts:false,send:['*'],sendBlocked:['wxid_blocked','filehelper'],receive:[]};
   const signal=new AbortController().signal;
   const send=service.tools().find(t=>t.name==='wechat_send_text')!;
@@ -90,7 +105,7 @@ test('Receive, history and remarks wildcard grants persist but operations requir
   const manifest=builtinPlugins.find(p=>p.id==='cshell.wechat')!;
   const store={plugins:()=>[{manifest,enabled:true,source:'bundled'}]} as unknown as Store;
   const service=new WechatService(directory,store);let calls=0;
-  (service as any).run=async()=>{calls++;return {processes:[{pid:42,binding:{pid:42}}]};};
+  (service as any).run=async()=>{calls++;return {readProtocolVersion:2,processes:[{pid:42,binding:{pid:42}}]};};
   const config={enabled:true,experimental:true,pid:42,readContacts:false,send:[],receive:['*'],history:['*'],remarks:['*']};
   const signal=new AbortController().signal;
   const invoke=(name:string,args:any)=>service.tools().find(t=>t.name===name)!.invoke(args,signal);

@@ -19,7 +19,7 @@ def execute(request):
             except Exception:pass
             finally:
                 if memory:memory.close()
-        return {'processes':processes}
+        return {'processes':processes,'readProtocolVersion':2}
     binding=request['binding'];memory=Memory(binding['pid'])
     try:
         current,path,base=memory.inspect();require(current==binding,'SESSION_CHANGED','WeChat process changed; bind again')
@@ -36,7 +36,9 @@ def execute(request):
             if method=='history':
                 from .history import history
                 return history(memory,binding,path,base,params,check)
-            if method=='contacts':return memory.cached_contacts(check,budget_mb=64,seconds=10)
+            if method=='contacts':
+                from .contacts import contacts
+                return contacts(memory,binding,path,base,params,check)
             if method=='receive':
                 targets=params['targets'];seconds=params.get('seconds',15)
                 require(type(seconds) is int and 1<=seconds<=30,'INVALID_DURATION','Use 1..30 seconds')

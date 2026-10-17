@@ -1,10 +1,7 @@
 """Bounded message_0.db history, on the database-owning thread. No key extraction."""
 import base64,hashlib,json,time
 from .contracts import require,identifier,fingerprint
-from .runtime import Instrument,ROOT,bounded
-FUNCTIONS={'db_handle':0x25279f0,'db_filename':0x35ddd00,'prepare_v2':0x5924c30,
- 'stmt_readonly':0x58f9f10,'step':0x58f8400,'finalize':0x58f7b70,'column_count':0x58f8af0,
- 'column_text':0x58f8f10,'column_bytes':0x58f8c00,'reset':0x58f7cb0,'stmt_busy':0x58f9f30}
+from .database_read import query_database,FUNCTIONS
 
 def prepare(params):
     target=params.get('target')
@@ -49,7 +46,7 @@ def decode_body(hex_data,encoding,native_type,size):
 
 def result_page(raw,params):
     target,limit,direction,cursor,_=prepare(params)
-    require(raw['state'][1]==2 and raw['state'][3]==101,'HISTORY_UNAVAILABLE','Database idle, table missing, or bounded query incomplete; open the conversation and retry read')
+    require(raw['state'][1]==2 and raw['state'][3]==101,'HISTORY_UNAVAILABLE','Client read service unavailable, table missing, or bounded query incomplete')
     require(raw['cleanup'].get('unloaded') and raw['cleanup'].get('codeRestored'),'CLEANUP_FAILED','Native reader did not clean up')
     database=fingerprint(raw['databasePath'])
     require(cursor is None or cursor['database']==database,'CURSOR_SCOPE_CHANGED','Database/account path changed; do not reuse cursor')
@@ -74,15 +71,6 @@ def result_page(raw,params):
             'complete':False,'snapshot':False,'cursorAdvancesOnlyAfterRead':True}
 
 def history(memory,binding,path,base,params,check):
-    _,_,_,_,sql=prepare(params);adapter=Instrument(memory,binding,path,base);raw={}
-    try:
-        config={'fixture':False,'functions':FUNCTIONS,'guards':{n:adapter.guard(r) for n,r in FUNCTIONS.items()},
-                'handles':[],'expectedPath':'message_0.db','sql':sql,'code':(ROOT/'native/history.c').read_text()}
-        check();rpc=adapter.start('const config='+json.dumps(config)+';'+(ROOT/'native/history.js').read_text());check();bounded(rpc.arm)
-        for _ in range(60):
-            check();state=bounded(rpc.status)
-            if state[1]==2:break
-            time.sleep(.5)
-        raw=bounded(rpc.result)
-    finally:raw['cleanup']=adapter.close()
+    target,_,_,_,sql=prepare(params)
+    raw=query_database(memory,binding,path,base,'message_0.db',sql,target,check)
     return result_page(raw,params)
