@@ -29,6 +29,7 @@ export function AiConversation({
   create,
   run,
   configure,
+  executionVisible,
 }: {
   openThread: (id: string) => void;
   insertion: { id: string; text: string; threadId: string } | null;
@@ -44,6 +45,7 @@ export function AiConversation({
   create: () => Promise<AiThread>;
   run: (fn: () => Promise<unknown>) => Promise<void>;
   configure: () => void;
+  executionVisible: boolean;
 }) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const composer = useRef<HTMLTextAreaElement>(null),
@@ -150,7 +152,9 @@ export function AiConversation({
           )}
           {thread?.messages.map((message, i) =>
             message.role === 'tool' ? (
-              <AiToolRecord message={message} key={i} />
+              executionVisible ? (
+                <AiToolRecord message={message} key={i} />
+              ) : null
             ) : (
               <article className={`agent-message ${message.role}`} key={i}>
                 <header>

@@ -1,3 +1,4 @@
+import { AgentApplications } from './AgentApplications';
 import { useCallback, useEffect, useState } from 'react';
 import type { AgentCall, AgentShellOption, AgentTarget } from '../../shared/agent';
 import type { ClientStatus, ClientShell } from '../../shared/client';
@@ -9,7 +10,9 @@ type Status = ClientStatus & { platform?: string; canImportLegacy?: boolean };
 export function AgentWorkbench() {
   const [targets, setTargets] = useState<AgentTarget[]>([]),
     [target, setTarget] = useState('local'),
-    [error, setError] = useState('');
+    [error, setError] = useState(''),
+    [launching, setLaunching] = useState(false),
+    [launchMessage, setLaunchMessage] = useState('');
   const refresh = () =>
     window.cshell
       .agentTargets()
@@ -39,14 +42,23 @@ export function AgentWorkbench() {
           </select>
         </label>
         <button onClick={() => void refresh()}>刷新</button>
+        {current?.local && current.bundledApp && (
+          <button disabled={launching} onClick={async () => {
+            setLaunching(true); setError(''); setLaunchMessage('');
+            try { await window.cshell.agentLaunch(); setLaunchMessage('已请求打开 cagent；已有后台继续使用原会话。'); await refresh(); }
+            catch (e) { setError(String(e)); }
+            finally { setLaunching(false); }
+          }}>{launching ? '正在打开…' : '打开本机 cagent'}</button>
+        )}
       </div>
       {error && <p role="alert">{error}</p>}
+      {launchMessage && <p role="status">{launchMessage}</p>}
       {current?.available ? (
         <AgentConfiguration key={target} target={current} />
       ) : (
         <div className="agent-empty">
           <h2>{current?.reason ?? '目标已断开'}</h2>
-          <p>安装并启动独立 Agent 后，可在这里配置。发现服务不会自动开放远程访问。</p>
+          <p>{current?.bundledApp ? '点击“打开本机 cagent”启动独立应用，再在这里配置连接与权限。' : '安装并启动独立 Agent 后，可在这里配置。'}发现服务不会自动开放远程访问。</p>
           <button
             onClick={() =>
               void window.cshell.clientDownloadPage().catch((e) => setError(String(e)))
@@ -72,6 +84,7 @@ function AgentConfiguration({ target }: { target: AgentTarget }) {
       <nav className="agent-tabs" aria-label="Agent 配置分类">
         {[
           ['connection', '连接与权限'],
+          ['applications', '应用市场'],
           ['hosting', 'HTTP 服务'],
           ['relay', '中继'],
           ['wsl', 'WSL'],
@@ -92,6 +105,7 @@ function AgentConfiguration({ target }: { target: AgentTarget }) {
       <div hidden={section !== 'connection'}>
         <AgentConnection target={target} call={call} />
       </div>
+      <div hidden={section !== 'applications'}>{visited.includes('applications')&&<AgentApplications target={target} call={call}/>}</div>
       <div hidden={section !== 'hosting'}>
         {visited.includes('hosting') && <AgentHostingPanel target={target.id} call={call} />}
       </div>

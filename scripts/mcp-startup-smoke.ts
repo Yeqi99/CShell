@@ -15,7 +15,7 @@ const launch = () =>
     ...(process.env.CSHELL_EXECUTABLE
       ? { executablePath: process.env.CSHELL_EXECUTABLE, args: [] }
       : { args: ['.'] }),
-    env,
+    env: process.env.CSHELL_EXECUTABLE ? { ...env, CSHELL_TEST_START_GATE: '1' } : env,
   });
 let app = await launch();
 // Bind the Chromium page directly. Electron's window-to-page bookkeeping can lag
@@ -47,7 +47,7 @@ try {
       const timer = setTimeout(() => {
         second.kill();
         reject(new Error('Second launch did not exit'));
-      }, 10000);
+      }, 30000);
       second.once('error', (error) => {
         clearTimeout(timer);
         reject(error);
@@ -123,6 +123,7 @@ try {
     'PASS: footer saves MCP, drafts survive categories, errors remain visible, retry/restart persist, second launch reveals hidden/minimized window',
   );
 } catch (error) {
+  console.error('Desktop regression failed:', error);
   console.error(
     'Startup diagnostic:',
     await app

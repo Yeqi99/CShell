@@ -28,7 +28,9 @@ export function agentReleaseAssets(version: string): string[] {
     'mac-x64.tar.gz',
     'linux-x64.tar.gz',
     'linux-arm64.tar.gz',
-  ].map((suffix) => `CShell-Agent-${version}-${suffix}`);
+  ].map((suffix) =>
+    suffix === 'win-x64.zip' ? `CAgent-Setup-${version}-${suffix}` : `CAgent-${version}-${suffix}`,
+  );
 }
 
 async function inspectPackage(path: string) {

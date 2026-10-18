@@ -3,6 +3,8 @@ import Markdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { remarkCjkStrong } from '../markdown-strong';
 import { CopyButton } from './AiCopyButton';
+import { navigatePermission } from '../permission-navigation';
+import { parsePermissionHref } from '../../shared/permission-links';
 
 function textContent(children: ReactNode): string {
   return Children.toArray(children)
@@ -14,6 +16,11 @@ function textContent(children: ReactNode): string {
     .join('');
 }
 const components: Components = {
+  a({href,children}) {
+    if(href && parsePermissionHref(href))return <a href={href} onClick={event=>{event.preventDefault();navigatePermission(href);}}>{children}</a>;
+    if(href?.startsWith('#cshell-permission/'))return <span>{children}（权限链接无效）</span>;
+    return <a href={href}>{children}</a>;
+  },
   pre({ children }) {
     const code = Children.toArray(children)[0];
     const language = isValidElement<{ className?: string }>(code)

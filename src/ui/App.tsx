@@ -1,7 +1,10 @@
+import { RdpConnectionForm } from './components/RdpConnectionForm';
+import { usePermissionNavigation } from './permission-navigation';
 import { HttpWorkbench, HttpCreate } from './components/HttpWorkbench';
 import { WslAccount } from './components/WslAccount';
 import type { LocalConnectionTarget } from '../shared/local-terminal';
 import { ConnectionEntry } from './components/ConnectionEntry';
+import { ClipboardConnection } from './components/ClipboardConnection';
 import { TextAssist } from './components/TextAssist';
 import { ClientProfileEditor } from './components/ClientProfileEditor';
 import type { ClientDevice, ClientShell } from '../shared/client';
@@ -10,6 +13,7 @@ import type { LocalShell } from '../shared/local-terminal';
 import { ActivityPage } from './components/ActivityPage';
 import { initialPlugins, pluginEnabled } from '../shared/plugins';
 import { AiPanel } from './components/AiPanel';
+import { AiExecution } from './components/AiExecution';
 import type { PythonFileRequest } from './components/ExtensionWorkbench';
 const ExtensionWorkbench = lazy(() =>
   import('./components/ExtensionWorkbench').then((module) => ({
@@ -99,6 +103,7 @@ export function App() {
 }
 function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Config) => void }) {
   const { t } = useI18n();
+  const importedPasswords = useRef(new Map<string, string>());
   const [localTargets, setLocalTargets] = useState<LocalConnectionTarget[]>([]);
   const [wslSetupTarget, setWslSetupTarget] = useState<string | null>(null);
   const [wslBusy, setWslBusy] = useState(false);
@@ -186,6 +191,8 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
   const [extensions, setExtensions] = useState(false);
   const [extensionVisited, setExtensionVisited] = useState(false);
   const [pythonRequest, setPythonRequest] = useState<PythonFileRequest | null>(null);
+  const permissionRequest=usePermissionNavigation();
+  useEffect(()=>{if(!permissionRequest)return;setMinimal(false);if(permissionRequest.node.page==='wechat'){setExtensions(true);setExtensionVisited(true);setSurface('extensions');}else setAiVisible(true);},[permissionRequest]);
   const openExtensions = () => {
     setExtensions(true);
     setExtensionVisited(true);
@@ -232,6 +239,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
   const [quickConnections, setQuickConnections] = useState<Profile[]>([]);
   const [quickId, setQuickId] = useState('');
   const openSaved = (profile: Profile) => {
+    if(profile.protocol==='rdp'){void window.cshell.openRdp(profile.id).catch(e=>{openConnection(profile);setError(e.message);});return;}
     if (profile.protocol === 'client') {
       void (async () => {
         const device = (await window.cshell.clientDevices()).find((d) => d.deviceId === profile.id);
@@ -288,6 +296,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
     setSurface('settings');
   };
   const closeEditor = (target = form) => {
+    if (target && target !== 'new') importedPasswords.current.delete(target.id);
     setDrafts((items) =>
       items.filter(
         (item) => (item === 'new' ? 'new' : item.id) !== (target === 'new' ? 'new' : target?.id),
@@ -1035,6 +1044,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
             >
               {draft === 'new' ? (
                 <ConnectionEntry
+                  onSaved={refresh}
                   http={
                     pluginEnabled(config.plugins, 'http') ? (
                       <HttpCreate
@@ -1064,6 +1074,8 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
                     onConnect={connect}
                   />
                 </ConnectionEntry>
+              ) : draft.protocol === 'rdp' ? (
+                <RdpConnectionForm profile={draft} saved={config.savedCredentials.includes(draft.id)} onSaved={refresh} />
               ) : draft.protocol === 'client' ? (
                 <ClientProfileEditor
                   profile={draft}
@@ -1074,6 +1086,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
               ) : (
                 <ConnectionForm
                   profile={draft}
+                  initialPassword={importedPasswords.current.get(draft.id)}
                   initialPersist={config.profiles.some((p) => p.id === draft.id)}
                   groups={config.groups}
                   saved={config.savedCredentials.includes(draft.id)}
@@ -1184,6 +1197,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
               </button>
             </div>
           )}
+          <AiExecution enabled={preferences.showAiExecution && !minimal} sessionId={current?.id} />
           {tabs.length ? (
             <div className="terminals" hidden={surface !== 'terminal'}>
               {tabs.map((tab) => (
@@ -1266,8 +1280,22 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
               ))}
           </div>
         )}
-        <div className="ai-panel-slot" hidden={!aiVisible || minimal}>
+        <div
+          className="ai-panel-slot"
+          hidden={!aiVisible || minimal}
+          style={{ width: layout.agentWidth }}
+        >
+          <PanelResizer
+            panel="agent"
+            width={layout.agentWidth}
+            reverse={true}
+            onChange={(agentWidth) => onLayout({ ...layout, agentWidth })}
+          />
           <AiPanel
+            executionVisible={preferences.showAiExecution}
+            onExecutionVisible={(showAiExecution) =>
+              savePreferences({ ...config.preferences, showAiExecution })
+            }
             visible={aiVisible && !minimal}
             sessionId={current && !current.closed ? current.id : undefined}
             profiles={config.profiles}
@@ -1317,6 +1345,24 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
           />
         </div>
       </footer>
+      <ClipboardConnection
+        onImport={({ fields }) => {
+          const id = crypto.randomUUID();
+          if (fields.password) importedPasswords.current.set(id, fields.password);
+          openConnection({
+            id,
+            protocol: 'ssh',
+            name: fields.name || fields.host!,
+            host: fields.host!,
+            port: fields.port ?? 22,
+            username: fields.username ?? '',
+            group: fields.group ?? '',
+            auth: fields.auth ?? 'password',
+            favorite: false,
+          });
+          setMinimal(false);
+        }}
+      />
       {error && (
         <div className="toast" role="alert">
           <div>

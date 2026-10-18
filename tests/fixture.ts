@@ -105,7 +105,7 @@ export async function fixture(
             return target;
           };
           const attrs = (s: import('node:fs').Stats) => ({
-            mode: s.isDirectory() ? 0o40755 : 0o100644,
+            mode: s.isSymbolicLink() ? 0o120777 : s.isDirectory() ? 0o40755 : 0o100644,
             uid: 1000,
             gid: 1000,
             size: s.size,
@@ -130,7 +130,7 @@ export async function fixture(
           });
           for (const op of ['STAT', 'LSTAT'])
             handler(op, async (id, path) => {
-              sftp.attrs(id, attrs(await fs.stat(local(path))));
+              sftp.attrs(id, attrs(await (op === 'LSTAT' ? fs.lstat(local(path)) : fs.stat(local(path)))));
             });
           handler('OPENDIR', async (id, path) => {
             const key = randomUUID();
@@ -219,6 +219,7 @@ export async function fixture(
             sftp.status(id, 0);
           });
           sftp.on('close', () => {
+            sftp.end();
             for (const h of handles.values()) void h.file?.close().catch(() => {});
           });
         });

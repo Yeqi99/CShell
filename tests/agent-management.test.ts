@@ -16,11 +16,28 @@ import { ConnectionRegistry } from '../src/core/connections/registry';
 import type { ProviderConnection } from '../src/core/connections/contracts';
 import { frames, send } from '../src/core/client/wire';
 import { hostingConfigSchema, type HostingStatus } from '../src/shared/agent-hosting';
+import { agentMethodOutputs } from '../src/core/api/agent-outputs';
 
 const codec = {
   encrypt: async (v: string) => Buffer.from(v).toString('base64'),
   decrypt: async (v: string) => Buffer.from(v, 'base64').toString(),
 };
+
+test('Agent applications require separate local consent and use authenticated controller identity', async () => {
+  const f = await fixture();
+  try {
+    const { device } = await f.pair({ allowManage: true });
+    const initial = await f.provider.call(device.deviceId, { method: 'applications.list' }) as { enabled: boolean };
+    assert.equal(initial.enabled, false);
+    await assert.rejects(f.provider.call(device.deviceId, { method: 'applications.plan', params: { app: 'git' } }), /denied|未授权/);
+    const owner = f.runtime.server.status().peers[0].fingerprint;
+    await f.runtime.dispatch('applications.configure', { enabled: true, controllers: [owner] });
+    const granted = await f.provider.call(device.deviceId, { method: 'applications.list' }) as { enabled: boolean };
+    assert.equal(granted.enabled, true);
+    await f.runtime.dispatch('applications.configure', { enabled: false });
+    await assert.rejects(f.provider.call(device.deviceId, { method: 'applications.plan', params: { app: 'git' } }), /denied|未授权/);
+  } finally { await f.close(); }
+});
 const shell = process.platform === 'win32' ? 'cmd' : 'bash';
 async function freePort() {
   const s = createServer();
@@ -97,6 +114,29 @@ async function fixture() {
 }
 
 // Bypass controller-side capability checks: the authenticated Agent server must reject independently.
+test('Agent exported status results match concrete schemas and omit reverse relay secrets', async () => {
+  const f = await fixture();
+  try {
+    const { session } = await f.pair({ allowManage: true, allowRelay: true, allowHosting: true });
+    const connection = f.provider.resolve(session);
+    for (const method of ['client.status', 'agent.shells', 'agent.logs', 'wsl.status', 'relay.status', 'relay.reverse.status', 'hosting.list']) {
+      const tool = connection.tools.find((t) => t.name === (method.startsWith('relay.') ? 'agent_relay' : method.startsWith('hosting.') ? 'agent_hosting' : 'agent_manage'))!;
+      const result = JSON.parse(await tool.invoke({ method }, new AbortController().signal));
+      assert.ok(agentMethodOutputs[method].safeParse(result).success, method);
+      assert.ok(tool.jsonOutput?.safeParse(result).success, method);
+      if (method === 'relay.reverse.status') assert.equal('credential' in (result.config.relay ?? {}), false);
+    }
+    const relayTool = connection.tools.find((t) => t.name === 'agent_relay')!;
+    const signal = new AbortController().signal;
+    const before = JSON.parse(await relayTool.invoke({ method: 'relay.status' }, signal));
+    const draft = { ...before.config, maxConnections: 9, expectedRevision: before.revision };
+    const updated = JSON.parse(await relayTool.invoke({ method: 'relay.configure', params: draft }, signal));
+    assert.notEqual(updated.revision, before.revision);
+    await assert.rejects(relayTool.invoke({ method: 'relay.configure', params: { ...draft, maxConnections: 10 } }, signal));
+    assert.equal(JSON.parse(await relayTool.invoke({ method: 'relay.status' }, signal)).config.maxConnections, 9);
+  } finally { await f.close(); }
+});
+
 async function rawManage(
   port: number,
   identity: ClientIdentity,
@@ -352,7 +392,7 @@ test('Agent hosting AI tools bind reviewed config and revision, and backend deni
 test('Agent provider reassembles bounded large management results across protocol frames', async () => {
   const f = await fixture();
   try {
-    const { device } = await f.pair({ allowHosting: true });
+    const { device, session } = await f.pair({ allowHosting: true });
     const ids: string[] = [];
     for (let i = 0; i < 5; i++) {
       const input = hostingConfigSchema.parse({
@@ -373,6 +413,16 @@ test('Agent provider reassembles bounded large management results across protoco
     );
     assert.ok(services.every((s) => s.config.routes[0].body === '中文'.repeat(8000)));
     assert.ok(services.every((s) => !s.running));
+    const tool = f.provider.resolve(session).tools.find((t) => t.name === 'agent_hosting')!;
+    const toolResult = JSON.parse(
+      await tool.invoke({ method: 'hosting.list' }, new AbortController().signal),
+    ) as HostingStatus[];
+    assert.deepEqual(
+      toolResult.map((s) => s.config.id),
+      ids,
+      'tool path must preserve complete JSON across frames',
+    );
+    assert.ok(toolResult.every((s) => s.config.routes[0].body === '中文'.repeat(8000)));
   } finally {
     await f.close();
   }

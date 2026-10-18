@@ -1,0 +1,126 @@
+.agent-events-page {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.agent-events-page[hidden] {
+  display: none;
+}
+.ai-event-subscriptions {
+  padding: 14px 16px 24px;
+  min-width: 0;
+}
+.event-actions,
+.event-editor-heading,
+.event-save {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.event-editor-heading {
+  justify-content: space-between;
+  margin: 12px 0;
+}
+.event-editor-heading span,
+.event-rule span,
+.event-run time {
+  font-size: 11px;
+  color: var(--muted);
+}
+.event-rule {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 12px;
+  margin: 8px 0;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface, transparent);
+}
+.event-rule strong {
+  overflow-wrap: anywhere;
+}
+.event-editor fieldset {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+  margin: 0;
+}
+.event-editor label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  min-width: 0;
+}
+.event-editor input:not([type='checkbox']),
+.event-editor select,
+.event-editor textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.event-editor textarea {
+  resize: vertical;
+}
+.event-editor label.event-check {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.event-editor .event-check input {
+  width: auto;
+  margin: 0;
+}
+.event-editor summary,
+.event-runs summary {
+  cursor: pointer;
+  font-size: 12px;
+  padding: 8px 0;
+}
+.event-options {
+  display: grid;
+  gap: 12px;
+  padding: 8px 0;
+}
+.event-limits {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.event-save {
+  justify-content: space-between;
+}
+.event-delete {
+  border: 1px solid var(--border);
+  padding: 10px;
+  border-radius: 6px;
+}
+.event-delete button {
+  margin-right: 8px;
+}
+.event-runs {
+  margin-top: 20px;
+  border-top: 1px solid var(--border);
+}
+.event-run {
+  border-bottom: 1px solid var(--border);
+  padding: 10px 0;
+  font-size: 12px;
+}
+.event-run > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+}
+.event-run p {
+  overflow-wrap: anywhere;
+}
+.ai-event-subscriptions button:focus-visible,
+.ai-event-subscriptions summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

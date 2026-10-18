@@ -3,6 +3,7 @@ export const aiLocations = ['workspace', 'terminal', 'files', 'python'] as const
 export const aiCapabilities = [
   'metrics.read',
   'files.read',
+  'files.create',
   'commands.execute',
   'http.send',
   'agent.manage',
@@ -44,7 +45,17 @@ export const aiPermissionSchema = z
 export const aiPolicySchema = z
   .object({
     application: z.array(
-      z.enum(['connections.read', 'connections.open', 'agents.manage', 'goals.manage', 'http.use']),
+      z.enum([
+        'connections.read',
+        'connections.open',
+        'agents.manage',
+        'goals.manage',
+        'http.use',
+        'ai.providers.manage',
+        'wechat.read',
+        'wechat.send',
+        'wechat.contacts.manage',
+      ]),
     ),
     allMachines: z.boolean(),
     profiles: z.array(z.string().uuid()).max(1000),
@@ -75,9 +86,17 @@ export type AiMessage = {
   role: 'user' | 'assistant' | 'tool';
   content: string;
   time: number;
+  eventGenerated?: boolean;
   tool?: { name: string; input: string; output: string; target?: string };
 };
 export type AiThread = {
+  execution?: {
+    id: string;
+    sessionId: string;
+    input: string;
+    output: string;
+    state: 'running' | 'finished' | 'error';
+  };
   id: string;
   title: string;
   location: AiLocation;
@@ -103,6 +122,10 @@ export interface AiSnapshot {
   threads: AiThread[];
 }
 export interface AiBridge {
+  aiEventsSnapshot(): Promise<import('./ai-events').AiEventSnapshot & {error?:string;subscriptions:{id:string;name:string;source:string}[]}>;
+  aiEventSave(rule:import('./ai-events').AiEventRule):Promise<import('./ai-events').AiEventRule>;
+  aiEventRemove(id:string):Promise<void>;
+  aiEventListen(input:{targets:string[];leaseSeconds:number}):Promise<unknown>;
   aiGoalSave(id: string, input: import('./ai-work').GoalInput): Promise<void>;
   aiGoalAction(
     id: string,

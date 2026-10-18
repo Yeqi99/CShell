@@ -3,9 +3,10 @@ import { z } from 'zod';
 // their own schemas; model output never creates new providers or executable actions.
 export const extractedConnectionSchema = z
   .object({
-    providerId: z.literal('cshell.ssh'),
+    providerId: z.enum(['cshell.ssh','cshell.rdp','cshell.client','cshell.http']),
     fields: z
       .object({
+        url: z.string().url().max(8192).refine(s=>{const u=new URL(s);return ['http:','https:'].includes(u.protocol)&&!u.username&&!u.password&&!u.hash;}).optional(),
         name: z.string().trim().max(255).optional(),
         host: z
           .string()
@@ -26,8 +27,7 @@ export const extractedConnectionSchema = z
         password: z.string().max(16000).optional(),
         group: z.string().trim().max(100).optional(),
       })
-      .strict()
-      .refine((fields) => !!fields.host, 'No SSH host found'),
+      .strict(),
   })
-  .strict();
+  .strict().refine(v=>v.providerId==='cshell.http'?!!v.fields.url&&!v.fields.password&&!v.fields.auth:!!v.fields.host&&!v.fields.url,'Connection endpoint is incomplete');
 export type ExtractedConnection = z.infer<typeof extractedConnectionSchema>;

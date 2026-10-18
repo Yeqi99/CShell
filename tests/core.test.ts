@@ -45,6 +45,31 @@ test('validates profiles and hostile remote names', () => {
   assert.equal(childPath('/home', 'a'), '/home/a');
   assert.throws(() => childPath('/home', '../a'));
 });
+
+test('failed permission persistence never expands live grants, and queued profile saves preserve committed grants', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'cshell-grant-commit-'));
+  const store = new Store(dir, { encrypt: async (v) => v, decrypt: async (v) => v });
+  try {
+    await store.load();
+    const initial = store.mcpSettings();
+    const expanded = { ...initial, enabled: true, allowCommands: true };
+    const obstruction = join(dir, 'config.json.tmp');
+    await mkdir(obstruction);
+    const failed = store.setMcpSettings(expanded);
+    assert.deepEqual(store.mcpSettings(), initial, 'grants cannot become live during persistence');
+    await assert.rejects(failed);
+    assert.deepEqual(store.mcpSettings(), initial);
+    await rm(obstruction, { recursive: true });
+    const p = profile();
+    await Promise.all([store.setMcpSettings(expanded), store.saveProfile(p)]);
+    const reloaded = new Store(dir, { encrypt: async (v) => v, decrypt: async (v) => v });
+    await reloaded.load();
+    assert.deepEqual(reloaded.mcpSettings(), expanded);
+    assert.equal(reloaded.profile(p.id).name, p.name);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
 test('configuration round-trip, credential binding and corrupt-file preservation', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'cshell-store-'));
   const codec = {

@@ -5,7 +5,7 @@ import type { ClientShell, ClientStatus } from '../../shared/client';
 import './client.css';
 const words = {
   'zh-CN': {
-    title: 'CShell Agent',
+    title: 'cagent',
     access: '连接',
     settings: '设置',
     password: '连接密码',
@@ -13,9 +13,9 @@ const words = {
     saveAccess: '保存访问设置',
     configured: '已设置连接密码',
     setupFirst: '先在设置中配置密码和开放权限',
-    connectionHint: '在 CShell 新建连接，选择 CShell Agent，填写地址、端口和密码。',
+    connectionHint: '在 CShell 新建连接，选择 cagent，填写地址、端口和密码。',
     subtitle: '管理此电脑的远程访问',
-    download: '获取 CShell Agent',
+    download: '获取 cagent',
     downloadHint: '在被管理电脑的 CShell 插件市场启用 Agent，再配置地址、端口和权限。',
     github: '打开 GitHub 发行页面',
     network: '连接设置',
@@ -66,7 +66,7 @@ const words = {
     waiting: '处理中…',
   },
   'en-US': {
-    title: 'CShell Agent',
+    title: 'cagent',
     access: 'Connection',
     settings: 'Settings',
     password: 'Connection password',
@@ -75,9 +75,9 @@ const words = {
     configured: 'Connection password configured',
     setupFirst: 'Configure a password and permissions in Settings first',
     connectionHint:
-      'Create a connection in CShell, choose CShell Agent, then enter the address, port and password.',
+      'Create a connection in CShell, choose cagent, then enter the address, port and password.',
     subtitle: 'Manage remote access to this computer',
-    download: 'Get CShell Agent',
+    download: 'Get cagent',
     downloadHint:
       'Install the standalone Client on the managed computer, then connect with its address and password. Installers are distributed through GitHub Releases.',
     github: 'Open GitHub releases',
@@ -246,7 +246,7 @@ export function ClientApplication({ embedded = false }: { embedded?: boolean }) 
               {status?.passwordConfigured ? t.connectionHint : t.setupFirst}
             </p>
             <p>
-              <strong>CShell Agent</strong> · {bind}:{port}
+              <strong>cagent</strong> · {bind}:{port}
             </p>
             {status?.running && (
               <>

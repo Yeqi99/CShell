@@ -1,4 +1,5 @@
-import { ClientConnectForm, RdpConnectForm, type ClientConnected } from './ClientConnectForm';
+import { RdpConnectionForm } from './RdpConnectionForm';
+import { ClientConnectForm, type ClientConnected } from './ClientConnectForm';
 import { useI18n } from '../i18n';
 import type { LocalShell, LocalConnectionTarget } from '../../shared/local-terminal';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -15,6 +16,7 @@ import type { Profile } from '../../shared/contracts';
 import './connection-entry.css';
 type ConnectionKind = 'ssh' | 'rdp' | 'client' | 'http';
 export function ConnectionEntry({
+  onSaved,
   profiles,
   http,
   onConnect,
@@ -24,6 +26,7 @@ export function ConnectionEntry({
   onClient,
   onLocal,
 }: {
+  onSaved: () => Promise<void>;
   http?: ReactNode;
   onClient: ClientConnected;
   onLocal: (shell: LocalShell) => Promise<void>;
@@ -76,8 +79,8 @@ export function ConnectionEntry({
     },
     {
       id: 'client' as const,
-      title: 'CShell Agent',
-      description: cn ? '连接运行独立 Agent 的电脑' : 'Access a computer running CShell Agent',
+      title: 'cagent',
+      description: cn ? '连接运行独立 Agent 的电脑' : 'Access a computer running cagent',
       icon: ShieldCheck,
     },
   ];
@@ -203,7 +206,7 @@ export function ConnectionEntry({
             {visited.includes('client') && <ClientConnectForm onConnect={onClient} />}
           </div>
           <div className="client-page protocol-client" hidden={kind !== 'rdp'}>
-            {visited.includes('rdp') && <RdpConnectForm />}
+            {visited.includes('rdp') && <RdpConnectionForm onSaved={onSaved} />}
           </div>
         </div>
       </div>

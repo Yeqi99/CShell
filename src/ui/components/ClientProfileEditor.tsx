@@ -49,7 +49,7 @@ export function ClientProfileEditor({
     <div className="client-page client-profile-editor">
       <h1>{cn ? '编辑连接' : 'Edit connection'}</h1>
       <p>
-        CShell Agent · {profile.host}:{profile.port}
+        cagent · {profile.host}:{profile.port}
       </p>
       <form
         onSubmit={(e) => {

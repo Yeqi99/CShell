@@ -1,0 +1,60 @@
+name: CAgent packages
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  cagent:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, platform: win, arch: x64 }
+          - { os: macos-latest, platform: mac, arch: arm64 }
+          - { os: macos-15-intel, platform: mac, arch: x64 }
+          - { os: ubuntu-latest, platform: linux, arch: x64 }
+          - { os: ubuntu-24.04-arm, platform: linux, arch: arm64 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Require native runner architecture
+        run: node -e "if(process.arch!=='${{ matrix.arch }}')throw Error('Native architecture mismatch')"
+      - if: matrix.platform == 'win'
+        name: Prepare checksum-pinned desktop compiler
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'llvm-mingw.zip'
+          Invoke-WebRequest 'https://github.com/mstorsjo/llvm-mingw/releases/download/20261006/llvm-mingw-20261006-ucrt-x86_64.zip' -OutFile $archive
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne '317492c456aa27ee607a5919f1d2d38dcdc1112516a24d0bf4b00d078f52d17a') { throw 'Compiler checksum mismatch' }
+          Expand-Archive -LiteralPath $archive -DestinationPath $env:RUNNER_TEMP
+          "CAGENT_NATIVE_CXX=$env:RUNNER_TEMP/llvm-mingw-20261006-ucrt-x86_64/bin/x86_64-w64-mingw32-clang++.exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - run: node scripts/prepare-pty.mjs
+      - run: pnpm exec tsc --noEmit
+      - name: Build standalone CAgent on the native architecture
+        run: node scripts/agent-build.mjs
+      - name: Archive, install or extract, and verify real packaged PTY
+        run: node scripts/package-agent.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cagent-verification-${{ matrix.platform }}-${{ matrix.arch }}
+          path: test-results/cagent-package-*.json
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cagent-package-${{ matrix.platform }}-${{ matrix.arch }}
+          if-no-files-found: error
+          path: |
+            release/*/CAgent-Setup-*.zip
+            release/*/CAgent-*.tar.gz
+
+# Deliberately build-only: verified artifacts are reviewed and attached to the
+# version's draft by the release owner. No asset is overwritten or auto-published.

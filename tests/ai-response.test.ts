@@ -49,3 +49,23 @@ test('truncated streams and malformed tools cannot execute', async () => {
     /索引/,
   );
 });
+
+test('output limits and filtering are interruptions rather than successful completions', async () => {
+  await assert.rejects(
+    readAiResponse(response([event({ content: '先检查' }, 'length')]), () => {}),
+    /长度上限/,
+  );
+  await assert.rejects(
+    readAiResponse(
+      new Response(
+        JSON.stringify({ choices: [{ message: { content: 'partial' }, finish_reason: 'length' }] }),
+      ),
+      () => {},
+    ),
+    /长度上限/,
+  );
+  await assert.rejects(
+    readAiResponse(response([event({}, 'content_filter')]), () => {}),
+    /过滤/,
+  );
+});

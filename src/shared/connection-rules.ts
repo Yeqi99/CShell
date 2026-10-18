@@ -9,9 +9,29 @@ export class ConnectionRuleError extends Error {
 
 // Deliberately deterministic: explicit labels/SSH destinations only. Never execute input,
 // infer credentials, or silently choose one target from multiple conflicting records.
-export function extractConnectionByRules(input: string): ExtractedConnection {
+export function extractConnectionByRules(input: string, providerId: ExtractedConnection['providerId'] = 'cshell.ssh'): ExtractedConnection {
   if (!input.trim()) throw new ConnectionRuleError('empty');
   if (input.length > 24000) throw new ConnectionRuleError('invalid');
+  const declared=/^(?:协议|连接类型|protocol)\s*[:：=]\s*(ssh|rdp|windows|agent|client|http|https)\s*$/im.exec(input);
+  const scheme=/^(ssh|rdp|cshell-agent|https?):\/\//im.exec(input.trim());
+  const kind=(declared?.[1]??scheme?.[1])?.toLowerCase();
+  const inferred=kind?({ssh:'cshell.ssh',rdp:'cshell.rdp',windows:'cshell.rdp',agent:'cshell.client',client:'cshell.client','cshell-agent':'cshell.client',http:'cshell.http',https:'cshell.http'} as const)[kind as 'ssh']:undefined;
+  if(inferred&&inferred!==providerId)throw new ConnectionRuleError('unsupported');
+  if(input.trim().startsWith('{')){
+    try{
+      const value=JSON.parse(input);
+      const fields={host:value.host,port:value.port,name:value.name};
+      const parsed=extractedConnectionSchema.safeParse({providerId,fields});
+      if(providerId!=='cshell.client'||!parsed.success)throw Error();
+      return parsed.data;
+    }catch{throw new ConnectionRuleError('invalid');}
+  }
+  if(providerId==='cshell.http'){
+    const urls=[...new Set(input.match(/https?:\/\/[^\s<>"']+/g)??[])];
+    if(urls.length!==1)throw new ConnectionRuleError(urls.length?'ambiguous':'unsupported');
+    const parsed=extractedConnectionSchema.safeParse({providerId,fields:{url:urls[0]}});
+    if(!parsed.success)throw new ConnectionRuleError('invalid');return parsed.data;
+  }
   const fields: Record<string, string | number> = {};
   const put = (key: string, value: string | number | undefined) => {
     if (value === undefined) return;
@@ -62,6 +82,7 @@ export function extractConnectionByRules(input: string): ExtractedConnection {
     const line = raw.trim();
     if (!line) continue;
     if (/^ssh\s/i.test(line)) {
+      if(providerId!=='cshell.ssh')throw new ConnectionRuleError('unsupported');
       try {
         const parsed = parseSshCommand(line)!;
         destination(parsed.host.includes(':') ? `[${parsed.host}]` : parsed.host);
@@ -73,8 +94,8 @@ export function extractConnectionByRules(input: string): ExtractedConnection {
       }
       continue;
     }
-    if (/^ssh:\/\//i.test(line)) {
-      destination(line.slice(6));
+    if (/^(ssh|rdp|cshell-agent):\/\//i.test(line)) {
+      destination(line.replace(/^[^:]+:\/\//,''));
       continue;
     }
     const matches = [...line.matchAll(pattern)];
@@ -103,7 +124,7 @@ export function extractConnectionByRules(input: string): ExtractedConnection {
       destination(line);
   }
   if (!fields.host) throw new ConnectionRuleError('unsupported');
-  const parsed = extractedConnectionSchema.safeParse({ providerId: 'cshell.ssh', fields });
+  const parsed = extractedConnectionSchema.safeParse({ providerId, fields });
   if (!parsed.success) throw new ConnectionRuleError('invalid');
   return parsed.data;
 }

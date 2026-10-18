@@ -41,6 +41,7 @@ const schema = z.object({
     allowCommands: false,
   }),
   mcpToken: z.string().optional(),
+  mcpClientTokens: z.record(z.string(), z.string()).optional(),
   profiles: z.array(profileSchema),
   groups: z.array(groupNameSchema).max(1000).default([]),
   preferences: preferencesSchema,
@@ -139,13 +140,29 @@ export class Store {
     return structuredClone(this.data.mcp);
   }
   async setMcpSettings(settings: McpSettings) {
-    this.data.mcp = mcpSettingsSchema.parse(settings);
-    await this.persist();
+    const next = mcpSettingsSchema.parse(settings);
+    const tokens = { ...this.data.mcpClientTokens };
+    const ids = new Set(next.clients?.map((c) => c.id));
+    for (const id of Object.keys(tokens)) if (!ids.has(id)) delete tokens[id];
+    // Never publish expanded in-memory grants before the durable configuration succeeds.
+    await this.persist({ mcp: next, mcpClientTokens: tokens });
   }
-  async mcpToken() {
+  async mcpToken(clientId?: string) {
+    if (clientId) {
+      const token = this.data.mcpClientTokens?.[clientId];
+      return token ? this.codec.decrypt(token) : undefined;
+    }
     return this.data.mcpToken ? this.codec.decrypt(this.data.mcpToken) : undefined;
   }
-  async setMcpToken(token: string) {
+  async setMcpToken(token: string, clientId?: string) {
+    if (clientId) {
+      const encrypted = await this.codec.encrypt(token);
+      if (!this.data.mcp.clients?.some((c) => c.id === clientId))
+        throw new Error('API client was removed');
+      (this.data.mcpClientTokens ??= {})[clientId] = encrypted;
+      await this.persist();
+      return;
+    }
     this.data.mcpToken = await this.codec.encrypt(token);
     await this.persist();
   }
@@ -237,15 +254,18 @@ export class Store {
     this.data.hosts[endpoint] = fingerprint;
     await this.persist();
   }
-  private persist() {
-    const content = JSON.stringify(this.data, null, 2);
+  private persist(mcp?: { mcp: McpSettings; mcpClientTokens: Record<string, string> }) {
     const next = this.writes
       .catch(() => {})
       .then(async () => {
+        // Snapshot at the serialized write boundary so queued unrelated saves cannot
+        // restore an older permission revision after a successful MCP update.
+        const content = JSON.stringify({ ...this.data, ...mcp }, null, 2);
         await mkdir(this.directory, { recursive: true });
         const temporary = join(this.directory, 'config.json.tmp');
         await writeFile(temporary, content, { mode: 0o600 });
         await rename(temporary, join(this.directory, 'config.json'));
+        if (mcp) Object.assign(this.data, mcp);
       });
     this.writes = next;
     return next;

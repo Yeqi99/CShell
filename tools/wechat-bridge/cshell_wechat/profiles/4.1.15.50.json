@@ -1,0 +1,58 @@
+{
+  "version": "4.1.15.50",
+  "moduleSha256": "0cf6379405432385a1c442766443450f26a7689f45e53c1b4ad2822061f3113b",
+  "status": "quarantined-after-frida-agent-crash",
+  "liveEnabled": false,
+  "quarantineReason": "Previous frida-agent fail-fast remains unresolved. TLS send-context guard added after Weixin.dll access violation; bounded tests do not yet establish long-term stability.",
+  "rvas": {
+    "getCoroutineContext": "0x47220",
+    "getMessageService": "0x381870",
+    "getMessageContext": "0x707420",
+    "sendEntry": "0x19e3b60",
+    "doSend": "0x17b3d70",
+    "textMessageConstructor": "0x778d10",
+    "textMessageSharedPointerFactory": "0x707300",
+    "receiveProbeSite": "0x17c8eb0"
+  },
+  "sendObject": {
+    "size": "0x798",
+    "recipientString": "0xb0",
+    "messageType": "0x118",
+    "alternateType": "0x9c",
+    "contentString": "0x758",
+    "mentionString": "0x778"
+  },
+  "evidence": {
+    "getCoroutineContext": "Full 92-byte match with relative addresses masked",
+    "getMessageService": "Full 32-byte match with relative addresses masked",
+    "getMessageContext": "Full 285-byte match and corresponding call from sendEntry",
+    "sendEntry": "Full 475-byte match with relative addresses masked",
+    "doSend": "Corresponding fourth direct call in sendEntry; body changed",
+    "textMessageConstructor": "Unique 96-byte prefix plus corresponding factory references; field shifts independently observed",
+    "messageType": "Actual caller 0x2f5e200 writes 1 at offset 0x118; old corresponding caller writes offset 0xd8",
+    "receiveProbeSite": "Entry RDX vector, stride 0x2e8. Native C callback parsed one actual group text with member prefix; no JS executed on client callback thread."
+  },
+  "verifiedSend": true,
+  "sendVerificationScope": "One text message to the explicitly authorized contact; recipient receipt confirmed by user. Not a stability guarantee.",
+  "nativeSendCallReturned": true,
+  "sendEvidence": "send-once-result.json",
+  "verifiedReceive": true,
+  "receiveVerificationScope": "One incoming 123 test from the authorized contact; sender matches independently resolved internal ID.",
+  "receiveRecord": {
+    "stride": "0x2e8",
+    "contentString": "0x180",
+    "senderString": "0x18"
+  },
+  "receiveEvidence": "record-message-probe-result.json",
+  "automaticVersionFallback": false,
+  "verifiedGroupTextSend": true,
+  "verifiedGroupTextReceive": true,
+  "groupVerificationScope": "One incoming text and one outgoing Chinese text in the explicitly authorized test group; delivery confirmed by user. Native C receive callback candidate; production remains quarantined.",
+  "nativeReceiveFixture": "10 bounded attach/drain/detach cycles passed, including ring overflow and code restoration",
+  "sendContextGuard": {
+    "tlsIndexRva": "0xbb63820",
+    "contextField": "0x1f0",
+    "getterGuard": "0x4a09e0",
+    "validation": "Seven synthetic native context cases; 143 eligible passive hits; one guarded native send returned. No long-term stability claim."
+  }
+}

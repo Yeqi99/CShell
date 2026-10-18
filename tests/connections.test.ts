@@ -7,6 +7,107 @@ import { createSshConnections } from '../src/core/connections/ssh-provider';
 import { SshService } from '../src/core/ssh';
 import { fixture } from './fixture';
 import { randomUUID } from 'node:crypto';
+import { ConnectionManager } from '../src/core/connections/manager';
+
+test('connection ownership is established before initial output and rolled back on rejected readiness', async () => {
+  const registry = new ConnectionRegistry(() => ({ id: 'target', group: '' }));
+  const manager = new ConnectionManager(registry);
+  const live = new Set<string>();
+  let owner: string | undefined;
+  let delivered = 0;
+  manager.register({
+    id: 'test.early',
+    version: '1.0.0',
+    capabilities: [],
+    configuration: z.object({}),
+    resolve: (id) => {
+      if (!live.has(id)) throw new Error('Closed');
+      return {
+        target: {
+          providerId: 'test.early',
+          resourceId: 'target',
+          identity: 'identity',
+          label: 'Early',
+        },
+        tools: [],
+      };
+    },
+    connect: async (_configuration, _credentials, _signal, ready) => {
+      const id = randomUUID();
+      live.add(id);
+      ready?.(id);
+      assert.equal(owner, id, 'initial output must already have an owner');
+      assert.equal(registry.describe(id).identity, 'identity');
+      delivered++;
+      return id;
+    },
+    disconnect: (id) => {
+      live.delete(id);
+    },
+  });
+  const id = await manager.connect('test.early', {}, undefined, undefined, (id) => {
+    owner = id;
+  });
+  assert.equal(delivered, 1);
+  await manager.disconnect(id);
+  await assert.rejects(
+    manager.connect('test.early', {}, undefined, undefined, () => {
+      throw new Error('Authorization changed');
+    }),
+    /Authorization changed/,
+  );
+  assert.equal(live.size, 0);
+  assert.equal(delivered, 1, 'rejected readiness must prevent output delivery');
+  manager.unregister('test.early');
+});
+
+test('declared JSON output contracts are enforced without replaying an executed operation', async () => {
+  let count = 0;
+  const connection: ProviderConnection = {
+    target: {
+      providerId: 'test.typed',
+      resourceId: 'target',
+      identity: 'identity',
+      label: 'Typed',
+    },
+    tools: [
+      {
+        name: 'write',
+        capability: 'files.create',
+        description: 'Typed operation',
+        input: z.object({}).strict(),
+        jsonOutput: z.object({ bytes: z.number().int() }).strict(),
+        needsReview: () => true,
+        invoke: async () => {
+          count++;
+          return '{"bytes":"invalid","secret":"hidden"}';
+        },
+      },
+    ],
+  };
+  const registry = new ConnectionRegistry(() => ({ id: 'target', group: '' }));
+  registry.register({
+    id: 'test.typed',
+    version: '1.0.0',
+    capabilities: ['files.create'],
+    resolve: () => connection,
+  });
+  registry.bind('session', 'test.typed');
+  const call = registry.prepare('session', 'write', {});
+  await assert.rejects(
+    call.execute(() => true, new AbortController().signal),
+    (error: unknown) => {
+      assert.equal((error as { code: string }).code, 'OUTCOME_UNKNOWN');
+      assert.ok(!String(error).includes('hidden'));
+      return true;
+    },
+  );
+  await assert.rejects(
+    call.execute(() => true, new AbortController().signal),
+    /consumed/,
+  );
+  assert.equal(count, 1);
+});
 
 test('provider dispatch is transport-independent, scoped, single-use and bound to connection generation', async () => {
   let alive = true,
@@ -117,8 +218,11 @@ test('built-in SSH provider exposes real tools, validates inputs and revokes edi
     const { sessionId } = await ssh.connect(profile, { password: remote.password });
     const registry = createSshConnections(ssh, () => [profile]);
     assert.equal(registry.describe(sessionId).providerId, 'cshell.ssh');
-    for (const tool of registry.tools(sessionId))
+    for (const tool of registry.tools(sessionId)) {
       assert.equal(z.toJSONSchema(tool.input, { io: 'input' }).type, 'object');
+      for (const example of tool.examples ?? [])
+        assert.equal(tool.input.safeParse(example.input).success, true, `Invalid example for ${tool.name}`);
+    }
     assert.throws(() =>
       registry.prepare(sessionId, 'execute_command', { command: 'pwd', unexpected: true }),
     );

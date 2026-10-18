@@ -24,7 +24,7 @@
 - 复现旧版底部“保存”只保存偏好设置、丢弃 MCP 草稿的问题；统一由底部保存入口提交明确修改过的 MCP 草稿，外观方案仍不能携带权限。切换分类保留勾选；未修改 MCP 时保存外观不重启 MCP 服务。
 - 第二次启动先恢复最小化窗口，再显式显示并聚焦已有窗口，解决仅调用 focus 无法唤回隐藏窗口的问题；窗口事件在创建后即注册，页面加载完成也显式显示。
 - `pnpm build`、74 项测试、设置分类桌面专项通过。新增 `scripts/mcp-startup-smoke.ts` 在真实 Electron 窗口验证底部保存后重新打开、端口占用错误保留、原值重试、重启恢复 MCP 服务，以及实际启动第二个进程唤回隐藏/最小化窗口；源码版和目录安装版均通过，Windows CI 与发行检查已接入。
-- 用户明确确认后重启并更新 `D:\Program Files\CShell\resources\app.asar`，安装文件与目录构建 SHA256 一致，更新前后用户配置文件哈希未变；旧归档备份在 `C:\Users\admin\AppData\Local\CShell-update-backups\mcp-save-20261013-153657`。原生窗口正常显示，原有服务器仍在，原 MCP 端口 3777 已监听。未发布 GitHub。
+- 用户明确确认后重启并更新 `D:\Program Files\CShell\resources\app.asar`，安装文件与目录构建 SHA256 一致，更新前后用户配置文件哈希未变；旧归档备份在 `%LOCALAPPDATA%/CShell-update-backups/<backup>`。原生窗口正常显示，原有服务器仍在，原 MCP 端口 3777 已监听。未发布 GitHub。
 - 文案更新后的重复目录版检查在自动重启后出现 Playwright `firstWindow` 捕获超时；主进程诊断确认窗口 `visible: true`、页面已加载完成。源码专项和此前目录专项通过，但不将后续自动捕获超时计为通过；保留诊断信息。用户按 Escape 停止桌面控制后未继续原生 UI 操作。
 
 ## 0.5.0 本地子智能体与定期目标（2026-10-12）

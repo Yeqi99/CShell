@@ -1,0 +1,19 @@
+import {readFile,mkdir,readdir,cp,writeFile,stat} from 'node:fs/promises';
+import {resolve,join,relative} from 'node:path';
+import {createHash} from 'node:crypto';
+import {spawnSync} from 'node:child_process';
+const staged=resolve(process.argv[2]??'test-results/cagent-deployment-build');
+const info=JSON.parse(await readFile(join(staged,'build-info.json'),'utf8'));
+if(info.platform!=='win32'||info.arch!=='x64'||info.electron!==false)throw Error('Windows x64 standalone build required');
+const output=resolve(process.argv[3]??`release/${info.version}/CAgent-Setup-${info.version}-win-x64`);
+await mkdir(output,{recursive:false});
+await cp(staged,join(output,'payload'),{recursive:true,dereference:false});
+const files=[];
+async function scan(dir){for(const item of await readdir(dir,{withFileTypes:true})){if(item.isSymbolicLink())throw Error('Symlink in bundle');const path=join(dir,item.name);if(item.isDirectory())await scan(path);else if(item.isFile()){const data=await readFile(path);files.push({path:relative(join(output,'payload'),path).replaceAll('\\','/'),bytes:data.length,sha256:createHash('sha256').update(data).digest('hex')});}else throw Error('Unexpected bundle entry');}}
+await scan(join(output,'payload'));files.sort((a,b)=>a.path.localeCompare(b.path));
+const bundleHash=createHash('sha256').update(JSON.stringify(files)).digest('hex');
+await writeFile(join(output,'deployment.json'),JSON.stringify({format:1,platform:'win32',arch:'x64',version:info.version,installId:`${info.version}-${bundleHash.slice(0,16)}`,files},null,2));
+for(const file of ['Install-CAgent.ps1','Install CAgent.cmd'])await cp(join('scripts/windows-deployment',file),join(output,file));
+await writeFile(join(output,'README.txt'),"CAgent Windows 离线部署\r\n\r\n1. 完整解压，双击 Install CAgent.cmd，安装到当前用户目录；未运行旧后台时打开 CAgent。\r\n2. 在设置中配置连接密码和监听地址/端口；按需启用远程管理。在应用市场安装“自研远程桌面”，分别选择观看/控制权限并配置允许的调用方。安装不等于授权。\r\n3. 在 CShell 新建并保存 cagent 连接，首次核对设备身份后输入密码，授权完成后打开桌面。\r\n\r\n不申请管理员权限、不自动开启防火墙或远程监听，不修改既有身份、加密凭据和运行中的应用。原有数据和授权继续使用；已有 CAgent 在运行时，本次安装不强制退出，安装器会提示正常退出旧 CAgent，再从开始菜单打开新版本；未确认后台状态时也不会重复启动。\r\n\r\n文件哈希用于发现损坏；该包未做 Authenticode 签名，请从发布方另行核对 ZIP 的 SHA256。这不是免配置自动开放远程控制的安装包。\r\n");
+const archive=output+'.zip';const result=spawnSync('tar',['-a','-cf',archive,'-C',output,'.'],{stdio:'inherit',windowsHide:true});if(result.error||result.status!==0)throw result.error??Error('Archive failed');
+const digest=createHash('sha256').update(await readFile(archive)).digest('hex');await writeFile(archive+'.sha256',`${digest}  ${archive.split(/[\\/]/).at(-1)}\n`);console.log(JSON.stringify({archive,bytes:(await stat(archive)).size,sha256:digest,version:info.version,files:files.length}));

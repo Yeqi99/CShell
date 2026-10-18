@@ -6,6 +6,7 @@ import { SshService } from '../src/core/ssh';
 import { DockerService, parseDockerStats } from '../src/core/docker';
 import { dockerActionSchema, toolsSettingsSchema } from '../src/shared/docker';
 import { suggestCommands, shellPromptInput } from '../src/ui/command-suggestions';
+import { extensionResults, extensionExamples } from '../src/core/api/extension-contracts';
 
 test('command suggestions only append known prefixes and never return executable control sequences', () => {
   assert.equal(suggestCommands('doc')[0].command, 'docker ps');
@@ -26,6 +27,7 @@ test('Docker input schemas reject shell-like IDs, invalid or duplicate ports and
     dockerActionSchema.parse({ type: 'ports', id: 'a'.repeat(64), ports: [p, p] }),
   );
   assert.equal(parseDockerStats({}).cpu, null);
+  for (const example of extensionExamples.docker_action!) dockerActionSchema.parse(example.input);
 });
 test(
   'Docker Engine over authenticated SSH: inventory, stats, lifecycle, preserved recreation and rollback',
@@ -52,7 +54,10 @@ test(
       );
       const docker = new DockerService(ssh, () => '/var/run/docker.sock');
       assert.equal((await docker.snapshot(sessionId)).containers.length, 2);
+      extensionResults.docker_snapshot.parse(await docker.snapshot(sessionId));
+      extensionResults.docker_details.parse(await docker.details(sessionId, server.docker.id));
       const stats = await docker.stats(sessionId, server.docker.id);
+      extensionResults.docker_stats.parse(stats);
       assert.equal(stats.cpu, 40);
       assert.equal(stats.memory, 41943040);
       await assert.rejects(
@@ -65,6 +70,7 @@ test(
         { host: '127.0.0.1' as const, hostPort: 9090, containerPort: 80, protocol: 'tcp' as const },
       ];
       const result = await docker.action(sessionId, { type: 'ports', id: server.docker.id, ports });
+      extensionResults.docker_action.parse(result);
       const commitIndex = server.docker.calls.findIndex((c) => c.path.startsWith('/commit?'));
       assert.ok(server.docker.calls[commitIndex - 1].path.endsWith('/stop?t=10'));
       assert.ok(result.backup);

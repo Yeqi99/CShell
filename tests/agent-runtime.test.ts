@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, readFile } from 'node:fs/promises';
+import { mkdtemp, rm, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -16,6 +16,35 @@ import { ClientProvider } from '../src/core/client/provider';
 import { createServer } from 'node:net';
 import { ClientVault } from '../src/core/client/identity';
 
+test('optional desktop package never installs, authorizes or listens at runtime startup', async () => {
+  const directory=await mkdtemp(join(tmpdir(),'cagent-desktop-runtime-'));
+  const desktopExecutable=join(directory,'cagent-desktop.exe');
+  // Deliberately non-executable fixture: startup/install/grant must never launch it.
+  await writeFile(desktopExecutable,'isolated native bytes fixture');
+  const runtime=await createAgentRuntime({directory,desktopExecutable});
+  try{
+    const status=await runtime.dispatch('desktop.status',{}) as any;
+    assert.equal(status.listening,false);assert.equal(status.packageReady,false);
+    const catalog=await runtime.dispatch('packages.catalog',{}) as any[];
+    const native=process.platform==='win32'&&process.arch==='x64';
+    assert.equal(catalog.some(p=>p.id==='cagent.desktop'),native);
+    await assert.rejects(runtime.dispatch('desktop.configure',{enabled:true}),/Install and authorize/);
+    await assert.rejects(runtime.dispatch('desktop.open',{}),/not ready/);
+    await assert.rejects(runtime.dispatch('desktop.status',{},undefined,false,'a'.repeat(64)),/未授权/);
+    await assert.rejects(runtime.dispatch('desktop.configure',{},undefined,false,'local'),/未授权/);
+    if(native){
+      await runtime.dispatch('packages.install',{id:'cagent.desktop',confirm:true});
+      assert.equal((await runtime.dispatch('desktop.status',{}) as any).listening,false);
+      await runtime.dispatch('packages.grant',{id:'cagent.desktop',permissions:['desktop.view']});
+      const granted=await runtime.dispatch('desktop.status',{}) as any;
+      assert.equal(granted.packageReady,true);assert.equal(granted.listening,false);
+      assert.equal(granted.viewAllowed,false);assert.equal(granted.controlAllowed,false);
+      await runtime.dispatch('packages.uninstall',{id:'cagent.desktop',confirm:true});
+      assert.equal((await runtime.dispatch('desktop.status',{}) as any).packageReady,false);
+    }
+  }finally{await runtime.close();await rm(directory,{recursive:true,force:true});}
+});
+
 test('independent Agent encrypts vault, authenticates local control, preserves imported identity and never auto-listens', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'cshell-agent-runtime-'));
   const runtime = await createAgentRuntime({ directory });
@@ -26,6 +55,16 @@ test('independent Agent encrypts vault, authenticates local control, preserves i
     const endpoint = await discoverAgent(directory);
     assert.ok(endpoint);
     assert.equal((await callAgent('client.status', undefined, directory)).running, false);
+    const packageCatalog=await callAgent('packages.catalog',undefined,directory);
+    assert.ok(packageCatalog.some((item:any)=>item.id==='cagent.system-apps'&&!item.installed));
+    const packageInstalled=await callAgent('packages.install',{id:'cagent.system-apps',confirm:true},directory);
+    assert.equal(packageInstalled.status,'authorization-required');
+    await callAgent('packages.grant',{id:'cagent.system-apps',permissions:['applications.read']},directory);
+    assert.equal((await callAgent('packages.tools',undefined,directory)).length,2);
+    await assert.rejects(runtime.dispatch('packages.invoke',{packageId:'cagent.system-apps',toolId:'system_apps_catalog',args:{}},new AbortController().signal,false,'a'.repeat(64)),/未授权/);
+    await assert.rejects(runtime.dispatch('packages.grant',{id:'cagent.system-apps',permissions:[]},new AbortController().signal,false,'local'),/未授权/);
+    await callAgent('packages.uninstall',{id:'cagent.system-apps',confirm:true},directory);
+    assert.equal((await callAgent('packages.tools',undefined,directory)).length,0);
     await assert.rejects(
       callDiscoveredAgent({ ...endpoint, token: '0'.repeat(64) }, 'client.status'),
     );

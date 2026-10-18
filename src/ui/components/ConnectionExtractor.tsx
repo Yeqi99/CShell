@@ -6,6 +6,7 @@ import { useAiProviders } from '../use-ai-providers';
 import { useI18n } from '../i18n';
 
 export function ConnectionExtractor({
+  providerId = 'cshell.ssh',
   title,
   titleId,
   disabled,
@@ -13,6 +14,7 @@ export function ConnectionExtractor({
   onExtract,
   onBusy,
 }: {
+  providerId?: ExtractedConnection['providerId'];
   title: string;
   titleId: string;
   disabled: boolean;
@@ -52,8 +54,9 @@ export function ConnectionExtractor({
     setError('');
     try {
       const result = ai
-        ? await window.cshell.aiExtractConnection(text, selected.id)
-        : extractConnectionByRules(text);
+        ? await window.cshell.aiExtractConnection('连接类型: '+({ 'cshell.ssh':'SSH','cshell.rdp':'RDP','cshell.client':'Agent','cshell.http':'HTTP' }[providerId])+'\n'+text, selected.id)
+        : extractConnectionByRules(text,providerId);
+      if(result.providerId!==providerId)throw new ConnectionRuleError('unsupported');
       onExtract(result);
       setText('');
       setOpen(false);
@@ -62,8 +65,8 @@ export function ConnectionExtractor({
         const errors = {
           empty: cn ? '请先粘贴连接信息。' : 'Paste connection information first.',
           unsupported: cn
-            ? '未找到可识别的 SSH 信息。请使用 SSH 命令，或“主机、端口、用户名”等字段标签。'
-            : 'No SSH details found. Use an SSH command or labelled Host, Port and Username fields.',
+            ? '未找到与当前连接类型匹配的信息。请使用对应地址，或“主机、端口、用户名”等字段标签。'
+            : 'No matching connection details found. Check the selected connection type.',
           ambiguous: cn
             ? '发现多组或相互冲突的连接信息，请仅保留一个目标后重试。'
             : 'Conflicting connection details found. Keep only one target and retry.',

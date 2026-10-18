@@ -33,6 +33,7 @@ export class EnvironmentService {
       sockets: Set<import('node:net').Socket>;
       url: string;
       port: number;
+      ready: boolean;
     }
   >();
   constructor(
@@ -75,8 +76,9 @@ export class EnvironmentService {
       throw new Error('Environment is no longer available on this server');
     return snapshot;
   }
-  async action(sessionId: string, input: EnvironmentAction) {
+  async action(sessionId: string, input: EnvironmentAction, beforeStart: () => void = () => {}) {
     const action = environmentActionSchema.parse(input);
+    beforeStart();
     if (action.type === 'install')
       return this.jobs.start(
         sessionId,
@@ -84,6 +86,7 @@ export class EnvironmentService {
         `${quote(action.python)} -m pip install --disable-pip-version-check ${action.packages.map(quote).join(' ')}`,
       );
     await this.known(sessionId, action.conda, action.type === 'remove' ? action.prefix : undefined);
+    beforeStart();
     if (action.type === 'create')
       return this.jobs.start(
         sessionId,
@@ -94,6 +97,7 @@ export class EnvironmentService {
     if (base === action.prefix) throw new Error('The base environment cannot be removed');
     if (this.notebooks.has(`${sessionId}:${action.prefix}/bin/python`))
       throw new Error('Stop Jupyter before removing this environment');
+    beforeStart();
     return this.jobs.start(
       sessionId,
       `Remove ${action.prefix}`,
@@ -152,22 +156,71 @@ export class EnvironmentService {
       })
       .parse(JSON.parse(text));
   }
-  private opening = new Set<string>();
+  private opening = new Map<string, AbortController>();
+  async openTerminal(
+    sessionId: string,
+    conda: string,
+    prefix: string,
+    signal?: AbortSignal,
+    ready?: (id: string) => void,
+  ) {
+    signal = signal ? AbortSignal.any([signal, AbortSignal.timeout(30000)]) : AbortSignal.timeout(30000);
+    signal?.throwIfAborted();
+    remoteExecutable.parse(conda);
+    remoteExecutable.parse(prefix);
+    await this.known(sessionId, conda, prefix);
+    signal?.throwIfAborted();
+    return this.ssh.openEnvironment(
+      sessionId,
+      `${quote(conda)} run --no-capture-output --prefix ${quote(prefix)} bash --noprofile --norc -i`,
+      signal,
+      ready,
+    );
+  }
   jupyterStatus(sessionId: string, python: string) {
     const item = this.notebooks.get(sessionId + ':' + python);
-    return { running: !!item, port: item?.port };
+    return { running: !!item?.ready, port: item?.port };
   }
-  async startJupyter(sessionId: string, python: string, port: number) {
+  async startJupyter(sessionId: string, python: string, port: number, signal?: AbortSignal) {
+    signal?.throwIfAborted();
     const key = sessionId + ':' + python;
     if (this.opening.has(key)) throw new Error('Jupyter is starting');
-    this.opening.add(key);
+    const existing = this.notebooks.get(key);
+    if (existing?.ready) {
+      if (existing.port !== port) throw new Error('Jupyter is already running on a different port');
+      return existing.url;
+    }
+    if (
+      new Set([...this.opening.keys(), ...this.notebooks.keys()]).size >= 16 ||
+      new Set(
+        [...this.opening.keys(), ...this.notebooks.keys()].filter((k) =>
+          k.startsWith(sessionId + ':'),
+        ),
+      ).size >= 4
+    )
+      throw new Error('Jupyter resource quota reached');
+    const controller = new AbortController();
+    const deadline = setTimeout(
+      () => controller.abort(new Error('Jupyter startup timed out')),
+      45000,
+    );
+    const abort = () => controller.abort(signal?.reason);
+    signal?.addEventListener('abort', abort, { once: true });
+    this.opening.set(key, controller);
     try {
-      return await this.startNotebook(sessionId, python, port);
+      return await this.startNotebook(sessionId, python, port, controller.signal);
     } finally {
+      clearTimeout(deadline);
+      signal?.removeEventListener('abort', abort);
       this.opening.delete(key);
     }
   }
-  private async startNotebook(sessionId: string, python: string, port: number) {
+  private async startNotebook(
+    sessionId: string,
+    python: string,
+    port: number,
+    signal: AbortSignal,
+  ) {
     remoteExecutable.parse(python);
     z.number().int().min(1024).max(65535).parse(port);
     const key = `${sessionId}:${python}`,
@@ -175,15 +228,29 @@ export class EnvironmentService {
     if (existing) return existing.url;
     const client = this.ssh.get(sessionId).client;
     // Probe the selected interpreter before opening a long-lived process.
-    await this.jobs.exec(sessionId, `${quote(python)} -c 'import jupyterlab'`);
+    await this.jobs.exec(
+      sessionId,
+      `${quote(python)} -c 'import jupyterlab'`,
+      undefined,
+      15000,
+      undefined,
+      signal,
+    );
+    signal.throwIfAborted();
+    if (this.ssh.get(sessionId).client !== client) throw new Error('Connection changed');
     const token = randomBytes(32).toString('hex');
     const sockets = new Set<import('node:net').Socket>();
     const server = createServer((socket) => {
+      if (sockets.size >= 16) {
+        socket.destroy();
+        return;
+      }
       sockets.add(socket);
       socket.once('close', () => sockets.delete(socket));
       socket.on('error', () => socket.destroy());
       client.forwardOut('127.0.0.1', 0, '127.0.0.1', port, (error, channel) => {
-        if (error) {
+        if (error || socket.destroyed) {
+          channel?.destroy();
           socket.destroy();
           return;
         }
@@ -198,35 +265,53 @@ export class EnvironmentService {
     });
     const localPort = (server.address() as import('node:net').AddressInfo).port;
     try {
-      const channel = await new Promise<ClientChannel>((resolve, reject) =>
+      signal.throwIfAborted();
+      const channel = await new Promise<ClientChannel>((resolve, reject) => {
+        const aborted = () => reject(signal.reason);
+        signal.addEventListener('abort', aborted, { once: true });
         client.exec(
           `JUPYTER_TOKEN=${quote(token)} ${quote(python)} -m jupyterlab --no-browser --ServerApp.ip=127.0.0.1 --ServerApp.port=${port} --ServerApp.port_retries=0 --ServerApp.allow_root=True`,
-          (error, stream) => (error ? reject(error) : resolve(stream)),
-        ),
-      );
+          (error, stream) => {
+            signal.removeEventListener('abort', aborted);
+            // Server-supplied errors may echo the command containing the token.
+            if (error) return reject(new Error('Jupyter process channel could not be opened'));
+            if (signal.aborted) {
+              stream.signal('TERM');
+              stream.close();
+              reject(signal.reason);
+              return;
+            }
+            resolve(stream);
+          },
+        );
+      });
       const url = `http://127.0.0.1:${localPort}/lab?token=${token}`;
       const cleanup = () => {
         server.close();
         for (const socket of sockets) socket.destroy();
-        this.notebooks.delete(key);
+        if (this.notebooks.get(key)?.channel === channel) this.notebooks.delete(key);
         client.off('close', onDisconnect);
       };
       const onDisconnect = () => {
         channel.destroy();
         cleanup();
       };
-      this.notebooks.set(key, { server, channel, sockets, url, port });
+      this.notebooks.set(key, { server, channel, sockets, url, port, ready: false });
       client.once('close', onDisconnect);
       channel.once('close', cleanup);
       channel.on('error', cleanup);
       await new Promise<void>((resolve, reject) => {
+        let settled = false;
         let output = '';
         const timeout = setTimeout(() => done(new Error('Jupyter startup timed out')), 30000);
         const done = (error?: Error) => {
+          if (settled) return;
+          settled = true;
           clearTimeout(timeout);
           channel.off('data', data);
           channel.stderr.off('data', data);
           channel.off('close', closed);
+          signal.removeEventListener('abort', aborted);
           error ? reject(error) : resolve();
         };
         const data = (chunk: Buffer) => {
@@ -235,10 +320,17 @@ export class EnvironmentService {
         };
         const closed = () =>
           done(new Error('Jupyter failed to start; check the port and environment.'));
+        const aborted = () => done(new Error('Jupyter startup cancelled'));
         channel.on('data', data);
         channel.stderr.on('data', data);
         channel.once('close', closed);
+        signal.addEventListener('abort', aborted, { once: true });
+        if (signal.aborted) aborted();
       });
+      signal.throwIfAborted();
+      if (this.ssh.get(sessionId).client !== client || this.notebooks.get(key)?.channel !== channel)
+        throw new Error('Connection closed during Jupyter startup');
+      this.notebooks.get(key)!.ready = true;
       channel.on('data', () => {});
       channel.stderr.on('data', () => {});
       return url;
@@ -251,12 +343,20 @@ export class EnvironmentService {
   stopJupyter(sessionId: string, python: string) {
     const key = `${sessionId}:${python}`,
       record = this.notebooks.get(key);
+    this.opening.get(key)?.abort(new Error('Jupyter startup stopped'));
     if (record) {
       record.channel.signal('TERM');
       record.channel.close();
       record.server.close();
       for (const socket of record.sockets) socket.destroy();
       this.notebooks.delete(key);
+    }
+  }
+  stopAllJupyter() {
+    for (const controller of this.opening.values()) controller.abort(new Error('Jupyter disabled'));
+    for (const key of [...this.notebooks.keys()]) {
+      const separator = key.indexOf(':');
+      this.stopJupyter(key.slice(0, separator), key.slice(separator + 1));
     }
   }
 }

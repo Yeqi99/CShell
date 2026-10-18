@@ -40,6 +40,7 @@ const requestSchema = z
       'ping',
       'http',
       'manage',
+      'desktop-stream',
       'exec',
     ]),
     payload: z.unknown().optional(),
@@ -64,7 +65,8 @@ export class ClientServer {
     private vault: ClientVault,
     private terminal: ManagedProvider,
     private options: {
-      manage?: (method: string, params: unknown, signal: AbortSignal) => Promise<unknown>;
+      desktopStream?: (socket: TLSSocket, owner: string) => Promise<void>;
+      manage?: (method: string, params: unknown, signal: AbortSignal, owner: string) => Promise<unknown>;
       shells?: () => Promise<AgentShellOption[]>;
       execute?: (input: unknown, signal: AbortSignal) => Promise<unknown>;
     } = {},
@@ -115,6 +117,9 @@ export class ClientServer {
       })),
       audit: [...this.audit].reverse(),
     };
+  }
+  managementAllowed(owner: string) {
+    return !!this.access?.allowManage && this.peers.some((p) => p.fingerprint === owner && p.allowManage);
   }
   async setAccess(options: unknown) {
     const input = clientAccessSchema.parse(options);
@@ -288,6 +293,14 @@ export class ClientServer {
       pending = 0;
     frames(socket, (raw) => {
       const req = requestSchema.parse(raw);
+      if(req.op==='desktop-stream'){
+        // Dedicated authenticated stream: no pipelined requests/terminal may cross the protocol boundary.
+        if(pending||c.terminal||!c.peer||!this.peers.includes(c.peer)||!this.managementAllowed(cert.fingerprint256)||!this.options.desktopStream){socket.destroy();return false;}
+        socket.setTimeout(0);
+        send(socket,{id:req.id,result:{desktopStream:true}});
+        setImmediate(()=>{if(c.alive&&c.peer&&this.managementAllowed(cert.fingerprint256))void this.options.desktopStream!(socket,cert.fingerprint256).catch(()=>socket.destroy());else socket.destroy();});
+        return false;
+      }
       if (++pending > 64) {
         socket.destroy();
         return;
@@ -432,7 +445,7 @@ export class ClientServer {
           !this.access?.[permission]
         )
           throw new Error('Management permission revoked');
-        return await this.options.manage(call.method, call.params, abort.signal);
+        return await this.options.manage(call.method, call.params, abort.signal, fp);
       } finally {
         c.socket.off('close', closed);
       }

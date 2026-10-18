@@ -33,6 +33,7 @@ export type WslSetupState = {
 };
 export type LocalConnectionTarget = { id: string; name: string; detail: string; shell: LocalShell };
 export interface LocalTerminalBridge {
+  apiLocalShells(): Promise<LocalShell[]>;
   wslNetwork(): Promise<import('./wsl-network').WslNetworkState>;
   saveWslNetwork(input: import('./wsl-network').WslNetworkInput): Promise<import('./wsl-network').WslNetworkState>;
   restartWsl(): Promise<boolean>;

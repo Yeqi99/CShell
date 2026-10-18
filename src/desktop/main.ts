@@ -1,10 +1,10 @@
+import { openRdpProfile, rdpProfileSchema } from '../core/rdp';
 import { HttpWorkspaces } from '../core/http-workspaces';
+import { WechatService } from '../core/wechat';
 import { testStartGate } from './test-start-gate';
 import { registerAgent } from './agent';
 import { syncClientProfiles } from '../core/client/profiles';
 import { ConnectionAttempts } from '../core/connection-attempts';
-import { spawn } from 'node:child_process';
-import { clientEndpointSchema } from '../shared/client';
 import { wslAccountStatus, initializeWslAccount } from './wsl-account';
 import { startClientApplication, clientCodec } from './client-app';
 import { ClientProvider } from '../core/client/provider';
@@ -20,10 +20,10 @@ import { registerActivity } from './activity';
 import type { Activity } from '../shared/activity';
 import { FloatingWindows } from './floating';
 import { registerExtensionHandlers } from './extensions';
+import { createExtensionServices } from '../core/api/extensions';
 import { registerUpdateHandlers } from './updates';
 import { initialWindowBounds } from './window-bounds';
 import { registerAiHandlers } from './ai';
-import { DockerService } from '../core/docker';
 import { toolsSettingsSchema, dockerActionSchema, dockerId } from '../shared/docker';
 import {
   app,
@@ -39,7 +39,7 @@ import {
 } from 'electron';
 import { join, basename } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, stat, realpath, rm } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { Store } from '../core/store';
@@ -144,8 +144,10 @@ else
       session.defaultSession.setPermissionCheckHandler(() => false);
       let connections: ConnectionManager | undefined;
       let floating: FloatingWindows | undefined;
+      let mcp: McpService | undefined;
       const emit = (event: SessionEvent) => {
         if (event.type === 'closed') connections?.closed(event.sessionId);
+        if (mcp?.event(event)) return;
         if (
           event.type === 'transfer' &&
           event.transfer.state !== 'running' &&
@@ -206,12 +208,18 @@ else
         await store.trust(endpoint, fingerprint);
         return true;
       });
-      connections = createSshManager(ssh, () => store.snapshot().profiles);
+      const extensionServices = createExtensionServices(ssh, store, async id => { if (id === 'cshell.http') http.dispose(); });
+      connections = createSshManager(ssh, () => store.snapshot().profiles, extensionServices.tools);
       const attempts = new ConnectionAttempts((id) => connections!.disconnect(id));
       window.webContents.on('render-process-gone', () => attempts.dispose());
       window.webContents.on('did-start-loading', () => attempts.dispose());
       const localTerminal = new LocalTerminalProvider(app.getPath('userData'), store, emit);
       await localTerminal.load();
+      const apiLocalShells = async () => process.platform !== 'win32' ? [] : [
+        'cmd', 'powershell',
+        ...(store.snapshot().plugins.some(p => p.enabled && p.manifest.id === 'cshell.wsl')
+          ? (await localTerminal.distributions()).distributions.map(name => `wsl:${name}`) : []),
+      ];
       connections.register(localTerminal);
       const clientProvider = new ClientProvider(
         new ClientVault(join(app.getPath('userData'), 'client-controller'), clientCodec),
@@ -331,24 +339,22 @@ else
         await syncClientProfiles(store, [device]);
         return device;
       });
+      handle('connection:rdp-save', async (value,password,clearPassword) => {
+        const profile=rdpProfileSchema.parse(value);
+        const old=store.snapshot().profiles.find(p=>p.id===profile.id);
+        if(old&&old.protocol!=='rdp')throw new Error('Cannot change connection protocol');
+        const secret=z.string().max(16000).optional().parse(password);
+        const clear=z.boolean().optional().parse(clearPassword);
+        // Discard any previous DPAPI credential file, including cleared or changed credentials.
+        await rm(join(app.getPath('userData'),'rdp',profile.id+'.rdp'),{force:true});
+        await store.saveProfile(profile);
+        if(clear)await store.setSecret(profile.id,null);
+        else if(secret!==undefined)await store.setSecret(profile.id,{password:secret});
+      });
       handle('connection:rdp', async (value) => {
-        if (process.platform !== 'win32') throw new Error('RDP requires Windows');
-        const endpoint = clientEndpointSchema
-          .extend({ port: z.number().int().min(1).max(65535) })
-          .parse(value);
-        const host = endpoint.host.includes(':') ? '[' + endpoint.host + ']' : endpoint.host;
-        await new Promise<void>((resolve, reject) => {
-          const child = spawn(
-            join(process.env.SystemRoot || 'C:/Windows', 'System32', 'mstsc.exe'),
-            ['/v:' + host + ':' + endpoint.port],
-            { detached: true, stdio: 'ignore' },
-          );
-          child.once('error', reject);
-          child.once('spawn', () => {
-            child.unref();
-            resolve();
-          });
-        });
+        const profile=rdpProfileSchema.parse(store.profile(idSchema.parse(value)));
+        const secret=await store.secret(profile.id);
+        await openRdpProfile(profile,secret?.password,join(app.getPath('userData'),'rdp'));
       });
       handle('client:devices', () => clientProvider.list());
       handle('client:pair', async (text) => {
@@ -421,6 +427,12 @@ else
         return window.isAlwaysOnTop();
       });
       const http = new HttpWorkspaces(app.getPath('userData'), store, connections.tools);
+      const wechat = new WechatService(app.getPath('userData'), store);
+      await wechat.load();
+      handle('wechat:status', () => wechat.status());
+      handle('wechat:save', config => wechat.save(config));
+      handle('wechat:stop-subscriptions', () => wechat.subscriptions.stopAll());
+      wechat.subscriptions.onEvent = notification => { if (!window.isDestroyed()) window.webContents.send('wechat:event',notification); };
       await http.load();
       http.onChanged = id => { if (!window.isDestroyed()) window.webContents.send('http:changed', id); };
       handle('http:create', (name, group) => http.create(name, group));
@@ -430,7 +442,9 @@ else
       handle('http:send', (id, request, runId) => http.send(id, request, runId, 'user'));
       handle('http:history', id => http.histories(id));
       handle('http:cancel', id => http.cancel(id));
-      const agent = await registerAgent(handle, store, clientProvider, connections.tools);
+      const agent = await registerAgent(handle, store, clientProvider, connections.tools, event => {
+        if (!window.isDestroyed()) window.webContents.send('desktop:view-event', event);
+      });
       const disposeAi = await registerAiHandlers(
         handle,
         app.getPath('userData'),
@@ -465,42 +479,100 @@ else
           if (!window.isDestroyed()) window.webContents.send(channel, value);
         },
         http,
+        wechat,
       );
       registerPresetHandlers(handle, window, app.getPath('userData'), store, text);
       window.once('closed', () => {
         void disposeAi().catch((error) => console.error('AI shutdown failed', error));
       });
-      const mcp = new McpService(store, app.getPath('userData'), async (name, command) => {
-        const result = await dialog.showMessageBox(window, {
-          type: 'warning',
-          title: text('MCP 请求执行命令', 'MCP command request'),
-          message: name,
-          detail: command,
-          buttons: [text('拒绝', 'Reject'), text('执行', 'Execute')],
-          defaultId: 0,
-          cancelId: 0,
-        });
-        return result.response === 1;
-      });
+      mcp = new McpService(
+        store,
+        app.getPath('userData'),
+        async (name, command, signal) => {
+          const result = await dialog.showMessageBox(window, {
+            signal,
+            type: 'warning',
+            title: text('MCP 请求执行命令', 'MCP command request'),
+            message: name,
+            detail: command,
+            buttons: [text('拒绝', 'Reject'), text('执行', 'Execute')],
+            defaultId: 0,
+            cancelId: 0,
+          });
+          return result.response === 1;
+        },
+        {
+          manager: connections,
+          http,
+          applicationTools: extensionServices.applicationTools,
+          connectEnvironment: async (parent, conda, prefix, signal, ready) => {
+            let child: string | undefined;
+            try {
+              const result = await extensionServices.environments.openTerminal(parent, conda, prefix, signal, id => {
+                child = id;
+                connections!.adopt('cshell.ssh', id);
+                ready(id);
+              });
+              return result.sessionId;
+            } catch (error) {
+              if (child) await connections!.disconnect(child);
+              throw error;
+            }
+          },
+          localShells: apiLocalShells,
+          connectLocal: (shell, signal, ready) => connections!.connect('cshell.local-terminal', shell, undefined, signal, ready),
+          connect: async (profile, signal, ready) => {
+            if (profile.protocol === 'client')
+              return connections!.connect(
+                'cshell.client',
+                {
+                  deviceId: profile.id,
+                  shell: profile.clientShell ?? 'powershell',
+                  distribution: profile.clientDistribution,
+                },
+                undefined,
+                signal,
+                ready,
+              );
+            if (!store.host(`${profile.host.toLowerCase()}:${profile.port}`))
+              throw new Error('Verify this SSH host identity in CShell before API access.');
+            const secret = await store.secret(profile.id);
+            if (!secret) throw new Error('Save credentials in CShell before API access.');
+            signal.throwIfAborted();
+            return connections!.connect('cshell.ssh', profile, secret, signal, ready);
+          },
+        },
+      );
       let mcpWrites = Promise.resolve();
       const serialMcp = <T>(fn: () => Promise<T>) => {
         const result = mcpWrites.catch(() => {}).then(fn);
         mcpWrites = result.then(() => {});
         return result;
       };
-      handle('mcp:status', () => mcp.status());
-      handle('mcp:configure', (settings) => serialMcp(() => mcp.configure(settings)));
-      handle('mcp:copy-token', async () => clipboard.writeText(await mcp.accessToken()));
-      handle('mcp:rotate-token', () => serialMcp(() => mcp.rotateToken()));
+      handle('mcp:status', () => mcp!.status());
+      handle('mcp:choose-file-root', async () => {
+        const selected = await dialog.showOpenDialog(window, { properties: ['openDirectory'] });
+        if (selected.canceled || !selected.filePaths[0]) return null;
+        const path = await realpath(selected.filePaths[0]);
+        const info = await stat(path);
+        if (!info.isDirectory()) throw new Error('Select a directory');
+        return { id: randomUUID(), path, name: basename(path) || path, identity: `${info.dev}:${info.ino}` };
+      });
+      handle('local-terminal:api-shells', apiLocalShells);
+      handle('mcp:configure', (settings, expectedRevision) => {
+        if (typeof expectedRevision !== 'string' || !/^[a-f0-9]{64}$/.test(expectedRevision))
+          throw new Error('Reload API settings before saving.');
+        return serialMcp(() => mcp!.configure(settings, expectedRevision));
+      });
+      handle('mcp:copy-token', async (clientId) =>
+        clipboard.writeText(await mcp!.accessToken(clientId)),
+      );
+      handle('mcp:rotate-token', (clientId) => serialMcp(() => mcp!.rotateToken(clientId)));
       await mcp.start();
       registerExtensionHandlers(handle, window, store, ssh, connections, async id => {
         if (id === 'cshell.http') http.dispose();
-      });
-      const docker = new DockerService(ssh, () => {
-        const tools = store.snapshot().tools;
-        if (!tools.dockerEnabled) throw new Error(text('Docker 面板未启用', 'Docker is disabled'));
-        return tools.dockerSocket;
-      });
+      }, extensionServices);
+      const docker = extensionServices.docker;
       const requireDocker = (id: unknown) => {
         if (!store.snapshot().tools.dockerEnabled)
           throw new Error(text('Docker 面板未启用', 'Docker is disabled'));
@@ -631,6 +703,7 @@ else
         const old = store.snapshot().profiles.find((p) => p.id === profile.id);
         if (old && (old.protocol ?? 'ssh') !== (profile.protocol ?? 'ssh'))
           throw new Error('Cannot change connection protocol');
+        if (profile.protocol === 'rdp') rdpProfileSchema.parse(profile);
         if (profile.protocol === 'http') http.workspace(profile.id);
         if (profile.protocol === 'client') {
           const device = clientProvider.list().find((d) => d.deviceId === profile.id);
@@ -641,6 +714,7 @@ else
       });
       handle('profile:delete', async (value) => {
         const id = idSchema.parse(value);
+        if (store.profile(id).protocol === 'rdp') await rm(join(app.getPath('userData'),'rdp',id+'.rdp'),{force:true});
         if (store.profile(id).protocol === 'client') await clientProvider.forget(id);
         if (store.profile(id).protocol === 'http') await http.remove(id);
         await store.deleteProfile(id);
@@ -724,8 +798,9 @@ else
         }),
       );
       handle('floating:open', (id, snapshot) => floating!.open(id, snapshot));
-      handle('disconnect', (id) => {
+      handle('disconnect', async (id) => {
         idSchema.parse(id);
+        await agent.stopTarget(id);
         transfers.cancelSession(id);
         return connections!.disconnect(id);
       });
@@ -852,7 +927,7 @@ else
       app.on('will-quit', (event) => {
         if (!flushed) {
           event.preventDefault();
-          flushing ??= disposeAi()
+          flushing ??= wechat.subscriptions.stopAll().catch(error => console.error('WeChat listener shutdown unconfirmed',error)).then(() => disposeAi())
             .catch((error) => console.error('AI shutdown failed', error))
             .then(() => activity.flush())
             .catch((error) => console.error('Could not finish saving before exit', error))

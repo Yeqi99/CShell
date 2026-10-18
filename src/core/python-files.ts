@@ -29,7 +29,13 @@ export class PythonFiles {
     });
     return { code: new TextDecoder('utf-8', { fatal: true }).decode(bytes), revision: hash(bytes) };
   }
-  async save(sessionId: string, input: string, code: string, revision: string) {
+  async save(
+    sessionId: string,
+    input: string,
+    code: string,
+    revision: string,
+    beforeWrite?: () => void,
+  ) {
     const path = this.path(input),
       key = `${sessionId}:${path}`;
     const sftp = await this.ssh.sftp(sessionId);
@@ -42,6 +48,7 @@ export class PythonFiles {
     this.writes.add(key);
     const temporary = posix.join(posix.dirname(path), `.cshell-${randomUUID()}.tmp`);
     try {
+      beforeWrite?.();
       const current = await this.read(sessionId, path);
       if (current.revision !== revision)
         throw new Error('File changed on the server. Reopen it before saving.');
@@ -49,6 +56,7 @@ export class PythonFiles {
         sftp.lstat(path, (e, a) => (e ? reject(e) : resolve(a))),
       );
       if (!attrs.isFile()) throw new Error('Only regular files can be saved');
+      beforeWrite?.();
       await new Promise<void>((resolve, reject) => {
         const stream = sftp.createWriteStream(temporary, { flags: 'wx', mode: attrs.mode & 0o777 });
         stream.once('error', reject);
@@ -64,6 +72,7 @@ export class PythonFiles {
       );
       if ((await this.read(sessionId, path)).revision !== revision)
         throw new Error('File changed on the server while saving');
+      beforeWrite?.();
       await new Promise<void>((resolve, reject) =>
         sftp.ext_openssh_rename(temporary, path, (e) => (e ? reject(e) : resolve())),
       );

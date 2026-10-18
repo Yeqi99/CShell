@@ -1,12 +1,9 @@
 import type { ConnectionManager } from '../core/connections/manager';
 import { dialog, shell, type BrowserWindow } from 'electron';
 import { z } from 'zod';
-import { PluginService, httpsText } from '../core/plugins';
+import { httpsText } from '../core/plugins';
 import { applications } from '../shared/plugins';
 import { applicationCatalogUrl } from '../shared/market';
-import { RemoteJobs, quote } from '../core/remote-jobs';
-import { EnvironmentService } from '../core/environments';
-import { ApplicationService } from '../core/applications';
 import {
   pluginId,
   pluginEnabled,
@@ -15,7 +12,7 @@ import {
 } from '../shared/plugins';
 import type { Store } from '../core/store';
 import type { SshService } from '../core/ssh';
-import { PythonFiles } from '../core/python-files';
+import { createExtensionServices, type ExtensionServices } from '../core/api/extensions';
 export function registerExtensionHandlers(
   handle: (name: string, fn: (...args: any[]) => any) => void,
   window: BrowserWindow,
@@ -23,11 +20,10 @@ export function registerExtensionHandlers(
   ssh: SshService,
   connections: ConnectionManager,
   beforeDisable?: (id: string) => Promise<void>,
+  services?: ExtensionServices,
 ) {
-  const plugins = new PluginService(store),
-    jobs = new RemoteJobs(ssh),
-    environments = new EnvironmentService(ssh, jobs),
-    apps = new ApplicationService(jobs);
+  const { jobs, environments, apps, files, plugins } =
+    services ?? createExtensionServices(ssh, store);
   const connected = (id: unknown) => {
     const value = z.string().uuid().parse(id);
     ssh.get(value);
@@ -37,7 +33,6 @@ export function registerExtensionHandlers(
     if (!pluginEnabled(store.plugins(), provider))
       throw new Error(`${provider} plugin is not enabled`);
   };
-  const files = new PythonFiles(ssh);
   handle('applications:catalog', async () => {
     const catalog = z
       .object({
@@ -81,11 +76,13 @@ export function registerExtensionHandlers(
     pluginId.parse(id);
     z.boolean().parse(enabled);
     if (!enabled) await beforeDisable?.(id);
+    if (!enabled && id === 'cshell.conda') environments.stopAllJupyter();
     return plugins.toggle(id, enabled);
   });
   handle('plugins:remove', async (id) => {
     pluginId.parse(id);
     await beforeDisable?.(id);
+    if (id === 'cshell.conda') environments.stopAllJupyter();
     return plugins.remove(id);
   });
   handle('plugins:source', () => store.pluginSource());
@@ -122,11 +119,7 @@ export function registerExtensionHandlers(
     const sessionId = connected(id);
     remoteExecutable.parse(conda);
     remoteExecutable.parse(prefix);
-    await environments.known(sessionId, conda, prefix);
-    const result = await ssh.openEnvironment(
-      sessionId,
-      `${quote(conda)} run --no-capture-output --prefix ${quote(prefix)} bash --noprofile --norc -i`,
-    );
+    const result = await environments.openTerminal(sessionId, conda, prefix);
     try {
       connections.adopt('cshell.ssh', result.sessionId);
     } catch (error) {

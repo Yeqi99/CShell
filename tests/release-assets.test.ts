@@ -15,7 +15,7 @@ test('release gate rejects missing platforms, wrong versions and duplicate asset
     const expected = desktopReleaseAssets('0.6.0');
     assert.equal(expected.length, 10);
     assert.equal(agentReleaseAssets('0.6.0').length, 5);
-    assert.ok(agentReleaseAssets('0.6.0').includes('CShell-Agent-0.6.0-win-x64.zip'));
+    assert.ok(agentReleaseAssets('0.6.0').includes('CAgent-Setup-0.6.0-win-x64.zip'));
     assert.ok(expected.includes('CShell-0.6.0-linux-amd64.deb'));
     assert.throws(() => desktopReleaseAssets('../bad'));
     await assert.rejects(verifyReleaseAssets(dir, expected), /Missing/);

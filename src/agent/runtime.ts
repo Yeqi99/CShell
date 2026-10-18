@@ -1,5 +1,5 @@
 import { access } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, dirname, resolve } from 'node:path';
 import { networkInterfaces } from 'node:os';
 import { X509Certificate, createPublicKey } from 'node:crypto';
 import { z } from 'zod';
@@ -15,8 +15,12 @@ import { WslNetworkSettings } from './wsl-network';
 import { HostingService } from './hosting';
 import { AgentRelayService } from './relay';
 import { AgentReverseRelayService } from './relay-reverse';
-import { agentRelayConfigSchema } from '../shared/agent-relay';
 import { hostingConfigSchema } from '../shared/agent-hosting';
+import { AgentApplicationService } from './applications';
+import { CagentAssistant } from './assistant';
+import { CapabilityRuntime } from './capability-runtime';
+import { createDesktopCapability } from './desktop-capability';
+import { version as agentVersion } from '../../package.json';
 
 const legacySchema = z
   .object({
@@ -63,7 +67,7 @@ async function finishLegacyImport(vault: ClientVault, input: z.infer<typeof lega
   await vault.write('legacy-import-pending', null);
 }
 export async function createAgentRuntime(
-  options: { directory?: string; terminal?: AgentTerminalProvider } = {},
+  options: { directory?: string; terminal?: AgentTerminalProvider; onClose?:()=>void; desktopExecutable?:string; extraPackages?:ConstructorParameters<typeof CapabilityRuntime>[0]['extraPackages'] } = {},
 ) {
   const directory = options.directory ?? agentDirectory();
   let canImportLegacy = false;
@@ -88,11 +92,28 @@ export async function createAgentRuntime(
       ...(s.distribution ? { distribution: s.distribution } : {}),
     }));
   server = new ClientServer(vault, terminal, {
-    manage: (method, params, signal) => dispatch(method, params, signal, false),
+    manage: (method, params, signal, owner) => dispatch(method, params, signal, false, owner),
+    desktopStream: (socket,owner) => desktop.service.acceptAuthenticated(socket,owner),
     shells,
     execute: (input, signal) => terminal.execute(input, signal),
   });
   await server.load();
+  const applications = new AgentApplicationService(vault, (owner) =>
+    server.managementAllowed(owner));
+  await applications.load();
+  const desktopIdentity=server.status().deviceId;
+  const desktop=await createDesktopCapability({identity:desktopIdentity,nativeExecutable:options.desktopExecutable??join(dirname(resolve(process.argv[1]??process.execPath)),'cagent-desktop.exe'),vault,authorize:owner=>server.status().deviceId===desktopIdentity&&(owner==='local'||server.managementAllowed(owner))});
+  const packages=new CapabilityRuntime({directory,vault,applications,agentVersion,extraPackages:[...desktop.extraPackages,...options.extraPackages??[]]});
+  await packages.load();
+  const assistant=new CagentAssistant(vault,{shells,applications:owner=>applications.list(owner),execute:(input,signal,owner)=>{
+    if(owner!=='local'){
+      const status=server.status(),peer=status.peers.find(p=>p.fingerprint===owner);
+      const shell=clientShellSchema.parse((input as {shell:unknown}).shell);
+      if(!peer?.shells.includes(shell)||!status.allowedShells?.includes(shell))throw new Error('控制端未获此 Shell 授权');
+    }
+    return terminal.execute(input,signal);
+  },allowed:owner=>server.managementAllowed(owner),capabilityTools:()=>packages.tools(),capabilityInvoke:(input,signal,owner)=>packages.invoke(input,owner,signal)});
+  await assistant.load();
   const hosting = new HostingService(join(directory, 'hosting'));
   await hosting.load();
   let relay = new AgentRelayService({ vault, identity: await vault.identity() });
@@ -130,9 +151,49 @@ export async function createAgentRuntime(
     params: unknown,
     signal = new AbortController().signal,
     local = true,
+    owner = 'local',
   ): Promise<unknown> {
     signal.throwIfAborted();
     if (closed) throw new Error('Agent 已关闭');
+    if(method.startsWith('desktop.')){
+      if(!local&&(owner==='local'||!server.managementAllowed(owner)))throw new Error('未授权控制端管理远程桌面');
+      if(server.status().deviceId!==desktopIdentity)throw new Error('设备身份已迁移，请重启 cagent 后使用远程桌面');
+      return desktop.dispatch(method,params,owner,local);
+    }
+    if(method.startsWith('packages.')){
+      if(!local&&(owner==='local'||!server.managementAllowed(owner)))throw new Error('未授权控制端管理能力包');
+      if(method==='packages.catalog')return packages.catalog();
+      if(method==='packages.list')return packages.list();
+      if(method==='packages.tools')return packages.tools();
+      if(method==='packages.invoke'){
+        const controller=new AbortController();
+        const guard=setInterval(()=>{if(!local&&!server.managementAllowed(owner))controller.abort(new Error('控制端授权已撤销'));},100);
+        try{return await packages.invoke(params,owner,AbortSignal.any([signal,controller.signal]));}finally{clearInterval(guard);}
+      }
+      if(!local)throw new Error('仅本机可安装、授权或卸载能力包');
+      if(method==='packages.install')return packages.install(params,signal);
+      if(method==='packages.grant')return packages.grant(params);
+      if(method==='packages.uninstall')return packages.uninstall(params);
+      if(method==='packages.refresh')return packages.refresh(params);
+      throw new Error('未知能力包操作');
+    }
+    if(method.startsWith('assistant.')){
+      if(!local&&owner==='local')throw new Error('缺少控制端身份');
+      if(method==='assistant.start')return assistant.start(params,owner);
+      if(method==='assistant.tasks')return assistant.list(owner);
+      if(method==='assistant.task')return structuredClone(assistant.get(params,owner));
+      if(method==='assistant.cancel')return assistant.cancel(params,owner);
+      if(!local)throw new Error('仅本机可修改智能体配置或批准操作');
+      if(method==='assistant.settings')return assistant.snapshot();
+      if(method==='assistant.configure')return serialized(()=>assistant.configure(params));
+      if(method==='assistant.approve')return assistant.approve(params);
+      throw new Error('未知智能体操作');
+    }
+    if (!local && owner === 'local' && method.startsWith('applications.')) throw new Error('缺少控制端身份');
+    if (method === 'applications.policy') { if(!local)throw new Error('仅目标 cagent 本机可读取应用安装授权');return applications.policySnapshot(); }
+    if (method === 'applications.list') return applications.list(owner);
+    if (method === 'applications.status') return applications.status(params, owner);
+    if (method === 'applications.plan') return applications.plan(params, owner, signal);
     if (method === 'agent.shells' || method === 'agent.environments') return shells();
     if (method === 'client.status')
       return {
@@ -189,6 +250,18 @@ export async function createAgentRuntime(
     return serialized(async () => {
       signal.throwIfAborted();
       if (closed) throw new Error('Agent 已关闭');
+      if (method === 'applications.configure') {
+        if (!local) throw new Error('仅目标 Agent 本机可修改应用安装授权');
+        const result = await applications.configure(params);
+        await recordManagement('applications.configure');
+        return result;
+      }
+      if (method === 'applications.cancel') return applications.cancel(params, owner);
+      if (method === 'applications.install') {
+        await recordManagement('applications.install');
+        signal.throwIfAborted();
+        return applications.install(params, owner);
+      }
       if (method === 'client.access') {
         const result = await server.setAccess(params);
         canImportLegacy = false;
@@ -289,7 +362,7 @@ export async function createAgentRuntime(
       if (method === 'hosting.stop') return hosting.stop(idInput(params));
       if (method === 'hosting.remove') return hosting.remove(idInput(params));
       if (method === 'relay.configure')
-        return relay.configure(agentRelayConfigSchema.parse(params));
+        return relay.configure(params);
       if (method === 'relay.start') return relay.start();
       if (method === 'relay.stop') return relay.stop();
       if (method === 'relay.rotateCredential') return relay.rotateCredential();
@@ -334,6 +407,7 @@ export async function createAgentRuntime(
         )
           throw new Error('旧设备证书与私钥不匹配');
         // Encrypted journal finishes interrupted migrations before loading any network service.
+        await desktop.shutdown();
         await vault.write('legacy-import-pending', input);
         await finishLegacyImport(vault, input);
         await server.load();
@@ -349,8 +423,12 @@ export async function createAgentRuntime(
   async function close() {
     if (closed) return;
     closed = true;
+    await assistant.close();
     await control?.close();
     await mutation;
+    await packages.dispose();
+    await desktop.shutdown();
+    await applications.dispose();
     await wsl.dispose();
     await hosting.dispose();
     await reverseRelay.stop();
@@ -358,6 +436,7 @@ export async function createAgentRuntime(
     await server.stop();
     await terminal.dispose();
     await vault.flush();
+    options.onClose?.();
   }
   return {
     server,

@@ -1,5 +1,28 @@
 import { z } from 'zod';
 export const agentMethods = [
+  'assistant.start',
+  'assistant.tasks',
+  'assistant.task',
+  'assistant.cancel',
+  'packages.catalog',
+  'packages.list',
+  'packages.tools',
+  'packages.invoke',
+  'packages.install',
+  'packages.grant',
+  'packages.uninstall',
+  'packages.refresh',
+  'desktop.status',
+  'desktop.configure',
+  'desktop.open',
+  'desktop.close',
+  'applications.policy',
+  'applications.configure',
+  'applications.list',
+  'applications.plan',
+  'applications.install',
+  'applications.status',
+  'applications.cancel',
   'agent.shells',
   'agent.environments',
   'client.status',
@@ -51,9 +74,11 @@ export type AgentTarget = {
   local: boolean;
   available: boolean;
   reason?: string;
+  bundledApp?: boolean;
 };
 export interface AgentBridge {
   agentTargets(): Promise<AgentTarget[]>;
+  agentLaunch(): Promise<void>;
   agentCall(target: string, call: AgentCall): Promise<unknown>;
   agentImportLegacy(): Promise<void>;
   clientShells(deviceId: string): Promise<AgentShellOption[]>;

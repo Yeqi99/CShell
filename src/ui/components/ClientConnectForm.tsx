@@ -1,3 +1,4 @@
+import { ConnectionExtractor } from './ConnectionExtractor';
 import type { Profile } from '../../shared/contracts';
 import { useState } from 'react';
 import {
@@ -131,17 +132,10 @@ export function ClientConnectForm({
         });
       }}
     >
+      <ConnectionExtractor title="cagent" titleId="cagent-connect-title" providerId="cshell.client" disabled={busy} onBusy={setBusy} onStart={()=>setError('')} onExtract={({fields})=>{
+        reset();if(fields.host)setHost(fields.host);if(fields.port!==undefined)setPort(String(fields.port));if(fields.password!==undefined)setPassword(fields.password);if(fields.name)setName(fields.name);if(fields.group)setGroup(fields.group);
+      }}/>
       <div className="connection-form-tools">
-        <button
-          type="button"
-          onClick={() =>
-            void run(async () => {
-              window.dispatchEvent(new Event('cshell:open-extensions'));
-            })
-          }
-        >
-          {cn ? '打开插件市场' : 'Open plugin marketplace'}
-        </button>
         <button
           type="button"
           disabled={busy}
@@ -322,58 +316,6 @@ export function ClientConnectForm({
         </button>
       </fieldset>
       {error && <p role="alert">{error}</p>}
-    </form>
-  );
-}
-export function RdpConnectForm() {
-  const { locale } = useI18n(),
-    cn = locale === 'zh-CN';
-  const [host, setHost] = useState(''),
-    [port, setPort] = useState('3389'),
-    [message, setMessage] = useState(''),
-    [busy, setBusy] = useState(false);
-  return (
-    <form
-      className="rdp-connect-form"
-      onSubmit={(e) => {
-        e.preventDefault();
-        setBusy(true);
-        setMessage('');
-        void window.cshell
-          .openRdp({ host: host.trim(), port: Number(port) })
-          .then(() =>
-            setMessage(
-              cn ? '已打开 Windows 远程桌面客户端。' : 'Windows Remote Desktop client opened.',
-            ),
-          )
-          .catch((e) => setMessage(e.message))
-          .finally(() => setBusy(false));
-      }}
-    >
-      <p>
-        {cn
-          ? '使用 Windows 远程桌面客户端，身份验证在系统窗口完成。'
-          : 'Uses Windows Remote Desktop. Authenticate in the system window.'}
-      </p>
-      <label>
-        {cn ? '主机地址' : 'Host'}
-        <input required value={host} onChange={(e) => setHost(e.target.value)} />
-      </label>
-      <label>
-        {cn ? '端口' : 'Port'}
-        <input
-          type="number"
-          min={1}
-          max={65535}
-          required
-          value={port}
-          onChange={(e) => setPort(e.target.value)}
-        />
-      </label>
-      <button className="client-primary" disabled={busy}>
-        {cn ? '打开远程桌面' : 'Open Remote Desktop'}
-      </button>
-      <p role="status">{message}</p>
     </form>
   );
 }

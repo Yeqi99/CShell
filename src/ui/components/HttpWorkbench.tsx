@@ -1,3 +1,4 @@
+import { ConnectionExtractor } from './ConnectionExtractor';
 import { useEffect, useRef, useState } from 'react';
 import { Plus, Send, Square, Save, Trash2, Settings2, RefreshCw, Copy, Globe } from 'lucide-react';
 import {
@@ -19,6 +20,7 @@ export function HttpCreate({
   onCreated: (id: string) => Promise<void>;
   groups: string[];
 }) {
+  const [initialUrl,setInitialUrl]=useState(''),[extracting,setExtracting]=useState(false),[createdId,setCreatedId]=useState<string>();
   const [name, setName] = useState('HTTP 请求'),
     [group, setGroup] = useState(''),
     [error, setError] = useState(''),
@@ -30,13 +32,17 @@ export function HttpCreate({
         e.preventDefault();
         setBusy(true);
         setError('');
-        void window.cshell
-          .httpCreate(name, group)
-          .then(onCreated)
+        void (async()=>{
+            const id=createdId??await window.cshell.httpCreate(name,group);setCreatedId(id);
+            if(initialUrl){const w=await window.cshell.httpWorkspace(id);const target={id:crypto.randomUUID(),name:new URL(initialUrl).host,url:initialUrl};await window.cshell.httpSave({...w,targets:[target],requests:w.requests.map(r=>({...r,targetId:target.id}))});}
+            await onCreated(id);
+          })()
           .catch((e) => setError(e.message))
           .finally(() => setBusy(false));
       }}
     >
+      <ConnectionExtractor title="HTTP 请求" titleId="http-create-title" providerId="cshell.http" disabled={busy} onStart={()=>setError('')} onBusy={setExtracting} onExtract={({fields})=>{if(fields.url)setInitialUrl(fields.url);if(fields.name)setName(fields.name);if(fields.group)setGroup(fields.group);}}/>
+      <label>目标地址<input type="url" placeholder="https://example.com" value={initialUrl} onChange={e=>setInitialUrl(e.target.value)}/></label>
       <label>
         工作区名称
         <input required maxLength={100} value={name} onChange={(e) => setName(e.target.value)} />
@@ -56,7 +62,7 @@ export function HttpCreate({
         </datalist>
       </label>
       <p>保存多个目标地址、常用请求和执行历史。发送时选择本机或已连接的发送方。</p>
-      <button className="primary" disabled={busy}>
+      <button className="primary" disabled={busy||extracting}>
         {busy ? '正在创建…' : '创建 HTTP 工作区'}
       </button>
       {error && <p role="alert">{error}</p>}

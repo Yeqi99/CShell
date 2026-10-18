@@ -139,7 +139,12 @@ export class LocalTerminalProvider implements ManagedProvider {
       };
     }
   }
-  async connect(value: unknown, _credentials: unknown, signal: AbortSignal) {
+  async connect(
+    value: unknown,
+    _credentials: unknown,
+    signal: AbortSignal,
+    ready?: (id: string) => void,
+  ) {
     if (process.platform !== 'win32') throw new Error('本机 CMD / PowerShell 仅支持 Windows');
     const shell = localShellSchema.parse(value);
     const distro = shell.startsWith('wsl:') ? shell.slice(4) : undefined;
@@ -189,6 +194,13 @@ export class LocalTerminalProvider implements ManagedProvider {
     };
     const session = { pty, connection, outstanding: 0 };
     this.sessions.set(id, session);
+    try {
+      ready?.(id);
+    } catch (error) {
+      this.sessions.delete(id);
+      pty.kill();
+      throw error;
+    }
     pty.onData((data) => {
       session.outstanding += data.length;
       if (session.outstanding > 500000) pty.pause();
@@ -210,7 +222,10 @@ export class LocalTerminalProvider implements ManagedProvider {
     return s.connection;
   }
   disconnect(id: string) {
-    this.sessions.get(id)?.pty.kill();
+    const session = this.sessions.get(id);
+    if (!session) return;
+    this.sessions.delete(id);
+    session.pty.kill();
   }
   get size() {
     return this.sessions.size;

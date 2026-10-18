@@ -86,6 +86,36 @@ function closed(socket: TLSSocket) {
     else socket.once('close', () => resolve());
   });
 }
+test('relay configuration CAS rejects concurrent stale drafts before persistence or shutdown', async () => {
+  const f = await fixture();
+  const reverse = new AgentReverseRelayService({ vault: f.vault });
+  try {
+    await reverse.load();
+    const expectedRevision = f.relay.status().revision;
+    const results = await Promise.allSettled([
+      f.relay.configure({ ...f.config, maxConnections: 2, expectedRevision }),
+      f.relay.configure({ ...f.config, maxConnections: 3, expectedRevision }),
+    ]);
+    assert.equal(results.filter((r) => r.status === 'fulfilled').length, 1);
+    assert.equal(f.relay.status().config.maxConnections, 2);
+    await f.relay.start();
+    await assert.rejects(f.relay.configure({ ...f.config, expectedRevision }), /configuration changed/);
+    assert.equal(f.relay.status().running, true);
+    const revision = reverse.status().revision;
+    const reverseResults = await Promise.allSettled([
+      reverse.configure({ enabled: false, localPort: 22444, expectedRevision: revision }),
+      reverse.configure({ enabled: false, localPort: 22445, expectedRevision: revision }),
+    ]);
+    assert.equal(reverseResults.filter((r) => r.status === 'fulfilled').length, 1);
+    assert.equal(reverse.status().config.localPort, 22444);
+    const restored = new AgentReverseRelayService({ vault: f.vault });
+    await restored.load();
+    assert.equal(restored.status().config.localPort, 22444);
+    assert.notEqual(restored.status().revision, reverse.status().revision);
+    await assert.rejects(restored.configure({ enabled: false, expectedRevision: reverse.status().revision }), /configuration changed/);
+    await restored.stop();
+  } finally { await reverse.stop(); await f.close(); }
+});
 async function until(check: () => boolean) {
   const deadline = Date.now() + 4000;
   while (!check()) {

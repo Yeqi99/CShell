@@ -2216,6 +2216,39 @@ input[type='range'] {
 .mcp-settings fieldset > label.checkbox {
   margin-bottom: 16px;
 }
+.mcp-settings fieldset {
+  max-width: 720px;
+}
+.mcp-settings details {
+  margin: 10px 0;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+.mcp-settings summary {
+  cursor: pointer;
+  padding: 4px 0;
+}
+.mcp-settings summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.mcp-settings details > label:not(.checkbox) {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(180px, 2fr);
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+}
+.mcp-settings details input[type='number'] {
+  margin: 0;
+}
+.mcp-settings code {
+  overflow-wrap: anywhere;
+}
+.mcp-settings .preset-row {
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
 
 /* Connection editor: a compact task surface within the desktop workspace. */
 .connection-editor {
@@ -4141,6 +4174,50 @@ input[type='radio']:focus-visible {
 .ai-panel[hidden] {
   display: none;
 }
+.ai-panel-slot > .panel-resizer {
+  top: 0;
+  width: 8px;
+}
+.panel-resizer:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.ai-execution {
+  flex: 0 1 auto;
+  min-height: 70px;
+  max-height: 36%;
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+.ai-execution > header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  min-height: 32px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.ai-execution > header span {
+  color: var(--muted);
+  margin-left: auto;
+}
+.ai-execution pre {
+  margin: 0;
+  padding: 8px 14px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font:
+    13px/1.6 Consolas,
+    monospace;
+  min-height: 0;
+}
+.ai-execution-command {
+  color: var(--accent);
+}
 .ai-panel {
   height: 100%;
   display: flex;
@@ -4224,9 +4301,9 @@ input[type='radio']:focus-visible {
   right: auto;
   top: auto;
   bottom: auto;
-  width: 370px;
-  max-width: 44vw;
-  flex: 0 0 370px;
+  width: 500px;
+  max-width: 65vw;
+  flex: 0 0 auto;
   order: 4;
   box-shadow: none;
   z-index: 2;
@@ -5811,4 +5888,33 @@ input[type='radio']:focus-visible {
   display: grid;
   gap: 6px;
   margin: 12px 0;
+}
+.clipboard-connection {
+  position: fixed;
+  right: 18px;
+  bottom: 48px;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(520px, calc(100vw - 36px));
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 4px 20px #0002;
+}
+.clipboard-connection > div {
+  min-width: 0;
+}
+.clipboard-connection p {
+  margin: 4px 0;
+  overflow-wrap: anywhere;
+}
+.clipboard-connection small {
+  color: var(--muted);
+}
+.clipboard-connection > button {
+  flex-shrink: 0;
 }

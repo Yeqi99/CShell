@@ -1,8 +1,8 @@
 import type { TLSSocket } from 'node:tls';
 /** Bounded newline JSON frames. Terminal bytes are JSON strings, not parsed commands. */
-export function frames(socket: TLSSocket, receive: (value: unknown) => void) {
+export function frames(socket: TLSSocket, receive: (value: unknown) => void | false) {
   let buffer = Buffer.alloc(0);
-  socket.on('data', (chunk: Buffer) => {
+  const data = (chunk: Buffer) => {
     buffer = Buffer.concat([buffer, chunk]);
     for (;;) {
       const end = buffer.indexOf(10);
@@ -14,14 +14,14 @@ export function frames(socket: TLSSocket, receive: (value: unknown) => void) {
       const frame = buffer.subarray(0, end);
       buffer = buffer.subarray(end + 1);
       try {
-        receive(JSON.parse(frame.toString('utf8')));
+        if(receive(JSON.parse(frame.toString('utf8')))===false){socket.pause();socket.off('data',data);if(buffer.length)socket.unshift(buffer);buffer=Buffer.alloc(0);return;}
       } catch {
         socket.destroy();
         return;
       }
     }
     if (buffer.length > 131072) socket.destroy();
-  });
+  };socket.on('data',data);
 }
 export function send(socket: TLSSocket, value: unknown) {
   if (socket.destroyed) throw new Error('Client connection closed');

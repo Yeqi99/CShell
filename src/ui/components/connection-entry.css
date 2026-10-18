@@ -238,3 +238,5 @@
     top: 19px;
   }
 }
+
+.rdp-connect-form fieldset{border:0;padding:0;display:grid;gap:14px}.rdp-connect-form label{display:grid;gap:6px}.rdp-connect-form input:not([type=checkbox]){padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--panel);color:var(--text)}

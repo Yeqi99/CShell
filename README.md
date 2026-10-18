@@ -1,8 +1,10 @@
 # CShell
 
-CanpShell 是面向高频操作的终端与 AI 工作台，采用 **MIT** 许可证。**0.6.0 开发预览已发布**，新增 HTTP 工作区与轻量独立 **CShell Agent**，提供 Windows、macOS、Linux 和 Android 下载。
+CanpShell 是面向高频操作的终端与 AI 工作台，采用 **MIT** 许可证。独立智能体 **CAgent（Canp Agent）** 可单独运行，也可为 CShell 提供已授权的机器能力。当前正在准备 **0.6.13** 发行；构建与本机验证不等同于已发布，下载以 GitHub Releases 实际附件为准。
 
 [源码](https://github.com/Yeqi99/CShell) · [版本下载](https://github.com/Yeqi99/CShell/releases) · [问题反馈](https://github.com/Yeqi99/CShell/issues) · [构建状态](https://github.com/Yeqi99/CShell/actions)
+
+0.6.13 的 Windows 工作台、独立 CAgent 与验证边界见 [发布说明](docs/RELEASE-0.6.13.md)。Windows CShell 安装包内置 CAgent；不需要完整工作台时，可选择独立 CAgent。新版独立包的五平台构建仍须通过各架构 CI 验收。
 
 白色默认界面、多标签终端、可收纳文件和资源侧栏；暗色可在右下角切换。极简模式仅保留标签与终端，并提供还原按钮。窗口依据当前屏幕可用区域缩放，切换工作区保留会话、滚动历史和草稿。SSH、配置和随包插件可离线使用，无产品账号、云同步、遥测或在线授权。
 
@@ -10,9 +12,11 @@ CanpShell 是面向高频操作的终端与 AI 工作台，采用 **MIT** 许可
 
 发行产物统一放到 [GitHub Releases](https://github.com/Yeqi99/CShell/releases)；市场目录固定到已发布的源码标签，不需要部署市场服务器。仓库为 [Yeqi99/CShell](https://github.com/Yeqi99/CShell)，以实际发布完成的附件为准。
 
-- [Windows 安装包](https://github.com/Yeqi99/CShell/releases/download/v0.6.0/CShell-0.6.0-win-x64.exe)
+- [当前发行附件与 Windows 下载](https://github.com/Yeqi99/CShell/releases)
 - [Android APK](https://github.com/Yeqi99/CShell/releases/download/v0.6.0/CShell-0.6.0-android-test.apk)
 - [全部 0.6.0 下载与发布说明](https://github.com/Yeqi99/CShell/releases/tag/v0.6.0) · [SHA-256 校验文件](https://github.com/Yeqi99/CShell/releases/download/v0.6.0/SHA256SUMS.txt)
+
+以下表格记录**已发布的 CShell 0.6.0**，不是 0.6.13 的跨平台验证结果。macOS、Linux 和 Android 的旧版附件继续保留。
 
 | 平台    | 格式 / 架构                           | 当前验证状态                                                        |
 | ------- | ------------------------------------- | ------------------------------------------------------------------- |
@@ -21,16 +25,15 @@ CanpShell 是面向高频操作的终端与 AI 工作台，采用 **MIT** 许可
 | Linux   | `.AppImage` / `.deb`，x64、ARM64      | 两种原生架构构建与成品 SSH/文件通过                                 |
 | Android | 测试 `.apk`，Android 8+               | 编译、lint、持久签名校验和 API 29 / 35 原生连接测试通过；真机待验收 |
 
-独立 Agent 下载（无需安装完整 CShell）：
+独立 CAgent 0.6.13 计划附件（[下载入口](https://github.com/Yeqi99/CShell/releases)，仅成功构建、解包验收并上传后才可下载）：
 
-| 平台        | 下载                                                                                                                                                                                                                  |
-| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Windows x64 | [ZIP](https://github.com/Yeqi99/CShell/releases/download/v0.6.0/CShell-Agent-0.6.0-win-x64.zip)                                                                                                                       |
-| macOS       | [Apple Silicon](https://github.com/Yeqi99/CShell/releases/download/v0.6.0/CShell-Agent-0.6.0-mac-arm64.tar.gz) · [Intel](https://github.com/Yeqi99/CShell/releases/download/v0.6.0/CShell-Agent-0.6.0-mac-x64.tar.gz) |
-| Linux       | [x64](https://github.com/Yeqi99/CShell/releases/download/v0.6.0/CShell-Agent-0.6.0-linux-x64.tar.gz) · [ARM64](https://github.com/Yeqi99/CShell/releases/download/v0.6.0/CShell-Agent-0.6.0-linux-arm64.tar.gz)       |
+| 平台                        | 附件                                                    | 界面与状态                                                              |
+| --------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Windows x64                 | `CAgent-Setup-0.6.13-win-x64.zip`                       | 原生 WPF 小窗；完整解压后运行 `Install CAgent.cmd`，安装到当前用户目录  |
+| macOS Apple Silicon / Intel | `CAgent-0.6.13-mac-arm64.tar.gz` / `mac-x64.tar.gz`     | 独立运行时与系统浏览器入口，非 Windows 同款原生界面；待原生架构 CI 验收 |
+| Linux x64 / ARM64           | `CAgent-0.6.13-linux-x64.tar.gz` / `linux-arm64.tar.gz` | 独立运行时与系统浏览器入口；待原生架构 CI 验收                          |
 
-五种 Agent 成品均通过原生终端、TLS、权限拒绝及退出检查。解压后按包内说明使用命令行入口，尚未自动注册系统服务。构建来源和已知限制见 [整合验收](docs/RELEASE-CHECKLIST.md)。
-
+每个平台包含本架构 Node 与原生 PTY，无须预装 CShell、Electron 或 Chromium。安装不自动开启远程监听、不扩大权限；尚不自动注册系统服务。历史 [0.6.0 Agent 附件](https://github.com/Yeqi99/CShell/releases/tag/v0.6.0) 使用 `CShell-Agent-*` 名称，不能视为新版功能包。使用与兼容范围见 [CAgent](docs/CAGENT.md)。
 尚无商业代码签名证书，macOS 未公证。核对附件的 SHA256SUMS.txt。完整范围见 [发布说明](docs/RELEASE.md)，已执行的检查见 [验证记录](docs/VALIDATION.md)。
 
 ## Android 工作台与更新
@@ -49,15 +52,17 @@ Android 默认进入概览首页，底部导航为首页、连接、终端、文
 
 顶栏“统计与历史”展示本设备真实记录：成功连接、文件操作请求、传输字节、AI 请求和活跃日期；支持日期/类型筛选、搜索、CSV/HTML 导出、暂停及清空。仅本机存储，最多一年/50,000 条，不采集终端输入、密码、文件路径或聊天正文，不伪造旧历史、Token 数或效率收益。
 
-连接生命周期与 Agent 工具采用 [Connection Provider Architecture](docs/CONNECTION-PROVIDERS.md)。SSH、Windows 本机终端和 CShell Agent 使用独立 Provider。Agent 与 SSH 共用左侧服务器列表，支持命名、分组、收藏、编辑和双击连接，旧 Client 记录迁移保留身份、凭据与授权。RDP 通过 Windows mstsc 打开独立窗口，暂不保存配置；VNC 与直连 Docker TLS 尚未实现。现有 Docker 插件使用真实 Engine HTTP API，经 SSH socket 隧道访问。
+连接生命周期与 Agent 工具采用 [Connection Provider Architecture](docs/CONNECTION-PROVIDERS.md)。SSH、Windows 本机终端和 CShell Agent 使用独立 Provider。Agent 与 SSH 共用左侧服务器列表，支持命名、分组、收藏、编辑和双击连接，旧 Client 记录迁移保留身份、凭据与授权。RDP 可保存主机、端口、用户名及可选的加密密码，与其他连接共用左侧列表；双击调用 Windows mstsc 打开独立窗口，系统策略仍可能要求再次认证。VNC 与直连 Docker TLS 尚未实现。现有 Docker 插件使用真实 Engine HTTP API，经 SSH socket 隧道访问。
 
-### CShell Agent
+### CAgent（原 CShell Agent）
 
 在被管理电脑上独立安装 Agent，无需完整 CShell、Electron、Chromium 或 SSH 服务。运行 Agent 后，CShell 的 Agent 插件可以发现本机服务，也可以管理明确选择且具有管理授权的远程 Agent。插件配置监听地址、端口、密码及能力权限；安装和发现不自动授权远程控制。
 
 控制端新建连接选择 CShell Agent，填写信息或显式粘贴，核对设备指纹后连接。普通复制信息不含密码，凭据独立加密保存，不进入外观方案。连接共用左侧命名、分组、收藏和双击操作。
 
-Agent 提供 Windows CMD / PowerShell 与 Linux、macOS 的原生 Shell；Windows Agent 的 WSL 管理作用于目标机器。HTTP 服务托管、中继与管理权限独立控制，默认关闭。当前分发可直接运行的命令行包，尚未自动注册系统服务；暂不提供 Agent 文件传输或屏幕控制。跨机器、休眠恢复与长期运行的验证边界见 [Agent 使用说明](docs/CLIENT.md) 和 [整合验收](docs/RELEASE-CHECKLIST.md)。
+CAgent 提供 Windows CMD / PowerShell 与 Linux、macOS 的原生 Shell；Windows CAgent 的 WSL 管理作用于目标机器。HTTP 服务托管、中继与管理权限独立控制，默认关闭。Windows 使用以对话与输入框为主体的原生小窗，会话、市场、设置与权限按需展开；macOS/Linux 当前提供运行时和系统浏览器入口。旧数据目录、设备身份与命令别名继续兼容。
+
+应用市场将系统应用安装和工具能力授权分开。自研远程桌面作为可选能力包，Windows 被控端使用原生采集、编码和键鼠控制，CShell 提供观看器；服务、观看与控制权限分别配置。本机真实画面、输入和断线恢复已验证，公网完整验收尚未完成；macOS/Linux 被控端与手机观看器不在此次已验证范围。它与调用系统 mstsc 的 RDP 连接是两个独立入口。详见 [远程桌面实现与边界](docs/CAGENT-DESKTOP.md)。
 
 ## HTTP 扩展
 
@@ -80,7 +85,7 @@ pnpm test:desktop
 pnpm run dist
 ```
 
-`release/0.6.0/CShell-0.6.0-win-x64.exe` 为当前 NSIS 构建目标，`release/0.6.0/win-unpacked/CShell.exe` 为目录版。独立 Agent 使用 `node scripts/agent-build.mjs` 构建，并通过 `node scripts/package-agent.mjs` 打包；在对应操作系统和架构上构建及验证。macOS 使用 `pnpm exec electron-builder --mac --arm64 --publish never`，Linux 使用 `pnpm exec electron-builder --linux --x64 --publish never`。首次安装依赖和构建需要网络。
+构建输出目录由 `package.json` 的版本决定：`release/<version>/CShell-<version>-win-x64.exe` 为 NSIS 安装包，`release/<version>/win-unpacked/CShell.exe` 为目录版。Windows CShell 打包前需先完成同版本 CAgent 构建，供安装包内置。独立 Agent 使用 `node scripts/agent-build.mjs` 构建，并通过 `node scripts/package-agent.mjs` 打包；在对应操作系统和架构上构建及验证。macOS 使用 `pnpm exec electron-builder --mac --arm64 --publish never`，Linux 使用 `pnpm exec electron-builder --linux --x64 --publish never`。首次安装依赖和构建需要网络。
 
 ## 插件与应用
 
@@ -146,7 +151,7 @@ Compose / Swarm 管理的容器不通过该入口重建，避免与部署声明�
 
 ## MCP 服务
 
-默认关闭，偏好设置中可启用本机 MCP 服务、配置端口、选择授权服务器和复制令牌。命令执行单独授权且逐条确认。详见 [接入说明](docs/MCP.md)。
+默认关闭。偏好设置中配置本机服务、独立客户端令牌、机器与本机环境范围、能力授权及审核策略；审核策略不扩大权限。版本化 API 与 MCP 共用能力目录，支持按预算渐进发现、异步任务、终端与实际 Provider 工具。详见 [API 与 MCP 接入说明](docs/API.md) 和 [当前覆盖及验证边界](docs/API-IMPLEMENTATION.md)。
 
 ## 当前功能
 
@@ -165,7 +170,7 @@ Compose / Swarm 管理的容器不通过该入口重建，避免与部署声明�
 
 ## 常用操作
 
-双击服务器在工作区打开连接编辑页；星标按钮收藏；右键或省略号打开紧凑菜单，可编辑、移至分组或删除连接。菜单浮于列表上方，不挤动布局，支持方向键、Enter 和 Escape。
+双击服务器直接连接；星标按钮收藏；右键或省略号打开紧凑菜单，可编辑、移至分组或删除连接。菜单浮于列表上方，不挤动布局，支持方向键、Enter 和 Escape。
 
 服务器列表上方提供“新建分组”；分组标题右侧菜单可重命名或删除分组。空分组会保留；删除分组只将连接移回“未分组”，不会删除连接或凭据。移动和改名不影响正在运行的终端。连接表单的分组字段可选择已有名称或输入新名称。
 

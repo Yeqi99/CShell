@@ -14,12 +14,20 @@ export interface ConnectionTool {
   readonly capability: string;
   readonly description: string;
   readonly input: z.ZodType;
+  /** When present, invoke returns a JSON string whose parsed content must match this schema. */
+  readonly jsonOutput?: z.ZodType;
+  readonly examples?: { input: unknown; explanation: string }[];
   /** Trusted built-in policy only. External annotations may increase, never lower risk. */
   readonly needsReview: (input: unknown) => boolean;
-  invoke(input: unknown, signal: AbortSignal): Promise<string>;
+  /** Shared resource mutation domain within this target. Undefined means no declared conflict. */
+  readonly conflictDomain?: (input: unknown) => string | readonly string[] | undefined;
+  invoke(input: unknown, signal: AbortSignal, output?: (text: string) => void): Promise<string>;
 }
 export interface ProviderConnection {
-  readonly agent?: (call:import('../../shared/agent').AgentCall, signal:AbortSignal)=>Promise<unknown>;
+  readonly agent?: (
+    call: import('../../shared/agent').AgentCall,
+    signal: AbortSignal,
+  ) => Promise<unknown>;
   readonly http?: (
     request: import('../../shared/http').HttpWireRequest,
     signal: AbortSignal,
@@ -49,5 +57,9 @@ export interface PreparedTool {
   readonly capability: string;
   readonly needsReview: boolean;
   /** Single-use; revalidates target, tool and host permissions after approval. */
-  execute(authorize: () => boolean, signal: AbortSignal): Promise<string>;
+  execute(
+    authorize: () => boolean,
+    signal: AbortSignal,
+    output?: (text: string) => void,
+  ): Promise<string>;
 }

@@ -4,6 +4,15 @@ export function remotePath(value: string) {
     throw new Error('Invalid remote path');
   return value;
 }
+/** Lexical lock identity only; never rewrite the path sent to the remote server.
+ * Keep .. because a preceding component may be a symlink. Hard links, symlinks,
+ * case aliases and relative/absolute aliases require provider identity support.
+ */
+export function remoteFileConflict(value: string) {
+  const path = remotePath(value);
+  const components = path.split('/').filter((part) => part !== '' && part !== '.');
+  return `file:${path.startsWith('/') ? '/' : ''}${components.join('/') || (path.startsWith('/') ? '' : '.')}`;
+}
 // A server controls directory entry names: never let them escape a local download root.
 export function safeName(value: string) {
   if (

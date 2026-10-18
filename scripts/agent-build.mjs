@@ -4,6 +4,8 @@ import { join, resolve, dirname, sep } from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
+import {existsSync} from 'node:fs';
+import {createHash} from 'node:crypto';
 import { preparePty } from './prepare-pty.mjs';
 const require = createRequire(import.meta.url);
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -12,6 +14,7 @@ const output = resolve(
   process.argv[2] || join(root, 'release', version, `agent-${process.platform}-${process.arch}`),
 );
 await mkdir(output, { recursive: true });
+let desktopNative;
 const result = await build({
   entryPoints: [join(root, 'src/agent/cli.ts')],
   outfile: join(output, 'agent.cjs'),
@@ -40,7 +43,7 @@ await writeFile(
   join(output, 'package.json'),
   JSON.stringify(
     {
-      name: 'cshell-agent-runtime',
+      name: 'cagent-runtime',
       version,
       private: true,
       dependencies: {
@@ -77,6 +80,29 @@ await writeFile(
     : '#!/bin/sh\nexec "$(dirname "$0")/node" "$(dirname "$0")/agent.cjs" "$@"\n',
   { mode: 0o755 },
 );
+await cp(join(output, launcher),join(output,process.platform==='win32'?'cagent.cmd':'cagent'));
+if(process.platform==='win32'){
+  const framework=join(process.env.SystemRoot||'C:\\Windows','Microsoft.NET','Framework64','v4.0.30319');
+  await new Promise((resolveBuild,reject)=>{
+    const child=spawn(join(framework,'csc.exe'),['/nologo','/target:winexe','/out:'+join(output,'Cagent.exe'),...['WindowsBase','PresentationCore','PresentationFramework'].map(name=>'/r:'+join(framework,'WPF',name+'.dll')),'/r:System.Xaml.dll','/r:System.Web.Extensions.dll',join(root,'src/agent/native/CagentWindow.cs')],{stdio:'inherit',windowsHide:true});
+    child.once('error',reject);child.once('exit',code=>code===0?resolveBuild():reject(new Error('Native cagent window build failed')));
+  });
+  await writeFile(join(output,'cagent-app.vbs'),`Set sh = CreateObject("WScript.Shell")\r\nSet fs = CreateObject("Scripting.FileSystemObject")\r\np = fs.GetParentFolderName(WScript.ScriptFullName)\r\nsh.Run Chr(34) & p & "\\Cagent.exe" & Chr(34), 1, False\r\n`);
+  if(process.arch==='x64'){
+    const cached=join(root,'test-results/toolchains/llvm-mingw-20261006-ucrt-x86_64/bin/x86_64-w64-mingw32-clang++.exe');
+    const compiler=process.env.CAGENT_NATIVE_CXX||(existsSync(cached)?cached:undefined);
+    if(!compiler)throw new Error('Set CAGENT_NATIVE_CXX to the LLVM-MinGW x64 clang++ compiler to build the optional desktop capability');
+    await new Promise((resolveBuild,reject)=>{
+      const child=spawn(compiler,['-std=c++17','-O2','-municode','-static',join(root,'tools/cagent-desktop/native/desktop.cpp'),'-o',join(output,'cagent-desktop.exe'),'-ld3d11','-ldxgi','-lmfplat','-lmfuuid','-lmf','-lole32','-loleaut32','-luuid','-lwmcodecdspuuid','-luser32','-lgdi32'],{stdio:'inherit',windowsHide:true});
+      child.once('error',reject);child.once('exit',code=>code===0?resolveBuild():reject(new Error('Native desktop capability build failed')));
+    });
+    await cp(join(root,'tools/cagent-desktop/licenses/nlohmann-json.txt'),join(output,'LICENSE.desktop-json.txt'));
+    const compilerLicense=join(dirname(dirname(compiler)),'LICENSE.TXT');
+    if(!existsSync(compilerLicense))throw new Error('LLVM-MinGW LICENSE.TXT must accompany the selected compiler');
+    await cp(compilerLicense,join(output,'LICENSE.desktop-toolchain.txt'));
+    desktopNative={platform:'win32',architecture:'x64',sha256:createHash('sha256').update(await readFile(join(output,'cagent-desktop.exe'))).digest('hex'),optional:true,enabledByDefault:false};
+  }
+}
 if (process.platform !== 'win32') {
   await chmod(join(output, launcher), 0o755);
   await chmod(join(output, nodeName), 0o755);
@@ -99,7 +125,7 @@ for (const file of [
     directory = dirname(directory);
   }
 }
-let notices = 'CShell Agent — bundled third-party licenses\n\n';
+let notices = 'cagent (Canp Agent) — bundled third-party licenses\n\n';
 for (const [name, { directory, data }] of [...packages.entries()].sort(([a], [b]) =>
   a.localeCompare(b),
 )) {
@@ -182,7 +208,7 @@ if (process.platform === 'win32') {
 }
 await writeFile(
   join(output, 'README.txt'),
-  `CShell Agent ${version}\n\nRun cshell-agent init to choose shells and create credentials.\nRun cshell-agent run (Windows: Start Agent.cmd) to start the user process.\nIt does not install a Windows service and does not open remote access automatically.\nConfigure and explicitly start the listener from the CShell Agent extension.\nNo Electron or Chromium is bundled.\nKeep the complete Agent data directory, including vault-key, for recovery.\n`,
+  `cagent (Canp Agent) ${version}\n\nOpen cagent-app.vbs (Windows) or run cagent app for the standalone local assistant.\nWindows uses a compact native WPF window; other platforms use the system browser. No bundled browser runtime.\nConfigure the model and explicit permissions in Settings.\nLegacy cshell-agent commands and data remain compatible.\n\nRun cshell-agent init to choose shells and create credentials.\nRun cshell-agent run (Windows: Start Agent.cmd) to start the user process.\nIt does not install a Windows service and does not open remote access automatically.\nConfigure and explicitly start the listener from the CShell Agent extension.\nNo Electron or Chromium is bundled.\nKeep the complete Agent data directory, including vault-key, for recovery.\n`,
 );
 await writeFile(
   join(output, 'build-info.json'),
@@ -193,6 +219,7 @@ await writeFile(
       arch: process.arch,
       node: process.versions.node,
       electron: false,
+      desktopNative,
     },
     null,
     2,

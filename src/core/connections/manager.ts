@@ -5,7 +5,12 @@ import { ConnectionRegistry } from './registry';
 /** Trusted host adapter. Secrets are supplied per connection and never retained by Core. */
 export interface ManagedProvider extends ConnectionProvider {
   readonly configuration: z.ZodType;
-  connect(configuration: unknown, credentials: unknown, signal: AbortSignal): Promise<string>;
+  connect(
+    configuration: unknown,
+    credentials: unknown,
+    signal: AbortSignal,
+    ready?: (id: string) => void,
+  ): Promise<string>;
   disconnect(id: string): void | Promise<void>;
 }
 
@@ -24,6 +29,7 @@ export class ConnectionManager {
     configuration: unknown,
     credentials: unknown,
     signal = new AbortController().signal,
+    ready?: (id: string) => void,
   ) {
     const provider = this.providers.get(providerId);
     if (!provider) throw new Error('Provider is not installed');
@@ -32,16 +38,29 @@ export class ConnectionManager {
     const token = crypto.randomUUID();
     this.opening.add(providerId + ':' + token);
     let id: string | undefined;
-    try {
-      id = await provider.connect(config, credentials, signal);
+    let prepared: string | undefined;
+    const bind = (sessionId: string) => {
       signal.throwIfAborted();
-      if (this.providers.get(providerId) !== provider || this.owners.has(id))
+      if (prepared || this.providers.get(providerId) !== provider || this.owners.has(sessionId))
         throw new Error('Provider lifecycle changed');
-      this.tools.bind(id, providerId);
-      this.owners.set(id, provider);
+      this.tools.bind(sessionId, providerId);
+      this.owners.set(sessionId, provider);
+      prepared = sessionId;
+      ready?.(sessionId);
+    };
+    try {
+      id = await provider.connect(config, credentials, signal, bind);
+      signal.throwIfAborted();
+      if (prepared && (prepared !== id || this.owners.get(id) !== provider))
+        throw new Error('Provider lifecycle changed');
+      if (!prepared) bind(id);
       return id;
     } catch (error) {
-      if (id && !this.owners.has(id)) await provider.disconnect(id);
+      if (prepared) {
+        this.closed(prepared);
+        await provider.disconnect(prepared);
+      }
+      if (id && id !== prepared && !this.owners.has(id)) await provider.disconnect(id);
       throw error;
     } finally {
       this.opening.delete(providerId + ':' + token);

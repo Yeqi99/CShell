@@ -18,6 +18,7 @@ type Field = 'name' | 'host' | 'port' | 'username';
 
 export function ConnectionForm({
   profile,
+  initialPassword = '',
   groups,
   initialPersist = !!profile,
   saved,
@@ -26,6 +27,7 @@ export function ConnectionForm({
   onConnect,
 }: {
   profile?: Profile;
+  initialPassword?: string;
   groups: string[];
   initialPersist?: boolean;
   saved: boolean;
@@ -51,7 +53,7 @@ export function ConnectionForm({
   );
   const [persist, setPersist] = useState(initialPersist);
   const [port, setPort] = useState(String(value.port));
-  const [password, setPassword] = useState('');
+  const [password, setPassword] = useState(initialPassword);
   const [passphrase, setPassphrase] = useState('');
   const [key, setKey] = useState<{ token: string; name: string } | null>(null);
   const [remember, setRemember] = useState(saved);

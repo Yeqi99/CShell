@@ -1,8 +1,21 @@
+import { usePermissionNavigation } from '../permission-navigation';
 import { AiPermissionTree } from './AiPermissionTree';
 import { AiGoals } from './AiWork';
+import { AiEventSubscriptions } from './AiEventSubscriptions';
+import type { AiEventSnapshot } from '../../shared/ai-events';
 import { Target } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { Plus, History, Settings2, MessageSquare, X, Trash2, Cpu, ShieldCheck } from 'lucide-react';
+import {
+  Plus,
+  History,
+  Settings2,
+  MessageSquare,
+  X,
+  Trash2,
+  Cpu,
+  ShieldCheck,
+  Radio,
+} from 'lucide-react';
 import {
   emptyAiPolicy,
   type AiSnapshot,
@@ -20,12 +33,16 @@ export function AiPanel({
   profiles,
   groups,
   onClose,
+  executionVisible,
+  onExecutionVisible,
 }: {
   visible: boolean;
   sessionId?: string;
   profiles: Profile[];
   groups: string[];
   onClose: () => void;
+  executionVisible: boolean;
+  onExecutionVisible: (visible: boolean) => Promise<void>;
 }) {
   const [snapshot, setSnapshot] = useState<AiSnapshot>({
     providers: [],
@@ -34,12 +51,46 @@ export function AiPanel({
     extractionProviderId: null,
     threads: [],
   });
-  const [page, setPage] = useState<'chat' | 'settings' | 'history' | 'goals'>('chat');
+  const [page, setPage] = useState<'chat' | 'settings' | 'history' | 'goals' | 'events'>('chat');
+  const [events, setEvents] = useState<
+    AiEventSnapshot & { subscriptions: { id: string; name: string; source: string }[] }
+  >({ rules: [], sources: [], runs: [], subscriptions: [] });
+  const refreshEvents = async () => setEvents(await window.cshell.aiEventsSnapshot());
+  useEffect(() => {
+    if (!visible || page !== 'events') return;
+    let disposed = false;
+    let pending = false;
+    const poll = async () => {
+      if (pending) return;
+      pending = true;
+      try {
+        const next = await window.cshell.aiEventsSnapshot();
+        if (!disposed) setEvents(next);
+      } catch (e) {
+        if (!disposed) setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        pending = false;
+      }
+    };
+    void poll();
+    const timer = setInterval(() => void poll(), 3000);
+    return () => {
+      disposed = true;
+      clearInterval(timer);
+    };
+  }, [visible, page]);
   const [location] = useState<AiLocation>('terminal');
   const [providerId, setProviderId] = useState(''),
     [threadId, setThreadId] = useState('');
   const [mode, setMode] = useState<AiMode>('review');
-  const [settingsTab, setSettingsTab] = useState<'models' | 'permissions'>('models');
+  const [settingsTab, setSettingsTab] = useState<'models' | 'permissions' | 'execution'>('models');
+  const permissionRequest = usePermissionNavigation();
+  useEffect(() => {
+    if (permissionRequest?.node.page === 'ai') {
+      setPage('settings');
+      setSettingsTab('permissions');
+    }
+  }, [permissionRequest]);
   const [historySearch, setHistorySearch] = useState('');
   const [error, setError] = useState(''),
     [busy, setBusy] = useState(false);
@@ -194,6 +245,15 @@ export function AiPanel({
           >
             <Target size={16} />
           </button>
+          <button
+            className="icon"
+            title="事件订阅"
+            aria-label="事件订阅"
+            aria-pressed={page === 'events'}
+            onClick={() => setPage(page === 'events' ? 'chat' : 'events')}
+          >
+            <Radio size={16} />
+          </button>
           <button className="icon" title="折叠智能体" aria-label="折叠智能体" onClick={onClose}>
             <X size={16} />
           </button>
@@ -206,6 +266,7 @@ export function AiPanel({
       )}
       <div className="agent-chat-page" hidden={page !== 'chat'}>
         <AiConversation
+          executionVisible={executionVisible}
           openThread={(id) => {
             setThreadId(id);
             setPage('chat');
@@ -236,6 +297,27 @@ export function AiPanel({
           run={run}
           busy={busy}
           open={(id) => {
+            setThreadId(id);
+            setPage('chat');
+          }}
+        />
+      </div>
+      <div className="agent-events-page" hidden={page !== 'events'}>
+        <AiEventSubscriptions
+          {...events}
+          threads={snapshot.threads.filter(t => !t.parentId && !t.goal && snapshot.providers.some(p => p.id === t.providerId))}
+          onRefresh={refreshEvents}
+          onStartSubscription={(input) => window.cshell.aiEventListen(input)}
+          onSave={async (rule) => {
+            const saved = await window.cshell.aiEventSave(rule);
+            await refreshEvents();
+            return saved;
+          }}
+          onRemove={async (id) => {
+            await window.cshell.aiEventRemove(id);
+            await refreshEvents();
+          }}
+          onOpenThread={(id) => {
             setThreadId(id);
             setPage('chat');
           }}
@@ -310,6 +392,12 @@ export function AiPanel({
       )}
       <div className="ai-settings" hidden={page !== 'settings'}>
         <nav className="agent-settings-tabs" aria-label="智能体设置分类">
+          <button
+            aria-pressed={settingsTab === 'execution'}
+            onClick={() => setSettingsTab('execution')}
+          >
+            执行过程
+          </button>
           <button aria-pressed={settingsTab === 'models'} onClick={() => setSettingsTab('models')}>
             <Cpu size={14} />
             模型基座
@@ -323,6 +411,23 @@ export function AiPanel({
             访问权限
           </button>
         </nav>
+        <div hidden={settingsTab !== 'execution'}>
+          <h3>指令过程显示</h3>
+          <label className="permission-model">
+            显示方式
+            <select
+              value={executionVisible ? 'visible' : 'silent'}
+              disabled={busy}
+              onChange={(e) => void run(() => onExecutionVisible(e.target.value === 'visible'))}
+            >
+              <option value="visible">可见：显示命令和实时返回内容</option>
+              <option value="silent">静默：仅显示回复与授权提示</option>
+            </select>
+          </label>
+          <p className="ai-section-note">
+            可见模式在对应机器的左侧工作区显示实际执行过程。设置会自动保存。
+          </p>
+        </div>
         <div hidden={settingsTab !== 'models'}>
           <div className="ai-section-heading">
             <h3>API 基座</h3>
@@ -568,6 +673,7 @@ export function AiPanel({
         </div>
         <div hidden={settingsTab !== 'permissions'}>
           <AiPermissionTree
+            visible={visible && page === 'settings' && settingsTab === 'permissions'}
             snapshot={snapshot}
             profiles={profiles}
             groups={groups}

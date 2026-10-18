@@ -3,12 +3,13 @@ import { StringDecoder } from 'node:string_decoder';
 import type { ClientChannel } from 'ssh2';
 import type { SshService } from './ssh';
 import type { RemoteJob } from '../shared/plugins';
+import { ApiError } from './api/errors';
 
 export const quote = (value: string) => "'" + value.replace(/'/g, "'\\''") + "'";
 export class RemoteJobs {
   private records = new Map<
     string,
-    { job: RemoteJob; channel?: ClientChannel; cancel: () => void }
+    { job: RemoteJob; channel?: ClientChannel; cancel: () => void; completion?: Promise<void> }
   >();
   constructor(private ssh: SshService) {}
   list(sessionId: string) {
@@ -19,6 +20,12 @@ export class RemoteJobs {
   cancel(id: string) {
     const record = this.records.get(id);
     if (record?.job.state === 'running') record.cancel();
+  }
+  async wait(id: string) {
+    const record = this.records.get(id);
+    if (!record) throw new Error('Unknown job');
+    await record.completion;
+    return { ...record.job };
   }
   start(sessionId: string, label: string, command: string, input?: string) {
     this.ssh.get(sessionId);
@@ -47,7 +54,7 @@ export class RemoteJobs {
         controller.abort();
       },
     });
-    void this.exec(
+    this.records.get(job.id)!.completion = this.exec(
       sessionId,
       command,
       input,
@@ -97,9 +104,15 @@ export class RemoteJobs {
           reject(error);
         } else resolve(result);
       };
-      const disconnected = () => finish(new Error('SSH connection closed'));
+      const uncertain = (message: string) =>
+        new ApiError(
+          'OUTCOME_UNKNOWN',
+          message,
+          'Inspect the remote target before retrying. The process may still be running.',
+        );
+      const disconnected = () => finish(uncertain('SSH connection closed'));
       const cancelled = () => finish(new Error('Task cancelled'));
-      const timer = setTimeout(() => finish(new Error('Remote task timed out')), timeout);
+      const timer = setTimeout(() => finish(uncertain('Remote task timed out')), timeout);
       client.once('close', disconnected);
       signal?.addEventListener('abort', cancelled, { once: true });
       if (signal?.aborted) {
@@ -132,7 +145,9 @@ export class RemoteJobs {
           finish(
             code === 0
               ? undefined
-              : new Error(errors.trim() || `Remote command failed (${code ?? 'disconnected'})`),
+              : code === undefined
+                ? uncertain('Remote command channel closed without exit status')
+                : new Error(errors.trim() || `Remote command failed (${code})`),
           ),
         );
         channel.end(input ?? '');

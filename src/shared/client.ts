@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { Profile } from './contracts';
 import { agentRelayConnectionSchema, type AgentRelayConnection } from './agent-relay';
 export const clientShellSchema = z.enum(['cmd', 'powershell', 'bash', 'zsh', 'sh', 'wsl']);
 export const clientOpenSchema = z.union([
@@ -73,7 +74,8 @@ export interface ClientBridge {
     relay?: AgentRelayConnection;
   }): Promise<ClientInfo>;
   clientPasswordPair(info: ClientInfo, password: string): Promise<ClientDevice>;
-  openRdp(endpoint: { host: string; port: number }): Promise<void>;
+  openRdp(profileId: string): Promise<void>;
+  saveRdp(profile: Profile, password?: string, clearPassword?: boolean): Promise<void>;
   clientDownloadPage(): Promise<void>;
   clientTheme(theme: 'light' | 'dark'): Promise<void>;
   clientDevices(): Promise<ClientDevice[]>;

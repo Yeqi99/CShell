@@ -1,0 +1,570 @@
+{
+  "version": "4.1.15.50",
+  "moduleSha256": "0cf6379405432385a1c442766443450f26a7689f45e53c1b4ad2822061f3113b",
+  "executableProfile": false,
+  "status": "research-only-quarantined",
+  "warning": "Native calls returned, but subsequent frida-agent.dll fail-fast recurred. This file must not enable tools or drive automatic injection.",
+  "contactService": {
+    "getService": "0x4737f0",
+    "lookup": "0x102a950",
+    "databaseServiceField": "0x1a8",
+    "databaseLookup": "0x3015dc0",
+    "databaseResult": "0x1022930",
+    "verification": "Read an explicitly authorized group through both service lookup and database dispatch; only one target tested. Cleanup reported restored bytes; delayed crash subsequently occurred.",
+    "model": {
+      "size": "0x460",
+      "username": "0x8",
+      "aliasCandidate": "0x28",
+      "flag": "0x6c",
+      "remarkCandidate": "0x78",
+      "nickname": "0xd8"
+    }
+  },
+  "setPinned": {
+    "contactServiceMethod": "0x104e140",
+    "oplogServiceGetter": "0x768320",
+    "oplogMethod": "0x1a46570",
+    "oplogType": 4,
+    "protobuf": "micromsg.SetTopOplog",
+    "parser": "0xf34710",
+    "serializer": "0xf348a0",
+    "fields": [
+      {
+        "number": 1,
+        "wireType": 2,
+        "objectOffset": "0x8"
+      },
+      {
+        "number": 2,
+        "wireType": 0,
+        "objectOffset": "0x10"
+      }
+    ],
+    "verification": "Static caller, parser and serializer inspection only. Never called. No state was changed.",
+    "wrapperCandidates": [
+      {
+        "rva": "0x1986750",
+        "targetField": "0x8",
+        "booleanField": "0x28"
+      },
+      {
+        "rva": "0x45d45c0",
+        "targetField": "0x8",
+        "booleanField": "0x28"
+      }
+    ],
+    "threadRequirement": "Both wrappers obtain current coroutine context and contact service; arbitrary-thread calling is not validated."
+  },
+  "setRemark": {
+    "contactServiceCandidate": "0x10521f0",
+    "oplogMethod": "0x1a46940",
+    "protobuf": "micromsg.SetRemarkOplog",
+    "parser": "0x7b5380",
+    "serializer": "0x7b5500",
+    "fields": [
+      {
+        "number": 1,
+        "wireType": 2,
+        "objectOffset": "0x8"
+      },
+      {
+        "number": 2,
+        "wireType": 2,
+        "objectOffset": "0x10"
+      }
+    ],
+    "verification": "Static call chain and field layout only. Never called."
+  },
+  "deleteContact": {
+    "protobuf": "micromsg.DelContact",
+    "parser": "0x19972f0",
+    "serializerSharedImplementation": "0x19974d0",
+    "fields": [
+      {
+        "number": 1,
+        "wireType": 2,
+        "kind": "nested message",
+        "objectOffset": "0x8",
+        "nestedParser": "0x68bb50"
+      }
+    ],
+    "hasBitsOffset": "0x14",
+    "candidateCallers": [
+      "0x19a8b30",
+      "0x19ae470",
+      "0x55f51a0"
+    ],
+    "verification": "Candidates derived from vtable and lifecycle cross references; not verified business entry points. Never called."
+  },
+  "verifyUser": {
+    "protobuf": "micromsg.VerifyUserRequest",
+    "parser": "0x3b638c0",
+    "serializer": "0x3b64580",
+    "byteSize": "0x3b64800",
+    "hasBitsOffset": "0x98",
+    "fields": [
+      {
+        "number": 1,
+        "wireType": 2,
+        "kind": "nested message",
+        "objectOffset": "0x8"
+      },
+      {
+        "number": 2,
+        "wireType": 0,
+        "kind": "uint32",
+        "objectOffset": "0x10"
+      },
+      {
+        "number": 3,
+        "wireType": 0,
+        "kind": "uint32",
+        "objectOffset": "0x14"
+      },
+      {
+        "number": 4,
+        "wireType": 2,
+        "kind": "repeated nested message",
+        "objectOffset": "0x18",
+        "countOffset": "0x20"
+      },
+      {
+        "number": 5,
+        "wireType": 2,
+        "kind": "string or bytes",
+        "objectOffset": "0x30"
+      },
+      {
+        "number": 6,
+        "wireType": 0,
+        "kind": "uint32",
+        "objectOffset": "0x4c"
+      },
+      {
+        "number": 7,
+        "wireType": 2,
+        "kind": "packed repeated varint",
+        "objectOffset": "0x38",
+        "countOffset": "0x40",
+        "encodedSizeOffset": "0x48"
+      },
+      {
+        "number": 8,
+        "wireType": 0,
+        "kind": "uint32",
+        "objectOffset": "0x50"
+      },
+      {
+        "number": 9,
+        "wireType": 2,
+        "kind": "repeated nested message",
+        "objectOffset": "0x58",
+        "countOffset": "0x60"
+      },
+      {
+        "number": 10,
+        "wireType": 2,
+        "kind": "nested message",
+        "objectOffset": "0x70"
+      },
+      {
+        "number": 11,
+        "wireType": 2,
+        "kind": "nested message",
+        "objectOffset": "0x78"
+      },
+      {
+        "number": 12,
+        "wireType": 0,
+        "kind": "uint32",
+        "objectOffset": "0x90"
+      },
+      {
+        "number": 13,
+        "wireType": 2,
+        "kind": "string or bytes",
+        "objectOffset": "0x80"
+      },
+      {
+        "number": 14,
+        "wireType": 2,
+        "kind": "string or bytes",
+        "objectOffset": "0x88"
+      }
+    ],
+    "layoutEvidence": "Static serializer and byte-size cross-check; wire field numbers and storage only. Semantic names and operation values are deliberately not inferred from older clients. No request was sent.",
+    "candidateCallers": [
+      "0x1a28ce0",
+      "0x1a3c770"
+    ],
+    "verification": "Static candidates only; request identifiers, ticket lifetimes, operation codes and accept/reject semantics remain unresolved. Never called.",
+    "copyConstructorCandidate": "0x1a3c770",
+    "copyConstructorWarning": "Copies protobuf plus trailing wrapper data; not an add/accept/reject business entry.",
+    "upperCallers": [
+      "0x766680",
+      "0x1a2c3c0",
+      "0x1a2d0e0",
+      "0x1a38f40",
+      "0x1a3aa10"
+    ],
+    "observedManualAccept": {
+      "clientVersion": "4.1.15.50",
+      "samples": 1,
+      "field2": 3,
+      "field3": 1,
+      "field4Count": 1,
+      "field6": 1,
+      "field8": 0,
+      "field9Count": 0,
+      "field12": 0,
+      "hasBits": 1079,
+      "cleanup": {
+        "codeRestored": true,
+        "unloaded": true
+      },
+      "verification": "One explicitly authorized request manually accepted by user; scalar serializer observation only. No native accept call performed.",
+      "unresolved": [
+        "recipient nested schema and binding",
+        "ticket lifetime and validation",
+        "remark and label mapping",
+        "chat-only and Moments visibility mapping",
+        "reject operation",
+        "repeat/expired request behavior"
+      ]
+    },
+    "acceptOptionsRequirement": {
+      "source": "User-provided approval screen",
+      "fields": [
+        "remark",
+        "labels",
+        "friendPermissionMode",
+        "hideMyMoments",
+        "hideTheirMoments"
+      ],
+      "policy": "Do not infer native encoding from the screenshot or silently widen permissions; require verified mappings before enabling each option."
+    },
+    "recipientMessage": {
+      "moduleSha256": "0cf6379405432385a1c442766443450f26a7689f45e53c1b4ad2822061f3113b",
+      "executableProfile": false,
+      "mode": "offline-static-audit",
+      "parentField": 4,
+      "objectSize": "0x88",
+      "vtable": "0x96f22f8",
+      "parser": "0x3b61720",
+      "serializer": "0x3b621e0",
+      "hasBitsOffset": "0x80",
+      "fields": [
+        {
+          "number": 1,
+          "kind": "bytes",
+          "objectOffset": "0x8"
+        },
+        {
+          "number": 2,
+          "kind": "bytes",
+          "objectOffset": "0x10"
+        },
+        {
+          "number": 3,
+          "kind": "bytes",
+          "objectOffset": "0x18"
+        },
+        {
+          "number": 4,
+          "kind": "uint32",
+          "objectOffset": "0x30"
+        },
+        {
+          "number": 5,
+          "kind": "bytes",
+          "objectOffset": "0x20"
+        },
+        {
+          "number": 6,
+          "kind": "bytes",
+          "objectOffset": "0x28"
+        },
+        {
+          "number": 7,
+          "kind": "bytes",
+          "objectOffset": "0x38"
+        },
+        {
+          "number": 8,
+          "kind": "uint32",
+          "objectOffset": "0x34"
+        },
+        {
+          "number": 9,
+          "kind": "bytes",
+          "objectOffset": "0x40"
+        },
+        {
+          "number": 10,
+          "kind": "uint32",
+          "objectOffset": "0x50"
+        },
+        {
+          "number": 11,
+          "kind": "nested-message",
+          "objectOffset": "0x48"
+        },
+        {
+          "number": 12,
+          "kind": "bytes",
+          "objectOffset": "0x58"
+        },
+        {
+          "number": 13,
+          "kind": "uint32",
+          "objectOffset": "0x54"
+        },
+        {
+          "number": 14,
+          "kind": "nested-message",
+          "objectOffset": "0x60"
+        },
+        {
+          "number": 15,
+          "kind": "uint32",
+          "objectOffset": "0x78"
+        },
+        {
+          "number": 16,
+          "kind": "bytes",
+          "objectOffset": "0x68"
+        },
+        {
+          "number": 17,
+          "kind": "bytes",
+          "objectOffset": "0x70"
+        }
+      ],
+      "semanticNamesVerified": false,
+      "nativeCalls": 0,
+      "protobuf": "micromsg.VerifyUser",
+      "verification": "Static parent parser allocation, child vtable, serializer and exact-build audit. No live recipient/ticket field meanings claimed."
+    },
+    "builderDataFlow": {
+      "function": "0x1a2a160",
+      "parameterNumbering": "Windows x64 physical arguments including hidden output/context arguments; not a callable ABI contract",
+      "operationArg": 4,
+      "copies": [
+        {
+          "argument": 3,
+          "destination": "child field 1"
+        },
+        {
+          "argument": 5,
+          "destination": "parent packed field 7"
+        },
+        {
+          "argument": 6,
+          "destination": "child field 4 when nonzero"
+        },
+        {
+          "argument": 7,
+          "destination": "child field 2 when operation>=3, field 3 otherwise"
+        },
+        {
+          "argument": 8,
+          "destination": "parent field 5"
+        },
+        {
+          "argument": 9,
+          "destination": "child field 5 when nonempty"
+        }
+      ],
+      "acceptCallerCandidate": {
+        "function": "0x1a38f40",
+        "callSite": "0x1a391eb",
+        "operation": 3
+      },
+      "otherCallerValues": {
+        "0x1a2c3c0": 2,
+        "0x1a2d0e0": 1
+      },
+      "verification": "Static data flow only. Do not label values 1/2 as add/reject without behavioral evidence. Coroutine ownership and completion unresolved."
+    }
+  },
+  "contactDatabaseTables": {
+    "contact": [
+      "id",
+      "username",
+      "local_type",
+      "alias",
+      "encrypt_username",
+      "flag",
+      "delete_flag",
+      "verify_flag",
+      "remark",
+      "remark_quan_pin",
+      "remark_pin_yin_initial",
+      "nick_name",
+      "pin_yin_initial",
+      "quan_pin",
+      "big_head_url",
+      "small_head_url",
+      "head_img_md5",
+      "chat_room_notify",
+      "is_in_chat_room",
+      "description",
+      "extra_buffer",
+      "chat_room_type"
+    ],
+    "chat_room": [
+      "id",
+      "username",
+      "owner",
+      "ext_buffer"
+    ],
+    "chatroom_member": [
+      "room_id",
+      "member_id"
+    ],
+    "room_verify_application": [
+      "msg_server_id",
+      "chatroom_name",
+      "hash_key",
+      "inviter_username",
+      "state",
+      "read_status",
+      "data_json",
+      "update_time"
+    ],
+    "contact_label": [
+      "label_id_",
+      "label_name_",
+      "sort_order_"
+    ],
+    "name2id": [
+      "username"
+    ]
+  },
+  "friendRequestStorage": {
+    "database": "general.db",
+    "table": "FMessageTable",
+    "serviceRegistrationCandidate": "0xeb4c50",
+    "tableAccessCandidates": [
+      "0x32214d0",
+      "0x322e2a0",
+      "0x322eb70",
+      "0x322f2e0",
+      "0x3230c70",
+      "0x32312c0",
+      "0x3232b90",
+      "0x324fe30",
+      "0x3253f30",
+      "0x32546b0",
+      "0x32550b0"
+    ],
+    "candidateWarning": "Static string references only; these are not validated callable methods.",
+    "columns": [
+      "user_name_",
+      "type_",
+      "timestamp_",
+      "encrypt_user_name_",
+      "content_",
+      "is_sender_",
+      "ticket_",
+      "scene_",
+      "fmessage_detail_buf_",
+      "remark_",
+      "label_ids_"
+    ],
+    "verification": "Live schema read on owner thread completed with SQLITE_DONE. Table schema alone does not establish status values or ticket validity; ticket contents have not been queried.",
+    "detail": {
+      "protobuf": "micromsg.FMessageDetail",
+      "parser": "0x3b5f560",
+      "serializer": "0x3b5f930",
+      "fields": [
+        {
+          "number": 1,
+          "kind": "repeated nested message",
+          "objectOffset": "0x8",
+          "countOffset": "0x10"
+        },
+        {
+          "number": 2,
+          "kind": "bool",
+          "objectOffset": "0x20"
+        },
+        {
+          "number": 3,
+          "kind": "bool",
+          "objectOffset": "0x21"
+        },
+        {
+          "number": 4,
+          "kind": "bool",
+          "objectOffset": "0x22"
+        }
+      ],
+      "semantics": "Static layout only; boolean meanings not assigned."
+    },
+    "message": {
+      "protobuf": "micromsg.FMessageMessage",
+      "parser": "0x3b5ed90",
+      "serializer": "0x3b5f030",
+      "fields": [
+        {
+          "number": 1,
+          "kind": "64-bit varint candidate",
+          "objectOffset": "0x8"
+        },
+        {
+          "number": 2,
+          "kind": "string or bytes",
+          "objectOffset": "0x10"
+        },
+        {
+          "number": 3,
+          "kind": "uint32",
+          "objectOffset": "0x18"
+        },
+        {
+          "number": 4,
+          "kind": "bool",
+          "objectOffset": "0x1c"
+        }
+      ]
+    },
+    "recordLayout": {
+      "size": "0x140",
+      "mappingFunction": "0x57be300",
+      "destructor": "0x1a178d0",
+      "fields": {
+        "user_name_": "0x0",
+        "type_": "0x20",
+        "timestamp_": "0x24",
+        "encrypt_user_name_": "0x28",
+        "content_": "0x48",
+        "is_sender_": "0x68",
+        "ticket_": "0x70",
+        "scene_": "0x90",
+        "fmessage_detail_buf_": "0x98",
+        "remark_": "0xb8",
+        "label_ids_": "0xd8"
+      },
+      "parsedDetailOffset": "0xf8",
+      "verification": "Static ORM column registrations and destructor cross-check. No live record decoding confirmed; type/state semantics unresolved."
+    },
+    "listReadCandidates": {
+      "tableList": "0x322eb70",
+      "queryBuilder": "0x322ef40",
+      "worker": "0x5a6a580",
+      "verification": "Static direct calls and 0x140 vector stride; not safe callable ABI."
+    },
+    "historyPolicy": "Include historical accepted records; preserve raw status until verified, never equate all history with pending requests."
+  },
+  "databaseVerification": "Owner-thread contact paging returned 7847 rows over 8 pages, 7847 distinct IDs and usernames, final SQLITE_DONE. This is the contact table, not a friend count; there is no cross-page snapshot guarantee. Authorized group membership returned 3 rows and SQLITE_DONE. General database returned 23 table schemas. No database writes, key extraction or backup patching. Stability remains unproven.",
+  "runtimeFaults": {
+    "latest": "2026-10-17T01:25:37+08:00",
+    "module": "Weixin.dll",
+    "exception": "0xc0000005",
+    "rva": "0x4a0a8e",
+    "function": "0x4a09e0",
+    "finding": "Thread-local context at TLS slot +0x1f0 is loaded, followed by dereference of object +0x388. Static null path exists; no dump/register state to confirm actual cause. Different signature from previous frida-agent fail-fast.",
+    "sendOutcome": "unknown; not retried"
+  }
+}

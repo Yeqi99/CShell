@@ -18,6 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
       - uses: pnpm/action-setup@v4
         with:
           version: 11.25.0
@@ -39,7 +41,7 @@ jobs:
           assert.match(runId, /^\d+$/);
           assert.match(sha, /^[a-f0-9]{40}$/);
           const get = async (path) => {
-            const r = await fetch(`https://api.github.com/repos/Yeqi99/CShell/${path}`, {
+            const r = await fetch(`https://api.github.com/repos/${process.env.GITHUB_REPOSITORY}/${path}`, {
               headers: {Authorization: `Bearer ${process.env.GH_TOKEN}`, 'User-Agent':'CShell-release-recovery'},
               signal: AbortSignal.timeout(30000),
             });
@@ -78,6 +80,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="v$(node -p 'require("./package.json").version')"
-          ID="$(gh api 'repos/Yeqi99/CShell/releases?per_page=100' --jq ".[] | select(.tag_name == \"$VERSION\" and .draft == true) | .id")"
+          ID="$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq ".[] | select(.tag_name == \"$VERSION\" and .draft == true) | .id")"
           test -n "$ID"
-          gh api --method PATCH "repos/Yeqi99/CShell/releases/$ID" -F draft=false
+          gh api --method PATCH "repos/$GITHUB_REPOSITORY/releases/$ID" -F draft=false
