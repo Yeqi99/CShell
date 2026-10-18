@@ -24,7 +24,7 @@ export const clientEndpointSchema = z
       .min(1)
       .max(253)
       .regex(/^[a-zA-Z0-9.:-]+$/),
-    port: z.number().int().min(1024).max(65535),
+    port: z.number().int().min(1).max(65535),
   })
   .strict();
 export const clientInvitationSchema = clientEndpointSchema
@@ -55,6 +55,7 @@ export type ClientStatus = {
   port?: number;
   bind?: string;
   advertisedHost?: string;
+    advertisedPort?: number;
   peers: { fingerprint: string; name: string; shells: ClientShell[]; connected: number }[];
   audit: { time: string; action: string; peer: string }[];
 };
@@ -91,13 +92,14 @@ export interface ClientBridge {
     bind: string;
     port: number;
     advertisedHost?: string;
+    advertisedPort?: number;
   }): Promise<ClientStatus>;
   clientStop(): Promise<ClientStatus>;
   clientInvite(options: { host: string; shells: ClientShell[] }): Promise<string>;
   clientRevoke(fingerprint: string): Promise<ClientStatus>;
 }
 
-export const clientPasswordSchema = z.string().min(12).max(128);
+export const clientPasswordSchema = z.string().min(1).max(128);
 export const clientAccessSchema = z
   .object({
     password: clientPasswordSchema,

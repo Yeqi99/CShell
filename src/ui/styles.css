@@ -5098,7 +5098,7 @@ input[type='radio']:focus-visible {
 }
 .floating-error {
   font-size: 11px;
-  color: var(--danger);
+  color: var(--red);
   padding: 3px 8px;
 }
 
@@ -5789,6 +5789,29 @@ input[type='radio']:focus-visible {
 .connection-extract-actions .icon {
   width: 30px;
 }
+.connection-ai-extractor .connection-extract-actions button.connection-extract,
+.connection-ai-extractor .connection-extract-paste button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 400;
+  box-sizing: border-box;
+}
+.connection-ai-extractor .connection-extract-paste {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
 .connection-extract-panel {
   margin-top: 12px;
   padding: 12px;
@@ -5918,3 +5941,4 @@ input[type='radio']:focus-visible {
 .clipboard-connection > button {
   flex-shrink: 0;
 }
+

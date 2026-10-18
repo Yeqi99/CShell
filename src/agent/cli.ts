@@ -58,7 +58,16 @@ async function main() {
     const child=spawn(join(dirname(process.argv[1]),'Cagent.exe'),[],{detached:true,stdio:'ignore',windowsHide:false});
     await new Promise<void>((resolve,reject)=>{child.once('spawn',resolve);child.once('error',reject);});child.unref();return;
   }
-  if(command==='app'||command==='app-host'){
+  if(command==='restart-app-host'){
+    try{await callAgent('agent.shutdown',{confirm:true});}catch(error){if((error as Error).message!=='本机 Agent 未运行'&&(error as NodeJS.ErrnoException).code!=='ECONNREFUSED')throw error;}
+    const deadline=Date.now()+30000;
+    for(;;){
+      try{await callAgent('client.status');}catch(error){if((error as Error).message==='本机 Agent 未运行'||(error as NodeJS.ErrnoException).code==='ECONNREFUSED')break;throw error;}
+      if(Date.now()>=deadline)throw new Error('旧后台尚未退出，请稍后重试');
+      await new Promise(resolve=>setTimeout(resolve,100));
+    }
+  }
+  if(command==='app'||command==='app-host'||command==='restart-app-host'){
     let runtime:Awaited<ReturnType<typeof createAgentRuntime>>|undefined;
     let app:Awaited<ReturnType<typeof startCagentApp>>|undefined;
     try{await callAgent('client.status');}catch(error){
@@ -66,7 +75,7 @@ async function main() {
       runtime=await createAgentRuntime({onClose:()=>{void app?.close();}});
       await runtime.startControl();
     }
-    try{app=await startCagentApp();if(command==='app-host'){stdout.write(JSON.stringify({url:app.url})+'\n');stdin.resume();stdin.on('end',()=>{void app?.close();});}else await openCagentApp(app.url);}catch(error){await app?.close();await runtime?.close();throw error;}
+    try{app=await startCagentApp();if(command!=='app'){stdout.write(JSON.stringify({url:app.url})+'\n');stdin.resume();stdin.on('end',()=>{void app?.close();});}else await openCagentApp(app.url);}catch(error){await app?.close();await runtime?.close();throw error;}
     stderr.write('cagent 本机界面已就绪；使用 cagent shutdown 退出运行时。\n');
     const stop=()=>{void app?.close().then(()=>runtime?.close());};
     process.once('SIGINT',stop);process.once('SIGTERM',stop);
@@ -118,7 +127,7 @@ async function main() {
         reader.close();
         if (!selected.length || selected.some((s) => !shells.includes(s)))
           throw new Error('请选择检测到的 Shell');
-        const password = await secret('连接密码（至少 12 位，输入隐藏）：');
+        const password = await secret('连接密码：');
         if (password !== (await secret('再次输入密码：'))) throw new Error('两次密码不一致');
         config = {
           password,

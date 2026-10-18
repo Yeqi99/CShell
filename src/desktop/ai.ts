@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { z } from 'zod';
 import { AiEventService } from '../core/ai-events';
+import { aiEventTools } from '../core/ai-event-tools';
 import { wechatAiEvent } from '../core/wechat-ai-events';
 import { aiEventRuleSchema } from '../shared/ai-events';
 
@@ -54,11 +55,15 @@ export async function registerAiHandlers(
   };
   const revalidate=setInterval(()=>{void events.revalidate().catch(()=>{eventError='事件调度不可用';});},1000);
   const listenerAbort=new AbortController();
-  handle('ai:events-snapshot',()=>({...events.snapshot(),error:eventError,
-    subscriptions:wechat?.subscriptions.list().filter(s=>s.state==='listening').map(s=>({id:s.id,name:`微信 · ${s.targets.join(', ')}`,source:'wechat'}))??[]}));
-  handle('ai:event-save',(input)=>{const rule=aiEventRuleSchema.parse(input);
+  const eventSnapshot=()=>({...events.snapshot(),error:eventError,
+    threads:ai.snapshot().threads.filter(t=>ai.canReceiveEvent(t.id)).map(t=>({id:t.id,title:t.title,providerId:t.providerId})),
+    subscriptions:wechat?.subscriptions.list().filter(s=>s.state==='listening').map(s=>({id:s.id,name:`微信 · ${s.targets.join(', ')}`,source:'wechat'}))??[]});
+  const saveEvent=(input:unknown)=>{const rule=aiEventRuleSchema.parse(input);
     if(rule.enabled&&rule.source==='wechat'&&!ai.canConsumeWechatEvent(rule.threadId))throw new Error('处理会话缺少微信读取权限，请在智能体访问权限中开启后保存');
-    return events.save({...rule,bindingKey:bindingKey(rule.threadId)});});
+    return events.save({...rule,bindingKey:bindingKey(rule.threadId)});};
+  ai.eventTools=threadId=>aiEventTools({snapshot:eventSnapshot,save:saveEvent,remove:id=>events.remove(id)},threadId);
+  handle('ai:events-snapshot',eventSnapshot);
+  handle('ai:event-save',saveEvent);
   handle('ai:event-remove',(id)=>events.remove(z.string().uuid().parse(id)));
   handle('ai:event-listen',(input)=>{if(!wechat)throw new Error('微信事件来源未安装');return wechat.startEventListener(input,listenerAbort.signal);});
   ai.work.start();

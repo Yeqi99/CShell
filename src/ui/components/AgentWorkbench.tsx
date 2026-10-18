@@ -1,3 +1,4 @@
+import { AgentAssistantSettings } from './AgentAssistantSettings';
 import { AgentApplications } from './AgentApplications';
 import { useCallback, useEffect, useState } from 'react';
 import type { AgentCall, AgentShellOption, AgentTarget } from '../../shared/agent';
@@ -6,7 +7,7 @@ import { AgentHostingPanel } from './AgentHostingPanel';
 import { AgentRelayPanel } from './AgentRelayPanel';
 import { AgentWslNetwork } from './AgentWslNetwork';
 import './agent-workbench.css';
-type Status = ClientStatus & { platform?: string; canImportLegacy?: boolean };
+type Status = ClientStatus & { autostart?: {supported:boolean;enabled:boolean}; platform?: string; canImportLegacy?: boolean };
 export function AgentWorkbench() {
   const [targets, setTargets] = useState<AgentTarget[]>([]),
     [target, setTarget] = useState('local'),
@@ -71,7 +72,7 @@ export function AgentWorkbench() {
     </div>
   );
 }
-function AgentConfiguration({ target }: { target: AgentTarget }) {
+export function AgentConfiguration({ target, machine=false }: { target: AgentTarget; machine?:boolean }) {
   const [section, setSection] = useState('connection');
   const [visited, setVisited] = useState<string[]>(['connection']);
   const call = useCallback(
@@ -84,12 +85,13 @@ function AgentConfiguration({ target }: { target: AgentTarget }) {
       <nav className="agent-tabs" aria-label="Agent 配置分类">
         {[
           ['connection', '连接与权限'],
+          ['assistant', '模型与智能体'],
           ['applications', '应用市场'],
           ['hosting', 'HTTP 服务'],
           ['relay', '中继'],
           ['wsl', 'WSL'],
           ['logs', '日志'],
-        ].map(([id, label]) => (
+        ].filter(([id])=>!machine||id!=='applications').map(([id, label]) => (
           <button
             key={id}
             aria-selected={section === id}
@@ -105,6 +107,7 @@ function AgentConfiguration({ target }: { target: AgentTarget }) {
       <div hidden={section !== 'connection'}>
         <AgentConnection target={target} call={call} />
       </div>
+      <div hidden={section !== 'assistant'}>{visited.includes('assistant')&&<AgentAssistantSettings call={call}/>}</div>
       <div hidden={section !== 'applications'}>{visited.includes('applications')&&<AgentApplications target={target} call={call}/>}</div>
       <div hidden={section !== 'hosting'}>
         {visited.includes('hosting') && <AgentHostingPanel target={target.id} call={call} />}
@@ -125,9 +128,10 @@ function AgentConnection({ target, call }: { target: AgentTarget; call: Call }) 
     [shells, setShells] = useState<AgentShellOption[]>([]),
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false),
-    [message, setMessage] = useState('');
-  const [bind, setBind] = useState('127.0.0.1'),
+    [message, setMessage] = useState(''), [loaded,setLoaded]=useState(false);
+  const [bind, setBind] = useState('0.0.0.0'),
     [port, setPort] = useState(47831),
+    [publicPort, setPublicPort] = useState(''),
     [host, setHost] = useState('127.0.0.1'),
     [password, setPassword] = useState(''),
     [grants, setGrants] = useState<ClientShell[]>([]);
@@ -140,14 +144,14 @@ function AgentConnection({ target, call }: { target: AgentTarget; call: Call }) 
     [confirm, setConfirm] = useState(false);
   const refresh = async () => {
     const s = (await call('client.status')) as Status;
-    setStatus(s);
+    setStatus(previous => ({...previous, ...s}));
     return s;
   };
   useEffect(() => {
     let alive = true;
     const timer = setInterval(() => {
       void call('client.status')
-        .then((s) => alive && setStatus(s))
+        .then((s) => alive && setStatus(previous => ({...previous, ...s})))
         .catch((e) => alive && setError(String(e)));
     }, 5000);
     return () => {
@@ -157,20 +161,23 @@ function AgentConnection({ target, call }: { target: AgentTarget; call: Call }) 
   }, [call]);
   useEffect(() => {
     let alive = true;
-    void Promise.all([call('client.status'), call('agent.environments')])
+    void Promise.all([call('connection.settings'), call('agent.environments')])
       .then(([s, choices]) => {
         if (!alive) return;
+        setLoaded(true);
         setStatus(s);
+        setPassword(s.password ?? '');
         setShells(choices);
-        setBind(s.bind ?? '127.0.0.1');
-        setHost(s.advertisedHost ?? s.bind ?? '127.0.0.1');
+        setBind(s.bind ?? '0.0.0.0');
+        setHost(s.advertisedHost ?? s.interfaces?.[0] ?? '127.0.0.1');
         setPort(s.port ?? 47831);
-        setGrants(s.allowedShells ?? []);
+        setPublicPort(s.advertisedPort == null ? '' : String(s.advertisedPort));
+        setGrants(s.passwordConfigured ? s.allowedShells ?? [] : [...new Set(choices.map((choice: {shell:ClientShell}) => choice.shell))] as ClientShell[]);
         setAccess({
-          allowHttp: !!s.allowHttp,
-          allowManage: !!s.allowManage,
-          allowHosting: !!s.allowHosting,
-          allowRelay: !!s.allowRelay,
+          allowHttp: !s.passwordConfigured || !!s.allowHttp,
+          allowManage: !s.passwordConfigured || !!s.allowManage,
+          allowHosting: !s.passwordConfigured || !!s.allowHosting,
+          allowRelay: !s.passwordConfigured || !!s.allowRelay,
         });
       })
       .catch((e) => alive && setError(String(e)));
@@ -190,38 +197,20 @@ function AgentConnection({ target, call }: { target: AgentTarget; call: Call }) 
       setBusy(false);
     }
   };
-  const listener = { bind, port, advertisedHost: host };
+  const listener = { bind, port, advertisedHost: host, ...(publicPort.trim() ? {advertisedPort:Number(publicPort)} : {}) };
   const save = () =>
     run(async () => {
-      if (
-        !password &&
-        status &&
-        (JSON.stringify([...grants].sort()) !==
-          JSON.stringify([...(status.allowedShells ?? [])].sort()) ||
-          Object.entries(access).some(([key, value]) => value !== !!status[key as keyof Status]))
-      )
-        throw new Error('修改权限时请设置新密码，已有授权会撤销');
-      if (status?.running) {
-        await call('client.reconfigure', {
-          confirmDisconnect: true,
-          listener,
-          ...(password ? { access: { password, shells: grants, ...access } } : {}),
-        });
-        setMessage('正在重启监听；现有连接会断开，请重新连接。');
-      } else {
-        if (password) await call('client.access', { password, shells: grants, ...access });
-        await call('client.start', listener);
-        await refresh();
-      }
-      setPassword('');
+      const result = await call('connection.save', {...listener, password, shells:grants, ...access});
+      if (result.disconnects) setMessage('正在应用连接设置；原连接会断开，请重新连接。');
+      else {await refresh();setMessage('连接设置已保存。');}
       setConfirm(false);
     });
   return (
-    <div className="agent-settings">
+    <div className="agent-settings">{!loaded&&!error&&<p role="status">正在读取这台机器的配置…</p>}
       <p role="status">
         {status?.running ? '远程访问已启动' : '远程访问未启动'} · {target.name}
       </p>
-      <fieldset disabled={busy}>
+      <fieldset disabled={busy||!loaded}>
         <div className="agent-fields">
           <label>
             监听地址
@@ -246,14 +235,16 @@ function AgentConnection({ target, call }: { target: AgentTarget; call: Call }) 
             <input value={host} onChange={(e) => setHost(e.target.value)} />
           </label>
         </div>
+        <label>对外端口（留空使用监听端口）<input type="number" min={1} max={65535} value={publicPort} placeholder={String(port)} onChange={e=>setPublicPort(e.target.value)}/></label>
+        {status?.autostart?.supported&&<label><input type="checkbox" checked={status.autostart.enabled} onChange={e=>{const enabled=e.target.checked;void call('connection.autostart',{enabled}).then(autostart=>setStatus({...status,autostart})).catch(e=>setError(String(e)))}}/>开机自动启动</label>}
         <label>
           连接密码
           <input
-            type="password"
+            type="text"
             value={password}
-            minLength={12}
+            minLength={1}
             maxLength={128}
-            placeholder={status?.passwordConfigured ? '留空保留现有权限与密码' : '至少 12 个字符'}
+            placeholder={status?.passwordConfigured ? '留空保留现有权限与密码' : '设置连接密码'}
             onChange={(e) => setPassword(e.target.value)}
           />
         </label>

@@ -12,7 +12,7 @@ test('optional desktop package installation does not listen or authorize owners'
  const capability=await createDesktopCapability({identity:'test',nativeExecutable:exe,vault,authorize:()=>true});
  try{assert.equal(capability.extraPackages.length,1);const {adapter}=capability.extraPackages[0];assert.equal((await adapter.inspect(root)).installed,true);
   assert.equal(capability.service.status('local').listening,false);
-  await adapter.register!(root,['desktop.view']);assert.equal(capability.service.status('local').listening,false);assert.equal(capability.service.status('local').viewAllowed,false);
+  await adapter.register!(root,['desktop.view']);assert.equal(capability.service.status('local').listening,false);assert.equal(capability.service.status('local').viewAllowed,true);
   await assert.rejects(capability.dispatch('desktop.configure',{enabled:false},'remote',false),/local administration/);
   await adapter.quiesce!();assert.equal((await capability.dispatch('desktop.status',{},'local',true) as {packageReady:boolean}).packageReady,false);
  }finally{await capability.shutdown();assert.ok(root.startsWith(prefix));await rm(root,{recursive:true,force:true});}

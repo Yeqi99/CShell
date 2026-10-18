@@ -255,8 +255,8 @@ void stream(){
  while(!stop){commands();if(stop)break;if(settings.empty()){Sleep(2);continue;}
   if(active!=settings){
    if(initialized)throw std::runtime_error("configuration changed; restart helper with fresh stream generation");
-   UINT display=settings.value("display",0u);capture.open(display);
-   UINT w=settings.value("width",capture.width)&~1u,h=settings.value("height",capture.height)&~1u;
+   UINT display=settings.value("display",0u);if(settings.value("forceGdi",0u)){checkCaptureDesktop();capture.fallback="DXGI capture invalid call; recovered with GDI";capture.openGdi(display);}else capture.open(display);
+   UINT w=std::min(settings.value("width",capture.width),capture.width)&~1u,h=std::min(settings.value("height",capture.height),capture.height)&~1u;
    UINT fps=settings.value("fps",(UINT)std::max(1.0,capture.hz)),bitrate=settings.value("bitrate",0u);
    uint64_t memory=settings.value("memoryBudgetBytes",(uint64_t)256*1024*1024);
    if(!w||!h||!fps||!bitrate||w>capture.width||h>capture.height||(uint64_t)capture.width*capture.height*4+(uint64_t)w*h*4>memory||memory>SIZE_MAX)throw std::runtime_error("capture settings exceed source or memory budget");

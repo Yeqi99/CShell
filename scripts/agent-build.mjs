@@ -84,7 +84,7 @@ await cp(join(output, launcher),join(output,process.platform==='win32'?'cagent.c
 if(process.platform==='win32'){
   const framework=join(process.env.SystemRoot||'C:\\Windows','Microsoft.NET','Framework64','v4.0.30319');
   await new Promise((resolveBuild,reject)=>{
-    const child=spawn(join(framework,'csc.exe'),['/nologo','/target:winexe','/out:'+join(output,'Cagent.exe'),...['WindowsBase','PresentationCore','PresentationFramework'].map(name=>'/r:'+join(framework,'WPF',name+'.dll')),'/r:System.Xaml.dll','/r:System.Web.Extensions.dll',join(root,'src/agent/native/CagentWindow.cs')],{stdio:'inherit',windowsHide:true});
+    const child=spawn(join(framework,'csc.exe'),['/nologo','/target:winexe','/win32icon:'+join(root,'assets/cagent-icon.ico'),'/out:'+join(output,'Cagent.exe'),...['WindowsBase','PresentationCore','PresentationFramework'].map(name=>'/r:'+join(framework,'WPF',name+'.dll')),'/r:System.Windows.Forms.dll','/r:System.Drawing.dll','/r:System.Xaml.dll','/r:System.Web.Extensions.dll',join(root,'src/agent/native/CagentWindow.cs')],{stdio:'inherit',windowsHide:true});
     child.once('error',reject);child.once('exit',code=>code===0?resolveBuild():reject(new Error('Native cagent window build failed')));
   });
   await writeFile(join(output,'cagent-app.vbs'),`Set sh = CreateObject("WScript.Shell")\r\nSet fs = CreateObject("Scripting.FileSystemObject")\r\np = fs.GetParentFolderName(WScript.ScriptFullName)\r\nsh.Run Chr(34) & p & "\\Cagent.exe" & Chr(34), 1, False\r\n`);

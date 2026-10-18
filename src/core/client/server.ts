@@ -24,7 +24,7 @@ const peerSchema = z.object({
   allowRelay: z.boolean().default(false),
   fingerprint: z.string(),
   name: z.string().min(1).max(80),
-  shells: z.array(clientShellSchema).min(1).max(6),
+  shells: z.array(clientShellSchema).max(6),
 });
 const requestSchema = z
   .object({
@@ -61,6 +61,7 @@ export class ClientServer {
   private port?: number;
   private bind?: string;
   private advertisedHost?: string;
+  private advertisedPort?: number;
   constructor(
     private vault: ClientVault,
     private terminal: ManagedProvider,
@@ -79,10 +80,12 @@ export class ClientServer {
         bind: z.string(),
         port: z.number().int().min(1024).max(65535),
         advertisedHost: clientEndpointSchema.shape.host.optional(),
+        advertisedPort: clientEndpointSchema.shape.port.optional(),
       }),
     );
     this.bind = listener?.bind;
     this.advertisedHost = listener?.advertisedHost;
+    this.advertisedPort = listener?.advertisedPort;
     this.port = listener?.port;
     this.access = (await this.vault.read('access', accessSchema)) ?? undefined;
     this.peers = (await this.vault.read('peers', z.array(peerSchema).max(32))) ?? [];
@@ -111,6 +114,7 @@ export class ClientServer {
       port: this.port,
       bind: this.bind,
       advertisedHost: this.advertisedHost,
+      advertisedPort: this.advertisedPort,
       peers: this.peers.map((p) => ({
         ...p,
         connected: [...this.channels].filter((c) => c.peer?.fingerprint === p.fingerprint).length,
@@ -121,6 +125,7 @@ export class ClientServer {
   managementAllowed(owner: string) {
     return !!this.access?.allowManage && this.peers.some((p) => p.fingerprint === owner && p.allowManage);
   }
+  async revealPassword() { return (await this.vault.read('connection-password', z.string())) ?? ''; }
   async setAccess(options: unknown) {
     const input = clientAccessSchema.parse(options);
     if (this.server || this.changingAccess) throw new Error('请先停止服务再修改密码与权限');
@@ -134,10 +139,20 @@ export class ClientServer {
         allowHosting: input.allowHosting,
         allowRelay: input.allowRelay,
       };
-      // Clear certificate grants before committing a new password. A crash cannot retain old grants.
-      await this.vault.write('peers', []);
-      this.peers = [];
+      // Saving an endpoint or unchanged password must not revoke paired machines.
+      // Narrow existing grants; newly enabled permissions still require explicit pairing.
+      const samePassword = this.access && await verifyPassword(input.password, this.access);
+      const peers = samePassword ? this.peers.map(peer => ({...peer,
+        shells: peer.shells.filter(shell => next.shells.includes(shell)),
+        allowHttp: !!peer.allowHttp && !!next.allowHttp,
+        allowManage: !!peer.allowManage && !!next.allowManage,
+        allowHosting: !!peer.allowHosting && !!next.allowHosting,
+        allowRelay: !!peer.allowRelay && !!next.allowRelay,
+      })) : [];
+      await this.vault.write('peers', peers);
+      this.peers = peers;
       this.invitation = undefined;
+      await this.vault.write('connection-password', input.password);
       await this.vault.write('access', next);
       this.access = next;
       await this.record('access.changed', 'local');
@@ -147,7 +162,7 @@ export class ClientServer {
     }
   }
   connectionInfo(host: string) {
-    const endpoint = clientEndpointSchema.parse({ host, port: this.port });
+    const endpoint = clientEndpointSchema.parse({ host, port: this.advertisedPort ?? this.port });
     return JSON.stringify({
       protocol: 1,
       deviceId: this.identity.id,
@@ -163,11 +178,12 @@ export class ClientServer {
         bind: z.string(),
         port: z.number().int().min(1024).max(65535),
         advertisedHost: clientEndpointSchema.shape.host.optional(),
+        advertisedPort: clientEndpointSchema.shape.port.optional(),
       })
       .strict()
       .parse(options);
     const addresses = [
-      '127.0.0.1',
+      '0.0.0.0', '127.0.0.1',
       '::1',
       ...Object.values(networkInterfaces()).flatMap((rows) => rows?.map((r) => r.address) ?? []),
     ];
@@ -200,6 +216,7 @@ export class ClientServer {
     this.port = input.port;
     this.bind = input.bind;
     this.advertisedHost = input.advertisedHost;
+    this.advertisedPort = input.advertisedPort;
     await this.vault.write('listener', input);
     await this.record('service.started', input.bind);
     return this.status();
@@ -234,7 +251,7 @@ export class ClientServer {
       deviceId: this.identity.id,
       name: hostname(),
       host: input.host,
-      port: this.port,
+      port: this.advertisedPort ?? this.port,
       certificate: this.identity.certificate,
       token,
       expires,
@@ -312,7 +329,9 @@ export class ClientServer {
             const result = await this.handle(c, cert.fingerprint256, req.op, req.payload);
             if (c.alive) await reply(socket, req.id, result);
           } catch {
-            if (c.alive) send(socket, { id: req.id, error: 'Client request denied or failed' });
+            if (c.alive) send(socket, { id: req.id, error: req.op === 'auth'
+              ? 'CAgent 认证失败：配对已失效或密码不正确，请重新认证'
+              : 'CAgent 请求失败：请检查远端权限和服务状态' });
             if (!c.peer) socket.end();
           }
         })

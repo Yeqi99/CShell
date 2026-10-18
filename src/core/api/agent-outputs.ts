@@ -30,6 +30,7 @@ const status = z
     port: z.number().optional(),
     bind: z.string().optional(),
     advertisedHost: z.string().optional(),
+    advertisedPort: z.number().int().optional(),
     peers: z.array(
       z
         .object({

@@ -46,6 +46,7 @@ const eventDeniedTools = new Set(['connect_machine','spawn_agent','list_agents',
 const idSchema = z.string().uuid();
 export const modeSchema = z.enum(['review', 'restricted', 'allow']);
 export class AiService {
+  eventTools?: (threadId:string)=>import('./connections/contracts').ConnectionTool[];
   readonly work: AiWork;
   private childCounts = new Map<string, number>();
   onThreadUpdate?: (thread: AiThread) => void;
@@ -404,6 +405,7 @@ export class AiService {
   private applicationTools(t: AiThread) {
     return [
       permissionLinkTool,
+      ...(!t.parentId && !t.goal ? this.eventTools?.(t.id) ?? [] : []),
       ...this.providerTools(t),
       ...(this.limits.wechat?.tools() ?? []),
       ...(this.limits.http?.tools((name, args) => this.allowed(t, name, args)) ?? []),
@@ -876,6 +878,7 @@ export class AiService {
         try {
           const args = JSON.parse(call.function.arguments);
           if(triggered&&eventDeniedTools.has(call.function.name))throw new Error('事件运行不允许创建新任务或修改模型基座');
+          if(triggered && call.function.name.startsWith('ai_event_') && call.function.name!=='ai_event_list')throw new Error('事件触发任务不能修改事件订阅；请在普通对话中管理');
           if (!this.allowed(t, call.function.name, args))
             throw new Error('Capability or server scope denied');
           if (call.function.name === 'connect_machine') {

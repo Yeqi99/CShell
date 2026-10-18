@@ -20,6 +20,8 @@ jobs:
       - run: pnpm build
       - run: pnpm test
       - run: pnpm test:desktop
+      - run: pnpm exec tsx scripts/rdp-layout-smoke.ts
+      - run: pnpm exec tsx scripts/rdp-saved-smoke.ts
       - run: pnpm exec tsx scripts/client-smoke.ts
       - run: pnpm exec tsx scripts/http-agent-smoke.ts
       - run: pnpm exec tsx scripts/minimal-pin-smoke.ts
@@ -33,16 +35,7 @@ jobs:
       - run: pnpm exec tsx scripts/extraction-smoke.ts
       - run: pnpm exec tsx scripts/activity-smoke.ts
       - run: pnpm exec tsx scripts/update-smoke.ts
-      - name: Prepare checksum-pinned desktop compiler
-        shell: pwsh
-        run: |
-          $archive = Join-Path $env:RUNNER_TEMP 'llvm-mingw.zip'
-          Invoke-WebRequest 'https://github.com/mstorsjo/llvm-mingw/releases/download/20261006/llvm-mingw-20261006-ucrt-x86_64.zip' -OutFile $archive
-          if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne '317492c456aa27ee607a5919f1d2d38dcdc1112516a24d0bf4b00d078f52d17a') { throw 'Compiler checksum mismatch' }
-          Expand-Archive -LiteralPath $archive -DestinationPath $env:RUNNER_TEMP
-          "CAGENT_NATIVE_CXX=$env:RUNNER_TEMP/llvm-mingw-20261006-ucrt-x86_64/bin/x86_64-w64-mingw32-clang++.exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - run: pnpm run dist
-      - run: pnpm exec tsx scripts/bundled-agent-launch-smoke.ts
       - uses: actions/upload-artifact@v4
         if: always()
         with:

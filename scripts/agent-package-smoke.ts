@@ -85,6 +85,14 @@ try {
       ? 'cmd'
       : shells.find((s) => ['bash', 'sh', 'zsh'].includes(s.shell))?.shell;
   assert.ok(shell && shells.some((s) => s.shell === shell));
+  if(process.platform==='win32'&&process.arch==='x64') {
+    const desktop=await callAgent('desktop.status',{},directory);
+    assert.equal(desktop.nativeAvailable,true);assert.equal(desktop.listening,false);
+    assert.equal(desktop.viewAllowed,true);assert.equal(desktop.controlAllowed,true);
+    const catalog=await callAgent('packages.catalog',{},directory);
+    assert.equal(catalog.find((p:any)=>p.id==='cagent.desktop')?.installed,true);
+    assert.deepEqual(catalog.find((p:any)=>p.id==='cagent.desktop')?.grants,['desktop.view','desktop.control']);
+  }
   const password = randomUUID();
   await callAgent(
     'client.access',

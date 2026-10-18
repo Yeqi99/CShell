@@ -151,7 +151,7 @@ export class AgentApplicationService {
     return (
       !this.closing.signal.aborted &&
       this.policy.enabled &&
-      (owner === 'local' || (this.policy.controllers.includes(owner) && this.permitted(owner)))
+      (owner === 'local' || ((this.policy.controllers.includes('*')||this.policy.controllers.includes(owner)) && this.permitted(owner)))
     );
   }
   private authorize(owner: string) {

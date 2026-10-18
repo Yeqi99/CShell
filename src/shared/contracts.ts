@@ -329,6 +329,7 @@ export interface Bridge
     UpdateBridge,
     FloatingBridge,
     ActivityBridge {
+  readonly platform: string;
   setAlwaysOnTop(enabled: boolean): Promise<boolean>;
   setMinimalMode(enabled: boolean): Promise<void>;
   configureTools(settings: ToolsSettings): Promise<void>;

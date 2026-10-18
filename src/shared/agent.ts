@@ -1,5 +1,11 @@
 import { z } from 'zod';
 export const agentMethods = [
+  'files.roots','files.list','files.action','files.read','files.uploadStart','files.uploadChunk','files.uploadFinish','files.uploadCancel',
+  'connection.autostart',
+  'connection.settings',
+  'connection.save',
+  'assistant.settings',
+  'assistant.configure',
   'assistant.start',
   'assistant.tasks',
   'assistant.task',
@@ -77,6 +83,11 @@ export type AgentTarget = {
   bundledApp?: boolean;
 };
 export interface AgentBridge {
+  agentFilePaste(target:string,input:{id:string;root:string;path:string}):Promise<{completed:string[]}>;
+  agentFileDownload(target:string,input:{id:string;root:string;path:string;name:string}):Promise<{cancelled?:boolean}>;
+  agentFileCancel(id:string):Promise<void>;
+  agentMachineOpen(deviceId:string): Promise<AgentTarget>;
+  agentMachineClose(target:string): Promise<void>;
   agentTargets(): Promise<AgentTarget[]>;
   agentLaunch(): Promise<void>;
   agentCall(target: string, call: AgentCall): Promise<unknown>;

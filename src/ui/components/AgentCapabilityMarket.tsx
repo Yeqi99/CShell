@@ -1,3 +1,4 @@
+import {Monitor,Package} from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { z } from 'zod';
 import type { AgentCall, AgentTarget } from '../../shared/agent';
@@ -147,9 +148,9 @@ export function AgentCapabilityMarket({ target, call }: { target: AgentTarget; c
                     setError('');
                   }}
                 >
-                  <strong>{p.name}</strong>
+                  <span className="capability-app-icon">{p.id==='cagent.desktop'?<Monitor size={23}/>:<Package size={23}/>}</span><strong>{p.name}</strong>
                   <small>
-                    {p.version} · {states[p.status]}
+                    {p.version} · {p.installed&&p.status==='not-installed'?'需要修复':states[p.status]}
                   </small>
                 </button>
               ))}
@@ -165,13 +166,13 @@ export function AgentCapabilityMarket({ target, call }: { target: AgentTarget; c
           <p>{item.description}</p>
           <small>
             {item.version} · {item.source === 'bundled' ? '随 cagent 提供' : 'GitHub'} ·{' '}
-            {states[(record ?? item).status]}
+            {record&&record.status==='not-installed'?'已安装 · 需要修复':states[(record ?? item).status]}
           </small>
           {(record?.reason ?? item.reason) && <p>{record?.reason ?? item.reason}</p>}
           {!record ? (
-            target.local ? (
+            true ? (
               <>
-                <p>安装后核验兼容性，工具权限需另行保存。</p>
+                <p>安装后即可使用，可在这里关闭不需要的能力。</p>
                 <button
                   disabled={busy}
                   onClick={() =>
@@ -189,8 +190,8 @@ export function AgentCapabilityMarket({ target, call }: { target: AgentTarget; c
             )
           ) : (
             <>
-              <p>{record.registered ? '工具已注册' : '工具未注册'}</p>
-              {target.local ? (
+              <p>{record.registered ? '已就绪' : '尚未就绪'}</p>{['not-installed','fault','incompatible'].includes(record.status)&&<button disabled={busy} onClick={()=>void run(()=>update('packages.install',{id:item.id,confirm:true}))}>修复安装</button>}
+              {true ? (
                 <>
                   <fieldset disabled={busy}>
                     <legend>工具权限</legend>
@@ -288,7 +289,7 @@ function DesktopSettings({ target, call }: { target: AgentTarget; call: Call }) 
   const refresh = async (replaceDraft = false) => {
     const value = statusSchema.parse(await call('desktop.status'));
     setStatus(value);
-    if (replaceDraft && target.local) setConfig(value.config);
+    if (replaceDraft) setConfig(value.config);
   };
   useEffect(() => {
     let disposed = false;
@@ -297,7 +298,7 @@ function DesktopSettings({ target, call }: { target: AgentTarget; call: Call }) 
         if (!disposed) {
           const value = statusSchema.parse(raw);
           setStatus(value);
-          if (target.local) setConfig(value.config);
+          setConfig(value.config);
         }
       })
       .catch((e) => {
@@ -315,8 +316,8 @@ function DesktopSettings({ target, call }: { target: AgentTarget; call: Call }) 
           刷新桌面状态
         </button>
       </div>
-      <p>{status ? (status.listening ? '服务已监听' : '服务未监听') : '正在读取服务状态'}</p>
-      {target.local && config && (
+      <p>{status ? (status.enabled ? (status.listening ? '服务已启用 · 独立监听' : '服务已启用 · 使用当前 cagent 连接') : '服务未启用') : '正在读取服务状态'}</p>
+      {config && (
         <details>
           <summary>服务与访问权限</summary>
           <form
@@ -340,41 +341,8 @@ function DesktopSettings({ target, call }: { target: AgentTarget; call: Call }) 
                 />
                 启用桌面服务
               </label>
-              <div className="capability-fields">
-                <label>
-                  监听 IP
-                  <input
-                    required
-                    value={config.bindAddress}
-                    onChange={(e) => setConfig({ ...config, bindAddress: e.target.value })}
-                  />
-                </label>
-                {(
-                  [
-                    ['tcpPort', 'TCP 端口'],
-                    ['udpPort', 'UDP 端口'],
-                    ['publicTcpPort', '映射后的公网 TCP 端口'],
-                    ['publicUdpPort', '映射后的公网 UDP 端口'],
-                  ] as const
-                ).map(([key, title]) => (
-                  <label key={key}>
-                    {title}
-                    <input
-                      type="number"
-                      min={1}
-                      max={65535}
-                      required={key === 'tcpPort' || key === 'udpPort'}
-                      value={config[key] ?? ''}
-                      onChange={(e) =>
-                        setConfig({
-                          ...config,
-                          [key]: e.target.value ? Number(e.target.value) : undefined,
-                        })
-                      }
-                    />
-                  </label>
-                ))}
-              </div>
+              <p>复用 CAgent 连接端口，无需单独映射远控端口。</p>
+              <label><input type="checkbox" checked={config.authenticatedPeers} onChange={e=>setConfig({...config,authenticatedPeers:e.target.checked,directListener:false})}/>允许已连接的控制端观看和操作</label>
               <label>
                 <input
                   type="checkbox"

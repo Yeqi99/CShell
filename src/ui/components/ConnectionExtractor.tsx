@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ClipboardPaste, ScanText, Sparkles, X } from 'lucide-react';
 import type { ExtractedConnection } from '../../shared/connection-extraction';
 import { ConnectionRuleError, extractConnectionByRules } from '../../shared/connection-rules';
@@ -9,6 +9,8 @@ export function ConnectionExtractor({
   providerId = 'cshell.ssh',
   title,
   titleId,
+  showTitle = true,
+  extraActions,
   disabled,
   onStart,
   onExtract,
@@ -17,6 +19,8 @@ export function ConnectionExtractor({
   providerId?: ExtractedConnection['providerId'];
   title: string;
   titleId: string;
+  showTitle?: boolean;
+  extraActions?: ReactNode;
   disabled: boolean;
   onStart: () => void;
   onExtract: (value: ExtractedConnection) => void;
@@ -54,9 +58,20 @@ export function ConnectionExtractor({
     setError('');
     try {
       const result = ai
-        ? await window.cshell.aiExtractConnection('连接类型: '+({ 'cshell.ssh':'SSH','cshell.rdp':'RDP','cshell.client':'Agent','cshell.http':'HTTP' }[providerId])+'\n'+text, selected.id)
-        : extractConnectionByRules(text,providerId);
-      if(result.providerId!==providerId)throw new ConnectionRuleError('unsupported');
+        ? await window.cshell.aiExtractConnection(
+            '连接类型: ' +
+              {
+                'cshell.ssh': 'SSH',
+                'cshell.rdp': 'RDP',
+                'cshell.client': 'Agent',
+                'cshell.http': 'HTTP',
+              }[providerId] +
+              '\n' +
+              text,
+            selected.id,
+          )
+        : extractConnectionByRules(text, providerId);
+      if (result.providerId !== providerId) throw new ConnectionRuleError('unsupported');
       onExtract(result);
       setText('');
       setOpen(false);
@@ -87,7 +102,7 @@ export function ConnectionExtractor({
   return (
     <div className="connection-ai-extractor">
       <header className="connection-heading">
-        <h1 id={titleId}>{title}</h1>
+        {showTitle && <h1 id={titleId}>{title}</h1>}
         <div className="connection-extract-actions">
           <button
             type="button"
@@ -102,16 +117,6 @@ export function ConnectionExtractor({
           >
             <ScanText size={14} />
             {cn ? '从文本填写' : 'Fill from text'}
-          </button>
-          <button
-            type="button"
-            className="icon"
-            title={cn ? '粘贴连接信息' : 'Paste connection text'}
-            aria-label={cn ? '粘贴连接信息' : 'Paste connection text'}
-            disabled={locked}
-            onClick={() => void paste()}
-          >
-            <ClipboardPaste size={14} />
           </button>
         </div>
       </header>
@@ -185,9 +190,19 @@ export function ConnectionExtractor({
             aria-label={cn ? '待提取文本' : 'Connection text'}
             autoFocus
             placeholder={
-              cn
-                ? 'ssh user@host -p 2222\n或粘贴：主机: example.com  端口: 22  用户名: root'
-                : 'ssh user@host -p 2222\nOr: Host: example.com  Port: 22  Username: root'
+              providerId === 'cshell.rdp'
+                ? cn
+                  ? '主机: example.com  端口: 3389  账号: administrator'
+                  : 'Host: example.com  Port: 3389  Username: administrator'
+                : providerId === 'cshell.client'
+                  ? cn
+                    ? '主机: example.com  端口: 2200'
+                    : 'Host: example.com  Port: 2200'
+                  : providerId === 'cshell.http'
+                    ? 'https://example.com/api'
+                    : cn
+                      ? 'ssh user@host -p 2222\n或粘贴：主机: example.com  端口: 22  用户名: root'
+                      : 'ssh user@host -p 2222\nOr: Host: example.com  Port: 22  Username: root'
             }
             value={text}
             onChange={(e) => {
@@ -197,6 +212,13 @@ export function ConnectionExtractor({
             maxLength={24000}
             disabled={locked}
           />
+          <div className="connection-extract-paste">
+            <button type="button" disabled={locked} onClick={() => void paste()}>
+              <ClipboardPaste size={14} />
+              {cn ? '粘贴文本' : 'Paste text'}
+            </button>
+            {extraActions}
+          </div>
           {error && (
             <p className="form-error" role="alert">
               {error}

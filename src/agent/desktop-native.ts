@@ -1,12 +1,12 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { EventEmitter } from 'node:events';
-export type NativeDesktopConfig={display?:number;width?:number;height?:number;fps:number;bitrate:number;memoryBudgetBytes?:number};
+export type NativeDesktopConfig={display?:number;width?:number;height?:number;fps:number;bitrate:number;memoryBudgetBytes?:number;forceGdi?:number};
 export type NativeDesktopFrame={type:'frame';id:number;key:boolean;timestampUs:number;captureUs:number;convertUs:number;encodeUs:number;data:Buffer};
 export type NativeDesktopInput={generation:number;sequence:number}&(
  {kind:'lease'}|{kind:'key';code:number;down:boolean}|{kind:'button';button:number;down:boolean}|
  {kind:'move';x:number;y:number}|{kind:'wheel';delta:number;horizontal?:boolean});
 export class NativeDesktop extends EventEmitter {
- private child?:ChildProcessWithoutNullStreams;private pending=Buffer.alloc(0);private errorText='';private finished=false;
+ private child?:ChildProcessWithoutNullStreams;private pending=Buffer.alloc(0);private errorText='';private finished=false;private stopping=false;
  constructor(private executable:string,private maxFrameBytes=32*1024*1024){super();}
  start(config:NativeDesktopConfig){
   if(this.child)throw new Error('Capture already started');
@@ -17,7 +17,7 @@ export class NativeDesktop extends EventEmitter {
   child.stderr.on('data',(data:Buffer)=>{this.errorText=(this.errorText+data.toString()).slice(-4096);});
   child.on('error',error=>this.emit('fault',error));
   child.on('close',code=>{this.finished=true;this.pending=Buffer.alloc(0);this.emit('closed',{code,error:this.errorText});});
-  child.stdin.on('error',error=>{if(!this.finished)this.emit('fault',error);});
+  child.stdin.on('error',error=>{if(!this.finished&&!this.stopping)this.emit('fault',error);});
   this.send({op:'configure',...config});
  }
  private read(data:Buffer){
@@ -39,8 +39,8 @@ export class NativeDesktop extends EventEmitter {
   }
  }
  private send(command:unknown){if(!this.child||this.finished||this.child.stdin.writableEnded||this.child.stdin.destroyed)throw new Error('Capture is closed');if(this.child.stdin.writableLength>8192)throw new Error('Native control backpressure');this.child.stdin.write(JSON.stringify(command)+'\n');}
- requestFrame(){this.send({op:'ack'});}
- requestKeyframe(){this.send({op:'keyframe'});}
+ requestFrame(){if(this.stopping||this.finished)return;this.send({op:'ack'});}
+ requestKeyframe(){if(this.stopping||this.finished)return;this.send({op:'keyframe'});}
  /** Backend-only: call after separately authorizing control on the authenticated
   * desktop session. Watching permission must never call this method. A fresh
   * increasing generation is required; reconnect must not replay old input.
@@ -61,7 +61,7 @@ export class NativeDesktop extends EventEmitter {
   this.send({op:'input-event',event});
  }
  async stop(){
-  const child=this.child;if(!child||this.finished)return;
+  const child=this.child;if(!child||this.finished)return;this.stopping=true;
   try{this.send({op:'stop'});child.stdin.end();}catch{/* Already disconnected. */}
   await new Promise<void>(resolve=>{
    const timeout=setTimeout(()=>{child.kill();},2500);

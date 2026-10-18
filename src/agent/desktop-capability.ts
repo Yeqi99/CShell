@@ -12,7 +12,7 @@ import {DesktopService} from './desktop-service';
  * just because the runtime starts or the package is installed. */
 export async function createDesktopCapability(options:{identity:string;nativeExecutable:string;vault:Pick<ClientVault,'read'|'write'>;authorize:(owner:string)=>boolean}){
  let registered=false,grants:readonly string[]=[],installedExecutable=options.nativeExecutable;
- let saved=(await options.vault.read('desktop-config',desktopConfigSchema))??desktopConfigSchema.parse({});
+ let saved=(await options.vault.read('desktop-config',desktopConfigSchema))??desktopConfigSchema.parse({enabled:true,directListener:false,authenticatedPeers:true,local:{view:true,control:true}});
  const service=new DesktopService({identity:options.identity,nativeExecutable:()=>installedExecutable,authorize:(owner,permission)=>registered&&grants.includes(`desktop.${permission}`)&&options.authorize(owner),persist:async config=>{saved=config;await options.vault.write('desktop-config',config);}});
  const safeStatus=(owner:string)=>{const status=service.status(owner);if(owner==='local')return status;const {config,...safe}=status;void config;return safe;};
  const bytes=process.platform==='win32'&&process.arch==='x64'?await readFile(options.nativeExecutable).catch(()=>undefined):undefined;
@@ -31,13 +31,13 @@ export async function createDesktopCapability(options:{identity:string;nativeExe
  }
  const dispatch=async(method:string,params:unknown,owner:string,local:boolean)=>{
   switch(method){
-   case 'desktop.status':return {...safeStatus(owner),nativeAvailable:!!bytes,packageReady:registered};
+   case 'desktop.status':return {...safeStatus(owner),...(local?{config:service.status('local').config}:{}),nativeAvailable:!!bytes,packageReady:registered};
    case 'desktop.configure':{
-    if(!local||owner!=='local')throw new Error('Desktop configuration requires local administration');
+    if(!local)throw new Error('Desktop configuration requires local administration');
     const config=desktopConfigSchema.parse(params);if(config.enabled&&(!registered||!grants.includes('desktop.view')))throw new Error('Install and authorize the desktop capability first');
     return service.configure(config);
    }
-   case 'desktop.open':{if(!registered)throw new Error('Desktop package is not ready');const request=z.object({control:z.boolean().default(false),transport:z.enum(['direct','management']).optional(),quality:desktopQualitySchema}).strict().parse(params);return service.open(owner,request);}
+   case 'desktop.open':{if(!registered)throw new Error('Desktop package is not ready');const request=z.object({control:z.boolean().default(false),mediaTransport:z.enum(['udp','tcp']).optional(),transport:z.enum(['direct','management']).optional(),quality:desktopQualitySchema}).strict().parse(params);return service.open(owner,request);}
    case 'desktop.close':await service.close(owner,z.object({id:z.string().regex(/^[0-9a-f]{32}$/)}).strict().parse(params).id);return {closed:true};
    default:throw new Error('Unsupported desktop method');
   }

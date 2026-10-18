@@ -1,0 +1,53 @@
+import {spawn} from 'node:child_process';
+import {_electron as electron} from 'playwright';
+import {mkdtemp,writeFile,mkdir,readFile} from 'node:fs/promises';
+import {tmpdir,homedir} from 'node:os';
+import {join,relative} from 'node:path';
+import {createServer} from 'node:net';
+import {once} from 'node:events';
+import assert from 'node:assert/strict';
+import {createAgentRuntime} from '../src/agent/runtime';
+const data=await mkdtemp(join(tmpdir(),'machine-ui-')),runtime=await createAgentRuntime({directory:join(data,'agent')});
+const holder=createServer().listen(0,'127.0.0.1');await once(holder,'listening');const port=(holder.address() as any).port;await new Promise<void>(r=>holder.close(()=>r()));
+await runtime.dispatch('connection.save',{bind:'127.0.0.1',port,password:'fixture-password'});
+await mkdir(join(data,'files'));await writeFile(join(data,'files','original.txt'),'REMOTE_FILE_CONTENT');
+const env={...process.env,CSHELL_TEST_DATA:join(data,'cshell')};delete env.ELECTRON_RUN_AS_NODE;
+const app=await electron.launch({args:['.'],env});
+try{
+ const page=await app.firstWindow();page.setDefaultTimeout(15000);console.log("window");await page.getByRole('heading',{name:'尚未连接'}).waitFor();
+ await page.evaluate(async({port})=>{const info=await window.cshell.clientProbe({host:'127.0.0.1',port});const device=await window.cshell.clientPasswordPair(info,'fixture-password');await window.cshell.saveProfile({id:device.deviceId,protocol:'client',name:'机器工作区测试',host:device.host,port:device.port,username:'Client',auth:'password',favorite:false,group:''});},{port});
+ console.log("paired");await page.reload();await page.getByText('机器工作区测试',{exact:true}).first().dblclick();
+ const machine=page.locator('.agent-machine:visible');await machine.waitFor();console.log("machine");assert.equal(await machine.locator('.terminal-pane').count(),0);
+ await machine.getByRole('button',{name:'文件',exact:true}).click();
+ await machine.getByLabel('目录路径',{exact:true}).waitFor();
+ await machine.getByLabel('目录路径',{exact:true}).fill('/'+relative(homedir(),join(data,'files')).replaceAll('\\','/'));await machine.getByLabel('目录路径',{exact:true}).press('Enter');
+ await machine.getByRole('button',{name:'original.txt',exact:true}).waitFor();
+ await machine.getByRole('button',{name:'新建文件夹',exact:true}).click();await machine.getByLabel('名称',{exact:true}).fill('测试目录');await machine.getByRole('button',{name:'确定',exact:true}).click();await machine.getByRole('button',{name:'测试目录',exact:true}).waitFor();
+ await machine.locator('input[type=file]').setInputFiles({name:'upload.txt',mimeType:'text/plain',buffer:Buffer.from('UPLOAD_CONTENT')});await machine.getByRole('button',{name:'upload.txt',exact:true}).waitFor();assert.equal(await readFile(join(data,'files','upload.txt'),'utf8'),'UPLOAD_CONTENT');
+ await machine.getByRole('button',{name:'upload.txt',exact:true}).click();await machine.getByRole('button',{name:'重命名',exact:true}).click();await machine.getByLabel('名称',{exact:true}).fill('renamed.txt');await machine.getByRole('button',{name:'确定',exact:true}).click();await machine.getByRole('button',{name:'renamed.txt',exact:true}).waitFor();
+ await machine.getByRole('button',{name:'renamed.txt',exact:true}).click();await app.evaluate(({dialog},destination)=>{dialog.showSaveDialog=async()=>({canceled:false,filePath:destination});},join(data,'downloaded.txt'));await machine.getByRole('button',{name:'下载文件',exact:true}).click();await machine.getByRole('button',{name:'下载文件',exact:true}).waitFor();await page.waitForFunction(()=>!document.querySelector<HTMLButtonElement>('.machine-files button[aria-label="刷新文件"]')?.disabled);assert.equal(await readFile(join(data,'downloaded.txt'),'utf8'),'UPLOAD_CONTENT');
+ await machine.getByRole('button',{name:'终端',exact:true}).click();await machine.getByRole('button',{name:'文件',exact:true}).click();await machine.getByRole('button',{name:'renamed.txt',exact:true}).waitFor();await page.screenshot({path:'test-results/agent-machine-files.png'});
+ await machine.getByRole('button',{name:'renamed.txt',exact:true}).click();await machine.getByRole('button',{name:'删除',exact:true}).click();await machine.getByRole('button',{name:'确认删除',exact:true}).click();await machine.getByRole('button',{name:'renamed.txt',exact:true}).waitFor({state:'detached'});
+ await machine.dispatchEvent('drop',{dataTransfer:await page.evaluateHandle(()=>{const dt=new DataTransfer();dt.items.add(new File([new Uint8Array(200000)],'drop.bin'));return dt;})});
+ await machine.getByRole('button',{name:'上传到此目录',exact:true}).click();await machine.getByRole('button',{name:'drop.bin',exact:true}).waitFor();assert.equal((await readFile(join(data,'files','drop.bin'))).length,200000);
+ const clipSource=join(data,'clipboard-source.txt'),ready=join(data,'clipboard-ready'),done=join(data,'clipboard-done');await writeFile(clipSource,'CLIPBOARD_FILE_CONTENT');
+ const quote=(v:string)=>"'"+v.replaceAll("'","''")+"'";
+ const script=`Add-Type -AssemblyName System.Windows.Forms; $saved=New-Object Windows.Forms.DataObject; $old=[Windows.Forms.Clipboard]::GetDataObject(); if($old){foreach($fmt in $old.GetFormats($false)){$saved.SetData($fmt,$false,$old.GetData($fmt,$false))}}; $files=New-Object Collections.Specialized.StringCollection; [void]$files.Add(${quote(clipSource)}); try{[Windows.Forms.Clipboard]::SetFileDropList($files); [IO.File]::WriteAllText(${quote(ready)},'ready'); $until=[DateTime]::UtcNow.AddSeconds(40);while(-not [IO.File]::Exists(${quote(done)}) -and [DateTime]::UtcNow -lt $until){Start-Sleep -Milliseconds 100}}finally{$current=@([Windows.Forms.Clipboard]::GetFileDropList());if($current.Count -eq 1 -and $current[0] -eq ${quote(clipSource)}){[Windows.Forms.Clipboard]::SetDataObject($saved,$true)}}`;
+ const clip=spawn('powershell.exe',['-NoProfile','-STA','-EncodedCommand',Buffer.from(script,'utf16le').toString('base64')],{windowsHide:true,stdio:'ignore'});const finished=once(clip,'exit');
+ try{for(let n=0;n<100;n++){if(await readFile(ready,'utf8').then(()=>true,()=>false))break;await new Promise(r=>setTimeout(r,100));}assert.equal(await readFile(ready,'utf8'),'ready');await machine.getByRole('button',{name:'粘贴文件',exact:true}).click();await machine.getByRole('button',{name:'clipboard-source.txt',exact:true}).waitFor();assert.equal(await readFile(join(data,'files','clipboard-source.txt'),'utf8'),'CLIPBOARD_FILE_CONTENT');}finally{await writeFile(done,'done');await finished;}
+ console.log('files verified including clipboard and multi-frame drop');
+ await machine.getByRole('button',{name:'应用市场',exact:true}).click();await machine.getByRole('button',{name:/系统应用/}).first().waitFor();await page.screenshot({path:'test-results/agent-machine-apps.png'});
+ await machine.getByRole('button',{name:'远程桌面',exact:true}).click();await machine.getByRole('button',{name:'连接桌面',exact:true}).waitFor();
+ console.log('desktop');await machine.getByRole('button',{name:'设置与权限',exact:true}).click();await machine.getByRole('button',{name:'连接与权限',exact:true}).waitFor();await machine.getByLabel('对外地址',{exact:true}).fill('draft.example.test');
+ await machine.getByRole('button',{name:'终端',exact:true}).click();await machine.getByRole('button',{name:/＋.*CMD/i}).click();await machine.locator('.terminal-pane.active .xterm-helper-textarea').waitFor();
+ await machine.locator('.terminal-pane.active .xterm-helper-textarea').focus();await page.keyboard.type('echo MACHINE_WORKSPACE_OK');await page.keyboard.press('Enter');await page.waitForTimeout(800);
+ console.log('terminal');await machine.getByRole('button',{name:'应用市场',exact:true}).click();await machine.getByRole('heading',{name:'应用市场',exact:true}).waitFor();
+ await machine.getByRole('button',{name:'终端',exact:true}).click();assert.equal(await machine.locator('.terminal-pane').count(),1);
+ await machine.getByRole('button',{name:/＋.*PowerShell/i}).click();await machine.locator('.terminal-pane').nth(1).waitFor({state:'attached'});assert.equal(await machine.locator('.terminal-pane').count(),2);
+ await machine.getByRole('button',{name:'设置与权限',exact:true}).click();assert.equal(await machine.getByLabel('对外地址',{exact:true}).inputValue(),'draft.example.test');await machine.getByRole('button',{name:'终端',exact:true}).click();await page.screenshot({path:'test-results/agent-machine-workspace.png'});
+ 
+ const id=await page.evaluate(async()=>{const devices=await window.cshell.clientDevices();return devices[0].deviceId;});
+ const target=await page.evaluate(id=>window.cshell.agentMachineOpen(id),id);await machine.getByRole('button',{name:'断开连接',exact:true}).click();await machine.waitFor({state:'detached'});
+ const rejected=await page.evaluate(async target=>{try{await window.cshell.agentCall(target,{method:'agent.shells'});return false;}catch{return true;}},target.id);assert.equal(rejected,true);
+ await writeFile('test-results/agent-machine-files-smoke.json',JSON.stringify({passed:true,files:true,clipboardPaste:true,multiFrameDrop:true,machineDisconnectButton:true,upload:true,download:true,rename:true,delete:true,directoryPreserved:true,noTerminalNeeded:true,desktopWithoutPlugin:true,settingsWithoutPlugin:true,multipleTerminals:true,sectionsPreserved:true,closedTargetRejected:true},null,2));
+}catch(e){console.error(e);await (await app.firstWindow()).screenshot({path:'test-results/agent-machine-failure.png'});throw e;}finally{await app.evaluate(({app})=>app.exit(0)).catch(()=>{});await runtime.close();}

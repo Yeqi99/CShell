@@ -53,7 +53,7 @@ jobs:
           name: cagent-package-${{ matrix.platform }}-${{ matrix.arch }}
           if-no-files-found: error
           path: |
-            release/*/CAgent-Setup-*.zip
+            release/*/CAgent-Setup-*.exe
             release/*/CAgent-*.tar.gz
 
 # Deliberately build-only: verified artifacts are reviewed and attached to the

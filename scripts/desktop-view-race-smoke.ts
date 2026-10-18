@@ -48,7 +48,11 @@ try {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto(`http://127.0.0.1:${(http.address() as { port: number }).port}`);
-  await page.getByRole('button', { name: '连接桌面', exact: true }).click();
+  await page.addStyleTag({content:await readFile('src/ui/styles.css','utf8')});
+  const connectButton=page.getByRole('button',{name:'连接桌面',exact:true});
+  for(const width of [1280,760,420]){await page.setViewportSize({width,height:800});const before=await connectButton.boundingBox();await page.getByRole('button',{name:'画质',exact:true}).click();const after=await connectButton.boundingBox();assert.ok(Math.abs(before!.y-after!.y)<2,'quality expansion must not vertically move connection controls');assert.equal(await page.locator('.desktop-quality').evaluate(e=>e.scrollWidth<=e.clientWidth+1),true);await page.getByRole('button',{name:'画质',exact:true}).click();}
+  await page.setViewportSize({width:1280,height:800});await page.getByRole('button',{name:'画质',exact:true}).click();await page.screenshot({path:'test-results/desktop-quality-layout.png'});await page.getByRole('button',{name:'画质',exact:true}).click();
+  await connectButton.click();
   await page.getByRole('button', { name: '切换目标', exact: true }).click();
   await page.evaluate(() => (window as any).pending.shift()());
   assert.equal(await page.getByRole('button', { name: '断开', exact: true }).count(), 0);
@@ -56,7 +60,7 @@ try {
   await page.getByRole('button', { name: '取消连接', exact: true }).click();
   await page.evaluate(() => (window as any).pending.shift()());
   assert.equal(await page.getByRole('button', { name: '断开', exact: true }).count(), 0);
-  await page.getByLabel('允许键鼠控制', { exact: true }).check();
+  await page.getByLabel('控制键鼠', { exact: true }).check();
   await page.getByRole('button', { name: '连接桌面', exact: true }).click();
   await page.evaluate(() => (window as any).pending.shift()());
   await page.getByRole('button', { name: '断开', exact: true }).waitFor();
@@ -88,6 +92,27 @@ try {
   const ackCount = await page.evaluate(() => (window as any).acks.length);
   await page.evaluate(() => (window as any).decoders[0].callbacks.error(Error('stale decoder')));
   assert.equal(await page.evaluate(() => (window as any).acks.length), ackCount);
+  await page.getByRole('status').filter({hasText:'正在使用软件解码恢复'}).waitFor();
+  assert.equal(await page.evaluate(() => (window as any).acks.at(-1)[2]), false);
+  assert.equal(await page.evaluate(() => (window as any).decoders[1].state), 'closed');
+  await page.evaluate(e => (window as any).receive({...e,data:new Uint8Array(e.data),sequence:'3',timestamp:3}), frame);
+  assert.equal(await page.evaluate(() => (window as any).decoders.length), 3);
+  await page.evaluate(id=>(window as any).receive({id,type:'error',message:'桌面采集未输出首帧，正在切换兼容采集…'}),frame.id);
+  await page.getByRole('status').filter({hasText:'正在切换兼容采集'}).waitFor();
+  assert.equal(await page.getByRole('alert').filter({hasText:'正在切换兼容采集'}).count(),0);
+  await page.evaluate(()=>{const c=document.createElement('canvas');c.width=1024;c.height=768;Object.assign(c,{displayWidth:1024,displayHeight:768,close(){}});(window as any).decoders[2].callbacks.output(c);});
+  assert.equal(await page.getByRole('status').filter({hasText:'正在切换兼容采集'}).count(),0);
+  assert.equal(await page.getByRole('alert').filter({hasText:'fixture decode error'}).count(),1,'real errors must remain');
+  const startsBefore=await page.evaluate(()=>(window as any).starts.length);
+  await page.getByRole('button',{name:'填满工作区',exact:true}).click();
+  await page.getByRole('button',{name:'还原工作区',exact:true}).waitFor();
+  assert.ok(await page.locator('canvas').evaluate(e=>{const c=e.getBoundingClientRect(),s=e.parentElement!.getBoundingClientRect();return c.width<=s.width+1&&c.height<=s.height+1;}));
+  await page.getByRole('button',{name:'全屏',exact:true}).click();
+  await page.waitForFunction(()=>!!document.fullscreenElement);
+  await page.getByRole('button',{name:'退出全屏',exact:true}).click();
+  await page.waitForFunction(()=>!document.fullscreenElement);
+  await page.getByRole('button',{name:'还原工作区',exact:true}).click();
+  assert.equal(await page.evaluate(()=>(window as any).starts.length),startsBefore,'mode switches preserve session');
   await page.evaluate(
     (id) =>
       (window as any).receive({
@@ -120,7 +145,7 @@ try {
       }),
     frame.id,
   );
-  assert.equal(await page.getByRole('status').count(), 0);
+  assert.equal(await page.getByRole('status').filter({hasText:'正在重连'}).count(), 0);
   await page.getByRole('button', { name: '断开', exact: true }).click();
   await page.getByText('画质', { exact: true }).click();
   await page.getByLabel('目标宽度', { exact: true }).fill('2560');
@@ -140,6 +165,9 @@ try {
   assert.ok(state.starts.every((s: any) => state.stops.includes(s.id)));
   assert.equal(state.starts.at(-1).quality.width, 2560);
   assert.equal(state.starts.at(-1).quality.fps, 144);
+  await page.reload();await page.getByLabel('控制键鼠',{exact:true}).check();await page.getByRole('button',{name:'连接桌面',exact:true}).click();
+  await page.evaluate(()=>{const w=window as any;w.receive({id:w.starts.at(-1).id,type:'error',message:'INPUT_DISABLED: 测试输入不可用，保留画面'});w.pending.shift()();});
+  await page.getByText('仅观看',{exact:true}).waitFor();await page.getByText('测试输入不可用，保留画面',{exact:true}).waitFor();
   assert.deepEqual(errors, []);
   await writeFile(
     'test-results/desktop-view-races.json',
@@ -148,11 +176,17 @@ try {
         passed: true,
         isolated: true,
         checks: [
+          'capture-recovery-notice-cleared-after-draw',
+          'real-errors-preserved-after-draw',
+          'workspace-and-fullscreen-preserve-session',
+          'canvas-fits-screen',
+          'input-denial-before-start-resolution-preserved',
           'late-start-target-switch',
           'cancel-pending-start',
           'late-start-unmount',
           'blur-releases-input',
           'decoder-error-keyframe-recovery',
+          'silent-decoder-timeout-recovery',
           'stale-decoder-ignored',
           'manual-resolution',
           'invalid-quality-not-sent',
@@ -170,3 +204,4 @@ try {
   await new Promise<void>((r) => http.close(() => r()));
   await rm(dir, { recursive: true, force: true });
 }
+

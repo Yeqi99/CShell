@@ -2,10 +2,11 @@
 const { app, BrowserWindow, nativeImage } = require('electron');
 const { readFile, writeFile } = require('node:fs/promises');
 const { resolve } = require('node:path');
+const iconName=process.argv[2]==='cagent-icon'?'cagent-icon':'icon';
 app.disableHardwareAcceleration();
 app.whenReady().then(async () => {
   try {
-    const svg = await readFile(resolve('assets/icon.svg'), 'utf8');
+    const svg = await readFile(resolve(`assets/${iconName}.svg`), 'utf8');
     const window = new BrowserWindow({
       width: 512,
       height: 512,
@@ -24,8 +25,8 @@ app.whenReady().then(async () => {
     const source = nativeImage
       .createFromBuffer(capture.toPNG())
       .resize({ width: 512, height: 512, quality: 'best' });
-    await writeFile(resolve('assets/icon-512.png'), source.toPNG());
-    await writeFile(resolve('assets/icon.png'), source.resize({ width: 256, height: 256 }).toPNG());
+    await writeFile(resolve(`assets/${iconName}-512.png`), source.toPNG());
+    await writeFile(resolve(`assets/${iconName}.png`), source.resize({ width: 256, height: 256 }).toPNG());
     const sizes = [16, 24, 32, 48, 64, 128, 256];
     const images = sizes.map((size) =>
       source.resize({ width: size, height: size, quality: 'best' }).toPNG(),
@@ -43,7 +44,7 @@ app.whenReady().then(async () => {
       header.writeUInt32LE(offset, position + 12);
       offset += images[index].length;
     });
-    await writeFile(resolve('assets/icon.ico'), Buffer.concat([header, ...images]));
+    await writeFile(resolve(`assets/${iconName}.ico`), Buffer.concat([header, ...images]));
     window.destroy();
     app.quit();
   } catch (error) {

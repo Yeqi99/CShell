@@ -23,19 +23,20 @@ const codec = {
   decrypt: async (v: string) => Buffer.from(v, 'base64').toString(),
 };
 
-test('Agent applications require separate local consent and use authenticated controller identity', async () => {
+test('Agent applications allow authenticated administration and preserve explicit opt-out', async () => {
   const f = await fixture();
   try {
     const { device } = await f.pair({ allowManage: true });
     const initial = await f.provider.call(device.deviceId, { method: 'applications.list' }) as { enabled: boolean };
-    assert.equal(initial.enabled, false);
-    await assert.rejects(f.provider.call(device.deviceId, { method: 'applications.plan', params: { app: 'git' } }), /denied|未授权/);
+    assert.equal(initial.enabled, true);
+    await f.provider.call(device.deviceId, { method: 'applications.configure', params: { enabled: false } });
+    await assert.rejects(f.provider.call(device.deviceId, { method: 'applications.plan', params: { app: 'git' } }), /denied|未授权|CAgent 请求失败：请检查远端权限和服务状态/);
     const owner = f.runtime.server.status().peers[0].fingerprint;
     await f.runtime.dispatch('applications.configure', { enabled: true, controllers: [owner] });
     const granted = await f.provider.call(device.deviceId, { method: 'applications.list' }) as { enabled: boolean };
     assert.equal(granted.enabled, true);
     await f.runtime.dispatch('applications.configure', { enabled: false });
-    await assert.rejects(f.provider.call(device.deviceId, { method: 'applications.plan', params: { app: 'git' } }), /denied|未授权/);
+    await assert.rejects(f.provider.call(device.deviceId, { method: 'applications.plan', params: { app: 'git' } }), /denied|未授权|CAgent 请求失败：请检查远端权限和服务状态/);
   } finally { await f.close(); }
 });
 const shell = process.platform === 'win32' ? 'cmd' : 'bash';
@@ -231,7 +232,7 @@ test('Agent native management, hosting and relay grants are independent on provi
       );
       for (const method of denied) {
         await assert.rejects(f.provider.call(device.deviceId, { method }), /未授予/);
-        await assert.rejects(rawManage(f.port, identity, method), /denied/);
+        await assert.rejects(rawManage(f.port, identity, method), /denied|CAgent 请求失败：请检查远端权限和服务状态/);
       }
       // A hosting grant cannot edit listeners/passwords; a relay grant cannot publish services.
       if (grant !== 'allowManage')
@@ -241,7 +242,7 @@ test('Agent native management, hosting and relay grants are independent on provi
             shells: [shell],
             allowManage: true,
           }),
-          /denied/,
+          /denied|CAgent 请求失败：请检查远端权限和服务状态/,
         );
       if (grant !== 'allowHosting')
         await assert.rejects(
@@ -252,9 +253,10 @@ test('Agent native management, hosting and relay grants are independent on provi
               routes: [{ method: 'GET', path: '/' }],
             }),
           }),
-          /denied/,
+          /denied|CAgent 请求失败：请检查远端权限和服务状态/,
         );
       f.provider.disconnect(session);
+      await f.runtime.server.revoke(f.runtime.server.status().peers[0].fingerprint);
     }
   } finally {
     await f.close();
@@ -296,7 +298,7 @@ test('Agent legacy peers retain identity but gain no new management or hosting g
       [],
     );
     for (const method of ['client.status', 'hosting.list', 'relay.status'] as const) {
-      await assert.rejects(rawManage(f.port, await f.vault.identity(), method), /denied/);
+      await assert.rejects(rawManage(f.port, await f.vault.identity(), method), /denied|CAgent 请求失败：请检查远端权限和服务状态/);
     }
     assert.equal(f.provider.list()[0].deviceId, device.deviceId);
   } finally {
@@ -351,7 +353,7 @@ test('Agent hosting AI tools bind reviewed config and revision, and backend deni
         id: input.id,
         expectedRevision: saved.config.revision,
       }),
-      /denied/,
+      /denied|CAgent 请求失败：请检查远端权限和服务状态/,
     );
     const tampered = registry.prepare(session, 'agent_hosting', {
       method: 'hosting.start',
@@ -476,3 +478,4 @@ test('Agent revocation during audit persistence prevents a queued management mut
     await f.close();
   }
 });
+

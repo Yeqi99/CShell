@@ -61,7 +61,7 @@ const destination = join(root, 'release', version);
 await mkdir(destination, { recursive: true });
 const name =
   os === 'win'
-    ? `CAgent-Setup-${version}-win-x64.zip`
+    ? `CAgent-Setup-${version}-win-x64.exe`
     : `CAgent-${version}-${os}-${process.arch}.tar.gz`;
 const file = join(destination, name),
   temporary = await mkdtemp(join(tmpdir(), 'cagent-release-'));
@@ -74,11 +74,11 @@ try {
       staged,
       installer,
     ]);
-    await cp(installer + '.zip', archive);
+    run(process.execPath,[join(root,'scripts/package-agent-windows-exe.mjs'),installer,archive]);
   } else run('tar', ['-czf', archive, '-C', staged, '.']);
   const extracted = join(temporary, 'extracted');
   await mkdir(extracted);
-  run('tar', ['-xf', archive, '-C', extracted]);
+  if(os !== 'win') run('tar', ['-xf', archive, '-C', extracted]);
   let verified = extracted;
   if (os === 'win') {
     const install = join(temporary, 'installed'),
@@ -87,23 +87,8 @@ try {
     // A pwsh 7 parent can export incompatible module paths into Windows PS 5.
     for (const key of Object.keys(installEnv))
       if (key.toLowerCase() === 'psmodulepath') delete installEnv[key];
-    run(
-      join(process.env.SystemRoot || 'C:/Windows', 'System32/WindowsPowerShell/v1.0/powershell.exe'),
-      [
-        '-NoProfile',
-        '-NonInteractive',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-File',
-        join(extracted, 'Install-CAgent.ps1'),
-        '-Destination',
-        install,
-        '-NoLaunch',
-        '-NoShortcuts',
-      ],
-      { env: installEnv },
-    );
-    const manifest = JSON.parse(await readFile(join(extracted, 'deployment.json'), 'utf8'));
+    run(archive,['/S', '/D='+install],{env:installEnv});
+    const manifest = JSON.parse(await readFile(join(temporary,'setup','deployment.json'),'utf8'));
     verified = join(install, 'versions', manifest.installId);
   }
   // This executes the runtime extracted from the exact archive, not a host Node substitute.

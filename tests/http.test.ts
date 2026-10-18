@@ -210,7 +210,7 @@ test('Agent HTTP requires an explicit grant, uses separate authenticated channel
   await new Promise<void>((r) => portServer.close(() => r()));
   try {
     const password = 'test-password-http-only';
-    await server.setAccess({ password, shells: ['cmd'] });
+    await server.setAccess({ password, shells: ['cmd'], allowHttp: false });
     await server.start({ bind: '127.0.0.1', port });
     const info = await client.probe({ host: '127.0.0.1', port });
     await client.pairPassword(info, password);
@@ -221,6 +221,7 @@ test('Agent HTTP requires an explicit grant, uses separate authenticated channel
     );
     assert.equal(client.resolve(session).http, undefined);
     client.disconnect(session);
+    await server.revoke(server.status().peers[0].fingerprint);
     await server.stop();
     await server.setAccess({ password, shells: ['cmd'], allowHttp: true });
     await server.start({ bind: '127.0.0.1', port });

@@ -64,14 +64,24 @@ NoLink $launcher
 $vbs = 'Set sh = CreateObject("WScript.Shell")' + "`r`n" + 'sh.Run Chr(34) & "' + $exe.Replace('"','""') + '" & Chr(34), 1, False' + "`r`n"
 [IO.File]::WriteAllText($launcher, $vbs, [Text.Encoding]::Unicode)
 if (-not $NoShortcuts) {
-  $menu = Join-Path ([Environment]::GetFolderPath('Programs')) 'CAgent.lnk'
   $shell = New-Object -ComObject WScript.Shell
-  $shortcut = $shell.CreateShortcut($menu)
-  $shortcut.TargetPath = Join-Path $env:SystemRoot 'System32\wscript.exe'
-  $shortcut.Arguments = '"' + $launcher + '"'
-  $shortcut.WorkingDirectory = $versionRoot
-  $shortcut.IconLocation = $exe
-  $shortcut.Save()
+  foreach ($folder in @([Environment]::GetFolderPath('Programs'), [Environment]::GetFolderPath('Desktop'))) {
+    $shortcutPath = Join-Path $folder 'CAgent.lnk'
+    $shortcut = $shell.CreateShortcut($shortcutPath)
+    $shortcut.TargetPath = Join-Path $env:SystemRoot 'System32\wscript.exe'
+    $shortcut.Arguments = '"' + $launcher + '"'
+    $shortcut.WorkingDirectory = $versionRoot
+    $shortcut.IconLocation = $exe + ',0'
+    $shortcut.Description = 'CAgent 本地智能体与远程桌面'
+    $shortcut.Save()
+    if (-not (Test-Path -LiteralPath $shortcutPath)) { throw 'Shortcut creation failed' }
+  }
+}
+# User-requested default autostart; preserve an explicit opt-out.
+if (-not $NoShortcuts -and -not (Test-Path -LiteralPath (Join-Path $root 'autostart-disabled'))) {
+  $startup = Join-Path ([Environment]::GetFolderPath('Startup')) 'CAgent.vbs'
+  $startupScript = 'Set sh = CreateObject("WScript.Shell")' + "`r`n" + 'sh.Run Chr(34) & "' + $launcher.Replace('"','""') + '" & Chr(34), 0, False' + "`r`n"
+  [IO.File]::WriteAllText($startup,$startupScript,[Text.Encoding]::Unicode)
 }
 # Read-only restricted IPC probe. Never expose its status payload or stop an existing runtime.
 $restartNeeded = $null

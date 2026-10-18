@@ -102,11 +102,15 @@ export class CapabilityRuntime {
     let result;
     try{result=await this.manager.stage(staged.manifestJson,staged.root,staged.manifestSha256);}
     catch(error){if(this.roots.get(id)!==staged.root)await this.removeRoot(staged.root);throw error;}
-    if(oldRoot&&oldRoot!==staged.root)await this.removeRoot(oldRoot);return result;
+    if(oldRoot&&oldRoot!==staged.root)await this.cleanupRetiredRoot(oldRoot);return result;
   });}
   grant(input:unknown){return this.mutate(async()=>{const {id,permissions}=idInput.extend({permissions:z.array(z.string()).max(64)}).strict().parse(input);return this.manager.setPermissions(id,permissions);});}
   refresh(input:unknown){return this.mutate(()=>this.manager.refresh(idInput.parse(input).id));}
-  uninstall(input:unknown){return this.mutate(async()=>{const {id}=capabilityInstallInput.parse(input),root=this.roots.get(id);await this.manager.uninstall(id);if(root)await this.removeRoot(root);return {id,uninstalled:true};});}
+  uninstall(input:unknown){return this.mutate(async()=>{const {id}=capabilityInstallInput.parse(input),root=this.roots.get(id);await this.manager.uninstall(id);if(root)await this.cleanupRetiredRoot(root);return {id,uninstalled:true};});}
+  // The replacement/uninstall is already committed. Older Windows packaged hosts
+  // can persist a virtualized LocalCache path; never delete outside this runtime's
+  // managed root, and never turn optional retirement into a startup failure.
+  private async cleanupRetiredRoot(root:string){try{await this.removeRoot(root);}catch{process.stderr.write('CAgent: retired capability files retained; active package is unchanged.\n');}}
   private async removeRoot(root:string){const parent=join(this.options.directory,'capability-packages'),within=relative(parent,root);if(!within||within.startsWith('..')||isAbsolute(within)||!/^package-[^/\\]+$/.test(within))throw new Error('Refusing to remove an unmanaged package path');await rm(root,{recursive:true,force:true});}
   tools():RuntimeCapabilityTool[]{return [...this.registered.values()].flatMap(({manifest,grants})=>manifest.tools.filter(tool=>tool.permissions.every(permission=>grants.includes(permission))).map(tool=>({...structuredClone(tool),packageId:manifest.id,toolId:tool.id})));}
   async invoke(input:unknown,owner:string,signal:AbortSignal){

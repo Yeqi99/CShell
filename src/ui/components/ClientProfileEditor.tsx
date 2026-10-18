@@ -1,6 +1,4 @@
-import { useEffect, useState } from 'react';
-import type { AgentShellOption } from '../../shared/agent';
-import type { ClientShell } from '../../shared/client';
+import { useState } from 'react';
 import type { Profile } from '../../shared/contracts';
 import { ClientConnectForm, type ClientConnected } from './ClientConnectForm';
 import { useI18n } from '../i18n';
@@ -21,13 +19,6 @@ export function ClientProfileEditor({
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
     [saved, setSaved] = useState(false);
-  const [shells, setShells] = useState<AgentShellOption[]>([]);
-  useEffect(() => {
-    void window.cshell
-      .clientShells(profile.id)
-      .then(setShells)
-      .catch(() => {});
-  }, [profile.id]);
   const update = (patch: Partial<Profile>) => {
     setDraft((p) => ({ ...p, ...patch }));
     setSaved(false);
@@ -74,40 +65,6 @@ export function ClientProfileEditor({
               value={draft.group}
               onChange={(e) => update({ group: e.target.value })}
             />
-          </label>
-          <label>
-            {cn ? '默认终端' : 'Default terminal'}
-            <select
-              aria-label={cn ? '默认终端' : 'Default terminal'}
-              value={(draft.clientShell ?? 'powershell') + '|' + (draft.clientDistribution ?? '')}
-              onChange={(e) => {
-                const choice = shells.find(
-                  (s) => s.shell + '|' + (s.distribution ?? '') === e.target.value,
-                )!;
-                update({
-                  clientShell: choice.shell as ClientShell,
-                  clientDistribution: choice.distribution,
-                });
-              }}
-            >
-              {!shells.length && (
-                <option
-                  value={
-                    (draft.clientShell ?? 'powershell') + '|' + (draft.clientDistribution ?? '')
-                  }
-                >
-                  {draft.clientDistribution ?? draft.clientShell ?? 'PowerShell'}（已保存）
-                </option>
-              )}
-              {shells.map((s) => (
-                <option
-                  key={s.shell + '|' + (s.distribution ?? '')}
-                  value={s.shell + '|' + (s.distribution ?? '')}
-                >
-                  {s.label}
-                </option>
-              ))}
-            </select>
           </label>
           <label className="client-favorite">
             <input

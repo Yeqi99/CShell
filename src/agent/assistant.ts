@@ -6,11 +6,11 @@ import type { RuntimeCapabilityTool } from './capability-runtime';
 
 const settingsSchema = z.object({
   endpoint: z.string().url().max(2048).default('https://api.openai.com/v1/chat/completions'),
-  model: z.string().min(1).max(120).default('gpt-4.1-mini'),
+  model: z.string().trim().max(120).default(''),
   key: z.string().max(16000).default(''),
-  commands: z.boolean().default(false),
-  review: z.boolean().default(true),
-  delegates: z.array(z.string().regex(/^[a-f0-9:]{64,95}$/i)).max(32).default([]),
+  commands: z.boolean().default(true),
+  review: z.boolean().default(false),
+  delegates: z.array(z.union([z.literal('*'),z.string().regex(/^[a-f0-9:]{64,95}$/i)])).max(32).default(['*']),
 }).strict().superRefine((v,c)=>{
   const u=new URL(v.endpoint);
   if(u.username||u.password||u.hash||!(u.protocol==='https:'||(u.protocol==='http:'&&['127.0.0.1','localhost','[::1]'].includes(u.hostname))))
@@ -52,7 +52,7 @@ export class CagentAssistant {
     this.active?.abort.abort(new Error('配置或授权已改变，任务已停止'));
     return this.snapshot();
   }
-  private authorize(owner:string){if(owner!=='local'&&(!this.host.allowed(owner)||!this.settings.delegates.includes(owner)))throw new Error('未授权此控制端委派任务');}
+  private authorize(owner:string){if(owner!=='local'&&(!this.host.allowed(owner)||!(this.settings.delegates.includes('*')||this.settings.delegates.includes(owner))))throw new Error('未授权此控制端委派任务');}
   list(owner:string){this.authorize(owner);return structuredClone(this.tasks.filter(t=>owner==='local'||t.owner===owner));}
   get(input:unknown,owner:string){this.authorize(owner);const {id}=z.object({id:z.string().uuid()}).strict().parse(input);const task=this.tasks.find(t=>t.id===id&&(owner==='local'||t.owner===owner));if(!task)throw new Error('任务不存在');return task;}
   async start(input:unknown,owner:string){
@@ -61,6 +61,7 @@ export class CagentAssistant {
     const previous=this.tasks.find(t=>t.owner===owner&&t.requestId===requestId);
     if(previous){if(previous.prompt!==prompt)throw new Error('同一请求 ID 不能用于不同任务');return {id:previous.id};}
     if(this.active)throw new Error('已有任务运行，请先完成或停止');
+    if(!this.settings.model)throw new Error('请先填写模型名称');
     if(!this.settings.key)throw new Error('请先配置模型基座');
     const task:Task={id:randomUUID(),requestId,owner,prompt,state:'running',answer:'',createdAt:new Date().toISOString(),events:[]};
     const active={task,abort:new AbortController(),done:Promise.resolve()} as NonNullable<CagentAssistant['active']>;

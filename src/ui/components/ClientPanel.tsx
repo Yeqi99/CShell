@@ -9,7 +9,7 @@ const words = {
     access: '连接',
     settings: '设置',
     password: '连接密码',
-    passwordHint: '至少 12 个字符。修改密码会清除已有设备授权。',
+    passwordHint: '请输入连接密码。修改密码会清除已有设备授权。',
     saveAccess: '保存访问设置',
     configured: '已设置连接密码',
     setupFirst: '先在设置中配置密码和开放权限',
@@ -70,7 +70,7 @@ const words = {
     access: 'Connection',
     settings: 'Settings',
     password: 'Connection password',
-    passwordHint: 'At least 12 characters. Changing it clears existing device grants.',
+    passwordHint: 'Enter the connection password. Changing it clears existing device grants.',
     saveAccess: 'Save access settings',
     configured: 'Connection password configured',
     setupFirst: 'Configure a password and permissions in Settings first',
@@ -369,7 +369,7 @@ export function ClientApplication({ embedded = false }: { embedded?: boolean }) 
             <input
               type="password"
               autoComplete="new-password"
-              minLength={12}
+              minLength={1}
               maxLength={128}
               value={password}
               disabled={status?.running || busy}
@@ -407,7 +407,7 @@ export function ClientApplication({ embedded = false }: { embedded?: boolean }) 
           <p className="client-permission-note">{t.notice}</p>
           <button
             className="client-primary"
-            disabled={busy || status?.running || password.length < 12 || !shells.length}
+            disabled={busy || status?.running || password.length < 1 || !shells.length}
             onClick={() =>
               void run(async () => {
                 await window.cshell.clientSetAccess({ password, shells, allowHttp });

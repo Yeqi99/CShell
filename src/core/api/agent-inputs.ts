@@ -15,7 +15,7 @@ const manageParams = {
   'applications.status': appTaskInput,
   'applications.cancel': appTaskInput,
   'agent.shells': empty, 'agent.environments': empty, 'client.status': empty,
-  'client.start': z.object({ bind: z.string(), port: z.number().int().min(1024).max(65535), advertisedHost: clientEndpointSchema.shape.host.optional() }).strict(),
+  'client.start': z.object({ bind: z.string(), port: z.number().int().min(1024).max(65535), advertisedHost: clientEndpointSchema.shape.host.optional(), advertisedPort: clientEndpointSchema.shape.port.optional() }).strict(),
   'client.stop': empty,
   'client.info': z.object({ host: z.string().max(253) }).strict(),
   'client.revoke': z.object({ fingerprint: z.string().min(1).max(100) }).strict(),

@@ -1,3 +1,6 @@
+import {SavedAgentConnection} from './components/SavedAgentConnection';
+import {AgentMachineWorkspace} from './components/AgentMachineWorkspace';
+import type {AgentTarget} from '../shared/agent';
 import { RdpConnectionForm } from './components/RdpConnectionForm';
 import { usePermissionNavigation } from './permission-navigation';
 import { HttpWorkbench, HttpCreate } from './components/HttpWorkbench';
@@ -223,7 +226,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
     [form, setForm] = useState<Profile | 'new' | null>(null),
     [settings, setSettings] = useState(false),
     [surface, setSurface] = useState<
-      'terminal' | 'connection' | 'quick' | 'settings' | 'extensions' | 'activity' | 'wsl'
+      'terminal' | 'connection' | 'quick' | 'settings' | 'extensions' | 'activity' | 'wsl' | 'machine'
     >('terminal'),
     [palette, setPalette] = useState(false),
     [error, setError] = useState(''),
@@ -231,6 +234,16 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
     [transfers, setTransfers] = useState<Transfer[]>([]),
     [confirmDelete, setConfirmDelete] = useState<Profile | null>(null),
     [confirmClose, setConfirmClose] = useState<Tab | null>(null);
+  const [machineSessionCounts,setMachineSessionCounts]=useState<Record<string,number>>({});
+  const [machines,setMachines]=useState<{device:ClientDevice;target:AgentTarget}[]>([]),[machineId,setMachineId]=useState('');
+  async function openMachineDevice(device:ClientDevice){
+    const existing=machines.find(m=>m.device.deviceId===device.deviceId);
+    const latest=await window.cshell.config();const opened=existing?.target??await window.cshell.agentMachineOpen(device.deviceId);
+    const target={...opened,name:latest.profiles.find(p=>p.id===device.deviceId)?.name??device.name};
+    setMachines(v=>v.some(m=>m.target.id===target.id)?v:[...v,{device,target}]);setMachineId(target.id);setSurface('machine');
+    setConfig(await window.cshell.config());
+  }
+  async function closeMachine(id:string){await window.cshell.agentMachineClose(id);setMachineSessionCounts(v=>{const next={...v};delete next[id];return next;});setMachines(v=>v.filter(m=>m.target.id!==id));if(machineId===id){setMachineId('');setSurface('terminal');}}
   const wslReturnSurface = useRef<typeof surface>('terminal');
   const closeWslSetup = () => {
     setWslSetupTarget(null);
@@ -240,23 +253,6 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
   const [quickId, setQuickId] = useState('');
   const openSaved = (profile: Profile) => {
     if(profile.protocol==='rdp'){void window.cshell.openRdp(profile.id).catch(e=>{openConnection(profile);setError(e.message);});return;}
-    if (profile.protocol === 'client') {
-      void (async () => {
-        const device = (await window.cshell.clientDevices()).find((d) => d.deviceId === profile.id);
-        if (!device) throw new Error('Client identity unavailable');
-        const shell = profile.clientShell ?? 'powershell';
-        await addClient(
-          await window.cshell.clientConnect(device.deviceId, shell, profile.clientDistribution),
-          device,
-          shell,
-          profile.clientDistribution,
-        );
-      })().catch((e) => {
-        openConnection(profile);
-        setError((e as Error).message);
-      });
-      return;
-    }
     setQuickConnections((items) =>
       items.some((item) => item.id === profile.id) ? items : [...items, profile],
     );
@@ -427,7 +423,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
       }),
     [],
   );
-  const showTools = right && !!current && !current.closed && !current.local && !current.client;
+  const showTools = surface === 'terminal' && right && !!current && !current.closed && !current.local && !current.client;
   const saveProfile = async (p: Profile) => {
     await window.cshell.saveProfile(p);
     setTabs((items) =>
@@ -530,9 +526,19 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
       setError(e.message);
     });
   }, [minimal, pinned]);
+  const preferenceRevision = useRef(0);
   const savePreferences = async (value: Preferences) => {
-    await window.cshell.preferences(value);
-    await refresh();
+    const revision = ++preferenceRevision.current;
+    // Subsequent controls must read the new draft while persistence is in flight.
+    setConfig({ ...config, preferences: value });
+    try {
+      await window.cshell.preferences(value);
+      const latest = await window.cshell.config();
+      if (revision === preferenceRevision.current) setConfig(latest);
+    } catch (error) {
+      if (revision === preferenceRevision.current) await refresh();
+      throw error;
+    }
   };
   const layout = preferences.layout;
   const onLayout = (next: Preferences['layout']) => {
@@ -673,8 +679,8 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
               onTarget={(target) => run(openLocal(target.shell))}
               groups={config.groups}
               profiles={config.profiles}
-              activeProfile={current?.profile.id}
-              online={tabs.filter((tab) => !tab.closed && !tab.local).map((tab) => tab.profile.id)}
+              activeProfile={surface==='machine'?machines.find(m=>m.target.id===machineId)?.device.deviceId:current?.profile.id}
+              online={[...tabs.filter((tab) => !tab.closed && !tab.local).map((tab) => tab.profile.id),...machines.map(m=>m.device.deviceId)]}
               onOpen={(p) => openConnection(p || 'new')}
               onConnect={openSaved}
               onSave={saveProfile}
@@ -750,6 +756,8 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
               </button>
             </div>
             <TabStrip>
+              {machines.map(m=><div key={m.target.id} className={'tab '+(surface==='machine'&&machineId===m.target.id?'active':'')} onClick={()=>{setMachineId(m.target.id);setSurface('machine');}}><button onClick={()=>{setMachineId(m.target.id);setSurface('machine');}}>{m.target.name}</button><button className="icon" title="关闭机器工作区及其会话" aria-label={'关闭 '+m.target.name} onClick={e=>{e.stopPropagation();void closeMachine(m.target.id).catch(onError);}}>×</button></div>)}
+
               {tabs.length ? (
                 tabs.map((tab) => (
                   <SessionTab
@@ -778,7 +786,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
                     }
                   />
                 ))
-              ) : !form && !settings && !quickConnections.length ? (
+              ) : !form && !settings && !quickConnections.length && !machines.length ? (
                 <div className="tab active welcome-tab">
                   <TerminalIcon size={15} />
                   {t('workspace')}
@@ -1023,6 +1031,8 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
                   enabled={pluginEnabled(config.plugins, 'http')}
                   onSaveProfile={saveProfile}
                 />
+              ) : profile.protocol === 'client' ? (
+                <SavedAgentConnection profile={profile} onConnect={openMachineDevice} onDone={()=>setQuickConnections(items=>items.filter(item=>item.id!==profile.id))}/>
               ) : (
                 <SavedConnection
                   profile={profile}
@@ -1058,7 +1068,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
                       />
                     ) : undefined
                   }
-                  onClient={addClient}
+                  onClient={openMachineDevice}
                   onLocal={openLocal}
                   profiles={config.profiles}
                   onConnect={openSaved}
@@ -1081,7 +1091,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
                   profile={draft}
                   onSave={saveProfile}
                   onConnect={openSaved}
-                  onClient={addClient}
+                  onClient={openMachineDevice}
                 />
               ) : (
                 <ConnectionForm
@@ -1156,6 +1166,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
               />
             </div>
           )}
+          {machines.map(m=><div key={m.target.id} className="workspace-editor" hidden={surface!=='machine'||machineId!==m.target.id}><AgentMachineWorkspace onDisconnect={()=>closeMachine(m.target.id)} device={m.device} target={m.target} preferences={preferences} onSessionCount={count=>setMachineSessionCounts(v=>v[m.target.id]===count?v:{...v,[m.target.id]:count})} active={surface==='machine'&&machineId===m.target.id}/></div>)}
           {surface === 'terminal' && current?.closed && (
             <div className="disconnected-session-bar" role="status">
               <span>
@@ -1297,7 +1308,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
               savePreferences({ ...config.preferences, showAiExecution })
             }
             visible={aiVisible && !minimal}
-            sessionId={current && !current.closed ? current.id : undefined}
+            sessionId={surface==='terminal' && current && !current.closed ? current.id : undefined}
             profiles={config.profiles}
             groups={config.groups}
             onClose={() => setAiVisible(false)}
@@ -1308,7 +1319,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
         <div>
           <ShieldCheck size={13} />
           <span>
-            {current
+            {surface==='machine'?'cagent · '+(machines.find(m=>m.target.id===machineId)?.target.name??''):current
               ? current.closed
                 ? t('disconnected')
                 : current.local
@@ -1319,7 +1330,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
         </div>
         <div>
           <span>
-            {tabs.filter((x) => !x.closed).length} {t('sessionCount')}
+            {tabs.filter((x) => !x.closed).length+Object.values(machineSessionCounts).reduce((a,b)=>a+b,0)} {t('sessionCount')}
           </span>
 
           <button

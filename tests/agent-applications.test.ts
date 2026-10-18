@@ -52,9 +52,10 @@ test('recipes use exact package IDs without arbitrary commands or elevation', ()
   assert.deepEqual(installArgs('apt-get', 'python'), ['install', '-y', 'python3']);
   assert.throws(() => installArgs('dnf', 'vscode'));
 });
-test('installation defaults closed and plans belong to a controller', async () => {
+test('installation preserves explicit opt-out and plans belong to a controller', async () => {
   const f = fixture();
   await f.service.load();
+  await f.service.configure({ enabled: false });
   await assert.rejects(f.service.install({ id: f.id, confirm: true }, 'local'), /未授权/);
   await f.service.configure({ enabled: true, controllers: ['a'.repeat(64)] });
   await assert.rejects(f.service.install({ id: f.id, confirm: true }, 'a'.repeat(64)), /NOT_FOUND/);

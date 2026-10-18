@@ -5,17 +5,10 @@ import {
   clientInfoSchema,
   type ClientInfo,
   type ClientDevice,
-  type ClientShell,
 } from '../../shared/client';
 import { useI18n } from '../i18n';
-import type { AgentShellOption } from '../../shared/agent';
 import type { AgentRelayConnection } from '../../shared/agent-relay';
-export type ClientConnected = (
-  result: { sessionId: string; name: string },
-  device: ClientDevice,
-  shell: ClientShell,
-  distribution?: string,
-) => void | Promise<void>;
+export type ClientConnected = (device:ClientDevice) => void | Promise<void>;
 export function ClientConnectForm({
   onConnect,
   profile,
@@ -28,10 +21,7 @@ export function ClientConnectForm({
   const [host, setHost] = useState(profile?.host ?? ''),
     [port, setPort] = useState(String(profile?.port ?? 47831)),
     [password, setPassword] = useState('');
-  const [shell, setShell] = useState<ClientShell>(profile?.clientShell ?? 'powershell');
-  const [distribution, setDistribution] = useState(profile?.clientDistribution);
   const [device, setDevice] = useState<ClientDevice>();
-  const [shells, setShells] = useState<AgentShellOption[]>([]);
   const [relayEnabled, setRelayEnabled] = useState(false);
   const [relay, setRelay] = useState<AgentRelayConnection>({
     host: '',
@@ -53,7 +43,6 @@ export function ClientConnectForm({
     setTrusted(false);
     setFingerprint('');
     setDevice(undefined);
-    setShells([]);
   };
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
@@ -84,6 +73,7 @@ export function ClientConnectForm({
   return (
     <form
       className="client-connect-form"
+      onPaste={e=>{const text=e.clipboardData.getData('text');if(text.length>16384||!text.trim().startsWith('{'))return;try{const parsed=clientInfoSchema.safeParse(JSON.parse(text));if(!parsed.success)return;e.preventDefault();reset();setHost(parsed.data.host);setPort(String(parsed.data.port));setName(parsed.data.name);void describe(parsed.data).catch(error=>setError(String(error)));}catch{}}}
       onSubmit={(e) => {
         e.preventDefault();
         void run(async () => {
@@ -98,62 +88,63 @@ export function ClientConnectForm({
             return;
           }
           if (!trusted) return;
-          if (!device) {
-            const next = await window.cshell.clientPasswordPair(info, password);
-            const choices = await window.cshell.clientShells(next.deviceId);
-            if (!choices.length) throw new Error('Agent 未开放可用终端');
-            setDevice(next);
-            setShells(choices);
-            setShell(choices[0].shell as ClientShell);
-            setDistribution(choices[0].distribution);
-            setPassword('');
-            return;
-          }
+          const connected = device ?? await window.cshell.clientPasswordPair(info, password);
+          setDevice(connected);
           await window.cshell.saveProfile({
-            id: device.deviceId,
+            id: connected.deviceId,
             protocol: 'client',
-            clientShell: shell,
-            clientDistribution: distribution,
-            name: profile?.name ?? (name.trim() || device.name),
+            clientShell: profile?.clientShell,
+            clientDistribution: profile?.clientDistribution,
+            name: profile?.name ?? (name.trim() || connected.name),
             group: profile?.group ?? group.trim(),
             favorite: profile?.favorite ?? favorite,
-            host: device.host,
-            port: device.port,
+            host: connected.host,
+            port: connected.port,
             username: 'Client',
             auth: 'password',
           });
           setPassword('');
-          await onConnect(
-            await window.cshell.clientConnect(device.deviceId, shell, distribution),
-            device,
-            shell,
-            distribution,
-          );
+          await onConnect(connected);
         });
       }}
     >
-      <ConnectionExtractor title="cagent" titleId="cagent-connect-title" providerId="cshell.client" disabled={busy} onBusy={setBusy} onStart={()=>setError('')} onExtract={({fields})=>{
-        reset();if(fields.host)setHost(fields.host);if(fields.port!==undefined)setPort(String(fields.port));if(fields.password!==undefined)setPassword(fields.password);if(fields.name)setName(fields.name);if(fields.group)setGroup(fields.group);
-      }}/>
-      <div className="connection-form-tools">
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() =>
-            void run(async () => {
-              const text = await window.cshell.pasteText();
-              if (text.length > 16384)
-                throw new Error(cn ? '连接信息过长' : 'Connection info too large');
-              const next = clientInfoSchema.parse(JSON.parse(text));
-              setHost(next.host);
-              setPort(String(next.port));
-              await describe(next);
-            })
-          }
-        >
-          {cn ? '粘贴连接信息' : 'Paste connection info'}
-        </button>
-      </div>
+      <ConnectionExtractor
+        extraActions={
+          <>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() =>
+                void run(async () => {
+                  const text = await window.cshell.pasteText();
+                  if (text.length > 16384)
+                    throw new Error(cn ? '连接信息过长' : 'Connection info too large');
+                  const next = clientInfoSchema.parse(JSON.parse(text));
+                  setHost(next.host);
+                  setPort(String(next.port));
+                  await describe(next);
+                })
+              }
+            >
+              {cn ? '导入 CAgent 配对信息' : 'Import CAgent pairing info'}
+            </button>
+          </>
+        }
+        title="cagent"
+        titleId="cagent-connect-title"
+        providerId="cshell.client"
+        disabled={busy}
+        onBusy={setBusy}
+        onStart={() => setError('')}
+        onExtract={({ fields }) => {
+          reset();
+          if (fields.host) setHost(fields.host);
+          if (fields.port !== undefined) setPort(String(fields.port));
+          if (fields.password !== undefined) setPassword(fields.password);
+          if (fields.name) setName(fields.name);
+          if (fields.group) setGroup(fields.group);
+        }}
+      />
       <fieldset disabled={busy}>
         <div className="client-fields">
           <label>
@@ -171,7 +162,7 @@ export function ClientConnectForm({
             {cn ? '端口' : 'Port'}
             <input
               type="number"
-              min={1024}
+              min={1}
               max={65535}
               required
               value={port}
@@ -188,37 +179,12 @@ export function ClientConnectForm({
             required={!device}
             type="password"
             autoComplete="current-password"
-            minLength={12}
+            minLength={1}
             maxLength={128}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
         </label>
-        {!!shells.length && (
-          <label>
-            {cn ? '终端' : 'Terminal'}
-            <select
-              aria-label={cn ? '终端' : 'Terminal'}
-              value={shell + '|' + (distribution ?? '')}
-              onChange={(e) => {
-                const choice = shells.find(
-                  (s) => s.shell + '|' + (s.distribution ?? '') === e.target.value,
-                )!;
-                setShell(choice.shell as ClientShell);
-                setDistribution(choice.distribution);
-              }}
-            >
-              {shells.map((s) => (
-                <option
-                  key={s.shell + '|' + (s.distribution ?? '')}
-                  value={s.shell + '|' + (s.distribution ?? '')}
-                >
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
         <details>
           <summary>{cn ? '通过中继连接' : 'Relay connection'}</summary>
           <label>
@@ -306,10 +272,10 @@ export function ClientConnectForm({
               ? cn
                 ? device
                   ? '连接'
-                  : '验证并读取终端'
+                  : '验证并连接机器'
                 : device
                   ? 'Connect'
-                  : 'Verify and load terminals'
+                  : 'Verify and connect'
               : cn
                 ? '检查设备'
                 : 'Check device'}

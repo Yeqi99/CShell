@@ -2,7 +2,7 @@ import { RdpConnectionForm } from './RdpConnectionForm';
 import { ClientConnectForm, type ClientConnected } from './ClientConnectForm';
 import { useI18n } from '../i18n';
 import type { LocalShell, LocalConnectionTarget } from '../../shared/local-terminal';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   Search,
   Server,
@@ -43,13 +43,7 @@ export function ConnectionEntry({
   const [query, setQuery] = useState('');
   const [localError, setLocalError] = useState('');
   const [opening, setOpening] = useState(false);
-  const [windows, setWindows] = useState(false);
-  useEffect(() => {
-    void window.cshell
-      .localEnvironment()
-      .then((s) => setWindows(s.supported))
-      .catch(() => {});
-  }, []);
+  const windows = window.cshell.platform === 'win32';
   const kinds = [
     ...(http
       ? [
@@ -205,8 +199,8 @@ export function ConnectionEntry({
           <div className="client-page protocol-client" hidden={kind !== 'client'}>
             {visited.includes('client') && <ClientConnectForm onConnect={onClient} />}
           </div>
-          <div className="client-page protocol-client" hidden={kind !== 'rdp'}>
-            {visited.includes('rdp') && <RdpConnectionForm onSaved={onSaved} />}
+          <div hidden={kind !== 'rdp'}>
+            {visited.includes('rdp') && <RdpConnectionForm embedded onSaved={onSaved} />}
           </div>
         </div>
       </div>

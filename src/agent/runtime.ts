@@ -1,3 +1,6 @@
+import {AgentFiles} from './files';
+import {AgentUpdater} from './update';
+import {startupState,setStartup} from './startup';
 import { access } from 'node:fs/promises';
 import { join, dirname, resolve } from 'node:path';
 import { networkInterfaces } from 'node:os';
@@ -53,6 +56,7 @@ const legacySchema = z
         bind: z.string().max(253),
         port: z.number().int().min(1024).max(65535),
         advertisedHost: z.string().max(253).optional(),
+        advertisedPort: clientEndpointSchema.shape.port.optional(),
       })
       .strict()
       .optional(),
@@ -69,7 +73,8 @@ async function finishLegacyImport(vault: ClientVault, input: z.infer<typeof lega
 export async function createAgentRuntime(
   options: { directory?: string; terminal?: AgentTerminalProvider; onClose?:()=>void; desktopExecutable?:string; extraPackages?:ConstructorParameters<typeof CapabilityRuntime>[0]['extraPackages'] } = {},
 ) {
-  const directory = options.directory ?? agentDirectory();
+  const files=new AgentFiles();
+  const directory = options.directory ?? agentDirectory(); const updater=new AgentUpdater(directory,agentVersion);
   let canImportLegacy = false;
   try {
     await access(join(directory, 'identity.enc'));
@@ -105,6 +110,23 @@ export async function createAgentRuntime(
   const desktop=await createDesktopCapability({identity:desktopIdentity,nativeExecutable:options.desktopExecutable??join(dirname(resolve(process.argv[1]??process.execPath)),'cagent-desktop.exe'),vault,authorize:owner=>server.status().deviceId===desktopIdentity&&(owner==='local'||server.managementAllowed(owner))});
   const packages=new CapabilityRuntime({directory,vault,applications,agentVersion,extraPackages:[...desktop.extraPackages,...options.extraPackages??[]]});
   await packages.load();
+  // Provision the Windows distribution's native desktop once, without granting access.
+  // Remember the decision so an explicit uninstall remains effective on restart.
+  if (desktop.extraPackages.length && !(await vault.read('desktop-builtin-provisioned', z.boolean()))) {
+    if (!packages.list().some(item => item.id === 'cagent.desktop')) {
+      await packages.install({id:'cagent.desktop',confirm:true});
+      await packages.grant({id:'cagent.desktop',permissions:['desktop.view','desktop.control']});
+    }
+    await vault.write('desktop-builtin-provisioned', true);
+  }
+  // Refresh an installed bundled engine after an application update; stage retains grants.
+  // An explicitly uninstalled desktop package stays uninstalled.
+  if(desktop.extraPackages.length&&packages.list().some(item=>item.id==='cagent.desktop'))await packages.install({id:'cagent.desktop',confirm:true});
+  let listenerStartupError:string|undefined;
+  if(await vault.read('connection-resume-listener',z.boolean())){
+    const previous=server.status();
+    if(previous.passwordConfigured&&previous.bind&&previous.port)try{await server.start({bind:previous.bind,port:previous.port,advertisedHost:previous.advertisedHost,advertisedPort:previous.advertisedPort});}catch{listenerStartupError='连接服务未启动，请检查本机地址和端口';}
+  }
   const assistant=new CagentAssistant(vault,{shells,applications:owner=>applications.list(owner),execute:(input,signal,owner)=>{
     if(owner!=='local'){
       const status=server.status(),peer=status.peers.find(p=>p.fingerprint===owner);
@@ -155,10 +177,33 @@ export async function createAgentRuntime(
   ): Promise<unknown> {
     signal.throwIfAborted();
     if (closed) throw new Error('Agent 已关闭');
+    if(method.startsWith('update.')){if(!local)throw new Error('更新只允许在本机执行');if(method==='update.check')return updater.check();if(method==='update.download')return updater.start();if(method==='update.status')return updater.status();throw new Error('未知更新操作');}
+    const admin=local || (owner!=='local' && server.managementAllowed(owner));
+    if(method.startsWith('files.')){if(!admin)throw new Error('未授权远程管理');return files.call(method,params,owner,signal);}
+    if(method==='connection.autostart'){if(!admin)throw new Error('未授权远程管理');return setStartup(z.object({enabled:z.boolean()}).strict().parse(params).enabled);}
+    if(method==='connection.settings') {
+      if(!admin)throw new Error('未授权远程管理');
+      const status=server.status();return {...status,listenerStartupError,autostart:await startupState(),password:await server.revealPassword(),interfaces:[...new Set(Object.values(networkInterfaces()).flatMap(v=>v?.filter(i=>!i.internal&&i.family==='IPv4').map(i=>i.address)??[]))]};
+    }
+    if(method==='connection.save') {
+      if(!admin)throw new Error('未授权远程管理');
+      const input=z.object({bind:z.string(),port:z.number().int().min(1024).max(65535),password:z.string().min(1).max(128),shells:z.array(clientShellSchema).min(1).max(6).optional(),allowManage:z.boolean().optional(),allowHttp:z.boolean().optional(),allowHosting:z.boolean().optional(),allowRelay:z.boolean().optional(),advertisedHost:z.string().optional(),advertisedPort:clientEndpointSchema.shape.port.optional()}).strict().parse(params);
+      if(!['0.0.0.0', '127.0.0.1','::1',...Object.values(networkInterfaces()).flatMap(v=>v?.map(i=>i.address)??[])].includes(input.bind))throw new Error('请选择当前设备的网络地址');
+      if(input.advertisedHost)clientEndpointSchema.shape.host.parse(input.advertisedHost);
+      const apply=async()=>{
+        await server.stop();await server.setAccess({password:input.password,shells:input.shells??(server.status().passwordConfigured?server.status().allowedShells:[...new Set((await shells()).map(s=>s.shell))]),allowManage:input.allowManage??(server.status().passwordConfigured?server.status().allowManage:true),allowHttp:input.allowHttp??(server.status().passwordConfigured?server.status().allowHttp:true),allowHosting:input.allowHosting??(server.status().passwordConfigured?server.status().allowHosting:true),allowRelay:input.allowRelay??(server.status().passwordConfigured?server.status().allowRelay:true)});
+        const current=await desktop.dispatch('desktop.status',{},'local',true) as {config:Record<string,unknown>};
+        if(desktop.extraPackages.length)await desktop.dispatch('desktop.configure',{...current.config,directListener:false,bindAddress:input.bind,tcpPort:input.port,udpPort:input.port,publicTcpPort:input.advertisedPort,publicUdpPort:input.advertisedPort??input.port},'local',true);
+        await server.start({bind:input.bind,port:input.port,advertisedHost:input.advertisedHost,advertisedPort:input.advertisedPort});
+        await vault.write('connection-resume-listener',true);listenerStartupError=undefined;
+      };
+      if(local){await serialized(apply);return {saved:true};}
+      setTimeout(()=>void serialized(apply).catch(error=>recordManagement('connection.save.failed',error)),200).unref();return {changing:true,disconnects:true};
+    }
     if(method.startsWith('desktop.')){
       if(!local&&(owner==='local'||!server.managementAllowed(owner)))throw new Error('未授权控制端管理远程桌面');
       if(server.status().deviceId!==desktopIdentity)throw new Error('设备身份已迁移，请重启 cagent 后使用远程桌面');
-      return desktop.dispatch(method,params,owner,local);
+      return desktop.dispatch(method,params,owner,admin);
     }
     if(method.startsWith('packages.')){
       if(!local&&(owner==='local'||!server.managementAllowed(owner)))throw new Error('未授权控制端管理能力包');
@@ -170,7 +215,7 @@ export async function createAgentRuntime(
         const guard=setInterval(()=>{if(!local&&!server.managementAllowed(owner))controller.abort(new Error('控制端授权已撤销'));},100);
         try{return await packages.invoke(params,owner,AbortSignal.any([signal,controller.signal]));}finally{clearInterval(guard);}
       }
-      if(!local)throw new Error('仅本机可安装、授权或卸载能力包');
+      if(!admin)throw new Error('未授权管理能力包');
       if(method==='packages.install')return packages.install(params,signal);
       if(method==='packages.grant')return packages.grant(params);
       if(method==='packages.uninstall')return packages.uninstall(params);
@@ -183,14 +228,14 @@ export async function createAgentRuntime(
       if(method==='assistant.tasks')return assistant.list(owner);
       if(method==='assistant.task')return structuredClone(assistant.get(params,owner));
       if(method==='assistant.cancel')return assistant.cancel(params,owner);
-      if(!local)throw new Error('仅本机可修改智能体配置或批准操作');
+      if(!admin)throw new Error('未授权管理智能体配置');
       if(method==='assistant.settings')return assistant.snapshot();
       if(method==='assistant.configure')return serialized(()=>assistant.configure(params));
       if(method==='assistant.approve')return assistant.approve(params);
       throw new Error('未知智能体操作');
     }
     if (!local && owner === 'local' && method.startsWith('applications.')) throw new Error('缺少控制端身份');
-    if (method === 'applications.policy') { if(!local)throw new Error('仅目标 cagent 本机可读取应用安装授权');return applications.policySnapshot(); }
+    if (method === 'applications.policy') { if(!admin)throw new Error('未授权管理应用安装');return applications.policySnapshot(); }
     if (method === 'applications.list') return applications.list(owner);
     if (method === 'applications.status') return applications.status(params, owner);
     if (method === 'applications.plan') return applications.plan(params, owner, signal);
@@ -202,7 +247,7 @@ export async function createAgentRuntime(
         platform: process.platform,
         interfaces: [
           ...new Set([
-            '127.0.0.1',
+            '0.0.0.0', '127.0.0.1',
             '::1',
             ...Object.values(networkInterfaces()).flatMap((v) => v?.map((i) => i.address) ?? []),
           ]),
@@ -250,8 +295,9 @@ export async function createAgentRuntime(
     return serialized(async () => {
       signal.throwIfAborted();
       if (closed) throw new Error('Agent 已关闭');
+    if(method.startsWith('update.')){if(!local)throw new Error('更新只允许在本机执行');if(method==='update.check')return updater.check();if(method==='update.download')return updater.start();if(method==='update.status')return updater.status();throw new Error('未知更新操作');}
       if (method === 'applications.configure') {
-        if (!local) throw new Error('仅目标 Agent 本机可修改应用安装授权');
+        if (!admin) throw new Error('未授权管理应用安装');
         const result = await applications.configure(params);
         await recordManagement('applications.configure');
         return result;
@@ -273,6 +319,7 @@ export async function createAgentRuntime(
         return result;
       }
       if (method === 'client.stop') {
+        await vault.write('connection-resume-listener',false);
         if (local) return server.stop();
         setTimeout(() => {
           if (!closed)
@@ -292,6 +339,7 @@ export async function createAgentRuntime(
                 bind: z.string(),
                 port: clientEndpointSchema.shape.port,
                 advertisedHost: clientEndpointSchema.shape.host.optional(),
+                advertisedPort: clientEndpointSchema.shape.port.optional(),
               })
               .strict()
               .optional(),
@@ -303,7 +351,7 @@ export async function createAgentRuntime(
         if (
           input.listener &&
           ![
-            '127.0.0.1',
+            '0.0.0.0', '127.0.0.1',
             '::1',
             ...Object.values(networkInterfaces()).flatMap(
               (rows) => rows?.map((row) => row.address) ?? [],
@@ -315,7 +363,7 @@ export async function createAgentRuntime(
         const listener =
           input.listener ??
           (status.running && status.bind && status.port
-            ? { bind: status.bind, port: status.port, advertisedHost: status.advertisedHost }
+            ? { bind: status.bind, port: status.port, advertisedHost: status.advertisedHost, advertisedPort: status.advertisedPort }
             : undefined);
         await recordManagement('configuration.change.accepted');
         setTimeout(() => {
@@ -423,6 +471,7 @@ export async function createAgentRuntime(
   async function close() {
     if (closed) return;
     closed = true;
+    await files.close();
     await assistant.close();
     await control?.close();
     await mutation;

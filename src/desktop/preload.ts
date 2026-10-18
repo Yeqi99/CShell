@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { Bridge, SessionEvent } from '../shared/contracts';
 const bridge: Bridge = {
+  platform: process.platform,
   aiEventsSnapshot:()=>ipcRenderer.invoke('ai:events-snapshot'),
   aiEventSave:rule=>ipcRenderer.invoke('ai:event-save',rule),
   aiEventRemove:id=>ipcRenderer.invoke('ai:event-remove',id),
@@ -39,6 +40,11 @@ const bridge: Bridge = {
     ipcRenderer.invoke('client:connect', id, shell, distribution),
   clientShells: (id) => ipcRenderer.invoke('agent:shells', id),
   agentTargets: () => ipcRenderer.invoke('agent:targets'),
+  agentMachineOpen: (id) => ipcRenderer.invoke('agent:machine-open',id),
+  agentFilePaste:(target,input)=>ipcRenderer.invoke('agent:file-paste',target,input),
+  agentFileDownload:(target,input)=>ipcRenderer.invoke('agent:file-download',target,input),
+  agentFileCancel:(id)=>ipcRenderer.invoke('agent:file-cancel',id),
+  agentMachineClose: (target) => ipcRenderer.invoke('agent:machine-close',target),
   agentLaunch: () => ipcRenderer.invoke('agent:launch'),
   agentCall: (target, call) => ipcRenderer.invoke('agent:call', target, call),
   desktopViewStart: input => ipcRenderer.invoke('desktop:view-start', input),

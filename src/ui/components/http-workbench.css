@@ -215,7 +215,7 @@
   color: var(--muted);
 }
 .http-error {
-  color: var(--danger, #bc3030);
+  color: var(--red, #bc3030);
   overflow-wrap: anywhere;
 }
 .http-create {
@@ -276,3 +276,4 @@
   min-height: 0;
   margin: 0;
 }
+

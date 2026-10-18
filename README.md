@@ -85,7 +85,7 @@ pnpm test:desktop
 pnpm run dist
 ```
 
-构建输出目录由 `package.json` 的版本决定：`release/<version>/CShell-<version>-win-x64.exe` 为 NSIS 安装包，`release/<version>/win-unpacked/CShell.exe` 为目录版。Windows CShell 打包前需先完成同版本 CAgent 构建，供安装包内置。独立 Agent 使用 `node scripts/agent-build.mjs` 构建，并通过 `node scripts/package-agent.mjs` 打包；在对应操作系统和架构上构建及验证。macOS 使用 `pnpm exec electron-builder --mac --arm64 --publish never`，Linux 使用 `pnpm exec electron-builder --linux --x64 --publish never`。首次安装依赖和构建需要网络。
+构建输出目录由 `package.json` 的版本决定：`release/<version>/CShell-<version>-win-x64.exe` 为 NSIS 安装包，`release/<version>/win-unpacked/CShell.exe` 为目录版。从 0.6.15 起，CShell 与 CAgent 分别打包；Windows CAgent 自带自研远控组件，首次启动安装但不自动授权或监听。独立 Agent 使用 `node scripts/agent-build.mjs` 构建，并通过 `node scripts/package-agent.mjs` 打包；在对应操作系统和架构上构建及验证。macOS 使用 `pnpm exec electron-builder --mac --arm64 --publish never`，Linux 使用 `pnpm exec electron-builder --linux --x64 --publish never`。首次安装依赖和构建需要网络。
 
 ## 插件与应用
 

@@ -185,7 +185,7 @@ test('Client password enrollment pins identity, limits attempts, persists access
     await server.load();
     await controller.load();
     await other.load();
-    await assert.rejects(server.setAccess({ password: 'short', shells: ['cmd'] }));
+    await assert.rejects(server.setAccess({ password: '', shells: ['cmd'] }));
     const password = 'test-password-very-long-2026';
     await server.setAccess({ password, shells: ['cmd'] });
     assert.equal(server.status().passwordConfigured, true);
@@ -219,6 +219,12 @@ test('Client password enrollment pins identity, limits attempts, persists access
     assert.equal(server.status().passwordConfigured, true);
     assert.deepEqual(server.status().allowedShells, ['cmd']);
     assert.equal(server.status().peers.length, 1);
+    const pairedBefore=server.status().peers.map(p=>p.fingerprint);
+    await server.setAccess({password,shells:['cmd']});
+    assert.deepEqual(server.status().peers.map(p=>p.fingerprint),pairedBefore);
+    await server.start({bind:'127.0.0.1',port});
+    assert.deepEqual(await controller.call(device.deviceId,{method:'agent.shells'}),[{shell:'cmd',label:'cmd'}]);
+    await server.stop();
     await server.setAccess({ password: 'rotated-password-2026', shells: ['powershell'] });
     assert.equal(server.status().peers.length, 0);
     await server.start({ bind: '127.0.0.1', port });

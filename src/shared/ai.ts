@@ -50,6 +50,7 @@ export const aiPolicySchema = z
         'connections.open',
         'agents.manage',
         'goals.manage',
+        'events.manage',
         'http.use',
         'ai.providers.manage',
         'wechat.read',

@@ -7,6 +7,19 @@ import type { AgentCall } from '../../shared/agent';
  * the catalog coverage test rejects newly added, unclassified RPC methods.
  */
 export const agentApiExcludedMethods = {
+  'files.roots': 'Machine file operations use the dedicated authenticated file interface, not generic API management.',
+  'files.list': 'Machine file operations require a dedicated file capability and target authorization contract.',
+  'files.read': 'File contents must not be exposed through a generic agent.manage capability.',
+  'files.action': 'File mutations require dedicated file permissions and review, not generic management.',
+  'files.uploadStart': 'Upload sessions belong to the dedicated authenticated machine file transport.',
+  'files.uploadChunk': 'Upload chunks require ownership checks on the dedicated file transport.',
+  'files.uploadFinish': 'Upload completion belongs to the dedicated file transport ownership domain.',
+  'files.uploadCancel': 'Upload cancellation belongs to the dedicated file transport ownership domain.',
+  'connection.autostart': 'Autostart is controlled through authenticated administration UI only.',
+  'connection.settings': 'Credentials belong to authenticated administration UI only.',
+  'connection.save': 'Connection configuration is not an autonomous tool.',
+  'assistant.settings': 'Model configuration belongs to administration UI.',
+  'assistant.configure': 'Model configuration belongs to administration UI.',
   'client.access': 'Local permission and credential configuration is not an API management tool.',
   'client.reconfigure': 'Local listener and credential migration is not exported.',
   'relay.revealCredential': 'Secret material must remain in the trusted configuration UI.',

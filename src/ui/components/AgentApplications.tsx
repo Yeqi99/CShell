@@ -31,7 +31,7 @@ export function AgentApplications({
   };
   const refresh = async () => {
     setCatalog(appCatalogSchema.parse(await call('applications.list')));
-    if (target.local) {
+    {
       const p = appPolicySchema.parse(await call('applications.policy'));
       setPolicy(p);
       setControllers(p.controllers.join('\n'));
@@ -74,7 +74,7 @@ export function AgentApplications({
       <AgentCapabilityMarket key={target.id} target={target} call={call} />
       <details>
         <summary>系统应用</summary>
-        {target.local && policy && (
+        {policy && (
           <details>
             <summary>应用安装权限</summary>
             <label>

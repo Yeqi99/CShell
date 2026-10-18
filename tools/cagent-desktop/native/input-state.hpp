@@ -11,7 +11,7 @@
 // Callers serialize access. Failed releases retain ownership for retry.
 struct InputState {
  using Json=nlohmann::json;
- bool allowed=false;uint64_t generation=0,lastSequence=0,lastLease=0;
+ bool allowed=false,leaseExpired=false;uint64_t generation=0,lastSequence=0,lastLease=0;
  std::set<unsigned> keys,buttons;
  std::function<void(const Json&)> sink;
  explicit InputState(std::function<void(const Json&)> output):sink(output){}
@@ -28,12 +28,12 @@ struct InputState {
  }
  void grant(uint64_t next,uint64_t now){
   if(!next||next>9007199254740991ULL||next<=generation)throw std::runtime_error("stale input generation");
-  allowed=false;release();generation=next;lastSequence=0;lastLease=now;allowed=true;
+  allowed=false;release();generation=next;lastSequence=0;lastLease=now;leaseExpired=false;allowed=true;
  }
- void revoke(){allowed=false;release();}
- void tick(uint64_t now){if(allowed&&(now<lastLease||now-lastLease>5000))allowed=false;if(!allowed&&(!keys.empty()||!buttons.empty()))release();}
+ void revoke(){allowed=false;leaseExpired=false;release();}
+ void tick(uint64_t now){if(allowed&&(now<lastLease||now-lastLease>5000)){allowed=false;leaseExpired=true;}if(!allowed&&(!keys.empty()||!buttons.empty()))release();}
  void apply(const Json& event,uint64_t now){
-  tick(now);if(!allowed)throw std::runtime_error("input permission denied");
+  tick(now);if(!allowed)throw std::runtime_error(leaseExpired?"INPUT_LEASE_EXPIRED":"INPUT_PERMISSION_DENIED");
   auto gen=integer(event.at("generation")),seq=integer(event.at("sequence"));
   if(gen!=generation||!seq||seq<=lastSequence)throw std::runtime_error("stale input event");
   auto kind=event.at("kind").get<std::string>();
@@ -41,11 +41,12 @@ struct InputState {
   if(kind=="key"){
    auto code=(unsigned)integer(event.at("code"),0x1ff);bool down=boolean(event.at("down"));
    if(!(code&0xff))throw std::runtime_error("invalid scan code");
-   if(!down&&!keys.count(code))throw std::runtime_error("key not owned by session");
+   // Blur/revoke already released this key. Consume the late up without injecting it.
+   if(!down&&!keys.count(code)){lastSequence=seq;lastLease=now;return;}
    sink(event);if(down)keys.insert(code);else keys.erase(code);
   }else if(kind=="button"){
    auto button=(unsigned)integer(event.at("button"),4);bool down=boolean(event.at("down"));
-   if(!down&&!buttons.count(button))throw std::runtime_error("button not owned by session");
+   if(!down&&!buttons.count(button)){lastSequence=seq;lastLease=now;return;}
    sink(event);if(down)buttons.insert(button);else buttons.erase(button);
   }else if(kind=="move"){
    if(!event.at("x").is_number()||!event.at("y").is_number())throw std::runtime_error("numeric pointer position required");

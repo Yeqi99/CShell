@@ -175,7 +175,7 @@
   font-size: 12px;
 }
 .hosting-error {
-  color: var(--danger, #b42318);
+  color: var(--red, #b42318);
 }
 .hosting-confirm {
   padding: 8px;
@@ -208,3 +208,4 @@
     padding: 8px;
   }
 }
+

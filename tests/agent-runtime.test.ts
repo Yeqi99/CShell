@@ -16,33 +16,13 @@ import { ClientProvider } from '../src/core/client/provider';
 import { createServer } from 'node:net';
 import { ClientVault } from '../src/core/client/identity';
 
-test('optional desktop package never installs, authorizes or listens at runtime startup', async () => {
-  const directory=await mkdtemp(join(tmpdir(),'cagent-desktop-runtime-'));
-  const desktopExecutable=join(directory,'cagent-desktop.exe');
-  // Deliberately non-executable fixture: startup/install/grant must never launch it.
-  await writeFile(desktopExecutable,'isolated native bytes fixture');
-  const runtime=await createAgentRuntime({directory,desktopExecutable});
-  try{
-    const status=await runtime.dispatch('desktop.status',{}) as any;
-    assert.equal(status.listening,false);assert.equal(status.packageReady,false);
-    const catalog=await runtime.dispatch('packages.catalog',{}) as any[];
-    const native=process.platform==='win32'&&process.arch==='x64';
-    assert.equal(catalog.some(p=>p.id==='cagent.desktop'),native);
-    await assert.rejects(runtime.dispatch('desktop.configure',{enabled:true}),/Install and authorize/);
-    await assert.rejects(runtime.dispatch('desktop.open',{}),/not ready/);
-    await assert.rejects(runtime.dispatch('desktop.status',{},undefined,false,'a'.repeat(64)),/未授权/);
-    await assert.rejects(runtime.dispatch('desktop.configure',{},undefined,false,'local'),/未授权/);
-    if(native){
-      await runtime.dispatch('packages.install',{id:'cagent.desktop',confirm:true});
-      assert.equal((await runtime.dispatch('desktop.status',{}) as any).listening,false);
-      await runtime.dispatch('packages.grant',{id:'cagent.desktop',permissions:['desktop.view']});
-      const granted=await runtime.dispatch('desktop.status',{}) as any;
-      assert.equal(granted.packageReady,true);assert.equal(granted.listening,false);
-      assert.equal(granted.viewAllowed,false);assert.equal(granted.controlAllowed,false);
-      await runtime.dispatch('packages.uninstall',{id:'cagent.desktop',confirm:true});
-      assert.equal((await runtime.dispatch('desktop.status',{}) as any).packageReady,false);
-    }
-  }finally{await runtime.close();await rm(directory,{recursive:true,force:true});}
+test('built-in desktop defaults to authenticated peers and preserves explicit opt-out', async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'cagent-desktop-runtime-')),desktopExecutable=join(directory,'cagent-desktop.exe');await writeFile(desktopExecutable,'non-executable test fixture');
+ let runtime=await createAgentRuntime({directory,desktopExecutable});
+ try{const native=process.platform==='win32'&&process.arch==='x64';const status=await runtime.dispatch('desktop.status',{}) as any;assert.equal(status.listening,false);assert.equal(status.packageReady,native);
+ if(native){assert.equal(status.viewAllowed,true);assert.equal(status.config.directListener,false);await runtime.dispatch('desktop.configure',{...status.config,enabled:false});await runtime.close();runtime=await createAgentRuntime({directory,desktopExecutable});assert.equal((await runtime.dispatch('desktop.status',{}) as any).enabled,false);await runtime.dispatch('packages.uninstall',{id:'cagent.desktop',confirm:true});await runtime.close();runtime=await createAgentRuntime({directory,desktopExecutable});assert.equal((await runtime.dispatch('packages.catalog',{}) as any[]).find(p=>p.id==='cagent.desktop').installed,false);}
+ await assert.rejects(runtime.dispatch('connection.settings',{},undefined,false,'unknown'),/未授权/);
+ }finally{await runtime.close();await rm(directory,{recursive:true,force:true})}
 });
 
 test('independent Agent encrypts vault, authenticates local control, preserves imported identity and never auto-listens', async () => {
@@ -385,3 +365,17 @@ test(
     }
   },
 );
+
+test('bundled desktop upgrade replaces outdated native bytes and preserves disabled grants',async()=>{
+ if(process.platform!=='win32'||process.arch!=='x64')return;
+ const directory=await mkdtemp(join(tmpdir(),'cagent-desktop-upgrade-')),desktopExecutable=join(directory,'cagent-desktop.exe');
+ await writeFile(desktopExecutable,'engine version one');let runtime=await createAgentRuntime({directory,desktopExecutable});
+ try{
+  await runtime.dispatch('packages.grant',{id:'cagent.desktop',permissions:['desktop.view']});await runtime.close();
+  await writeFile(desktopExecutable,'engine version two');runtime=await createAgentRuntime({directory,desktopExecutable});
+  const record=(await runtime.dispatch('packages.list',{}) as any[]).find(p=>p.id==='cagent.desktop');
+  assert.equal(record.status,'available');assert.equal(record.registered,true);assert.deepEqual(record.grants,['desktop.view']);
+  const status=await runtime.dispatch('desktop.status',{}) as any;assert.equal(status.packageReady,true);
+  await assert.rejects(runtime.dispatch('files.roots',{},undefined,false,'unknown'),/未授权/);
+ }finally{await runtime.close();await rm(directory,{recursive:true,force:true});}
+});

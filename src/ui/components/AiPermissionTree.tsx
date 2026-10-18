@@ -136,6 +136,7 @@ export function AiPermissionTree({
             [
               ['agents.manage', '分配与管理子任务'],
               ['goals.manage', '管理定期目标'],
+              ['events.manage', '管理事件订阅与触发任务'],
               ['ai.providers.manage', '查询、添加与测试 AI 基座'],
               ['wechat.read', '读取本机微信状态、联系人与授权消息'],
               ['wechat.send', '向授权联系人发送微信文本'],

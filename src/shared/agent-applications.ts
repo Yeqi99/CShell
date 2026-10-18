@@ -13,11 +13,11 @@ export const agentAppId = z.enum([
 ]);
 export const appPolicySchema = z
   .object({
-    enabled: z.boolean().default(false),
+    enabled: z.boolean().default(true),
     controllers: z
-      .array(z.string().regex(/^[a-f0-9:]{64,95}$/i))
+      .array(z.union([z.literal('*'),z.string().regex(/^[a-f0-9:]{64,95}$/i)]))
       .max(32)
-      .default([]),
+      .default(['*']),
   })
   .strict();
 export const appPlanInput = z.object({ app: agentAppId }).strict();

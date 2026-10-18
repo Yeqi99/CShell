@@ -138,6 +138,8 @@
   margin: 0;
   max-width: none;
 }
+.connection-flow .connection-ai-extractor > .connection-heading h1 { display: none; }
+.connection-flow .connection-ai-extractor > .connection-heading { justify-content: flex-end; }
 .connection-flow .protocol-client {
   padding: 0;
   overflow: visible;

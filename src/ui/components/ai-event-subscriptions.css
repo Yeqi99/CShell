@@ -38,7 +38,7 @@
   text-align: left;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: var(--surface, transparent);
+  background: var(--panel, transparent);
 }
 .event-rule strong {
   overflow-wrap: anywhere;
@@ -124,3 +124,4 @@
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+

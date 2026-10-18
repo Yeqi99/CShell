@@ -1,7 +1,7 @@
 {
   "name": "canpshell",
   "productName": "CShell",
-  "version": "0.6.13",
+  "version": "0.6.30",
   "private": true,
   "description": "CanpShell offline-first terminal workbench",
   "author": "CanpShell contributors",
@@ -62,7 +62,7 @@
     "appId": "org.canpshell.desktop",
     "productName": "CShell",
     "directories": {
-      "output": "release/0.6.13"
+      "output": "release/0.6.30"
     },
     "files": [
       "dist/**/*",
@@ -92,16 +92,7 @@
     "win": {
       "target": "nsis",
       "icon": "assets/icon.ico",
-      "signExecutable": false,
-      "extraResources": [
-        {
-          "from": "release/${version}/agent-win32-x64",
-          "to": "cagent",
-          "filter": [
-            "**/*"
-          ]
-        }
-      ]
+      "signExecutable": false
     },
     "nsis": {
       "oneClick": false,
@@ -121,9 +112,7 @@
     ],
     "asarUnpack": [
       "node_modules/node-pty/**"
-    ],
-    "beforePack": "scripts/bundled-agent-before.cjs",
-    "afterPack": "scripts/bundled-agent-after.cjs"
+    ]
   },
   "packageManager": "pnpm@11.25.0",
   "type": "module"

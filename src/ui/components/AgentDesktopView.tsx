@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Monitor, Square, SlidersHorizontal } from 'lucide-react';
+import { Monitor, Square, SlidersHorizontal, Expand, Minimize, Maximize } from 'lucide-react';
 import {
   desktopQualitySchema,
   type DesktopVideoInfo,
@@ -13,17 +13,38 @@ export function AgentDesktopView({
   target,
   canView,
   canControl,
+  onFiles,
 }: {
   target: string;
   canView: boolean;
   canControl: boolean;
+  onFiles?: () => void;
 }) {
   const [active, setActive] = useState(false),
     [busy, setBusy] = useState(false),
     [reconnecting, setReconnecting] = useState(''),
-    [control, setControl] = useState(false),
+    [control, setControl] = useState(canControl),
     [error, setError] = useState(''),
     [info, setInfo] = useState<DesktopVideoInfo>();
+  const [qualityOpen,setQualityOpen]=useState(false);
+  const [picture, setPicture] = useState('等待远端画面…');
+  const view = useRef<HTMLElement>(null), screen = useRef<HTMLDivElement>(null);
+  const [expanded,setExpanded]=useState(false),[fullscreen,setFullscreen]=useState(false);
+  const [frameSize,setFrameSize]=useState<{width:number;height:number}>();
+  useEffect(()=>{
+    const changed=()=>setFullscreen(document.fullscreenElement===view.current);
+    document.addEventListener('fullscreenchange',changed);
+    return()=>document.removeEventListener('fullscreenchange',changed);
+  },[]);
+  useEffect(()=>{
+    if(!screen.current)return;
+    const resize=()=>{const box=screen.current!.getBoundingClientRect();const ratio=(info?.width??16)/(info?.height??9);const width=Math.min(box.width,box.height*ratio);setFrameSize({width,height:width/ratio});};
+    const observer=new ResizeObserver(resize);observer.observe(screen.current);resize();
+    return()=>observer.disconnect();
+  },[active,busy,info]);
+  const toggleFullscreen=async()=>{release();try{if(document.fullscreenElement===view.current)await document.exitFullscreen();else await view.current?.requestFullscreen();}catch(e){setError('无法进入全屏：'+String(e));}};
+  const decodeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const softwareDecode = useRef(false);
   const [quality, setQuality] = useState<DesktopQuality>({
     fps: 60,
     bitrate: 12000000,
@@ -35,6 +56,7 @@ export function AgentDesktopView({
     decoder = useRef<VideoDecoder | null>(null),
     codec = useRef('');
   const wireGeneration = useRef(1);
+  const inputDenied = useRef(false);
   const generation = useRef(0),
     permissions = useRef({ canView, canControl });
   permissions.current = { canView, canControl };
@@ -43,6 +65,7 @@ export function AgentDesktopView({
     pointer = useRef<{ x: number; y: number } | null>(null),
     raf = useRef(0);
   const stopDecoder = () => {
+    clearTimeout(decodeTimer.current);
     try {
       decoder.current?.close();
     } catch {}
@@ -51,6 +74,7 @@ export function AgentDesktopView({
     awaiting.current = null;
   };
   const ack = (decoded: boolean) => {
+    clearTimeout(decodeTimer.current);
     const pending = awaiting.current;
     awaiting.current = null;
     if (pending && id.current)
@@ -90,8 +114,9 @@ export function AgentDesktopView({
     setReconnecting('');
     setBusy(false);
     setInfo(undefined);
+    setPicture('等待远端画面…');
     setError('');
-    setControl(false);
+    setControl(permissions.current.canControl);
     const off = window.cshell.onDesktopViewEvent((event) => {
       if (event.id !== id.current) return;
       if ((event.generation ?? 1) < wireGeneration.current) return;
@@ -115,7 +140,7 @@ export function AgentDesktopView({
       }
       if (event.type === 'closed') {
         generation.current++;
-        setError(event.reason);
+        setError(event.reason==='CAPTURE_ACCESS_DENIED'?'Windows 拒绝采集当前桌面。请检查远端是否锁屏，以及 Windows 远程桌面是否最小化或已断开，再重试。':event.reason==='CAPTURE_CLOSED'?'远端画面采集退出，请检查远端登录会话后重新连接（CAPTURE_CLOSED）':event.reason);
         setActive(false);
         setReconnecting('');
         setBusy(false);
@@ -126,7 +151,10 @@ export function AgentDesktopView({
         return;
       }
       if (event.type === 'error') {
-        setError(event.message);
+        // Older agents transport this recoverable progress notice as an error.
+        if(event.message==='桌面采集未输出首帧，正在切换兼容采集…'){setPicture(event.message);return;}
+        if(event.message.startsWith('INPUT_DISABLED: ')){inputDenied.current=true;controlling.current=false;setControl(false);release();}
+        setError(event.message.replace(/^INPUT_DISABLED: /,''));
         return;
       }
       if (awaiting.current) {
@@ -150,10 +178,14 @@ export function AgentDesktopView({
               try {
                 if (id.current !== session || decoder.current !== instance) return;
                 const c = canvas.current;
-                if (c) {
+                if (!c) { ack(false); return; }
+                {
                   if (c.width !== frame.displayWidth) c.width = frame.displayWidth;
                   if (c.height !== frame.displayHeight) c.height = frame.displayHeight;
-                  c.getContext('2d', { alpha: false })?.drawImage(frame, 0, 0, c.width, c.height);
+                  const context = c.getContext('2d', { alpha: false });
+                  if (!context) { setError('无法创建视频画布，请重新连接桌面'); ack(false); return; }
+                  context.drawImage(frame, 0, 0, c.width, c.height);
+                  setPicture('');
                 }
                 ack(true);
               } finally {
@@ -171,7 +203,7 @@ export function AgentDesktopView({
           instance.configure({
             codec: next,
             optimizeForLatency: true,
-            hardwareAcceleration: 'prefer-hardware',
+            hardwareAcceleration: softwareDecode.current ? 'prefer-software' : 'prefer-hardware',
           });
         }
         if (
@@ -182,6 +214,14 @@ export function AgentDesktopView({
           ack(false);
           return;
         }
+        const pendingSequence = event.sequence;
+        decodeTimer.current = setTimeout(() => {
+          if (id.current !== event.id || awaiting.current?.sequence !== pendingSequence) return;
+          softwareDecode.current = true;
+          ack(false);
+          stopDecoder();
+          setPicture('解码未输出画面，正在使用软件解码恢复…');
+        }, 1200);
         decoder.current.decode(
           new EncodedVideoChunk({
             type: event.key ? 'key' : 'delta',
@@ -234,9 +274,11 @@ export function AgentDesktopView({
   }, [canView, canControl]);
   const start = async () => {
     if (id.current || !permissions.current.canView) return;
+    inputDenied.current=false;
     const validated = validateQuality();
     if (!validated) return;
     setBusy(true);
+    setPicture('等待远端画面…');
     setError('');
     setInfo(undefined);
     const key = crypto.randomUUID(),
@@ -255,7 +297,7 @@ export function AgentDesktopView({
         return;
       }
       setActive(true);
-      controlling.current = result.control && permissions.current.canControl;
+      controlling.current = result.control && permissions.current.canControl && !inputDenied.current;
       setControl(controlling.current);
       if (!controlling.current) release();
     } catch (e) {
@@ -285,6 +327,7 @@ export function AgentDesktopView({
       });
   };
   const key = (event: React.KeyboardEvent<HTMLCanvasElement>, down: boolean) => {
+    if(event.key==='Escape' && (fullscreen||expanded)){event.preventDefault();release();if(down){if(fullscreen)void document.exitFullscreen();else setExpanded(false);}return;}
     if (!controlling.current) return;
     const code = desktopScanCode(event.code);
     if (!code) return;
@@ -319,7 +362,7 @@ export function AgentDesktopView({
     }
   };
   return (
-    <section className="agent-desktop-view" aria-label="CAgent 远程桌面">
+    <section ref={view} className={'agent-desktop-view'+(expanded?' desktop-expanded':'')} aria-label="CAgent 远程桌面">
       <div className="desktop-toolbar">
         <strong>
           <Monitor size={16} />
@@ -334,7 +377,7 @@ export function AgentDesktopView({
                 disabled={!canControl || busy}
                 onChange={(e) => setControl(e.target.checked)}
               />
-              允许键鼠控制
+              控制键鼠
             </label>
             <button className="primary" disabled={busy || !canView} onClick={() => void start()}>
               {busy ? '连接中…' : '连接桌面'}
@@ -350,11 +393,12 @@ export function AgentDesktopView({
           </>
         )}
         {busy && <button onClick={() => void stop()}>取消连接</button>}
-        <details>
-          <summary title="画质设置">
-            <SlidersHorizontal size={16} />
-            画质
-          </summary>
+        {onFiles && <button onClick={onFiles} title="在当前机器选择目录，粘贴或拖入文件">传输文件</button>}
+        <button className="desktop-quality-toggle" aria-expanded={qualityOpen} onClick={()=>setQualityOpen(v=>!v)} title="画质设置"><SlidersHorizontal size={16}/>画质</button>
+        <button title={expanded?'还原工作区':'填满工作区'} aria-label={expanded?'还原工作区':'填满工作区'} aria-pressed={expanded} onClick={()=>{release();setExpanded(v=>!v);}}>{expanded?<Minimize size={16}/>:<Expand size={16}/>}</button>
+        <button title={fullscreen?'退出全屏':'全屏'} aria-label={fullscreen?'退出全屏':'全屏'} onClick={()=>void toggleFullscreen()}>{fullscreen?<Minimize size={16}/>:<Maximize size={16}/>}</button>
+      </div>
+      {qualityOpen && (
           <div className="desktop-quality">
             <label>
               目标帧率
@@ -426,10 +470,9 @@ export function AgentDesktopView({
               />
               根据网络自动调整
             </label>
-            {active && <button onClick={() => void applyQuality()}>应用画质</button>}
+            {active && <button className="primary" onClick={() => void applyQuality()}>应用到当前连接</button>}
           </div>
-        </details>
-      </div>
+      )}
       {reconnecting && (
         <p role="status" className="desktop-info">
           {reconnecting}
@@ -441,9 +484,11 @@ export function AgentDesktopView({
         </p>
       )}
       {(active || busy) && (
-        <div className="desktop-screen">
+        <div ref={screen} className="desktop-screen">
+          {picture && <span className="desktop-picture-status" role="status">{picture}</span>}
           <canvas
             ref={canvas}
+            style={frameSize}
             tabIndex={0}
             aria-label={control ? '远程桌面，点击后输入' : '远程桌面，仅观看'}
             width={1}
