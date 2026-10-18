@@ -1,6 +1,6 @@
 # CShell
 
-CanpShell 是面向高频操作的终端与 AI 工作台，采用 **MIT** 许可证。独立智能体 **CAgent（Canp Agent）** 可单独运行，也可为 CShell 提供已授权的机器能力。当前正在准备 **0.6.13** 发行；构建与本机验证不等同于已发布，下载以 GitHub Releases 实际附件为准。
+CanpShell 是面向高频操作的终端与 AI 工作台，采用 **MIT** 许可证。独立智能体 **CAgent（Canp Agent）** 可单独运行，也可为 CShell 提供已授权的机器能力。**0.6.13 开发预览已发布**，包含内置 CAgent 的 Windows CShell 与五个平台的独立 CAgent 包。
 
 [源码](https://github.com/Yeqi99/CShell) · [版本下载](https://github.com/Yeqi99/CShell/releases) · [问题反馈](https://github.com/Yeqi99/CShell/issues) · [构建状态](https://github.com/Yeqi99/CShell/actions)
 
@@ -25,7 +25,7 @@ CanpShell 是面向高频操作的终端与 AI 工作台，采用 **MIT** 许可
 | Linux   | `.AppImage` / `.deb`，x64、ARM64      | 两种原生架构构建与成品 SSH/文件通过                                 |
 | Android | 测试 `.apk`，Android 8+               | 编译、lint、持久签名校验和 API 29 / 35 原生连接测试通过；真机待验收 |
 
-独立 CAgent 0.6.13 发行附件（构建与解包验收已通过；链接在 Release 附件上传后可用，以[发行页](https://github.com/Yeqi99/CShell/releases)为准）：
+独立 CAgent 0.6.13 发行附件（构建与解包验收已通过，上传摘要已核对）：[发行页](https://github.com/Yeqi99/CShell/releases/tag/v0.6.13) · [SHA256 校验文件](https://github.com/Yeqi99/CShell/releases/download/v0.6.13/SHA256SUMS.txt)。
 
 | 平台                        | 附件                                                    | 界面与状态                                                              |
 | --------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------- |
