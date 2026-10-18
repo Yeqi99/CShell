@@ -42,6 +42,7 @@ jobs:
           Expand-Archive -LiteralPath $archive -DestinationPath $env:RUNNER_TEMP
           "CAGENT_NATIVE_CXX=$env:RUNNER_TEMP/llvm-mingw-20261006-ucrt-x86_64/bin/x86_64-w64-mingw32-clang++.exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - run: pnpm run dist
+      - run: pnpm exec tsx scripts/bundled-agent-launch-smoke.ts
       - uses: actions/upload-artifact@v4
         if: always()
         with:

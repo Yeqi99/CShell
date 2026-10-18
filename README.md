@@ -4,7 +4,7 @@ CanpShell 是面向高频操作的终端与 AI 工作台，采用 **MIT** 许可
 
 [源码](https://github.com/Yeqi99/CShell) · [版本下载](https://github.com/Yeqi99/CShell/releases) · [问题反馈](https://github.com/Yeqi99/CShell/issues) · [构建状态](https://github.com/Yeqi99/CShell/actions)
 
-0.6.13 的 Windows 工作台、独立 CAgent 与验证边界见 [发布说明](docs/RELEASE-0.6.13.md)。Windows CShell 安装包内置 CAgent；不需要完整工作台时，可选择独立 CAgent。新版独立包的五平台构建仍须通过各架构 CI 验收。
+0.6.13 的 Windows 工作台、独立 CAgent 与验证边界见 [发布说明](docs/RELEASE-0.6.13.md)。Windows CShell 安装包内置 CAgent；不需要完整工作台时，可选择独立 CAgent。新版独立包的 Windows x64、macOS arm64/x64、Linux x64/arm64 已通过[五平台原生构建与解包 PTY/TLS 验收](https://github.com/Yeqi99/CShell/actions/runs/39086200375)。
 
 白色默认界面、多标签终端、可收纳文件和资源侧栏；暗色可在右下角切换。极简模式仅保留标签与终端，并提供还原按钮。窗口依据当前屏幕可用区域缩放，切换工作区保留会话、滚动历史和草稿。SSH、配置和随包插件可离线使用，无产品账号、云同步、遥测或在线授权。
 
@@ -12,7 +12,7 @@ CanpShell 是面向高频操作的终端与 AI 工作台，采用 **MIT** 许可
 
 发行产物统一放到 [GitHub Releases](https://github.com/Yeqi99/CShell/releases)；市场目录固定到已发布的源码标签，不需要部署市场服务器。仓库为 [Yeqi99/CShell](https://github.com/Yeqi99/CShell)，以实际发布完成的附件为准。
 
-- [当前发行附件与 Windows 下载](https://github.com/Yeqi99/CShell/releases)
+- [Windows 0.6.13 发行附件](https://github.com/Yeqi99/CShell/releases/download/v0.6.13/CShell-0.6.13-win-x64.exe)
 - [Android APK](https://github.com/Yeqi99/CShell/releases/download/v0.6.0/CShell-0.6.0-android-test.apk)
 - [全部 0.6.0 下载与发布说明](https://github.com/Yeqi99/CShell/releases/tag/v0.6.0) · [SHA-256 校验文件](https://github.com/Yeqi99/CShell/releases/download/v0.6.0/SHA256SUMS.txt)
 
@@ -25,13 +25,13 @@ CanpShell 是面向高频操作的终端与 AI 工作台，采用 **MIT** 许可
 | Linux   | `.AppImage` / `.deb`，x64、ARM64      | 两种原生架构构建与成品 SSH/文件通过                                 |
 | Android | 测试 `.apk`，Android 8+               | 编译、lint、持久签名校验和 API 29 / 35 原生连接测试通过；真机待验收 |
 
-独立 CAgent 0.6.13 计划附件（[下载入口](https://github.com/Yeqi99/CShell/releases)，仅成功构建、解包验收并上传后才可下载）：
+独立 CAgent 0.6.13 发行附件（构建与解包验收已通过；链接在 Release 附件上传后可用，以[发行页](https://github.com/Yeqi99/CShell/releases)为准）：
 
 | 平台                        | 附件                                                    | 界面与状态                                                              |
 | --------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------- |
-| Windows x64                 | `CAgent-Setup-0.6.13-win-x64.zip`                       | 原生 WPF 小窗；完整解压后运行 `Install CAgent.cmd`，安装到当前用户目录  |
-| macOS Apple Silicon / Intel | `CAgent-0.6.13-mac-arm64.tar.gz` / `mac-x64.tar.gz`     | 独立运行时与系统浏览器入口，非 Windows 同款原生界面；待原生架构 CI 验收 |
-| Linux x64 / ARM64           | `CAgent-0.6.13-linux-x64.tar.gz` / `linux-arm64.tar.gz` | 独立运行时与系统浏览器入口；待原生架构 CI 验收                          |
+| Windows x64                 | [Windows x64 安装 ZIP](https://github.com/Yeqi99/CShell/releases/download/v0.6.13/CAgent-Setup-0.6.13-win-x64.zip)                       | 原生 WPF 小窗；完整解压后运行 `Install CAgent.cmd`，安装到当前用户目录  |
+| macOS Apple Silicon / Intel | [Apple Silicon](https://github.com/Yeqi99/CShell/releases/download/v0.6.13/CAgent-0.6.13-mac-arm64.tar.gz) / [Intel](https://github.com/Yeqi99/CShell/releases/download/v0.6.13/CAgent-0.6.13-mac-x64.tar.gz)     | 独立运行时与系统浏览器入口，非 Windows 同款原生界面；原生架构构建与解包 PTY/TLS 验收通过 |
+| Linux x64 / ARM64           | [x64](https://github.com/Yeqi99/CShell/releases/download/v0.6.13/CAgent-0.6.13-linux-x64.tar.gz) / [ARM64](https://github.com/Yeqi99/CShell/releases/download/v0.6.13/CAgent-0.6.13-linux-arm64.tar.gz) | 独立运行时与系统浏览器入口；原生架构构建与解包 PTY/TLS 验收通过                          |
 
 每个平台包含本架构 Node 与原生 PTY，无须预装 CShell、Electron 或 Chromium。安装不自动开启远程监听、不扩大权限；尚不自动注册系统服务。历史 [0.6.0 Agent 附件](https://github.com/Yeqi99/CShell/releases/tag/v0.6.0) 使用 `CShell-Agent-*` 名称，不能视为新版功能包。使用与兼容范围见 [CAgent](docs/CAGENT.md)。
 尚无商业代码签名证书，macOS 未公证。核对附件的 SHA256SUMS.txt。完整范围见 [发布说明](docs/RELEASE.md)，已执行的检查见 [验证记录](docs/VALIDATION.md)。

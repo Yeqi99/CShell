@@ -2,7 +2,7 @@
 
 ## 发行状态
 
-本说明对应 0.6.13 待交付源码。Windows 本机验证与 CI 配置已具备；独立 CAgent 的 macOS/Linux 四种架构仍须在各自运行器完成构建和成品验证，不能将计划附件视为已发布。[GitHub Releases](https://github.com/Yeqi99/CShell/releases) 中实际上传的文件与校验结果是下载依据。
+本说明对应 0.6.13 发行构建。独立 CAgent 的 Windows x64、macOS arm64/x64、Linux x64/arm64 已在各自原生运行器通过构建、解包后真实 PTY/TLS 验收；五份产物下载后均与 CI 验证收据的 SHA256 匹配。结果见[五平台 CI](https://github.com/Yeqi99/CShell/actions/runs/39086200375)（源码提交 `bc450f2`）。构建通过不等同于已发布或已更新本机应用。[GitHub Releases](https://github.com/Yeqi99/CShell/releases) 中实际上传的文件与校验结果是下载依据。
 
 此前已发布的 CShell 0.6.0 macOS、Linux、Android 附件继续保留，其验证记录属于旧版，不代表这些平台已经获得 0.6.13 的全部功能。
 
@@ -23,20 +23,22 @@ Windows 使用原生 WPF 小窗，以消息和输入区为主，会话、应用�
 
 ## 已执行验证与边界
 
+266 项测试全部通过。Windows 正式成品的内置 CAgent 已通过真实 `agent:launch` IPC 验收：由 CShell 启动原生窗口和随包运行时，并核对隔离数据、默认远程监听关闭、桌面服务关闭及未扩大权限。此项验证成品内置启动路径，不代表已完成用户本机安装。
+
 Windows 本机真实 Electron IPC、管理通道中继与断流恢复测试在一次 34.428 秒观察中解码 1677 帧，最后 2.5 秒为 133 帧；解码耗时 P50 1.7 ms、P95 4.6 ms。这是指定本机与测试负载下的观察，不是跨设备性能保证，也不是公网延迟测量。
 
 自有本机测试窗口验证了字母数字输入、鼠标点击，以及连接断开后 Shift 释放（该次记录约 98 ms）。关闭控制权限后新控制连接被拒绝，重新显式授权和新票据后可再次输入。没有将测试输入发送到其他应用。
 
 整网掉线后设备绑定保留、旧输入拒绝、权限失败不重试等另有隔离故障测试。**公网端到端验收尚未完成**；本机结果不能替代公网、长期运行、休眠恢复、UIPI/安全桌面或复杂网络条件的验收。macOS/Linux 被控桌面实现与手机观看器不属于本次已验证能力。
 
-## 计划附件与构建门槛
+## 发行附件与验证状态
 
-| 范围           | 附件名称                                                             | 门槛                                            |
+| 范围           | 附件名称                                                             | 验证状态                                            |
 | -------------- | -------------------------------------------------------------------- | ----------------------------------------------- |
-| Windows CShell | `CShell-0.6.13-win-x64.exe`                                          | 同版本 CAgent 内置、工作台构建及成品检查        |
-| Windows CAgent | `CAgent-Setup-0.6.13-win-x64.zip`                                    | 原生构建、解包隔离安装、安装后真实 PTY/TLS 验证 |
-| macOS CAgent   | `CAgent-0.6.13-mac-arm64.tar.gz`、`CAgent-0.6.13-mac-x64.tar.gz`     | 对应原生架构构建、解包后真实运行时验证，尚待 CI |
-| Linux CAgent   | `CAgent-0.6.13-linux-x64.tar.gz`、`CAgent-0.6.13-linux-arm64.tar.gz` | 对应原生架构构建、解包后真实运行时验证，尚待 CI |
+| Windows CShell | `CShell-0.6.13-win-x64.exe`                                          | 同版本 CAgent 内置、工作台构建及真实内置启动 IPC 验收通过        |
+| Windows CAgent | `CAgent-Setup-0.6.13-win-x64.zip`                                    | 原生构建、解包隔离安装、安装后真实 PTY/TLS 验收通过 |
+| macOS CAgent   | `CAgent-0.6.13-mac-arm64.tar.gz`、`CAgent-0.6.13-mac-x64.tar.gz`     | 对应原生架构构建、解包后真实 PTY/TLS 验收通过 |
+| Linux CAgent   | `CAgent-0.6.13-linux-x64.tar.gz`、`CAgent-0.6.13-linux-arm64.tar.gz` | 对应原生架构构建、解包后真实 PTY/TLS 验收通过 |
 
 独立 `CAgent packages` 工作流只构建和上传通过检查的 CI 产物，不自行发布或覆盖 Release 附件。正式附件应核对发布方提供的 SHA256；目前未使用商业代码签名，macOS 未公证。源码采用 MIT，第三方运行时与组件许可随包保留。
 
