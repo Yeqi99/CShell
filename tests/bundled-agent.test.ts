@@ -20,6 +20,8 @@ test('packaged CAgent must contain matching standalone resources; corrupt copies
     await assert.rejects(bundledAgentExecutable(source, '1.2.4'), /版本/);
     const appOutDir = join(root, 'app');
     await cp(source, join(appOutDir, 'resources/cagent'), { recursive: true });
+    // Model electron-builder extraResources' default omission of node_modules.
+    await rm(join(appOutDir, 'resources/cagent/node_modules'), { recursive: true });
     const context = { electronPlatformName: 'win32', appOutDir, packager: { projectDir: root, appInfo: { version: '1.2.3' } } };
     await hooks.afterPack(context);
     await writeFile(join(appOutDir, 'resources/cagent/agent.cjs'), 'stale code');

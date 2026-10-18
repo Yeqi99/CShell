@@ -5,6 +5,12 @@
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+function FileSha256([string]$Path) {
+  $stream = [IO.File]::OpenRead($Path)
+  $hash = [Security.Cryptography.SHA256]::Create()
+  try { return [BitConverter]::ToString($hash.ComputeHash($stream)).Replace('-', '').ToLowerInvariant() }
+  finally { $hash.Dispose(); $stream.Dispose() }
+}
 function Within([string]$Base, [string]$Relative) {
   if ([IO.Path]::IsPathRooted($Relative) -or $Relative.Contains(':') -or ($Relative -split '[\\/]' | Where-Object { $_ -eq '..' -or $_ -eq '.' -or $_ -eq '' })) { throw 'Invalid bundle path' }
   $root = [IO.Path]::GetFullPath($Base).TrimEnd('\')
@@ -33,7 +39,7 @@ foreach ($file in $manifest.files) {
   NoLink $source
   if ($seen.ContainsKey($file.path.ToLowerInvariant()) -or $file.sha256 -notmatch '^[a-f0-9]{64}$') { throw 'Invalid or duplicate bundle entry' }
   $seen[$file.path.ToLowerInvariant()] = $true
-  if ((Get-Item -LiteralPath $source).Length -ne $file.bytes -or (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash.ToLowerInvariant() -ne $file.sha256) { throw ('Bundle verification failed: ' + $file.path) }
+  if ((Get-Item -LiteralPath $source).Length -ne $file.bytes -or (FileSha256 $source) -ne $file.sha256) { throw ('Bundle verification failed: ' + $file.path) }
 }
 if ((Get-ChildItem -LiteralPath $payload -Recurse -File -Force).Count -ne $manifest.files.Count) { throw 'Unexpected bundle files' }
 # Side-by-side program files; the existing data directory and running processes are untouched.
@@ -44,12 +50,12 @@ foreach ($file in $manifest.files) {
   $target = Within $versionRoot $file.path
   NoLink $target
   if (Test-Path -LiteralPath $target) {
-    if ((Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLowerInvariant() -ne $file.sha256) { throw 'Existing version directory differs; refusing to overwrite a running installation' }
+    if ((FileSha256 $target) -ne $file.sha256) { throw 'Existing version directory differs; refusing to overwrite a running installation' }
   } else {
     New-Item -ItemType Directory -Path ([IO.Path]::GetDirectoryName($target)) -Force | Out-Null
     Copy-Item -LiteralPath (Within $payload $file.path) -Destination $target
   }
-  if ((Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLowerInvariant() -ne $file.sha256) { throw 'Installed file verification failed' }
+  if ((FileSha256 $target) -ne $file.sha256) { throw 'Installed file verification failed' }
 }
 $exe = Join-Path $versionRoot 'Cagent.exe'
 if (-not (Test-Path -LiteralPath $exe)) { throw 'Native CAgent launcher missing' }

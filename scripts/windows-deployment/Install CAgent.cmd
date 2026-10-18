@@ -1,5 +1,7 @@
 @echo off
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Install-CAgent.ps1"
+setlocal
+set "PSModulePath="
+"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "%~dp0Install-CAgent.ps1"
 if errorlevel 1 (
   echo Installation failed. No access permissions were granted.
   pause

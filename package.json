@@ -11,7 +11,7 @@
     "build": "tsc --noEmit && vite build && node scripts/build.mjs",
     "start": "electron .",
     "dev": "pnpm build && electron .",
-    "test": "tsx --test tests/*.test.ts",
+    "test": "tsx --test --test-concurrency=2 tests/*.test.ts",
     "test:desktop": "tsx scripts/smoke.ts",
     "dist": "pnpm run licenses && pnpm build && electron-builder --win nsis --x64 --publish never",
     "licenses": "node scripts/licenses.mjs",

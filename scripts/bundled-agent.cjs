@@ -1,4 +1,4 @@
-const { readFile, readdir, stat } = require('node:fs/promises');
+const { readFile, readdir, stat, cp } = require('node:fs/promises');
 const { join } = require('node:path');
 const { createHash } = require('node:crypto');
 const { spawn } = require('node:child_process');
@@ -42,8 +42,14 @@ exports.afterPack = async (context) => {
   const version = context.packager.appInfo.version;
   const source = join(context.packager.projectDir, 'release', version, 'agent-win32-x64');
   const destination = join(context.appOutDir, 'resources', 'cagent');
+  await verify(source, version);
+  const expected = await inventory(source);
+  // electron-builder's extraResources matcher omits node_modules. These are the
+  // standalone Node ABI dependencies, not Electron's dependency tree: copy them
+  // verbatim and retain the complete post-copy digest check.
+  await cp(join(source, 'node_modules'), join(destination, 'node_modules'), { recursive: true });
   await verify(destination, version);
-  const expected = await inventory(source), actual = await inventory(destination);
+  const actual = await inventory(destination);
   if (Object.keys(expected).length !== Object.keys(actual).length || Object.entries(expected).some(([name, hash]) => actual[name] !== hash))
     throw new Error('Packaged CAgent resources do not match the standalone build');
 };

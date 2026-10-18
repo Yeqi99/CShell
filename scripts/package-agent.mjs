@@ -83,8 +83,12 @@ try {
   if (os === 'win') {
     const install = join(temporary, 'installed'),
       data = join(temporary, 'isolated-data');
+    const installEnv = { ...process.env, CSHELL_AGENT_DATA: data };
+    // A pwsh 7 parent can export incompatible module paths into Windows PS 5.
+    for (const key of Object.keys(installEnv))
+      if (key.toLowerCase() === 'psmodulepath') delete installEnv[key];
     run(
-      'powershell.exe',
+      join(process.env.SystemRoot || 'C:/Windows', 'System32/WindowsPowerShell/v1.0/powershell.exe'),
       [
         '-NoProfile',
         '-NonInteractive',
@@ -97,7 +101,7 @@ try {
         '-NoLaunch',
         '-NoShortcuts',
       ],
-      { env: { ...process.env, CSHELL_AGENT_DATA: data } },
+      { env: installEnv },
     );
     const manifest = JSON.parse(await readFile(join(extracted, 'deployment.json'), 'utf8'));
     verified = join(install, 'versions', manifest.installId);
