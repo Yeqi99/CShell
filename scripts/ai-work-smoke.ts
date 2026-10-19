@@ -9,6 +9,7 @@ import { fixture } from '../tests/fixture';
 const data = await mkdtemp(join(tmpdir(), 'cshell-ai-work-ui-'));
 const ssh = await fixture();
 let complete = false;
+const modelRequests: { url?: string; goal: boolean; lastRole: string }[] = [];
 const tool = (name: string, args: unknown) => ({
   content: null,
   tool_calls: [
@@ -20,6 +21,7 @@ const api = createServer(async (req, res) => {
   for await (const part of req) raw += part;
   const body = JSON.parse(raw),
     last = body.messages.at(-1);
+  modelRequests.push({ url: req.url, goal: body.messages[0].content.includes('Current goal:'), lastRole: last.role });
   let message: any;
   if (body.messages[0].content.includes('Current goal:'))
     message =
@@ -150,6 +152,10 @@ try {
   console.log(
     'PASS: child execution and approval on pinned SSH target, parent draft retained, goal create/run/pause/complete/remove, light/dark/narrow, no extra modal or lost session',
   );
+} catch (error) {
+  console.error('Model fixture requests:', JSON.stringify(modelRequests));
+  console.error('AI work fixture state:', JSON.stringify(await app.firstWindow().then(page => page.evaluate(() => window.cshell.aiSnapshot())), null, 2));
+  throw error;
 } finally {
   await app.close();
   await ssh.close();

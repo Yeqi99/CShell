@@ -97,7 +97,7 @@ try {
   await p.getByRole('button', { name: '插件与应用', exact: true }).click();
   const agentPlugin = ext
     .locator('.plugin-row')
-    .filter({ has: p.getByRole('heading', { name: /^CShell Agent/ }) });
+    .filter({ has: p.getByRole('heading', { name: /^CAgent/ }) });
   await agentPlugin.getByRole('button', { name: '安装', exact: true }).click();
   const agent = p.locator('.agent-workbench');
   await agent.waitFor();

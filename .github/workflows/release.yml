@@ -109,8 +109,8 @@ jobs:
         name: Verify packaged Linux application on its native architecture
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb gnome-keyring libsecret-1-0
-          dbus-run-session -- xvfb-run -a sh -c 'printf "cshell-ci\n" | gnome-keyring-daemon --unlock --components=secrets; pnpm exec tsx scripts/platform-package-smoke.ts'
+          sudo apt-get install -y xvfb gnome-keyring libsecret-1-0 libsecret-tools
+          dbus-run-session -- xvfb-run -a bash scripts/linux-package-smoke.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:

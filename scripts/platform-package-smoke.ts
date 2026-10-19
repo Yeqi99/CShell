@@ -49,15 +49,32 @@ try {
   stage(`Launching isolated package ${executablePath}`);
   app = await electron.launch({
     executablePath,
-    args: [],
+    // Xvfb has no desktop session to select the Secret Service backend from.
+    args: process.platform === 'linux' ? ['--password-store=gnome-libsecret'] : [],
     env,
     timeout: 60000,
   });
+  app.process().stderr?.on('data', chunk => process.stderr.write(`[packaged stderr] ${chunk}`));
+  app.process().stdout?.on('data', chunk => process.stdout.write(`[packaged stdout] ${chunk}`));
   assert.equal(
     await bounded('Startup attachment check', app.evaluate(() => (globalThis as any).__cshellPackagedTestAttached), 10000),
     true,
     'The packaged test must attach Chromium before application readiness',
   );
+  stage('Startup gate attached; verifying native encrypted storage');
+  const storage = await bounded('Native encrypted storage roundtrip', app.evaluate(async ({ safeStorage }) => {
+    const available = safeStorage.isEncryptionAvailable();
+    const backend = process.platform === 'linux' ? safeStorage.getSelectedStorageBackend() : process.platform;
+    if (!available || backend === 'basic_text')
+      throw new Error(`Secure storage unavailable: ${backend}`);
+    const plain = 'cshell-package-encryption-verification';
+    const encrypted = await safeStorage.encryptStringAsync(plain);
+    const decrypted = await safeStorage.decryptStringAsync(encrypted);
+    return { backend, roundtrip: decrypted.result === plain, encrypted: !encrypted.includes(Buffer.from(plain)) };
+  }), 20000);
+  if (process.platform === 'linux') assert.equal(storage.backend, 'gnome_libsecret');
+  assert.ok(storage.roundtrip && storage.encrypted, 'Native secure storage must encrypt and decrypt successfully');
+  stage(`Native encrypted storage verified (${storage.backend}); waiting for application page`);
   const page =
     app.context().pages()[0] ?? (await app.context().waitForEvent('page', { timeout: 60000 }));
   page.setDefaultTimeout(20000);
