@@ -36,12 +36,17 @@ export async function workbenchSmoke(
       (text) => window.cshell.copyText(text),
       `ssh tester@127.0.0.1 -p ${server.port}`,
     );
-    await form.getByRole('button', { name: '粘贴连接信息', exact: true }).click();
+    await form.getByRole('button', { name: '从文本填写', exact: true }).click();
+    await form.getByRole('button', { name: '粘贴文本', exact: true }).click();
     await form.getByRole('button', { name: '提取并填写', exact: true }).click();
     await form.getByText('已填入连接信息，仍可手动修改。', { exact: true }).waitFor();
     assert.equal(await form.getByLabel('主机地址').inputValue(), '127.0.0.1');
     assert.equal(await form.getByLabel('用户名').inputValue(), 'tester');
     assert.equal(await form.getByLabel('端口').inputValue(), String(server.port));
+    // The fixture has consumed its clipboard command. Retire the independent
+    // clipboard suggestion before testing editor controls underneath its corner.
+    await page.evaluate(() => window.cshell.copyText(''));
+    await page.locator('.clipboard-connection').waitFor({ state: 'hidden' });
     await form.locator('.connection-secret input').fill(server.password);
     await form.getByRole('button', { name: '连接', exact: true }).click();
     await form.waitFor({ state: 'hidden' });
@@ -111,7 +116,7 @@ export async function workbenchSmoke(
         '.session-tools:not([hidden]) input[aria-label="路径"]',
       )?.value === '/projects',
   );
-  await page.keyboard.press('Control+Shift+e');
+  await page.locator('.tools-panel:visible').getByRole('button', { name: '关闭 文件', exact: true }).click();
   await page.locator('.dock-side[data-panel="files"]').waitFor({ state: 'hidden' });
   await page.keyboard.press('Control+Shift+e');
   assert.equal(
