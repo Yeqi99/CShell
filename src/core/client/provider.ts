@@ -503,7 +503,7 @@ export class ClientProvider implements ManagedProvider {
                   input: z
                     .object({
                       command: z.string().min(1).max(32768),
-                      timeoutMs: z.number().int().min(1).max(60000).default(30000),
+                      timeoutMs: z.number().int().min(1).max(86400000).default(30000),
                     })
                     .strict(),
                   needsReview: () => true,

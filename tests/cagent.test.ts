@@ -8,6 +8,16 @@ import type {requestAiReply} from '../src/core/ai-request';
 import {request as httpRequest} from 'node:http';
 import type {RuntimeCapabilityTool} from '../src/agent/capability-runtime';
 const config={endpoint:'https://example.invalid/v1/chat/completions',model:'fixture',key:'secret',commands:true,review:true,delegates:['a'.repeat(64),'b'.repeat(64)]};
+test('CAgent progresses beyond sixteen rounds and resumes with owned checkpoint instead of replay',async()=>{
+ const data=new Map<string,unknown>();let step=0,executed=0;const requests:any[]=[];
+ const vault={read:async(k:string)=>structuredClone(data.get(k)),write:async(k:string,v:unknown)=>{data.set(k,structuredClone(v));}} as unknown as ClientVault;
+ const request=(async(_url:any,init:any)=>{requests.push(JSON.parse(init.body));return ++step<=20?{tool_calls:[{id:'c'+step,type:'function',function:{name:'command',arguments:JSON.stringify({shell:'cmd',command:'echo '+step,timeoutMs:120000})}}]}:{content:'verified'};}) as typeof requestAiReply;
+ const service=new CagentAssistant(vault,{shells:async()=>[],applications:async()=>[],execute:async()=>({exitCode:0,result:++executed}),allowed:()=>true},request);
+ try{await service.load();await service.configure({...config,review:false});const t=await service.start({prompt:'complete all steps',requestId:randomUUID()},'a'.repeat(64));await until(()=>service.get(t,'local').state==='completed');assert.equal(executed,20);
+ await assert.rejects(service.start({resumeId:t.id,prompt:'continue',requestId:randomUUID()},'b'.repeat(64)),/不存在/);
+ const resumed=await service.start({resumeId:t.id,prompt:'check state',requestId:randomUUID()},'a'.repeat(64));await until(()=>service.get(resumed,'local').state==='completed');assert.match(JSON.stringify(requests.at(-1).messages),/complete all steps/);assert.match(JSON.stringify(requests.at(-1).messages),/never replay/);assert.equal(executed,20);
+ }finally{await service.close();}
+});
 async function fixture(){
  const data=new Map<string,unknown>();let executions=0,allowed=true,replies=0;
  const vault={read:async(k:string)=>structuredClone(data.get(k)),write:async(k:string,v:unknown)=>{data.set(k,structuredClone(v));}} as unknown as ClientVault;

@@ -3,6 +3,7 @@ import { appCatalogSchema, appTaskSchema, appPolicySchema } from '../../shared/a
 import type { AgentCall, AgentTarget } from '../../shared/agent';
 import type { z } from 'zod';
 import { AgentCapabilityMarket } from './AgentCapabilityMarket';
+import { AgentWsl } from './AgentWsl';
 
 export function AgentApplications({
   target,
@@ -15,6 +16,7 @@ export function AgentApplications({
     [task, setTask] = useState<z.infer<typeof appTaskSchema>>();
   const [policy, setPolicy] = useState<z.infer<typeof appPolicySchema>>(),
     [controllers, setControllers] = useState('');
+  const [wslOpen,setWslOpen]=useState(false);
   const [query, setQuery] = useState(''),
     [busy, setBusy] = useState(false),
     [error, setError] = useState('');
@@ -72,6 +74,9 @@ export function AgentApplications({
         </p>
       </header>
       <AgentCapabilityMarket key={target.id} target={target} call={call} />
+      {catalog?.platform==='win32'&&<details className="agent-system-apps" onToggle={e=>setWslOpen(e.currentTarget.open)}><summary>Linux 虚拟机 · WSL</summary>{wslOpen&&<AgentWsl target={target.id} call={call}/>}</details>}
+      {error && <p role="alert" className="form-error">{error}</p>}
+      {busy && <p role="status">正在处理应用操作…</p>}
       <details>
         <summary>系统应用</summary>
         {policy && (
@@ -109,7 +114,7 @@ export function AgentApplications({
           </details>
         )}
         {catalog && !catalog.enabled && (
-          <p>应用安装未授权。请在目标 cagent 本机的应用安装权限中启用；远程控制端还需指纹授权。</p>
+          <p>应用安装未授权。请在目标 CAgent 本机的应用安装权限中启用；远程控制端还需指纹授权。</p>
         )}
         <div className="agent-toolbar">
           <input
@@ -183,7 +188,6 @@ export function AgentApplications({
             )}
           </section>
         )}
-        {error && <p role="alert">{error}</p>}
       </details>
     </section>
   );

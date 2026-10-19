@@ -756,3 +756,18 @@ body.minimal #terminal-tools {
 #agent-identity button {
   margin-top: 8px;
 }
+/* Remote desktop owns the visible workspace; keyboard resizing never crops controls. */
+.mobile-desktop{position:fixed;inset:0;z-index:100;background:var(--bg,#f5f7fa);display:flex;flex-direction:column;padding:12px;gap:8px;overflow:auto}
+.mobile-desktop[hidden]{display:none}
+.mobile-desktop header{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.mobile-desktop header strong{margin-right:auto}
+.mobile-desktop header label{display:inline-flex;flex-direction:row;align-items:center;gap:6px;margin:0;white-space:nowrap}
+.mobile-desktop header input[type=checkbox]{width:18px;height:18px;min-height:0;margin:0;padding:0;flex:none}
+.mobile-desktop button{min-height:40px;border-radius:12px;padding:8px 12px;flex-shrink:0}
+.mobile-desktop canvas{background:#101820;object-fit:contain;width:100%;min-height:100px;height:0;flex:1;touch-action:none;outline-offset:-3px}
+.mobile-desktop .desktop-keys{display:flex;gap:6px;overflow-x:auto;flex-shrink:0}
+.mobile-desktop p{font-size:12px;margin:0;overflow-wrap:anywhere}
+.mobile-desktop details label{display:inline-flex;gap:8px;align-items:center;margin:8px}
+.mobile-desktop details input{width:90px}
+.mobile-desktop textarea{min-height:80px;flex-shrink:0}
+.agent-desktop-shortcut{position:absolute;right:12px;top:8px;z-index:2}

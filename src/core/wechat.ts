@@ -16,10 +16,17 @@ export class WechatService {
   private busy=false;
   private revision=0;
   readonly subscriptions:WechatSubscriptions;
-  constructor(private directory:string,private store:Store){this.subscriptions=new WechatSubscriptions(join(directory,'wechat-subscriptions'),join(process.env.LOCALAPPDATA??'','CShell','tools','wechat-bridge','venv','Scripts','python.exe'));}
+  constructor(private directory:string,private store:Pick<Store,'plugins'>,private options:{python?:string;enabled?:()=>boolean}={}){this.subscriptions=new WechatSubscriptions(join(directory,'wechat-subscriptions'),(this.options.python??join(process.env.LOCALAPPDATA??'','CShell','tools','wechat-bridge','venv','Scripts','python.exe')));}
+  private isEnabled(){return this.options.enabled?.()??pluginEnabled(this.store.plugins(),'wechat');}
+  configured(){return this.config.enabled&&this.config.experimental&&!!this.binding;}
+  async ready(){
+    if(!this.configured())return false;
+    const data=await this.run({method:'discover'},new AbortController().signal);
+    return data.processes.some((process:any)=>JSON.stringify(process.binding)===JSON.stringify(this.binding));
+  }
   private get file(){return join(this.directory,'wechat.json');}
   async load(){try{const data=JSON.parse(await readFile(this.file,'utf8'));this.config=wechatConfigSchema.parse(data.config);this.binding=data.binding;}catch{this.config=emptyWechatConfig();}await this.subscriptions.load();}
-  private requirePlugin(){if(process.platform!=='win32')throw new Error('微信控制目前仅支持 Windows');if(!pluginEnabled(this.store.plugins(),'wechat'))throw new Error('请先安装并启用微信扩展');}
+  private requirePlugin(){if(process.platform!=='win32')throw new Error('微信控制目前仅支持 Windows');if(!this.isEnabled())throw new Error('请先安装并启用微信扩展');}
   async status(){this.requirePlugin();try{const result=await this.run({method:'discover'},new AbortController().signal);return {config:this.config,processes:result.processes,subscriptions:this.subscriptions.list().map(({id,state,reason})=>({id,state,reason}))};}catch(error){return {config:this.config,processes:[],error:String(error)};}}
   async save(input:unknown){
     this.requirePlugin();if(this.busy)throw new Error('请先停止正在进行的微信操作');
@@ -37,7 +44,7 @@ export class WechatService {
     this.config=config;this.binding=binding;this.revision++;
   }
   tools():ConnectionTool[]{
-    if(!pluginEnabled(this.store.plugins(),'wechat')||process.platform!=='win32')return [];
+    if(!this.isEnabled()||process.platform!=='win32')return [];
     const tool=(name:string,method:string,capability:string,input:z.ZodType,description:string,review=false):ConnectionTool=>({
       name,capability,input,description,needsReview:()=>review,
       invoke:async(args,signal)=>JSON.stringify(await this.invoke(method,args,signal)),
@@ -62,7 +69,7 @@ export class WechatService {
   }
   async subscribeAuthorized(args:any,signal:AbortSignal,authorize:()=>boolean){return JSON.stringify(await this.invoke('subscribe',args,signal,authorize));}
   eventSource(){
-    if(process.platform!=='win32'||!pluginEnabled(this.store.plugins(),'wechat'))return null;
+    if(process.platform!=='win32'||!this.isEnabled())return null;
     const available=this.config.enabled&&this.config.experimental&&!!this.binding;
     return {id:'wechat',name:'微信',eventTypes:[{id:'message.received',name:'收到消息'}],available,...(!available?{reason:'请先在微信扩展中绑定进程并开启接收授权'}:{})};
   }
@@ -81,7 +88,7 @@ export class WechatService {
   }
   private async invoke(method:string,args:any,signal:AbortSignal,persistentGuard:()=>boolean=()=>true){
     this.requirePlugin();if(method==='status')return this.status();
-    const permitted=(targets:string[],binding:unknown)=>this.config.enabled&&this.config.experimental&&pluginEnabled(this.store.plugins(),'wechat')&&JSON.stringify(binding)===JSON.stringify(this.binding)&&targets.every(id=>this.config.receive.includes('*')||this.config.receive.includes(id));
+    const permitted=(targets:string[],binding:unknown)=>this.config.enabled&&this.config.experimental&&this.isEnabled()&&JSON.stringify(binding)===JSON.stringify(this.binding)&&targets.every(id=>this.config.receive.includes('*')||this.config.receive.includes(id));
     if(method==='subscriptions')return this.subscriptions.list().filter(x=>permitted(x.targets,x.binding));
     if(method==='unsubscribe')return this.subscriptions.stop(args.subscriptionId,args.purge);
     if(method==='events'){
@@ -132,7 +139,7 @@ export class WechatService {
       if(!this.config.remarks.includes('*')&&!this.config.remarks.includes(args.target))throw new Error(`联系人不在微信备注授权列表。[前往授权](${permissionHref('wechat/remarks')})`);
     }
     const revision=this.revision;this.busy=true;
-    const authorized=()=>revision===this.revision&&pluginEnabled(this.store.plugins(),'wechat')&&this.config.enabled;
+    const authorized=()=>revision===this.revision&&this.isEnabled()&&this.config.enabled;
     try{
       if(method==='contacts'||method==='history'||method==='conversations'||method==='moments'||method==='moments_interactions'||method==='moments_publish'){
         const runtime=await this.run({method:'discover'},signal,authorized);
@@ -149,12 +156,12 @@ export class WechatService {
   }
   private async run(request:any,signal:AbortSignal,authorized=()=>true):Promise<any>{
     signal.throwIfAborted();
-    const python=join(process.env.LOCALAPPDATA??'','CShell','tools','wechat-bridge','venv','Scripts','python.exe');
+    const python=(this.options.python??join(process.env.LOCALAPPDATA??'','CShell','tools','wechat-bridge','venv','Scripts','python.exe'));
     const cancelFile=join(this.directory,'wechat-cancel-'+randomUUID());
     await mkdir(this.directory,{recursive:true});
     return new Promise((resolve,reject)=>{
-      const env:NodeJS.ProcessEnv={...process.env,PYTHONIOENCODING:'utf-8'};delete env.PYTHONPATH;delete env.PYTHONHOME;
-      const child=spawn(python,['-m','cshell_wechat.desktop'],{windowsHide:true,stdio:['pipe','pipe','pipe'],env});
+      const env:NodeJS.ProcessEnv={...process.env,PYTHONIOENCODING:'utf-8',PYTHONDONTWRITEBYTECODE:'1'};delete env.PYTHONPATH;delete env.PYTHONHOME;
+      const child=spawn(python,['-B','-m','cshell_wechat.desktop'],{windowsHide:true,stdio:['pipe','pipe','pipe'],env});
       let output=Buffer.alloc(0),settled=false,cancelled=false;
       const cancel=()=>{if(!cancelled){cancelled=true;void writeFile(cancelFile,'cancel').catch(()=>{});}};
       const timer=setInterval(()=>{if(signal.aborted||!authorized())cancel();},100);

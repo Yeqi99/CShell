@@ -130,7 +130,7 @@ export function ClientConnectForm({
             </button>
           </>
         }
-        title="cagent"
+        title="CAgent"
         titleId="cagent-connect-title"
         providerId="cshell.client"
         disabled={busy}

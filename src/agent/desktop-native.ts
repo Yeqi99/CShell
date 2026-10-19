@@ -3,7 +3,7 @@ import { EventEmitter } from 'node:events';
 export type NativeDesktopConfig={display?:number;width?:number;height?:number;fps:number;bitrate:number;memoryBudgetBytes?:number;forceGdi?:number};
 export type NativeDesktopFrame={type:'frame';id:number;key:boolean;timestampUs:number;captureUs:number;convertUs:number;encodeUs:number;data:Buffer};
 export type NativeDesktopInput={generation:number;sequence:number}&(
- {kind:'lease'}|{kind:'key';code:number;down:boolean}|{kind:'button';button:number;down:boolean}|
+ {kind:'lease'}|{kind:'text';text:string}|{kind:'key';code:number;down:boolean}|{kind:'button';button:number;down:boolean}|
  {kind:'move';x:number;y:number}|{kind:'wheel';delta:number;horizontal?:boolean});
 export class NativeDesktop extends EventEmitter {
  private child?:ChildProcessWithoutNullStreams;private pending=Buffer.alloc(0);private errorText='';private finished=false;private stopping=false;
@@ -57,7 +57,8 @@ export class NativeDesktop extends EventEmitter {
   if(event.kind==='button'&&(!Number.isInteger(event.button)||event.button<0||event.button>4||typeof event.down!=='boolean'))throw new Error('Invalid mouse button');
   if(event.kind==='move'&&[event.x,event.y].some(n=>!Number.isFinite(n)||n<0||n>1))throw new Error('Invalid pointer position');
   if(event.kind==='wheel'&&(!Number.isInteger(event.delta)||event.delta< -32768||event.delta>32767||(event.horizontal!==undefined&&typeof event.horizontal!=='boolean')))throw new Error('Invalid wheel event');
-  if(!['key','button','move','wheel','lease'].includes(event.kind))throw new Error('Unsupported input kind');
+  if(event.kind==='text'&&(typeof event.text!=='string'||!event.text.length||event.text.length>512||event.text.includes('\0')))throw new Error('Invalid text input');
+  if(!['key','button','move','wheel','lease','text'].includes(event.kind))throw new Error('Unsupported input kind');
   this.send({op:'input-event',event});
  }
  async stop(){

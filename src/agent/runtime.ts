@@ -1,3 +1,4 @@
+import {createWechatCapability} from './wechat-capability';
 import {AgentFiles} from './files';
 import {AgentUpdater} from './update';
 import {startupState,setStartup} from './startup';
@@ -108,7 +109,8 @@ export async function createAgentRuntime(
   await applications.load();
   const desktopIdentity=server.status().deviceId;
   const desktop=await createDesktopCapability({identity:desktopIdentity,nativeExecutable:options.desktopExecutable??join(dirname(resolve(process.argv[1]??process.execPath)),'cagent-desktop.exe'),vault,authorize:owner=>server.status().deviceId===desktopIdentity&&(owner==='local'||server.managementAllowed(owner))});
-  const packages=new CapabilityRuntime({directory,vault,applications,agentVersion,extraPackages:[...desktop.extraPackages,...options.extraPackages??[]]});
+  const wechat=await createWechatCapability({directory,runtime:join(dirname(resolve(process.argv[1]??process.execPath)),'wechat-runtime'),authorize:owner=>owner==='local'||server.managementAllowed(owner)});
+  const packages=new CapabilityRuntime({directory,vault,applications,agentVersion,extraPackages:[...desktop.extraPackages,...wechat.extraPackages,...options.extraPackages??[]]});
   await packages.load();
   // Provision the Windows distribution's native desktop once, without granting access.
   // Remember the decision so an explicit uninstall remains effective on restart.
@@ -127,13 +129,13 @@ export async function createAgentRuntime(
     const previous=server.status();
     if(previous.passwordConfigured&&previous.bind&&previous.port)try{await server.start({bind:previous.bind,port:previous.port,advertisedHost:previous.advertisedHost,advertisedPort:previous.advertisedPort});}catch{listenerStartupError='连接服务未启动，请检查本机地址和端口';}
   }
-  const assistant=new CagentAssistant(vault,{shells,applications:owner=>applications.list(owner),execute:(input,signal,owner)=>{
+  const assistant=new CagentAssistant(vault,{shells,applications:owner=>applications.list(owner),execute:(input,signal,owner,output)=>{
     if(owner!=='local'){
       const status=server.status(),peer=status.peers.find(p=>p.fingerprint===owner);
       const shell=clientShellSchema.parse((input as {shell:unknown}).shell);
       if(!peer?.shells.includes(shell)||!status.allowedShells?.includes(shell))throw new Error('控制端未获此 Shell 授权');
     }
-    return terminal.execute(input,signal);
+    return terminal.execute(input,signal,output);
   },allowed:owner=>server.managementAllowed(owner),capabilityTools:()=>packages.tools(),capabilityInvoke:(input,signal,owner)=>packages.invoke(input,owner,signal)});
   await assistant.load();
   const hosting = new HostingService(join(directory, 'hosting'));
@@ -191,7 +193,7 @@ export async function createAgentRuntime(
       if(!['0.0.0.0', '127.0.0.1','::1',...Object.values(networkInterfaces()).flatMap(v=>v?.map(i=>i.address)??[])].includes(input.bind))throw new Error('请选择当前设备的网络地址');
       if(input.advertisedHost)clientEndpointSchema.shape.host.parse(input.advertisedHost);
       const apply=async()=>{
-        await server.stop();await server.setAccess({password:input.password,shells:input.shells??(server.status().passwordConfigured?server.status().allowedShells:[...new Set((await shells()).map(s=>s.shell))]),allowManage:input.allowManage??(server.status().passwordConfigured?server.status().allowManage:true),allowHttp:input.allowHttp??(server.status().passwordConfigured?server.status().allowHttp:true),allowHosting:input.allowHosting??(server.status().passwordConfigured?server.status().allowHosting:true),allowRelay:input.allowRelay??(server.status().passwordConfigured?server.status().allowRelay:true)});
+        await server.stop();await server.setAccess({password:input.password,shells:input.shells??(server.status().passwordConfigured?server.status().allowedShells:[...new Set([...(await shells()).map(s=>s.shell),...(process.platform==='win32'?['wsl' as const]:[])])]),allowManage:input.allowManage??(server.status().passwordConfigured?server.status().allowManage:true),allowHttp:input.allowHttp??(server.status().passwordConfigured?server.status().allowHttp:true),allowHosting:input.allowHosting??(server.status().passwordConfigured?server.status().allowHosting:true),allowRelay:input.allowRelay??(server.status().passwordConfigured?server.status().allowRelay:true)});
         const current=await desktop.dispatch('desktop.status',{},'local',true) as {config:Record<string,unknown>};
         if(desktop.extraPackages.length)await desktop.dispatch('desktop.configure',{...current.config,directListener:false,bindAddress:input.bind,tcpPort:input.port,udpPort:input.port,publicTcpPort:input.advertisedPort,publicUdpPort:input.advertisedPort??input.port},'local',true);
         await server.start({bind:input.bind,port:input.port,advertisedHost:input.advertisedHost,advertisedPort:input.advertisedPort});
@@ -204,6 +206,14 @@ export async function createAgentRuntime(
       if(!local&&(owner==='local'||!server.managementAllowed(owner)))throw new Error('未授权控制端管理远程桌面');
       if(server.status().deviceId!==desktopIdentity)throw new Error('设备身份已迁移，请重启 cagent 后使用远程桌面');
       return desktop.dispatch(method,params,owner,admin);
+    }
+    if(method.startsWith('wechat.')){
+      if(!admin||(!local&&(owner==='local'||!server.managementAllowed(owner))))throw new Error('未授权管理此机器的微信');
+      if(!packages.list().some(item=>item.id==='cagent.wechat'))throw new Error('请先在此机器安装微信掌控');
+      if(method==='wechat.status')return wechat.service.status();
+      if(method==='wechat.configure'){await wechat.verify();await wechat.service.save(params);await packages.refresh({id:'cagent.wechat'});return {saved:true};}
+      if(method==='wechat.stop'){await wechat.service.subscriptions.stopAll();return {stopped:true};}
+      throw new Error('未知微信管理操作');
     }
     if(method.startsWith('packages.')){
       if(!local&&(owner==='local'||!server.managementAllowed(owner)))throw new Error('未授权控制端管理能力包');
@@ -476,6 +486,7 @@ export async function createAgentRuntime(
     await control?.close();
     await mutation;
     await packages.dispose();
+    await wechat.shutdown();
     await desktop.shutdown();
     await applications.dispose();
     await wsl.dispose();

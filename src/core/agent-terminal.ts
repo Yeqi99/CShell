@@ -159,13 +159,13 @@ export class AgentTerminalProvider implements ManagedProvider {
   shells() {
     return this.detect();
   }
-  async execute(input: unknown, signal: AbortSignal) {
+  async execute(input: unknown, signal: AbortSignal, output?: (text:string)=>void) {
     const request = z
       .object({
         shell: z.enum(['cmd', 'powershell', 'bash', 'zsh', 'sh', 'wsl']),
         distribution: z.string().min(1).max(120).optional(),
         command: z.string().min(1).max(16384),
-        timeoutMs: z.number().int().min(1).max(60000).default(30000),
+        timeoutMs: z.number().int().min(1).max(86400000).default(30000),
       })
       .strict()
       .parse(input);
@@ -208,7 +208,8 @@ export class AgentTerminalProvider implements ManagedProvider {
         truncated = false,
         settled = false;
       const collect = (target: Buffer[]) => (chunk: Buffer) => {
-        const available = Math.max(0, 65536 - length);
+        output?.(chunk.toString('utf8'));
+        const available = Math.max(0, (output ? 4*1024*1024 : 65536) - length);
         if (chunk.length > available) truncated = true;
         if (available) {
           const kept = chunk.subarray(0, available);

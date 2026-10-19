@@ -7,7 +7,7 @@ import {createServer} from 'node:net';
 import {once} from 'node:events';
 import assert from 'node:assert/strict';
 import {createAgentRuntime} from '../src/agent/runtime';
-const data=await mkdtemp(join(tmpdir(),'machine-ui-')),runtime=await createAgentRuntime({directory:join(data,'agent')});
+const data=await mkdtemp(join(homedir(),'.cshell-files-test-')),runtime=await createAgentRuntime({directory:join(data,'agent')});
 const holder=createServer().listen(0,'127.0.0.1');await once(holder,'listening');const port=(holder.address() as any).port;await new Promise<void>(r=>holder.close(()=>r()));
 await runtime.dispatch('connection.save',{bind:'127.0.0.1',port,password:'fixture-password'});
 await mkdir(join(data,'files'));await writeFile(join(data,'files','original.txt'),'REMOTE_FILE_CONTENT');

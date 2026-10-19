@@ -73,7 +73,7 @@ try {
     } catch {
       return false;
     }
-  });
+  }, 120000);
   assert.equal(
     (await callAgent('client.status', undefined, directory)).running,
     false,

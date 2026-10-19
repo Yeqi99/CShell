@@ -25,6 +25,7 @@ export const pluginManifestSchema = z
       'http',
       'agent',
       'wechat',
+      'opencode',
     ]),
     permissions: z
       .array(z.enum(['terminal.input', 'remote.read', 'remote.execute', 'remote.forward']))
@@ -79,11 +80,12 @@ const builtin = (
   commands: [],
 });
 export const builtinPlugins = [
+  builtin('opencode', 'OpenCode', '接入 Go 套餐或按量计费模型，选择模型并查看官方用量。', 'opencode', []),
   builtin('wechat', '微信（实验）', '绑定本机 Windows 微信，授权智能体读取联系人、收发文本。实验适配可能导致微信崩溃。', 'wechat', []),
   builtin('http', 'HTTP', '编辑请求、多目标、切换发送方与请求历史，可供智能体调用。', 'http', [
     'remote.forward',
   ]),
-  builtin('agent', 'cagent', '配置此电脑的受控访问、监听地址与权限。', 'agent', [
+  builtin('agent', 'CAgent', '配置此电脑的受控访问、监听地址与权限。', 'agent', [
     'remote.execute',
     'remote.forward',
   ]),

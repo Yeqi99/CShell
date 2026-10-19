@@ -7,7 +7,7 @@ export function AgentMachineFiles({call,target,pendingFiles=[],onFilesConsumed}:
  const downloadId=useRef('');
  const cancelled=useRef(false),alive=useRef(true),picker=useRef<HTMLInputElement>(null);
  const load=async(r:string,p:string)=>{setBusy(true);setError('');try{const result=await call('files.list',{root:r,path:p}) as {path:string;entries:FileEntry[]};if(!alive.current)return;setRoot(r);setPath(result.path);setDraft(result.path);setEntries(result.entries);setSelected(undefined);}catch(e){setError(String(e));setEntries([]);}finally{setBusy(false);}};
- useEffect(()=>{alive.current=true;void (async()=>{try{const result=await call('files.roots') as {roots:{root:string;label:string}[]};if(!alive.current)return;setRoots(result.roots);if(result.roots[0])await load(result.roots[0].root,'/');}catch(e){setError('无法读取远端文件能力，请确认 cagent 已更新且允许远程管理。'+String(e));}})();return()=>{alive.current=false;cancelled.current=true;if(downloadId.current)void window.cshell.agentFileCancel(downloadId.current);};},[call]);
+ useEffect(()=>{alive.current=true;void (async()=>{try{const result=await call('files.roots') as {roots:{root:string;label:string}[]};if(!alive.current)return;setRoots(result.roots);if(result.roots[0])await load(result.roots[0].root,'/');}catch(e){setError('无法读取远端文件能力，请确认 CAgent 已更新且允许远程管理。'+String(e));}})();return()=>{alive.current=false;cancelled.current=true;if(downloadId.current)void window.cshell.agentFileCancel(downloadId.current);};},[call]);
  const check=()=>{if(cancelled.current||!alive.current)throw new Error('传输已取消');};
  const transfer=async(file?:globalThis.File)=>{
   setBusy(true);setError('');setProgress('正在传输…');cancelled.current=false;let uploadId='';

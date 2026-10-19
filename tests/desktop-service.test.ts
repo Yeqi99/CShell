@@ -111,3 +111,42 @@ test('disconnect and revoke cancel pending desktop recovery',{timeout:8000},asyn
 test('desktop recovery has a bounded deadline instead of an endless capture loop',{timeout:8000},async()=>{
  const {service,captures}=await fixture();try{const ticket=service.open('viewer',{quality});const client=await connectDesktop(ticket,{host:'127.0.0.1',expectedHostIdentity:'device-1',local:true});await once(client,'frame');(service as any).active.unavailableSince=performance.now()-120001;const closed=once(client,'closed');captures[0].emit('closed',{code:1,error:'CAPTURE_SECURE_OR_INACCESSIBLE_DESKTOP'});assert.equal((await closed)[0],'CAPTURE_ACCESS_DENIED');assert.equal(captures.length,1);await client.close();}finally{await service.shutdown();}
 });
+
+test('quality change recovers when the final frame acknowledgement is lost',{timeout:8000},async()=>{
+ const {service,captures}=await fixture();
+ try{const ticket=service.open('viewer',{quality});const client=await connectDesktop(ticket,{host:'127.0.0.1',expectedHostIdentity:'device-1',local:true});await once(client,'frame');
+  client.quality({...quality,bitrate:1111111});
+  await new Promise(r=>setTimeout(r,1900));
+  assert.equal(captures.length,2,'lost ack must not stall queued reconfiguration');
+  assert.equal(captures[0].stopped,true);assert.equal(captures[1].config.bitrate,1111111);
+  assert.ok(captures[1].frames>2);assert.equal(client.session.ready,true);
+  client.ack('0');await new Promise(r=>setTimeout(r,50));assert.equal(captures.length,2,'late ack cannot restart the new stream');
+  await client.close();
+ }finally{await service.shutdown();}
+});
+
+test('quality transition has its own deadline after the frame timer expired',{timeout:8000},async()=>{
+ const {service,captures}=await fixture();try{
+  const ticket=service.open('viewer',{quality});const client=await connectDesktop(ticket,{host:'127.0.0.1',expectedHostIdentity:'device-1',local:true});await once(client,'frame');
+  captures[0].requestFrame=()=>{};
+  await new Promise(r=>setTimeout(r,1200));
+  client.quality({...quality,bitrate:1234567});await new Promise(r=>setTimeout(r,1900));
+  assert.equal(captures.length,2);assert.equal(captures[1].config.bitrate,1234567);assert.ok(captures[1].frames>2);
+  await client.close();
+ }finally{await service.shutdown();}
+});
+test('disconnect cancels queued quality recovery without creating another capture',{timeout:8000},async()=>{
+ const {service,captures}=await fixture();try{
+  const ticket=service.open('viewer',{quality});const client=await connectDesktop(ticket,{host:'127.0.0.1',expectedHostIdentity:'device-1',local:true});await once(client,'frame');
+  client.quality({...quality,bitrate:1234567});await new Promise(r=>setTimeout(r,40));await client.close();
+  await new Promise(r=>setTimeout(r,1700));assert.equal(captures.length,1);assert.equal(captures[0].stopped,true);
+ }finally{await service.shutdown();}
+});
+
+test('capture that stops after initial frames switches backend without reconnect',{timeout:10000},async()=>{
+ const {service,captures}=await fixture();try{
+  const ticket=service.open('viewer',{quality});const client=await connectDesktop(ticket,{host:'127.0.0.1',expectedHostIdentity:'device-1',local:true});client.on('frame',f=>client.ack(f.id));await once(client,'frame');
+  captures[0].requestFrame=()=>{};await new Promise(r=>setTimeout(r,3700));
+  assert.equal(captures.length,2);assert.equal(captures[1].config.forceGdi,1);assert.ok(captures[1].frames>2);assert.equal(client.session.ready,true);await client.close();
+ }finally{await service.shutdown();}
+});

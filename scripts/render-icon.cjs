@@ -2,7 +2,8 @@
 const { app, BrowserWindow, nativeImage } = require('electron');
 const { readFile, writeFile } = require('node:fs/promises');
 const { resolve } = require('node:path');
-const iconName=process.argv[2]==='cagent-icon'?'cagent-icon':'icon';
+const iconName=process.argv[2]||'icon';
+if(!['icon','cagent-icon','brand/cshell-pro','brand/cagent-pro'].includes(iconName))throw Error('Unknown brand icon');
 app.disableHardwareAcceleration();
 app.whenReady().then(async () => {
   try {

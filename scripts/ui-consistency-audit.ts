@@ -30,5 +30,5 @@ try {
   results.push({section:'extensions',theme,width,fits});assert.ok(fits,'market overflow');
   await page.screenshot({path:`test-results/ui-market-${theme}-${width}.png`});
  }
- await writeFile('test-results/ui-consistency-0.6.28.json',JSON.stringify({passed:true,isolated:true,results},null,2));
+ await writeFile('test-results/ui-consistency-0.6.33.json',JSON.stringify({passed:true,isolated:true,results},null,2));
 }finally{await app.evaluate(({app})=>app.exit(0)).catch(()=>{});}

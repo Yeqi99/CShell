@@ -37,10 +37,10 @@ export function AgentDesktopView({
     return()=>document.removeEventListener('fullscreenchange',changed);
   },[]);
   useEffect(()=>{
-    if(!screen.current)return;
-    const resize=()=>{const box=screen.current!.getBoundingClientRect();const ratio=(info?.width??16)/(info?.height??9);const width=Math.min(box.width,box.height*ratio);setFrameSize({width,height:width/ratio});};
-    const observer=new ResizeObserver(resize);observer.observe(screen.current);resize();
-    return()=>observer.disconnect();
+    const element=screen.current;if(!element)return;let disposed=false;
+    const resize=()=>{if(disposed||screen.current!==element)return;const box=element.getBoundingClientRect();const ratio=(info?.width??16)/(info?.height??9);const width=Math.min(box.width,box.height*ratio);setFrameSize({width,height:width/ratio});};
+    const observer=new ResizeObserver(resize);observer.observe(element);resize();
+    return()=>{disposed=true;observer.disconnect();};
   },[active,busy,info]);
   const toggleFullscreen=async()=>{release();try{if(document.fullscreenElement===view.current)await document.exitFullscreen();else await view.current?.requestFullscreen();}catch(e){setError('无法进入全屏：'+String(e));}};
   const decodeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -152,7 +152,7 @@ export function AgentDesktopView({
       }
       if (event.type === 'error') {
         // Older agents transport this recoverable progress notice as an error.
-        if(event.message==='桌面采集未输出首帧，正在切换兼容采集…'){setPicture(event.message);return;}
+        if(['桌面采集未输出首帧，正在切换兼容采集…','桌面采集暂未更新，正在切换兼容采集…'].includes(event.message)){setPicture(event.message);return;}
         if(event.message.startsWith('INPUT_DISABLED: ')){inputDenied.current=true;controlling.current=false;setControl(false);release();}
         setError(event.message.replace(/^INPUT_DISABLED: /,''));
         return;
@@ -328,11 +328,14 @@ export function AgentDesktopView({
   };
   const key = (event: React.KeyboardEvent<HTMLCanvasElement>, down: boolean) => {
     if(event.key==='Escape' && (fullscreen||expanded)){event.preventDefault();release();if(down){if(fullscreen)void document.exitFullscreen();else setExpanded(false);}return;}
-    if (!controlling.current) return;
+    if (!controlling.current || event.nativeEvent.isComposing) return;
     const code = desktopScanCode(event.code);
     if (!code) return;
     event.preventDefault();
-    if (!event.repeat) input({ kind: 'key', code, down });
+    input({ kind: 'key', code, down });
+    // macOS may suppress key-up for a key pressed with Command. Release the
+    // remote chord when Command is released, so no remote modifier stays down.
+    if(!down && (event.code==='MetaLeft'||event.code==='MetaRight'))release();
   };
   const validateQuality = () => {
     const parsed = desktopQualitySchema.safeParse(quality);
@@ -362,7 +365,12 @@ export function AgentDesktopView({
     }
   };
   return (
-    <section ref={view} className={'agent-desktop-view'+(expanded?' desktop-expanded':'')} aria-label="CAgent 远程桌面">
+    <section ref={view} className={'agent-desktop-view'+(expanded?' desktop-expanded':'')} aria-label="CAgent 远程桌面" onKeyDownCapture={event=>{
+      if(event.key==='Escape'&&document.fullscreenElement===view.current){
+        event.preventDefault();event.stopPropagation();release();
+        void document.exitFullscreen().catch(e=>setError('无法退出全屏：'+String(e)));
+      }
+    }}>
       <div className="desktop-toolbar">
         <strong>
           <Monitor size={16} />
@@ -502,6 +510,10 @@ export function AgentDesktopView({
               if (controlling.current) {
                 e.preventDefault();
                 e.currentTarget.setPointerCapture(e.pointerId);
+                const r=e.currentTarget.getBoundingClientRect();
+                if(raf.current){cancelAnimationFrame(raf.current);raf.current=0;}
+                pointer.current=null;
+                input({kind:'move',x:Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)),y:Math.max(0,Math.min(1,(e.clientY-r.top)/r.height))});
                 input({
                   kind: 'button',
                   button: [0, 2, 1, 3, 4][e.button] ?? e.button,
@@ -522,6 +534,7 @@ export function AgentDesktopView({
               }
             }}
             onPointerCancel={release}
+            onLostPointerCapture={release}
             onPointerMove={(e) => {
               if (!controlling.current) return;
               const r = e.currentTarget.getBoundingClientRect();
@@ -540,8 +553,8 @@ export function AgentDesktopView({
               if (controlling.current) {
                 input({
                   kind: 'wheel',
-                  delta: Math.max(-32768, Math.min(32767, Math.round(-e.deltaY))),
-                  horizontal: false,
+                  delta: Math.max(-32768, Math.min(32767, Math.round(Math.abs(e.deltaX)>Math.abs(e.deltaY)?e.deltaX:-e.deltaY))),
+                  horizontal: Math.abs(e.deltaX)>Math.abs(e.deltaY),
                 });
               }
             }}

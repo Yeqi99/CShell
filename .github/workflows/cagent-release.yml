@@ -38,6 +38,17 @@ jobs:
           "CAGENT_NATIVE_CXX=$env:RUNNER_TEMP/llvm-mingw-20261006-ucrt-x86_64/bin/x86_64-w64-mingw32-clang++.exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - run: node scripts/prepare-pty.mjs
       - run: pnpm exec tsc --noEmit
+      - uses: actions/setup-python@v5
+        if: runner.os == 'Windows'
+        with:
+          python-version: '3.12'
+          architecture: 'x64'
+      - name: Prepare pinned WeChat runtime dependencies
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          python -m pip install frida==17.24.0 pefile==2024.8.26 zstandard==0.23.0
+          "CAGENT_WECHAT_PYTHON=$((Get-Command python).Source)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - name: Build standalone CAgent on the native architecture
         run: node scripts/agent-build.mjs
       - name: Archive, install or extract, and verify real packaged PTY

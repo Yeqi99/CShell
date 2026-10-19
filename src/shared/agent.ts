@@ -1,5 +1,6 @@
 import { z } from 'zod';
 export const agentMethods = [
+  'wechat.status','wechat.configure','wechat.stop',
   'files.roots','files.list','files.action','files.read','files.uploadStart','files.uploadChunk','files.uploadFinish','files.uploadCancel',
   'connection.autostart',
   'connection.settings',

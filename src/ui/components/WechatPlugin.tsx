@@ -1,21 +1,21 @@
 import { usePermissionFocus } from '../permission-navigation';
 import { useEffect,useState } from 'react';
 import { emptyWechatConfig,parseWechatConfig,type WechatConfig } from '../../shared/wechat';
-export function WechatPlugin(){
+export function WechatPlugin({api=window.cshell,remote=false}:{api?:Pick<typeof window.cshell,'wechatStatus'|'wechatSave'|'wechatStopSubscriptions'>;remote?:boolean}={}){
   const [draft,setDraft]=useState<WechatConfig>(emptyWechatConfig);
   const [processes,setProcesses]=useState<{pid:number;version:string}[]>([]);
   const [send,setSend]=useState(''),[sendBlocked,setSendBlocked]=useState(''),[receive,setReceive]=useState(''),[history,setHistory]=useState(''),[remarks,setRemarks]=useState('');
   const [subscriptions,setSubscriptions]=useState<{id:string;state:string;reason?:string}[]>([]);
   const [message,setMessage]=useState(''),[busy,setBusy]=useState(true);
   usePermissionFocus('wechat',!busy);
-  async function refresh(initial=false){setBusy(true);try{const s=await window.cshell.wechatStatus();setProcesses(s.processes);setSubscriptions(s.subscriptions??[]);setMessage(s.error??'');if(initial){setDraft(s.config);setSend(s.config.send.join('\n'));setSendBlocked(s.config.sendBlocked.join('\n'));setReceive(s.config.receive.join('\n'));setHistory(s.config.history.join('\n'));setRemarks(s.config.remarks.join('\n'));}}catch(e){setMessage(String(e));}finally{setBusy(false);}}
+  async function refresh(initial=false){setBusy(true);try{const s=await api.wechatStatus();setProcesses(s.processes);setSubscriptions(s.subscriptions??[]);setMessage(s.error??'');if(initial){setDraft(s.config);setSend(s.config.send.join('\n'));setSendBlocked(s.config.sendBlocked.join('\n'));setReceive(s.config.receive.join('\n'));setHistory(s.config.history.join('\n'));setRemarks(s.config.remarks.join('\n'));}}catch(e){setMessage(String(e));}finally{setBusy(false);}}
   useEffect(()=>{void refresh(true);},[]);
   const ids=(text:string)=>[...new Set(text.split(/[\s,，]+/).filter(Boolean))];
-  async function save(){setBusy(true);try{await window.cshell.wechatSave(parseWechatConfig({...draft,send:ids(send),sendBlocked:ids(sendBlocked),receive:ids(receive),history:ids(history),remarks:ids(remarks)}));setMessage('已保存。请在智能体访问权限中勾选微信读取、发送或修改备注，再开始测试。');}catch(e){setMessage(String(e));}finally{setBusy(false);}}
+  async function save(){setBusy(true);try{await api.wechatSave(parseWechatConfig({...draft,send:ids(send),sendBlocked:ids(sendBlocked),receive:ids(receive),history:ids(history),remarks:ids(remarks)}));setMessage('已保存。请在智能体访问权限中勾选微信读取、发送或修改备注，再开始测试。');}catch(e){setMessage(String(e));}finally{setBusy(false);}}
   return <section className="wechat-plugin" style={{maxWidth:720,padding:20,display:'grid',gap:14}}>
-    <p>仅控制此电脑当前登录的微信，与智能体绑定的远端机器无关。实验适配可能导致微信崩溃；历史读取目前覆盖本地 message_0.db；其他分片和已删除消息不保证可用。</p>
-    <div><span>消息订阅：{subscriptions.filter(s=>s.state==='listening').length} 个运行中</span> <button disabled={busy} onClick={()=>void window.cshell.wechatStopSubscriptions().then(()=>refresh()).catch(e=>setMessage(String(e)))}>停止监听</button></div>
-    <small>可在智能体中请求持续监听。默认持续 1 小时，最多 24 小时；退出 CShell 或撤销接收权限后停止。订阅不会自动回复消息。</small>
+    <p>{remote?'控制当前连接的 CAgent 机器上的微信，不访问控制端微信。':'仅控制此电脑当前登录的微信，与智能体绑定的远端机器无关。'}实验适配可能导致微信崩溃；历史读取目前覆盖本地 message_0.db；其他分片和已删除消息不保证可用。</p>
+    <div><span>消息订阅：{subscriptions.filter(s=>s.state==='listening').length} 个运行中</span> <button disabled={busy} onClick={()=>void api.wechatStopSubscriptions().then(()=>refresh()).catch(e=>setMessage(String(e)))}>停止监听</button></div>
+    <small>可在智能体中请求持续监听。默认持续 1 小时，最多 24 小时；退出托管程序或撤销接收权限后停止。订阅不会自动回复消息。</small>
     <fieldset disabled={busy} style={{display:'contents'}}>
     <label data-permission-node="wechat/pid">微信进程 <select aria-label="微信进程" value={draft.pid??''} onChange={e=>setDraft({...draft,pid:e.target.value?Number(e.target.value):null})} disabled={busy}><option value="">请选择</option>{processes.map(p=><option key={p.pid} value={p.pid}>微信 {p.version} · PID {p.pid}</option>)}</select></label>
     <button disabled={busy} onClick={()=>void refresh()}>刷新进程</button>

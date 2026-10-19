@@ -35,15 +35,15 @@ try {
   assert.equal(await p.locator('.connection-editor').count(), 0);
   const rdp = p.locator('.rdp-connect-form');
   await rdp.getByLabel('主机地址').fill('workstation.example');
-  await rdp.getByRole('button', { name: '打开远程桌面', exact: true }).click();
-  await rdp.getByRole('status').getByText('已打开 Windows 远程桌面客户端。').waitFor();
-  assert.deepEqual(await app.evaluate(() => (globalThis as any).rdp), {
-    host: 'workstation.example',
-    port: 3389,
-  });
+  await rdp.getByLabel('账号',{exact:true}).fill('tester');
+  await rdp.getByRole('button', { name: '保存并连接', exact: true }).click();
+  await rdp.getByRole('status').getByText('已保存并打开远程桌面客户端。').waitFor();
+  const rdpId=await app.evaluate(() => (globalThis as any).rdp);
+  const saved=await p.evaluate(async id=>(await window.cshell.config()).profiles.find(x=>x.id===id),rdpId);
+  assert.equal(saved?.host,'workstation.example');assert.equal(saved?.port,3389);
   await p.screenshot({ path: 'test-results/connection-rdp.png' });
   await p.getByRole('button', { name: '返回连接方式' }).click();
-  await p.getByRole('button', { name: 'CShell Agent', exact: true }).click();
+  await p.getByRole('button', { name: 'CAgent', exact: true }).click();
   const client = p.locator('.client-connect-form');
   await client.getByLabel('主机地址').fill('client.example');
   assert.equal(await client.getByLabel('名称', { exact: true }).isVisible(), false);

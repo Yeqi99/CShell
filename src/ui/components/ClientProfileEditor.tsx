@@ -40,7 +40,7 @@ export function ClientProfileEditor({
     <div className="client-page client-profile-editor">
       <h1>{cn ? '编辑连接' : 'Edit connection'}</h1>
       <p>
-        cagent · {profile.host}:{profile.port}
+        CAgent · {profile.host}:{profile.port}
       </p>
       <form
         onSubmit={(e) => {

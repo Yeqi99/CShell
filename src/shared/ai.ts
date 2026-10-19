@@ -30,6 +30,8 @@ export const aiProviderSchema = z
         );
       }, 'Use HTTPS or a loopback HTTP endpoint, without embedded credentials'),
     model: z.string().trim().min(1).max(200),
+    runBudget:z.object({minutes:z.number().int().min(1).max(240),contextBytes:z.number().int().min(10000).max(20000000),noProgress:z.number().int().min(2).max(20)}).optional(),
+    extension: z.object({id:z.string().regex(/^[a-z][a-z0-9-]*\.[a-z][a-z0-9-]*$/),model:z.string().min(1).max(300)}).strict().optional(),
   })
   .strict();
 export type AiProvider = z.infer<typeof aiProviderSchema> & { hasKey: boolean };
@@ -91,6 +93,9 @@ export type AiMessage = {
   tool?: { name: string; input: string; output: string; target?: string };
 };
 export type AiThread = {
+  checkpoint?: import('../core/agent-continuity').AgentCheckpoint;
+  contextSummary?: string;
+  contextThrough?: number;
   execution?: {
     id: string;
     sessionId: string;
@@ -153,6 +158,7 @@ export interface AiBridge {
   aiExtractionProviderSave(id: string | null): Promise<void>;
   aiSnapshot(): Promise<AiSnapshot>;
   aiProviderSave(provider: z.infer<typeof aiProviderSchema>, key?: string): Promise<void>;
+  aiExtensionCall(id:string,action:string,input?:unknown):Promise<unknown>;
   aiProviderDelete(id: string): Promise<void>;
   aiPermissionSave(permission: AiPermission): Promise<void>;
   aiThreadCreate(

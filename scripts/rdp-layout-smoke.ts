@@ -27,10 +27,10 @@ try {
     .getByRole('button', { name: 'Windows 远程桌面', exact: true })
     .waitFor({ timeout: 1000 });
   const styles = [];
-  for (const name of ['SSH 终端', 'cagent', 'Windows 远程桌面', 'HTTP 请求']) {
+  for (const name of ['SSH 终端', 'CAgent', 'Windows 远程桌面', 'HTTP 请求']) {
     await page.getByRole('button', { name, exact: true }).click();
     const entry = page.locator('.connection-detail:visible');
-    if(name==='cagent'){
+    if(name==='CAgent'){
       const password=entry.getByLabel('连接密码',{exact:true});
       await password.fill('123456');assert.equal(await password.evaluate((el:HTMLInputElement)=>el.checkValidity()),true);
       await password.fill('1');assert.equal(await password.evaluate((el:HTMLInputElement)=>el.checkValidity()),true);

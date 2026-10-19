@@ -1,4 +1,5 @@
 import { usePermissionNavigation } from '../permission-navigation';
+import {AiExtensionModelSelect} from './AiExtensionModelSelect';
 import { AiPermissionTree } from './AiPermissionTree';
 import { AiGoals } from './AiWork';
 import { AiEventSubscriptions } from './AiEventSubscriptions';
@@ -94,7 +95,7 @@ export function AiPanel({
   const [historySearch, setHistorySearch] = useState('');
   const [error, setError] = useState(''),
     [busy, setBusy] = useState(false);
-  const [editing, setEditing] = useState<Pick<AiProvider, 'id' | 'name' | 'url' | 'model'> | null>(
+  const [editing, setEditing] = useState<Pick<AiProvider, 'id' | 'name' | 'url' | 'model' | 'extension' | 'runBudget'> | null>(
     null,
   );
   const [key, setKey] = useState(''),
@@ -496,7 +497,7 @@ export function AiPanel({
               >
                 <strong>{p.name}</strong>
                 <small>
-                  {p.model} · {p.hasKey ? '已保存 Key' : '无 Key'}
+                  {p.model} · {p.extension ? '由扩展提供' : p.hasKey ? '已保存 Key' : '无 Key'}
                 </small>
               </button>
               <button
@@ -551,6 +552,8 @@ export function AiPanel({
                       name: editing.name,
                       url: editing.url,
                       model: editing.model,
+                      ...(editing.runBudget?{runBudget:editing.runBudget}:{}),
+                      ...(editing.extension?{extension:editing.extension}:{}),
                     },
                     keyChanged ? key : undefined,
                   );
@@ -574,6 +577,7 @@ export function AiPanel({
                     onChange={(e) => setEditing({ ...editing, name: e.target.value })}
                   />
                 </label>
+                {editing.extension ? <AiExtensionModelSelect extension={editing.extension} onChange={(ref,model)=>setEditing({...editing,model,extension:{...editing.extension!,model:ref}})}/> : <>
                 <label>
                   API URL
                   <input
@@ -607,6 +611,8 @@ export function AiPanel({
                     }}
                   />
                 </label>
+                </>}
+                <details><summary>持续执行预算</summary><small>按时间、累计上下文字节和重复无进展停止；字节预算不是计费金额。</small>{(['minutes','contextBytes','noProgress'] as const).map((field,i)=><label key={field}>{['每轮最多分钟','累计上下文预算（字节）','相同结果停止次数'][i]}<input type="number" min={[1,10000,2][i]} max={[240,20000000,20][i]} value={(editing.runBudget??{minutes:30,contextBytes:2000000,noProgress:5})[field]} onChange={e=>setEditing({...editing,runBudget:{minutes:30,contextBytes:2000000,noProgress:5,...editing.runBudget,[field]:Number(e.target.value)}})}/></label>)}</details>
                 <div className="ai-form-actions">
                   <button
                     type="button"
@@ -618,7 +624,7 @@ export function AiPanel({
                       try {
                         const { id, name, url, model } = editing;
                         const result = await window.cshell.aiProviderTest(
-                          { id, name, url, model },
+                          { id, name, url, model, ...(editing.extension?{extension:editing.extension}:{}) },
                           keyChanged ? key : undefined,
                         );
                         setTestResult({

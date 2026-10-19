@@ -2,6 +2,7 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import './style.css';
+import {MobileDesktop} from './desktop';
 
 declare global {
   interface Window {
@@ -9,6 +10,9 @@ declare global {
       fileRequest(data: string): void;
       connect(data: string): void;
       openAgent(id: string, index: number): void;
+      desktopOpen(id:string,options:string):void;
+      desktopClose(id:string):void;
+      desktopCommand(id:string,command:string):void;
       agentSupported(): boolean;
       resetAgentTrust(host: string, port: number): void;
       input(id: string, data: string): void;
@@ -29,6 +33,8 @@ declare global {
   }
 }
 const $ = (id: string) => document.getElementById(id)!;
+const desktop=new MobileDesktop(window.CShellNative);
+const desktopStatus=new Map<string,{packageReady?:boolean;viewAllowed?:boolean;controlAllowed?:boolean;inputFeatures?:string[]}>();
 const icons: Record<string, string> = {
   home: '<path d="m3 10 9-7 9 7v10H3Z M9 20v-7h6v7"/>',
   folder: '<path d="M3 7V4h6l3 3h9v13H3Z"/>',
@@ -54,8 +60,7 @@ function icon(el: HTMLElement, name: string) {
   el.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + icons[name] + '</svg>';
 }
 document.querySelectorAll<HTMLElement>('[data-icon]').forEach((el) => icon(el, el.dataset.icon!));
-document.querySelector('.brand-mark')!.innerHTML =
-  '<svg viewBox="0 0 64 64" aria-hidden="true"><path d="M43 19H31a13 13 0 0 0 0 26h12" fill="none" stroke="currentColor" stroke-width="6"/><path d="M37 32h12" stroke="#72a8ff" stroke-width="6"/></svg>';
+document.querySelector('.brand-mark')!.innerHTML = '<img src="icon.png" alt="" width="32" height="32">';
 const form = $('connect') as HTMLFormElement;
 const field = (name: string) => form.elements.namedItem(name) as HTMLInputElement;
 type Profile = {
@@ -447,6 +452,7 @@ $('auth-key').onclick = () => setAuth('key');
 for (const id of ['new', 'empty-new', 'session-new', 'home-new']) $(id).onclick = () => openForm();
 $('back').onclick = () => navigate('home');
 window.mobileBack = () => {
+  if(desktop.visible){desktop.close();return true;}
   if (document.body.classList.contains('minimal')) {
     document.body.classList.remove('minimal');
     resize();
@@ -567,6 +573,11 @@ form.onsubmit = (e) => {
   window.CShellNative.connect(JSON.stringify({ ...p, ...credentials, id, port: Number(p.port) }));
 };
 window.receive = (id, type, value) => {
+  if(type.startsWith('desktop-')){
+    if(type==='desktop-status')try{desktopStatus.set(id,JSON.parse(value));}catch{}
+    else desktop.event(id,type,value);
+    return;
+  }
   const s = sessions.get(id);
   if (!s) return;
   if (type === 'environments') {
@@ -593,10 +604,13 @@ window.receive = (id, type, value) => {
       const picker = document.createElement('section');
       picker.className = 'agent-environments';
       const title = document.createElement('h2');
-      title.textContent = '选择终端环境';
+      title.textContent = 'CAgent 机器';
       const target = document.createElement('p');
       target.textContent = s.profile.name + ' · ' + s.profile.host;
       picker.append(title, target);
+      const status=desktopStatus.get(id);
+      if(status?.packageReady&&status.viewAllowed){const b=document.createElement('button');b.textContent='远程桌面';b.onclick=()=>desktop.open(id,status);picker.append(b);
+        const shortcut=document.createElement('button');shortcut.className='agent-desktop-shortcut';shortcut.textContent='远程桌面';shortcut.onclick=()=>desktop.open(id,status);s.element.append(shortcut);}
       choices.forEach((choice, index) => {
         const button = document.createElement('button');
         button.textContent = choice.distribution ? choice.distribution + ' · WSL' : choice.label;
@@ -609,7 +623,7 @@ window.receive = (id, type, value) => {
         picker.append(button);
       });
       s.element.append(picker);
-      s.state = '选择终端环境';
+      s.state = '已连接 CAgent';
     } catch {
       s.state = '环境列表无效';
       window.CShellNative.disconnect(id);
@@ -630,6 +644,7 @@ window.receive = (id, type, value) => {
     if (active === id) resize();
   }
   if (type === 'closed' || type === 'error') {
+    desktop.event(id,'desktop-closed',type==='error'?value:'机器连接已断开');desktopStatus.delete(id);
     s.state = '已断开';
     s.element.querySelector('.agent-environments')?.remove();
     if (type === 'error') s.terminal.writeln('\r\n' + value.replace(/[\x00-\x1f\x7f]/g, ' '));

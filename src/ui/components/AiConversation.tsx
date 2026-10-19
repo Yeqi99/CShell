@@ -211,6 +211,7 @@ export function AiConversation({
               </footer>
             </section>
           )}
+          {thread?.checkpoint && <details className="agent-checkpoint"><summary>任务检查点 · {thread.checkpoint.phase}</summary>{thread.checkpoint.memory&&<><p>{thread.checkpoint.memory.objective}</p><p>待完成：{thread.checkpoint.memory.remaining.join('；')||'未记录'}</p><p>验证：{thread.checkpoint.memory.verification.join('；')||'尚未记录验收证据'}</p></>}{thread.checkpoint.pending&&<p>结果待核查：{thread.checkpoint.pending.tool}。继续前检查实际状态，勿直接重跑。</p>}<small>{new Date(thread.checkpoint.updatedAt).toLocaleString()}</small></details>}
           {thread?.error && (
             <p className="form-error" role="alert">
               {thread.error}

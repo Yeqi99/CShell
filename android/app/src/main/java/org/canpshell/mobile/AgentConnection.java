@@ -28,6 +28,19 @@ final class AgentConnection implements AutoCloseable {
   private volatile SSLSocket socket;
   private JSONArray environments = new JSONArray();
   private volatile boolean opened;
+  private volatile DesktopTransport desktop;
+  private String deviceId;
+  Object manage(String method, Object params)throws Exception { return requestValue("manage",new JSONObject().put("method",method).put("params",params)); }
+  void desktop(JSONObject quality,boolean control)throws Exception {
+    JSONObject ticket=(JSONObject)manage("desktop.open",new JSONObject().put("quality",quality).put("control",control).put("transport","management").put("mediaTransport","tcp"));
+    if(!deviceId.equals(ticket.getString("hostIdentity"))||ticket.getLong("expiresAt")<=System.currentTimeMillis())throw new IOException("桌面身份或票据无效");
+    desktop=new DesktopTransport(ticket,events);
+    socket.setSoTimeout(15000);
+    heartbeat.shutdownNow();
+    requestValue("desktop-stream",null);
+  }
+  void desktopCommand(String json)throws Exception { DesktopTransport d=desktop;if(d!=null)d.command(new JSONObject(json)); }
+  void queueDesktopCommand(String json){execute(()->desktopCommand(json));}
   private final Object outputLock = new Object();
   private final List<String> earlyOutput = new ArrayList<>();
   private int earlySize;
@@ -57,6 +70,7 @@ final class AgentConnection implements AutoCloseable {
     if(!password.isEmpty())credentials.put("password",password);
     JSONObject auth=request("auth",credentials);
     if(auth.getInt("protocol")!=1||!info.getString("deviceId").equals(auth.getString("deviceId")))throw new IOException("Agent 身份不匹配");
+    deviceId=info.getString("deviceId");
     JSONArray allowed=auth.getJSONArray("shells");
     try {
       Object result=requestValue("manage",new JSONObject().put("method","agent.shells"));
@@ -73,7 +87,7 @@ final class AgentConnection implements AutoCloseable {
         String shell=allowed.getString(i);if(Arrays.asList("cmd","powershell","bash","zsh","sh").contains(shell))environments.put(new JSONObject().put("shell",shell).put("label",shell));
       }
     }
-    if(environments.length()==0)throw new IOException("此 Agent 没有可用且已授权的终端环境");
+    try { events.emit("desktop-status",manage("desktop.status",new JSONObject()).toString()); } catch(AgentDenied unavailable) { events.emit("desktop-status","{}"); }
     heartbeat.scheduleAtFixedRate(()->{try{request("ping",null);}catch(Exception e){fail(e);}},15,15,TimeUnit.SECONDS);
     events.emit("environments",environments.toString());
   }
@@ -148,7 +162,9 @@ final class AgentConnection implements AutoCloseable {
         String event=message.getString("event");if(event.equals("closed"))break;
         if(!event.equals("data"))throw new IOException("Invalid Agent event");String data=message.getString("data");if(data.length()>65536)throw new IOException("Agent terminal frame exceeds limit");
         synchronized(outputLock) { if(opened)emitData(data);else { earlySize+=data.length();if(earlySize>500000)throw new IOException("Agent early output limit");earlyOutput.add(data); } }
-      }else{CompletableFuture<JSONObject> future=pending.get(message.getString("id"));if(future!=null)future.complete(message);else {ScheduledFuture<?> timer=commands.remove(message.getString("id"));if(timer!=null){timer.cancel(false);if(message.has("error"))throw new IOException(message.optString("error"));} acknowledgementReplied(message.getString("id"));}}
+      }else{CompletableFuture<JSONObject> future=pending.get(message.getString("id"));if(future!=null)future.complete(message);else {ScheduledFuture<?> timer=commands.remove(message.getString("id"));if(timer!=null){timer.cancel(false);if(message.has("error"))throw new IOException(message.optString("error"));} acknowledgementReplied(message.getString("id"));}
+        if(desktop!=null && message.optJSONObject("result")!=null && message.getJSONObject("result").optBoolean("desktopStream")){desktop.run(in,socket.getOutputStream());return;}
+      }
     }
   }catch(Exception e){if(!closed.get())events.emit("error",e.getMessage()==null?"Agent 连接失败":e.getMessage());}finally{close();}}
   private void emitData(String data)throws Exception {

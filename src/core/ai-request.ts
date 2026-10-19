@@ -7,6 +7,7 @@ export async function requestAiReply(
   signal: AbortSignal,
   onContent: (content: string) => void,
   limits = { idleMs: 180_000, totalMs: 600_000 },
+  transport:typeof fetch=fetch,
 ) {
   const controller = new AbortController();
   const combined = AbortSignal.any([signal, controller.signal]);
@@ -24,7 +25,7 @@ export async function requestAiReply(
     idle = setTimeout(() => timeout(false), limits.idleMs);
   };
   try {
-    const response = await fetch(url, { ...init, signal: combined });
+    const response = await transport(url, { ...init, signal: combined });
     if (!response.ok) {
       await response.body?.cancel();
       throw new Error(`AI API HTTP ${response.status}`);

@@ -98,6 +98,14 @@ export class ConnectionRegistry {
       return false;
     }
   }
+  agent(id:string){
+    const connection=this.connection(id);
+    if(!connection.agent)throw new Error('此连接没有 CAgent 管理能力');
+    return (call:import('../../shared/agent').AgentCall,signal:AbortSignal)=>{
+      if(this.connection(id)!==connection)throw new Error('CAgent 连接已改变');
+      return connection.agent!(call,signal);
+    };
+  }
   http(id: string) {
     const connection = this.connection(id);
     if (!connection.http) throw new Error('此发送方不支持 HTTP');

@@ -73,8 +73,8 @@ export function ConnectionEntry({
     },
     {
       id: 'client' as const,
-      title: 'cagent',
-      description: cn ? '连接运行独立 Agent 的电脑' : 'Access a computer running cagent',
+      title: 'CAgent',
+      description: cn ? '连接运行独立 Agent 的电脑' : 'Access a computer running CAgent',
       icon: ShieldCheck,
     },
   ];

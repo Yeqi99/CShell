@@ -2,12 +2,12 @@ import { z } from 'zod';
 import { extractedConnectionSchema } from '../shared/connection-extraction';
 
 export async function extractConnection(
-  provider: { url: string; model: string; key: string },
+  provider: { url: string; model: string; key: string; transport?:typeof fetch },
   text: string,
 ) {
   const input = z.string().trim().min(1).max(24000).parse(text);
   const base = provider.url.replace(/\/+$/, '');
-  const response = await fetch(
+  const response = await (provider.transport??fetch)(
     base + (base.endsWith('/chat/completions') ? '' : '/chat/completions'),
     {
       method: 'POST',

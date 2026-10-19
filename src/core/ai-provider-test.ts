@@ -2,14 +2,14 @@ import { readAiResponse } from './ai-response';
 
 /** A real, isolated completion probe. No conversation, tools, or user context is sent. */
 export async function testAiProvider(
-  p: { url: string; model: string; key: string },
+  p: { url: string; model: string; key: string; transport?:typeof fetch },
   signal?: AbortSignal,
 ) {
   const started = Date.now();
   let firstTokenMs: number | null = null;
   const base = p.url.replace(/\/+$/, '');
   try {
-    const response = await fetch(
+    const response = await (p.transport??fetch)(
       base + (base.endsWith('/chat/completions') ? '' : '/chat/completions'),
       {
         method: 'POST',

@@ -76,14 +76,14 @@ async function main() {
       await runtime.startControl();
     }
     try{app=await startCagentApp();if(command!=='app'){stdout.write(JSON.stringify({url:app.url})+'\n');stdin.resume();stdin.on('end',()=>{void app?.close();});}else await openCagentApp(app.url);}catch(error){await app?.close();await runtime?.close();throw error;}
-    stderr.write('cagent 本机界面已就绪；使用 cagent shutdown 退出运行时。\n');
+    stderr.write('CAgent 本机界面已就绪；使用 cagent shutdown 退出运行时。\n');
     const stop=()=>{void app?.close().then(()=>runtime?.close());};
     process.once('SIGINT',stop);process.once('SIGTERM',stop);
     return;
   }
   if (command === 'help' || command === '--help') {
     stdout.write(
-      `cagent (Canp Agent)\n\napp        打开独立本机智能体界面（系统浏览器）\ninit       本机初始配置（交互输入密码；不启动远程监听）\nrun        前台运行后台服务，允许当前用户的 CShell 管理\nstatus     查看状态\nstart      从标准输入读取 {"bind":"127.0.0.1","port":24443} 并开启监听\nstop       关闭远程监听和已连接会话\nlogs       查看审计日志\nshutdown   退出 Agent 进程\nshells     检测本机 Shell 与 WSL\ncall METHOD  从标准输入读取参数并执行本机管理操作\nrecover    显示本机恢复方法（不删除身份、凭据或授权）\n\n数据目录：${agentDirectory()}\n`,
+      `CAgent (Canp Agent)\n\napp        打开独立本机智能体界面（Windows 原生窗口；其他系统使用浏览器）\ninit       本机初始配置（交互输入密码；不启动远程监听）\nrun        前台运行后台服务，允许当前用户的 CShell 管理\nstatus     查看状态\nstart      从标准输入读取 {"bind":"127.0.0.1","port":24443} 并开启监听\nstop       关闭远程监听和已连接会话\nlogs       查看审计日志\nshutdown   退出 Agent 进程\nshells     检测本机 Shell 与 WSL\ncall METHOD  从标准输入读取参数并执行本机管理操作\nrecover    显示本机恢复方法（不删除身份、凭据或授权）\n\n数据目录：${agentDirectory()}\n`,
     );
     return;
   }
@@ -152,7 +152,7 @@ async function main() {
       await runtime.close();
       throw error;
     }
-    stderr.write('cagent 已运行；远程监听保持关闭，由本机配置明确启动。\n');
+    stderr.write('CAgent 已运行；远程监听保持关闭，由本机配置明确启动。\n');
     const stop = () => {
       void runtime.close().catch((error) => {
         stderr.write(String(error) + '\n');

@@ -14,7 +14,7 @@ export const clientExecSchema = z
     shell: clientShellSchema,
     distribution: z.string().min(1).max(100).optional(),
     command: z.string().min(1).max(32768),
-    timeoutMs: z.number().int().min(1).max(60000).default(30000),
+    timeoutMs: z.number().int().min(1).max(86400000).default(30000),
   })
   .strict();
 export const clientEndpointSchema = z

@@ -124,6 +124,7 @@ const bridge: Bridge = {
   aiExtractConnection: (text, providerId) =>
     ipcRenderer.invoke('ai:extract-connection', text, providerId),
   aiProviderSave: (p, key) => ipcRenderer.invoke('ai:provider-save', p, key),
+  aiExtensionCall:(id,action,input)=>ipcRenderer.invoke('ai:extension-call',id,action,input),
   aiProviderDelete: (id) => ipcRenderer.invoke('ai:provider-delete', id),
   onAiConnection: (listener) => {
     const handler = (

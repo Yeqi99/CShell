@@ -270,7 +270,7 @@ test('agent enforces target/capability, review, revocation, stop and encrypted p
     const thread = await ai.create('terminal', provider.id, 'review', sessionId);
     await ai.send(thread.id, 'show directory');
     await until(() => ai.snapshot().threads[0].state === 'approval');
-    assert.deepEqual(requests[0].tools.map((t: any) => t.function.name), ['get_permission_link', 'execute_command']);
+    assert.deepEqual(requests[0].tools.map((t: any) => t.function.name), ['task_start', 'task_wait', 'task_stop', 'task_list', 'task_log_read', 'task_checkpoint', 'get_permission_link', 'execute_command']);
     await ai.permission({ ...permission, capabilities: [] });
     ai.approve(thread.id, ai.snapshot().threads[0].pending!.id, true);
     await until(() => ai.snapshot().threads[0].state === 'idle');
@@ -525,7 +525,7 @@ test('CShell inventory tools work without a bound machine, obey global grants an
     await until(() => ai.snapshot().threads[0].state === 'idle');
     assert.deepEqual(
       requests[0].tools.map((t: any) => t.function.name),
-      ['get_permission_link', 'list_machines', 'list_sessions'],
+      ['task_log_read', 'task_checkpoint', 'get_permission_link', 'list_machines', 'list_sessions'],
     );
     const result = JSON.parse(
       ai

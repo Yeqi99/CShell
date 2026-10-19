@@ -42,7 +42,7 @@ Android 10+ 可直接连接独立 CShell Agent，不依赖 SSH。Android 8/9 仍
 - 首次连接核对 Agent 的 SHA-256 证书指纹后才发送密码；后续证书变化拒绝连接。控制端 EC 私钥由 AndroidKeyStore 生成且不可导出，不把密码或私钥保存到网页、配置或日志。
 - 认证后读取真实 `agent.shells`，在所属会话选择 CMD、PowerShell、Linux Shell 或具体 WSL 发行版；旧版 Agent 无环境查询接口时仅使用已授权的非 WSL Shell，不猜测发行版。
 - 已授权并保存的 Agent 可从列表直接重新连接。撤权、退出、取消和网络断开会释放通道；端到端保持 TLS 1.3 客户端证书认证。终端输入使用有界异步队列，输出按渲染完成发送字符确认。
-- Agent 当前只在移动端提供已实现的终端能力；不会把它列入 SSH 文件会话，不伪装支持文件浏览、远程配置或环境安装。桌面端管理能力不自动等同于 Android 已实现。
+- 0.6.34 增加 Windows CAgent 远程桌面观看和触摸键鼠控制，详见 [移动远控与 WSL](../docs/MOBILE-DESKTOP-AND-WSL.md)。移动端其余管理功能尚未对齐；不会把它列入 SSH 文件会话，不伪装支持文件浏览、远程配置或环境安装。桌面端管理能力不自动等同于 Android 已实现。
 
 验证入口：`pnpm exec node scripts/build-android.mjs`、`pnpm exec tsc -p android/web/tsconfig.json --noEmit`、`pnpm exec tsx scripts/mobile-smoke.ts`，以及 Gradle `assembleDebug assembleDebugAndroidTest lint`。移动网页回归使用模拟桥，不能替代原生协议测试。
 

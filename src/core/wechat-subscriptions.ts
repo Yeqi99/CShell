@@ -56,8 +56,8 @@ export class WechatSubscriptions {
       await mkdir(this.directory(id),{recursive:true});
       const entry:Subscription={id,targets,binding,state:'starting',created:Date.now()};
       this.entries.push(entry);await this.save();
-      const env:NodeJS.ProcessEnv={...process.env,PYTHONIOENCODING:'utf-8'};delete env.PYTHONPATH;delete env.PYTHONHOME;
-      const child=this.spawnChild(this.python,['-m','cshell_wechat.subscription'],{windowsHide:true,stdio:['pipe','pipe','pipe'],env});
+      const env:NodeJS.ProcessEnv={...process.env,PYTHONIOENCODING:'utf-8',PYTHONDONTWRITEBYTECODE:'1'};delete env.PYTHONPATH;delete env.PYTHONHOME;
+      const child=this.spawnChild(this.python,['-B','-m','cshell_wechat.subscription'],{windowsHide:true,stdio:['pipe','pipe','pipe'],env});
       let settleReady:(x:Subscription)=>void,failReady:(e:Error)=>void;
       const ready=new Promise<Subscription>((resolve,reject)=>{settleReady=resolve;failReady=reject;});
       let finish!:()=>void;

@@ -132,6 +132,12 @@ struct NativeInput {
  }
  void inject(const json&e){
   checkDesktop();INPUT value{};const auto kind=e.at("kind").get<std::string>();
+  if(kind=="text"){
+   auto text=e.at("text").get<std::string>();int length=MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,text.data(),(int)text.size(),nullptr,0);
+   if(length<=0||length>512)throw std::runtime_error("INPUT_INVALID_TEXT");std::wstring wide(length,L'\0');MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,text.data(),(int)text.size(),wide.data(),length);
+   std::vector<INPUT> inputs;inputs.reserve(length*2);for(wchar_t unit:wide){INPUT down{};down.type=INPUT_KEYBOARD;down.ki.wScan=unit;down.ki.dwFlags=KEYEVENTF_UNICODE;inputs.push_back(down);down.ki.dwFlags|=KEYEVENTF_KEYUP;inputs.push_back(down);}
+   if(SendInput((UINT)inputs.size(),inputs.data(),sizeof(INPUT))!=inputs.size())throw std::runtime_error("INPUT_TEXT_FAILED");return;
+  }
   if(kind=="key"){
    auto code=e.at("code").get<unsigned>();value.type=INPUT_KEYBOARD;value.ki.wScan=(WORD)(code&0xff);
    value.ki.dwFlags=KEYEVENTF_SCANCODE|((code&0x100)?KEYEVENTF_EXTENDEDKEY:0)|(e.at("down").get<bool>()?0:KEYEVENTF_KEYUP);

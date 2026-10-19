@@ -2,6 +2,7 @@ import { z } from 'zod';
 const callSchema = z.object({
   id: z.string().max(200),
   type: z.literal('function'),
+  providerData:z.string().max(32000).optional(),
   function: z.object({ name: z.string().max(80), arguments: z.string().max(32000) }),
 });
 const replySchema = z.object({
@@ -66,6 +67,7 @@ export async function readAiResponse(response: Response, onContent: (content: st
         };
         if (part.id) c.id += part.id;
         if (part.type) c.type = part.type;
+        if(typeof part.providerData==='string')c.providerData=part.providerData;
         if (part.function?.name) c.function.name += part.function.name;
         if (part.function?.arguments) c.function.arguments += part.function.arguments;
         calls.set(part.index, c);

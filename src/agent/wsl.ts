@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { ClientVault } from '../core/client/identity';
 import { detectAgentShells } from '../core/agent-terminal';
+import {wslGuidance,wslInstallArgs} from './wsl-diagnostics';
 
 const exec = promisify(execFile);
 const distributionSchema = z
@@ -27,6 +28,8 @@ const stateSchema = z.object({
   ]),
   logs: z.string(),
   code: z.number().optional(),
+  operation:z.enum(['install','update']).default('install'),
+  elevated:z.boolean().default(false),
 });
 type Installation = z.infer<typeof stateSchema>;
 const decode = (buffer: Buffer) =>
@@ -73,6 +76,7 @@ export class AgentWslService {
         })
       ).stdout,
     );
+    let help='';try{help=decode((await exec(executable(),['--help'],{encoding:'buffer',windowsHide:true,timeout:10000,maxBuffer:262144})).stdout);}catch{}
     let online: string[] = [],
       onlineError: string | undefined;
     try {
@@ -100,21 +104,27 @@ export class AgentWslService {
         .map((s) => s.distribution!),
       online,
       onlineError,
+      webDownloadSupported:help.includes('--web-download'),
+      updateSupported:help.includes('--update'),
+      guidance:wslGuidance(this.installation?.logs??''),
       installation: this.installation,
     };
   }
   async plan(input: unknown) {
     requireWindows();
     if (this.process) throw new Error('WSL 安装正在运行');
-    const { distribution } = z.object({ distribution: distributionSchema }).strict().parse(input);
+    const { distribution,webDownload,operation } = z.object({ distribution: distributionSchema,webDownload:z.boolean().default(false),operation:z.enum(['install','update']).default('install') }).strict().parse(input);
     const check = await this.check();
-    if (!check.online.includes(distribution)) throw new Error('请选择系统真实返回的可安装发行版');
-    if (check.distributions.includes(distribution)) throw new Error('发行版已安装，无需覆盖');
-    if (!check.virtualization) throw new Error('固件虚拟化未启用，请先在本机 BIOS/UEFI 中启用');
+    if(operation==='install'){
+      if (!check.online.includes(distribution)) throw new Error('请选择系统真实返回的可安装发行版；网络异常时先恢复下载连接');
+      if (check.distributions.includes(distribution)) throw new Error('发行版已安装，无需覆盖');
+      if (!check.virtualization) throw new Error('虚拟化未启用，请检查 BIOS/UEFI；云服务器需要开放嵌套虚拟化');
+    }else if(!check.updateSupported)throw new Error('当前系统 WSL 不支持在线更新，请更新 Windows 或使用微软 WSL 安装程序');
+    if(webDownload&&!check.webDownloadSupported)throw new Error('此 WSL 版本不支持直接下载，请使用默认下载方式');
     this.installation = {
       id: randomUUID(),
       distribution,
-      args: ['--install', '--distribution', distribution, '--no-launch'],
+      args: wslInstallArgs(distribution,webDownload,operation==='update'),operation,elevated:false,
       state: 'planned',
       logs: '目标：当前 Windows Agent。可能需要管理员权限及重启；不会自动提权或重启。',
     };
@@ -128,17 +138,22 @@ export class AgentWslService {
   }
   async install(input: unknown) {
     requireWindows();
-    const { planId } = z
-      .object({ planId: z.string().uuid(), confirm: z.literal(true) })
+    const { planId,elevate } = z
+      .object({ planId: z.string().uuid(), confirm: z.literal(true),elevate:z.boolean().default(false) })
       .strict()
       .parse(input);
     const state = this.installation;
     if (!state || state.id !== planId || this.process || state.state === 'completed')
       throw new Error('安装计划已失效或正在执行');
     state.state = 'running';
+    state.elevated=elevate;
     state.logs += '\n开始执行系统 WSL 安装。';
     await this.persist();
-    const child = spawn(executable(), state.args, {
+    // The user explicitly chooses elevation. The fixed validated argument list
+    // is encoded, never interpolated from free-form shell text. No reboot flag.
+    const encodedArgs=Buffer.from(JSON.stringify(state.args)).toString('base64');
+    const elevation=`$ErrorActionPreference='Stop';try{$a=ConvertFrom-Json ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${encodedArgs}')));$p=Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\\wsl.exe') -ArgumentList $a -WindowStyle Hidden -Verb RunAs -Wait -PassThru;exit $p.ExitCode}catch{Write-Output $_.Exception.Message;exit 1}`;
+    const child = spawn(elevate?'powershell.exe':executable(), elevate?['-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(elevation,'utf16le').toString('base64')]:state.args, {
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -154,11 +169,16 @@ export class AgentWslService {
       this.process = undefined;
       void this.persist();
     });
-    child.once('exit', (code) => {
-      if (state.state !== 'cancelled')
+    child.once('close', async (code) => {
+      if (state.state !== 'cancelled'){
         state.state = code === 3010 ? 'restart-required' : code === 0 ? 'completed' : 'failed';
+        if(code===0&&state.operation==='install'){
+          const present=await detectAgentShells().then(shells=>shells.some(s=>s.distribution===state.distribution)).catch(()=>false);
+          if(!present){state.state='restart-required';state.logs+='\n尚未检测到可用发行版；系统组件可能等待重启。请按 Windows 提示重启后重新检查并继续安装。';}
+        }
+      }
       state.code = code ?? -1;
-      this.process = undefined;
+      if(this.process===child)this.process = undefined;
       void this.persist();
     });
     return this.status();
@@ -168,10 +188,10 @@ export class AgentWslService {
   }
   async cancel() {
     if (this.process && this.installation) {
+      if(this.installation.elevated)throw new Error('管理员安装由 Windows 执行，普通进程无法安全取消；请等待安装完成，不会自动重启');
       this.installation.state = 'cancelled';
       this.installation.logs += '\n用户取消；系统组件可能已部分安装，请重新检查。';
       this.process.kill();
-      this.process = undefined;
       await this.persist();
     }
     return this.status();
@@ -256,6 +276,7 @@ export class AgentWslService {
     }
   }
   async dispose() {
+    if(this.process&&this.installation?.elevated){this.installation.state='interrupted';this.installation.logs+='\nCAgent 已退出，管理员安装可能仍在运行；重新打开后先检查系统状态，不要重复安装。';await this.persist();this.process.kill();return;}
     await this.cancel();
   }
 }

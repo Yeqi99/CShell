@@ -10,3 +10,6 @@ await build({
   target: 'chrome90',
 });
 await copyFile('android/web/index.html', `${directory}/index.html`);
+
+await copyFile('assets/icon.png', `${directory}/icon.png`);
+await copyFile('assets/icon.png', 'android/app/src/main/res/drawable/icon.png');

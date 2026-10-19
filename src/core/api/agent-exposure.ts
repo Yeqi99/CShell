@@ -7,6 +7,9 @@ import type { AgentCall } from '../../shared/agent';
  * the catalog coverage test rejects newly added, unclassified RPC methods.
  */
 export const agentApiExcludedMethods = {
+  'wechat.status': 'Target WeChat configuration is available in authenticated machine settings.',
+  'wechat.configure': 'Account binding and grants are explicit machine administration actions.',
+  'wechat.stop': 'Listener management belongs to the target capability interface.',
   'files.roots': 'Machine file operations use the dedicated authenticated file interface, not generic API management.',
   'files.list': 'Machine file operations require a dedicated file capability and target authorization contract.',
   'files.read': 'File contents must not be exposed through a generic agent.manage capability.',

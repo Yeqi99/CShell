@@ -19,6 +19,7 @@ public final class AgentProtocolTest extends Instrumentation {
   private Bundle arguments;
   @Override public void onCreate(Bundle arguments) { super.onCreate(arguments); this.arguments=arguments; start(); }
   @Override public void onStart() {
+    if(arguments.getBoolean("desktopMode",false)||"true".equals(arguments.getString("desktopMode"))){desktopTest();return;}
     String[] tests={"testRejectIdentityBeforeSendingSecret","testCancelBeforeConnect","testPinnedNativePtyReconnectAndRevocation"};
     int failures=0;StringBuilder report=new StringBuilder();
     try {setUp();awaitFixtureNetwork(report);}
@@ -33,6 +34,21 @@ public final class AgentProtocolTest extends Instrumentation {
       catch(Throwable error){failures++;Throwable cause=error.getCause()==null?error:error.getCause();StringWriter text=new StringWriter();cause.printStackTrace(new PrintWriter(text));status.putString("stack",text.toString());sendStatus(-2,status);report.append(text).append("\n");}
     }
     Bundle result=new Bundle();result.putString("stream",report + (failures==0?"OK (3 tests)":"FAILURES!!! Tests run: 3, Failures: "+failures));finish(Activity.RESULT_OK,result);
+  }
+  private void desktopTest(){
+    Bundle result=new Bundle();
+    try{setUp();awaitFixtureNetwork(new StringBuilder());
+      for(int attempt=0;attempt<2;attempt++){
+        CountDownLatch frames=new CountDownLatch(3);AtomicReference<Throwable> failure=new AtomicReference<>();final AgentConnection[] c=new AgentConnection[1];
+        c[0]=new AgentConnection((type,value)->{try{
+          if(type.equals("desktop-frame")){org.json.JSONObject f=new org.json.JSONObject(value);byte[] bytes=Base64.decode(f.getString("data"),Base64.DEFAULT);assertTrue(bytes.length==100000);for(byte b:bytes)assertTrue(b==73);c[0].queueDesktopCommand(new org.json.JSONObject().put("op","ack").put("id",f.getString("id")).toString());c[0].queueDesktopCommand("{\"op\":\"input\",\"value\":{\"kind\":\"move\",\"x\":0.5,\"y\":0.5}}");frames.countDown();}
+          if(type.equals("error")){failure.set(new Exception(value));while(frames.getCount()>0)frames.countDown();}
+        }catch(Throwable e){failure.set(e);while(frames.getCount()>0)frames.countDown();}});
+        try{c[0].connect(host,port,attempt==0?password:"",this::pin);c[0].desktop(new org.json.JSONObject("{\"fps\":30,\"bitrate\":2000000,\"adaptive\":true,\"display\":0}"),true);assertTrue("Timed out waiting for encrypted frames",frames.await(20,TimeUnit.SECONDS));if(failure.get()!=null)throw new Exception(failure.get());Thread.sleep(200);}finally{c[0].close();}
+      }
+      result.putString("stream","OK (desktop TLS, crypto, 6 fragmented frames, ACK, input, identity reconnect)");
+    }catch(Throwable error){StringWriter detail=new StringWriter();error.printStackTrace(new PrintWriter(detail));result.putString("stream","FAILURES!!!\n"+detail);}
+    finish(Activity.RESULT_OK,result);
   }
   private static void assertTrue(boolean condition){assertTrue("Expected true",condition);}
   private static void assertTrue(String message,boolean condition){if(!condition)throw new AssertionError(message);}

@@ -1,4 +1,5 @@
-import {Monitor,Package} from 'lucide-react';
+import {WechatPlugin} from './WechatPlugin';
+import {Monitor,Package,MessageCircle} from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { z } from 'zod';
 import type { AgentCall, AgentTarget } from '../../shared/agent';
@@ -56,6 +57,9 @@ const states = {
   fault: '故障',
 };
 const permissionNames: Record<string, string> = {
+  'wechat.read': '读取微信与监听消息',
+  'wechat.send': '发送微信与发布朋友圈',
+  'wechat.contacts.manage': '修改好友备注',
   'applications.read': '读取系统应用目录',
   'applications.plan': '检查并生成安装计划',
   'applications.install': '按计划安装系统应用',
@@ -148,7 +152,7 @@ export function AgentCapabilityMarket({ target, call }: { target: AgentTarget; c
                     setError('');
                   }}
                 >
-                  <span className="capability-app-icon">{p.id==='cagent.desktop'?<Monitor size={23}/>:<Package size={23}/>}</span><strong>{p.name}</strong>
+                  <span className="capability-app-icon">{p.id==='cagent.desktop'?<Monitor size={23}/>:p.id==='cagent.wechat'?<MessageCircle size={23}/>:<Package size={23}/>}</span><strong>{p.name}</strong>
                   <small>
                     {p.version} · {p.installed&&p.status==='not-installed'?'需要修复':states[p.status]}
                   </small>
@@ -165,14 +169,14 @@ export function AgentCapabilityMarket({ target, call }: { target: AgentTarget; c
           <h3>{item.name}</h3>
           <p>{item.description}</p>
           <small>
-            {item.version} · {item.source === 'bundled' ? '随 cagent 提供' : 'GitHub'} ·{' '}
+            {item.version} · {item.source === 'bundled' ? '随 CAgent 提供' : 'GitHub'} ·{' '}
             {record&&record.status==='not-installed'?'已安装 · 需要修复':states[(record ?? item).status]}
           </small>
           {(record?.reason ?? item.reason) && <p>{record?.reason ?? item.reason}</p>}
           {!record ? (
             true ? (
               <>
-                <p>安装后即可使用，可在这里关闭不需要的能力。</p>
+                <p>安装后按应用要求完成配置，可在这里调整工具权限。</p>
                 <button
                   disabled={busy}
                   onClick={() =>
@@ -186,7 +190,7 @@ export function AgentCapabilityMarket({ target, call }: { target: AgentTarget; c
                 </button>
               </>
             ) : (
-              <p>请在目标 cagent 本机安装并配置此能力包。</p>
+              <p>请在目标 CAgent 本机安装并配置此能力包。</p>
             )
           ) : (
             <>
@@ -263,8 +267,9 @@ export function AgentCapabilityMarket({ target, call }: { target: AgentTarget; c
                   )}
                 </>
               ) : (
-                <p>能力包配置与授权由目标 cagent 本机管理。</p>
+                <p>能力包配置与授权由目标 CAgent 本机管理。</p>
               )}
+              {item.id === 'cagent.wechat' && <WechatPlugin key={target.id} remote api={{wechatStatus:async()=>await call('wechat.status') as Awaited<ReturnType<typeof window.cshell.wechatStatus>>,wechatSave:async input=>{await call('wechat.configure',input);await refresh();},wechatStopSubscriptions:async()=>{await call('wechat.stop');}}}/>}
               {item.id === 'cagent.desktop' && (
                 <DesktopSettings
                   key={target.id + item.id + record.status + record.grants.join(',')}
@@ -316,7 +321,7 @@ function DesktopSettings({ target, call }: { target: AgentTarget; call: Call }) 
           刷新桌面状态
         </button>
       </div>
-      <p>{status ? (status.enabled ? (status.listening ? '服务已启用 · 独立监听' : '服务已启用 · 使用当前 cagent 连接') : '服务未启用') : '正在读取服务状态'}</p>
+      <p>{status ? (status.enabled ? (status.listening ? '服务已启用 · 独立监听' : '服务已启用 · 使用当前 CAgent 连接') : '服务未启用') : '正在读取服务状态'}</p>
       {config && (
         <details>
           <summary>服务与访问权限</summary>

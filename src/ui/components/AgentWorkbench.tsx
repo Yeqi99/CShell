@@ -5,7 +5,7 @@ import type { AgentCall, AgentShellOption, AgentTarget } from '../../shared/agen
 import type { ClientStatus, ClientShell } from '../../shared/client';
 import { AgentHostingPanel } from './AgentHostingPanel';
 import { AgentRelayPanel } from './AgentRelayPanel';
-import { AgentWslNetwork } from './AgentWslNetwork';
+import { AgentWsl } from './AgentWsl';
 import './agent-workbench.css';
 type Status = ClientStatus & { autostart?: {supported:boolean;enabled:boolean}; platform?: string; canImportLegacy?: boolean };
 export function AgentWorkbench() {
@@ -46,10 +46,10 @@ export function AgentWorkbench() {
         {current?.local && current.bundledApp && (
           <button disabled={launching} onClick={async () => {
             setLaunching(true); setError(''); setLaunchMessage('');
-            try { await window.cshell.agentLaunch(); setLaunchMessage('已请求打开 cagent；已有后台继续使用原会话。'); await refresh(); }
+            try { await window.cshell.agentLaunch(); setLaunchMessage('已请求打开 CAgent；已有后台继续使用原会话。'); await refresh(); }
             catch (e) { setError(String(e)); }
             finally { setLaunching(false); }
-          }}>{launching ? '正在打开…' : '打开本机 cagent'}</button>
+          }}>{launching ? '正在打开…' : '打开本机 CAgent'}</button>
         )}
       </div>
       {error && <p role="alert">{error}</p>}
@@ -59,7 +59,7 @@ export function AgentWorkbench() {
       ) : (
         <div className="agent-empty">
           <h2>{current?.reason ?? '目标已断开'}</h2>
-          <p>{current?.bundledApp ? '点击“打开本机 cagent”启动独立应用，再在这里配置连接与权限。' : '安装并启动独立 Agent 后，可在这里配置。'}发现服务不会自动开放远程访问。</p>
+          <p>{current?.bundledApp ? '点击“打开本机 CAgent”启动独立应用，再在这里配置连接与权限。' : '安装并启动独立 Agent 后，可在这里配置。'}发现服务不会自动开放远程访问。</p>
           <button
             onClick={() =>
               void window.cshell.clientDownloadPage().catch((e) => setError(String(e)))
@@ -405,156 +405,6 @@ function AgentLogs({ call }: { call: Call }) {
     <div>
       <p role="alert">{error}</p>
       <pre>{logs.map((r) => `${r.time}  ${r.action}  ${r.peer}`).join('\n') || '暂无活动'}</pre>
-    </div>
-  );
-}
-function AgentWsl({ target, call }: { target: string; call: Call }) {
-  const [check, setCheck] = useState<any>(),
-    [plan, setPlan] = useState<any>(),
-    [distribution, setDistribution] = useState(''),
-    [installed, setInstalled] = useState(''),
-    [user, setUser] = useState(''),
-    [password, setPassword] = useState(''),
-    [confirm, setConfirm] = useState(false),
-    [error, setError] = useState(''),
-    [busy, setBusy] = useState(false),
-    [result, setResult] = useState('');
-  const run = async (fn: () => Promise<void>) => {
-    setBusy(true);
-    setError('');
-    try {
-      await fn();
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-  useEffect(() => {
-    void run(async () => {
-      const value = await call('wsl.check');
-      setCheck(value);
-      setPlan(value.installation);
-      setDistribution(value.online?.[0] ?? '');
-      setInstalled(value.distributions?.[0] ?? '');
-    });
-  }, [target]);
-  useEffect(() => {
-    if (plan?.state !== 'running') return;
-    const timer = setInterval(
-      () =>
-        void call('wsl.status')
-          .then(setPlan)
-          .catch((e) => setError(String(e))),
-      1500,
-    );
-    return () => clearInterval(timer);
-  }, [call, plan?.state]);
-  return (
-    <div className="agent-settings">
-      {check?.supported === false ? (
-        <p>此 Agent 不是 Windows，无 WSL 功能。</p>
-      ) : (
-        <>
-          <p>操作作用于所选 Windows Agent，安装可能需要管理员权限及重启；不会自动提权或重启。</p>
-          <fieldset disabled={busy}>
-            <div className="agent-fields">
-              <label>
-                安装发行版
-                <select value={distribution} onChange={(e) => setDistribution(e.target.value)}>
-                  {check?.online?.map((d: string) => (
-                    <option key={d}>{d}</option>
-                  ))}
-                </select>
-              </label>
-              <button
-                disabled={!distribution}
-                onClick={() =>
-                  void run(async () => {
-                    setPlan(await call('wsl.plan', { distribution }));
-                    setConfirm(false);
-                  })
-                }
-              >
-                检查并生成计划
-              </button>
-            </div>
-            {check?.onlineError && <p>{check.onlineError}</p>}
-            {plan && (
-              <>
-                <pre>{plan.logs}</pre>
-                <label className="agent-check">
-                  <input
-                    type="checkbox"
-                    checked={confirm}
-                    onChange={(e) => setConfirm(e.target.checked)}
-                  />
-                  确认在此 Agent 安装 {plan.distribution}
-                </label>
-                <button
-                  disabled={!confirm || plan.state === 'running' || plan.state === 'completed'}
-                  onClick={() =>
-                    void run(async () =>
-                      setPlan(await call('wsl.install', { planId: plan.id, confirm: true })),
-                    )
-                  }
-                >
-                  执行安装
-                </button>
-                {plan.state === 'running' && (
-                  <button onClick={() => void run(async () => setPlan(await call('wsl.cancel')))}>
-                    取消安装
-                  </button>
-                )}
-                <p>状态：{plan.state}</p>
-              </>
-            )}
-            <details>
-              <summary>初始化 Linux 用户</summary>
-              <label>
-                已安装发行版
-                <select value={installed} onChange={(e) => setInstalled(e.target.value)}>
-                  {check?.distributions?.map((d: string) => (
-                    <option key={d}>{d}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                用户名
-                <input value={user} onChange={(e) => setUser(e.target.value)} />
-              </label>
-              <label>
-                Linux 密码
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </label>
-              <button
-                disabled={!installed || !user || !password}
-                onClick={() =>
-                  void run(async () => {
-                    const status = await call('wsl.account.initialize', {
-                      distribution: installed,
-                      username: user,
-                      password,
-                      confirm: true,
-                    });
-                    setPassword('');
-                    setResult(status.ready ? '默认 Linux 用户已验证' : '用户初始化未完成');
-                  })
-                }
-              >
-                创建并设为默认用户
-              </button>
-            </details>
-          </fieldset>
-          <AgentWslNetwork call={call} />
-        </>
-      )}
-      {result && <p role="status">{result}</p>}
-      {error && <p role="alert">{error}</p>}
     </div>
   );
 }

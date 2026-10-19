@@ -27,11 +27,11 @@ public class MainActivity extends Activity {
   private volatile boolean destroyed;
   private final Object trustLock = new Object();
   private static class Connection {
-    Session session; ChannelShell shell; OutputStream output; AgentConnection agent; String agentEndpoint;
+    Session session; ChannelShell shell; OutputStream output; AgentConnection agent, desktop; String agentEndpoint, agentHost; int agentPort;
     final ExecutorService files = Executors.newSingleThreadExecutor();
     final ExecutorService writer = Executors.newSingleThreadExecutor();
     final Semaphore outputSlots = new Semaphore(8);
-    synchronized void close() { if (agent != null) agent.close(); files.shutdownNow(); writer.shutdownNow(); outputSlots.release(8); if (shell != null) shell.disconnect(); if (session != null) session.disconnect(); }
+    synchronized void close() { if (desktop != null) desktop.close(); desktop=null; if (agent != null) agent.close(); files.shutdownNow(); writer.shutdownNow(); outputSlots.release(8); if (shell != null) shell.disconnect(); if (session != null) session.disconnect(); }
   }
   @Override public void onCreate(Bundle state) {
     super.onCreate(state);
@@ -205,6 +205,20 @@ public class MainActivity extends Activity {
       Connection c = connections.get(id); if (destroyed || c == null || c.agent == null) return;
       workers.execute(() -> { try { c.agent.open(index); } catch(Exception e) { event(id,"error",e.getMessage()); c.close(); } });
     }
+    @JavascriptInterface public void desktopOpen(String id, String options) {
+      Connection c=connections.get(id);if(destroyed||c==null||c.agent==null)return;
+      final AgentConnection[] holder=new AgentConnection[1];
+      synchronized(c){if(c.desktop!=null)return;holder[0]=new AgentConnection((type,value)->{if(c.desktop!=holder[0])return;if(type.startsWith("desktop-")&&!type.equals("desktop-status"))event(id,type,value);if(type.equals("error"))event(id,"desktop-error",value);});c.desktop=holder[0];}
+      AgentConnection d=c.desktop;
+      workers.execute(()->{try{JSONObject p=new JSONObject(options);d.connect(c.agentHost,c.agentPort,"",certificate->trust(c.agentEndpoint,certificate,()->!destroyed&&connections.get(id)==c&&c.desktop==d));if(c.desktop!=d){d.close();return;}d.desktop(p.getJSONObject("quality"),p.optBoolean("control"));}catch(Exception e){event(id,"desktop-error",e.getMessage());d.close();synchronized(c){if(c.desktop==d)c.desktop=null;}}});
+    }
+    @JavascriptInterface public void desktopCommand(String id,String command) {
+      Connection c=connections.get(id);if(c==null||c.desktop==null)return;
+      AgentConnection d=c.desktop;
+      // Reuse the bounded native protocol writer; never block WebView callbacks on a socket.
+      d.queueDesktopCommand(command);
+    }
+    @JavascriptInterface public void desktopClose(String id) {Connection c=connections.get(id);if(c==null)return;synchronized(c){AgentConnection d=c.desktop;c.desktop=null;if(d!=null)d.close();}}
     @JavascriptInterface public void disconnect(String id) { Connection c = connections.remove(id); if (c != null) workers.execute(c::close); }
   }
   private void connectAgent(String json) {
@@ -217,8 +231,9 @@ public class MainActivity extends Activity {
         String password=p.optString("password");if(password.length()>128)throw new IOException("凭证过长");
         final String sessionId=id, endpoint="agent:"+host.toLowerCase(Locale.ROOT)+":"+port;
         c.agentEndpoint=endpoint;
+        c.agentHost=host;c.agentPort=port;
         c.agent = new AgentConnection((type,value)->{
-          if(type.equals("closed")) { connections.remove(sessionId,c); c.files.shutdownNow(); c.writer.shutdownNow(); }
+          if(type.equals("closed")) { connections.remove(sessionId,c); if(c.desktop!=null)c.desktop.close(); c.files.shutdownNow(); c.writer.shutdownNow(); }
           event(sessionId,type,value);
         });
         if(connections.putIfAbsent(id,c)!=null)throw new IOException("连接已存在");
@@ -303,6 +318,7 @@ public class MainActivity extends Activity {
     destroyed = true; for (Connection c : connections.values()) c.close(); connections.clear(); workers.shutdownNow();
     web.removeJavascriptInterface("CShellNative"); web.destroy(); super.onDestroy();
   }
+  @Override protected void onPause(){super.onPause();for(Connection c:connections.values()){synchronized(c){if(c.desktop!=null)c.desktop.close();c.desktop=null;}}}
   private void navigateBack() {
     web.evaluateJavascript("window.mobileBack()", result -> {
       if (!"true".equals(result)) moveTaskToBack(true);

@@ -1,4 +1,6 @@
 import { AiService, type AiConnectionHost } from '../core/ai';
+import {OpenCodeExtension} from '../extensions/opencode/service';
+import {pluginEnabled} from '../shared/plugins';
 import type { Store } from '../core/store';
 import type { AiThread } from '../shared/ai';
 import { createHash } from 'node:crypto';
@@ -32,6 +34,10 @@ export async function registerAiHandlers(
     }, 40);
   };
   await ai.load();
+  const openCode=new OpenCodeExtension({directory:join(directory,'extensions','opencode'),enabled:()=>pluginEnabled(store.plugins(),'opencode'),encrypt:s=>store.encryptPrivate(s),decrypt:s=>store.decryptPrivate(s),saveProvider:async p=>{await ai.saveProvider(p);publish?.('ai:providers-changed');},open:async url=>(await import('electron')).shell.openExternal(url)});
+  await openCode.load();
+  ai.providerExtensions.register(openCode);
+  handle('ai:extension-call',(id,action,input)=>ai.providerExtensions.call(z.string().max(100).parse(id),z.string().max(80).parse(action),input));
   const bindingKey=(id:string)=>{
     const thread=ai.snapshot().threads.find(t=>t.id===id);
     if(!thread||!ai.canReceiveEvent(id))throw new Error('请选择已配置基座的普通智能体会话');

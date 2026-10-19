@@ -1319,7 +1319,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
         <div>
           <ShieldCheck size={13} />
           <span>
-            {surface==='machine'?'cagent · '+(machines.find(m=>m.target.id===machineId)?.target.name??''):current
+            {surface==='machine'?'CAgent · '+(machines.find(m=>m.target.id===machineId)?.target.name??''):current
               ? current.closed
                 ? t('disconnected')
                 : current.local

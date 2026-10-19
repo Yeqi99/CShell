@@ -41,7 +41,7 @@ const http = createServer(async (req, res) => {
   );
 });
 await new Promise<void>((r) => http.listen(0, '127.0.0.1', r));
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: process.platform==='win32'?'msedge':undefined, headless: true });
 try {
   const page = await browser.newPage();
   page.setDefaultTimeout(10000);

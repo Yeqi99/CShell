@@ -1,4 +1,5 @@
 import { openRdpProfile, rdpProfileSchema } from '../core/rdp';
+import { installWindowPermissions } from './window-permissions';
 import { HttpWorkspaces } from '../core/http-workspaces';
 import { WechatService } from '../core/wechat';
 import { testStartGate } from './test-start-gate';
@@ -138,10 +139,7 @@ else
       window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
       window.webContents.on('will-navigate', (event) => event.preventDefault());
       window.webContents.on('will-attach-webview', (event) => event.preventDefault());
-      session.defaultSession.setPermissionRequestHandler((_wc, _permission, callback) =>
-        callback(false),
-      );
-      session.defaultSession.setPermissionCheckHandler(() => false);
+      installWindowPermissions(session.defaultSession, window.webContents, entry);
       let connections: ConnectionManager | undefined;
       let floating: FloatingWindows | undefined;
       let mcp: McpService | undefined;

@@ -50,6 +50,17 @@ jobs:
           if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne '317492c456aa27ee607a5919f1d2d38dcdc1112516a24d0bf4b00d078f52d17a') { throw 'Compiler checksum mismatch' }
           Expand-Archive -LiteralPath $archive -DestinationPath $env:RUNNER_TEMP
           "CAGENT_NATIVE_CXX=$env:RUNNER_TEMP/llvm-mingw-20261006-ucrt-x86_64/bin/x86_64-w64-mingw32-clang++.exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - uses: actions/setup-python@v5
+        if: runner.os == 'Windows'
+        with:
+          python-version: '3.12'
+          architecture: 'x64'
+      - name: Prepare pinned WeChat runtime dependencies
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          python -m pip install frida==17.24.0 pefile==2024.8.26 zstandard==0.23.0
+          "CAGENT_WECHAT_PYTHON=$((Get-Command python).Source)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - name: Build the standalone Agent without Electron
         run: node scripts/agent-build.mjs
       - name: Verify the packaged Agent with a real native terminal
@@ -86,6 +97,12 @@ jobs:
       - run: pnpm exec electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - if: matrix.platform == 'mac'
+        name: Verify CAgent desktop viewer on macOS
+        run: |
+          pnpm exec playwright install chromium
+          pnpm exec tsx scripts/desktop-view-race-smoke.ts
+          pnpm exec tsx scripts/desktop-fullscreen-smoke.ts
       - if: matrix.platform != 'linux'
         run: pnpm exec tsx scripts/platform-package-smoke.ts
       - if: matrix.platform == 'linux'
