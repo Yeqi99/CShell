@@ -23,13 +23,13 @@ export function desktopReleaseAssets(version: string): string[] {
 export function agentReleaseAssets(version: string): string[] {
   desktopReleaseAssets(version); // Apply the same strict version check.
   return [
-    'win-x64.zip',
+    'win-x64.exe',
     'mac-arm64.tar.gz',
     'mac-x64.tar.gz',
     'linux-x64.tar.gz',
     'linux-arm64.tar.gz',
   ].map((suffix) =>
-    suffix === 'win-x64.zip' ? `CAgent-Setup-${version}-${suffix}` : `CAgent-${version}-${suffix}`,
+    suffix === 'win-x64.exe' ? `CAgent-Setup-${version}-${suffix}` : `CAgent-${version}-${suffix}`,
   );
 }
 
