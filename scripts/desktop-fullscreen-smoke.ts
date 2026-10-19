@@ -12,21 +12,40 @@ await writeFile(join(dir,'main.cjs'),`const {app,BrowserWindow,session}=require(
 const env={...process.env};delete env.ELECTRON_RUN_AS_NODE;
 const app=await electron.launch({args:[join(dir,'main.cjs')],env});
 
+// DOM fullscreen and the macOS native Space transition complete independently.
+// Observe native completion on both entry and exit before starting another cycle.
+async function nativeFullscreen(expected:boolean){
+ const deadline=Date.now()+15000;
+ while(await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].isFullScreen())!==expected){
+  assert.ok(Date.now()<deadline,`Native fullscreen did not become ${expected}`);
+  await new Promise(resolve=>setTimeout(resolve,50));
+ }
+ assert.equal(await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].isFullScreen()),expected);
+}
+
 try{
  const page=await app.firstWindow();
+ const entered=async()=>{
+  await page.waitForFunction(()=>!!document.fullscreenElement);
+  await nativeFullscreen(true);
+  await page.waitForFunction(()=>{
+   const box=document.fullscreenElement?.getBoundingClientRect();
+   return box&&Math.abs(box.x)<2&&Math.abs(box.y)<2&&Math.abs(box.width-innerWidth)<2&&Math.abs(box.height-innerHeight)<2;
+  },undefined,{timeout:15000});
+  const box=await page.locator('.agent-desktop-view').boundingBox();const viewport=await page.evaluate(()=>({w:innerWidth,h:innerHeight}));
+  assert.ok(box&&Math.abs(box.x)<2&&Math.abs(box.y)<2&&Math.abs(box.width-viewport.w)<2&&Math.abs(box.height-viewport.h)<2,JSON.stringify({box,viewport}));
+ };
+ const exited=async()=>{await page.waitForFunction(()=>!document.fullscreenElement);await nativeFullscreen(false);};
 for(let i=0;i<2;i++){
   await page.getByRole('button',{name:'全屏',exact:true}).click();
-  await page.waitForFunction(()=>!!document.fullscreenElement,undefined,{timeout:3000});
-  await page.waitForTimeout(400);
-  const box=await page.locator('.agent-desktop-view').boundingBox();const viewport=await page.evaluate(()=>({w:innerWidth,h:innerHeight}));
-  assert.ok(box&&Math.abs(box.width-viewport.w)<2&&Math.abs(box.height-viewport.h)<2,JSON.stringify({box,viewport}));
-  assert.equal(await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].isFullScreen()),true);
-  await page.getByRole('button',{name:'退出全屏',exact:true}).click();await page.waitForFunction(()=>!document.fullscreenElement);
+  await entered();
+  await page.getByRole('button',{name:'退出全屏',exact:true}).click();await exited();
  }
  await page.getByRole('button',{name:'填满工作区',exact:true}).click();
- await page.getByRole('button',{name:'全屏',exact:true}).click();await page.waitForFunction(()=>!!document.fullscreenElement,undefined,{timeout:3000});
- await page.waitForTimeout(400);await page.getByRole('button',{name:'退出全屏',exact:true}).focus();await page.keyboard.press('Escape');await page.waitForFunction(()=>!document.fullscreenElement);
+ await page.getByRole('button',{name:'全屏',exact:true}).click();await entered();
+ await page.getByRole('button',{name:'退出全屏',exact:true}).focus();await page.keyboard.press('Escape');await exited();
  assert.equal(await page.getByRole('button',{name:'还原工作区',exact:true}).getAttribute('aria-pressed'),'true');
  await page.getByRole('button',{name:'还原工作区',exact:true}).click();
  await writeFile('test-results/desktop-fullscreen-0.6.33.json',JSON.stringify({ok:true,nativeFullscreenVerified:true,repeatedEntryExit:true,escapeRestoresExpanded:true},null,2));console.log('PASS fullscreen');
 }finally{await app.close();}
+
