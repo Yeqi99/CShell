@@ -1,0 +1,21 @@
+.ai-extension-model-picker {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.ai-extension-model-picker label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+}
+.ai-extension-model-picker input,
+.ai-extension-model-picker select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  min-height: 38px;
+  border-radius: 8px;
+}
+.ai-extension-model-picker small {
+  color: var(--muted);
+}

@@ -53,6 +53,7 @@ export const aiPolicySchema = z
         'agents.manage',
         'goals.manage',
         'events.manage',
+        'web.search',
         'http.use',
         'ai.providers.manage',
         'wechat.read',
@@ -131,7 +132,7 @@ export interface AiBridge {
   aiEventsSnapshot(): Promise<import('./ai-events').AiEventSnapshot & {error?:string;subscriptions:{id:string;name:string;source:string}[]}>;
   aiEventSave(rule:import('./ai-events').AiEventRule):Promise<import('./ai-events').AiEventRule>;
   aiEventRemove(id:string):Promise<void>;
-  aiEventListen(input:{targets:string[];leaseSeconds:number}):Promise<unknown>;
+  aiEventListen(input:{source?:string;targets:string[];leaseSeconds:number}):Promise<unknown>;
   aiGoalSave(id: string, input: import('./ai-work').GoalInput): Promise<void>;
   aiGoalAction(
     id: string,

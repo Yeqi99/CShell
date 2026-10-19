@@ -97,9 +97,19 @@ if(process.platform==='win32'){
     const compiler=process.env.CAGENT_NATIVE_CXX||(existsSync(cached)?cached:undefined);
     if(!compiler)throw new Error('Set CAGENT_NATIVE_CXX to the LLVM-MinGW x64 clang++ compiler to build the optional desktop capability');
     await new Promise((resolveBuild,reject)=>{
-      const child=spawn(compiler,['-std=c++17','-O2','-municode','-static',join(root,'tools/cagent-desktop/native/desktop.cpp'),'-o',join(output,'cagent-desktop.exe'),'-ld3d11','-ldxgi','-lmfplat','-lmfuuid','-lmf','-lole32','-loleaut32','-luuid','-lwmcodecdspuuid','-luser32','-lgdi32'],{stdio:'inherit',windowsHide:true});
+      const child=spawn(compiler,['-std=c++17','-O2','-municode','-static',join(root,'tools/cagent-desktop/native/desktop.cpp'),'-o',join(output,'cagent-desktop.exe'),'-ld3d11','-ldxgi','-lmfplat','-lmfuuid','-lmf','-lole32','-loleaut32','-luuid','-lwmcodecdspuuid','-luser32','-lgdi32','-ladvapi32'],{stdio:'inherit',windowsHide:true});
       child.once('error',reject);child.once('exit',code=>code===0?resolveBuild():reject(new Error('Native desktop capability build failed')));
     });
+    const systemDirectory=join(output,'system-desktop');
+    await mkdir(systemDirectory,{recursive:true});
+    const nativeBuild=(source,name,libraries,defines=[])=>new Promise((done,reject)=>{
+      const child=spawn(compiler,['-std=c++17','-O2','-municode','-static',...defines,join(root,'tools/cagent-desktop/native',source),'-o',join(systemDirectory,name),...libraries],{stdio:'inherit',windowsHide:true});
+      child.once('error',reject);child.once('exit',code=>code===0?done():reject(new Error(`System desktop build failed: ${source}`)));
+    });
+    await nativeBuild('desktop.cpp','cagent-desktop.exe',['-ld3d11','-ldxgi','-lmfplat','-lmfuuid','-lmf','-lole32','-loleaut32','-luuid','-lwmcodecdspuuid','-luser32','-lgdi32','-ladvapi32'],['-DCAGENT_EXPERIMENTAL_SYSTEM_BROKER']);
+    await nativeBuild('desktop-broker.cpp','cagent-desktop-broker.exe',['-ladvapi32','-luserenv','-lole32']);
+    for(const name of ['install-system-service.ps1','system-desktop-status.ps1'])await cp(join(root,'tools/cagent-desktop',name),join(output,name));
+    await new Promise((done,reject)=>{const child=spawn(process.execPath,[join(root,'scripts/build-virtual-display.mjs'),join(output,'CAgentVirtualDisplay.exe')],{cwd:root,stdio:'inherit',windowsHide:true});child.once('error',reject);child.once('exit',code=>code===0?done():reject(new Error('Virtual display helper build failed')));});
     await cp(join(root,'tools/cagent-desktop/licenses/nlohmann-json.txt'),join(output,'LICENSE.desktop-json.txt'));
     const compilerLicense=join(dirname(dirname(compiler)),'LICENSE.TXT');
     if(!existsSync(compilerLicense))throw new Error('LLVM-MinGW LICENSE.TXT must accompany the selected compiler');

@@ -26,6 +26,7 @@ export const pluginManifestSchema = z
       'agent',
       'wechat',
       'opencode',
+      'tavily',
     ]),
     permissions: z
       .array(z.enum(['terminal.input', 'remote.read', 'remote.execute', 'remote.forward']))
@@ -80,6 +81,7 @@ const builtin = (
   commands: [],
 });
 export const builtinPlugins = [
+  builtin('tavily', 'Tavily 搜索', '多 Key 用量管理，为智能体提供带来源的网络搜索。', 'tavily', []),
   builtin('opencode', 'OpenCode', '接入 Go 套餐或按量计费模型，选择模型并查看官方用量。', 'opencode', []),
   builtin('wechat', '微信（实验）', '绑定本机 Windows 微信，授权智能体读取联系人、收发文本。实验适配可能导致微信崩溃。', 'wechat', []),
   builtin('http', 'HTTP', '编辑请求、多目标、切换发送方与请求历史，可供智能体调用。', 'http', [

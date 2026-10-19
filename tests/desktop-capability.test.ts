@@ -13,7 +13,16 @@ test('optional desktop package installation does not listen or authorize owners'
  try{assert.equal(capability.extraPackages.length,1);const {adapter}=capability.extraPackages[0];assert.equal((await adapter.inspect(root)).installed,true);
   assert.equal(capability.service.status('local').listening,false);
   await adapter.register!(root,['desktop.view']);assert.equal(capability.service.status('local').listening,false);assert.equal(capability.service.status('local').viewAllowed,true);
+  await assert.rejects(capability.dispatch('desktop.virtual-display.install',{planId:'12345678-1234-4234-8234-123456789abc',confirm:true},'local',true),/计划无效/);
+  await assert.rejects(capability.dispatch('desktop.virtual-display.status',{},'local',false),/管理权限/);
   await assert.rejects(capability.dispatch('desktop.configure',{enabled:false},'remote',false),/local administration/);
   await adapter.quiesce!();assert.equal((await capability.dispatch('desktop.status',{},'local',true) as {packageReady:boolean}).packageReady,false);
  }finally{await capability.shutdown();assert.ok(root.startsWith(prefix));await rm(root,{recursive:true,force:true});}
+});
+
+test('virtual display management rejects unauthorized callers before probing or downloading',async()=>{
+ const vault={read:async()=>undefined,write:async()=>{}} as unknown as Pick<ClientVault,'read'|'write'>;
+ const capability=await createDesktopCapability({identity:'test',nativeExecutable:join(tmpdir(),'absent-desktop-test.exe'),vault,authorize:()=>false});
+ try{for(const method of ['plan','status','install','remove','recover'])await assert.rejects(capability.dispatch('desktop.virtual-display.'+method,{},'remote',false),/管理权限/);}
+ finally{await capability.shutdown();}
 });

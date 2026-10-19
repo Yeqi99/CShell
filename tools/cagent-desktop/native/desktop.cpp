@@ -27,6 +27,7 @@
 #include <vector>
 #include "vendor/json.hpp"
 #include "input-state.hpp"
+#include "desktop-broker-client.hpp"
 using json=nlohmann::json;
 template<class T>struct Com{T*p=nullptr;~Com(){reset();}Com()=default;Com(const Com&)=delete;Com&operator=(const Com&)=delete;T*operator->()const{return p;}operator bool()const{return p!=nullptr;}T**put(){reset();return &p;}void reset(){if(p)p->Release();p=nullptr;}};
 void check(HRESULT hr,const char*stage){if(FAILED(hr)){char b[128];snprintf(b,sizeof(b),"%s: HRESULT 0x%08lx",stage,(unsigned long)hr);throw std::runtime_error(b);}}
@@ -43,11 +44,20 @@ void pauseMicros(uint64_t us){
  Sleep((DWORD)std::max<uint64_t>(1,(us+999)/1000));
 }
 std::string utf8(const wchar_t*s){int n=WideCharToMultiByte(CP_UTF8,0,s,-1,nullptr,0,nullptr,nullptr);std::string result(n,'\0');WideCharToMultiByte(CP_UTF8,0,s,-1,&result[0],n,nullptr,nullptr);if(!result.empty())result.pop_back();return result;}
+bool systemWorker=false;
+HDESK systemDesktop=nullptr;
+void bindSystemDesktop(){
+ HANDLE token=nullptr;if(!OpenProcessToken(GetCurrentProcess(),TOKEN_QUERY,&token))throw std::runtime_error("System desktop token unavailable");
+ DWORD n=0;GetTokenInformation(token,TokenUser,nullptr,0,&n);std::vector<BYTE> buffer(n);BOOL ok=GetTokenInformation(token,TokenUser,buffer.data(),n,&n);CloseHandle(token);
+ if(!ok||!IsWellKnownSid(((TOKEN_USER*)buffer.data())->User.Sid,WinLocalSystemSid))throw std::runtime_error("System desktop worker requires the installed service");
+ systemDesktop=OpenInputDesktop(0,FALSE,DESKTOP_READOBJECTS|DESKTOP_WRITEOBJECTS|DESKTOP_SWITCHDESKTOP);
+ if(!systemDesktop||!SetThreadDesktop(systemDesktop))throw std::runtime_error("CAPTURE_DESKTOP_UNAVAILABLE");systemWorker=true;
+}
 void checkCaptureDesktop(){
  auto name=[](HDESK d){DWORD bytes=0;GetUserObjectInformationW(d,UOI_NAME,nullptr,0,&bytes);if(!bytes)throw std::runtime_error("CAPTURE_DESKTOP_UNAVAILABLE");std::vector<wchar_t> n(bytes/sizeof(wchar_t)+1);if(!GetUserObjectInformationW(d,UOI_NAME,n.data(),bytes,&bytes))throw std::runtime_error("CAPTURE_DESKTOP_UNAVAILABLE");return std::wstring(n.data());};
  HDESK input=OpenInputDesktop(0,FALSE,DESKTOP_READOBJECTS);if(!input)throw std::runtime_error("CAPTURE_SECURE_OR_INACCESSIBLE_DESKTOP");
  struct Close{HDESK p;~Close(){CloseDesktop(p);}}close{input};
- if(name(input)!=L"Default"||name(GetThreadDesktop(GetCurrentThreadId()))!=L"Default")throw std::runtime_error("CAPTURE_SECURE_OR_DIFFERENT_DESKTOP");
+ if((!systemWorker&&name(input)!=L"Default")||name(input)!=name(GetThreadDesktop(GetCurrentThreadId())))throw std::runtime_error("CAPTURE_SECURE_OR_DIFFERENT_DESKTOP");
 }
 std::mutex outputMutex;
 void packet(json meta,const std::vector<uint8_t>&body={}){std::lock_guard<std::mutex>lock(outputMutex);std::string h=meta.dump();uint32_t sizes[2]={(uint32_t)h.size(),(uint32_t)body.size()};if(fwrite(sizes,4,2,stdout)!=2||fwrite(h.data(),1,h.size(),stdout)!=h.size()||(!body.empty()&&fwrite(body.data(),1,body.size(),stdout)!=body.size()))throw std::runtime_error("output pipe closed");fflush(stdout);}
@@ -113,7 +123,7 @@ struct GpuConverter{
  void convert(ID3D11Texture2D*source){D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC iv{};iv.ViewDimension=D3D11_VPIV_DIMENSION_TEXTURE2D;Com<ID3D11VideoProcessorInputView> input;check(device->CreateVideoProcessorInputView(source,enumerator.p,&iv,input.put()),"video input view");D3D11_VIDEO_PROCESSOR_STREAM stream{};stream.Enable=TRUE;stream.pInputSurface=input.p;check(context->VideoProcessorBlt(processor.p,output.p,0,1,&stream),"GPU BGRA to NV12");}
 };
 // SendInput is deliberately confined to this optional, default-denied private
-// pipe owner. It cannot cross integrity levels or the Windows secure desktop.
+// pipe owner. Secure desktop access additionally requires the installed system broker.
 struct NativeInput {
  Capture& capture;HANDLE pipe;std::mutex mutex;std::atomic<bool> quitting{false};
  InputState state;std::thread watchdog;
@@ -128,10 +138,18 @@ struct NativeInput {
   if(!active)throw std::runtime_error("INPUT_SECURE_OR_INACCESSIBLE_DESKTOP");
   struct Close{HDESK value;~Close(){CloseDesktop(value);}} close{active};
   auto current=desktopName(GetThreadDesktop(GetCurrentThreadId()));auto target=desktopName(active);
-  if(current!=target||target!=L"Default")throw std::runtime_error("INPUT_SECURE_OR_DIFFERENT_DESKTOP");
+  if(current!=target||(!systemWorker&&target!=L"Default"))throw std::runtime_error("INPUT_SECURE_OR_DIFFERENT_DESKTOP");
  }
  void inject(const json&e){
   checkDesktop();INPUT value{};const auto kind=e.at("kind").get<std::string>();
+  if(kind=="secure-attention"){
+#ifdef CAGENT_EXPERIMENTAL_SYSTEM_BROKER
+   if(!systemWorker||!brokerSecureAttentionAvailable())throw std::runtime_error("INPUT_SECURE_ATTENTION_UNAVAILABLE");
+   brokerSecureAttention();return;
+#else
+   throw std::runtime_error("INPUT_SECURE_ATTENTION_UNAVAILABLE");
+#endif
+  }
   if(kind=="text"){
    auto text=e.at("text").get<std::string>();int length=MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,text.data(),(int)text.size(),nullptr,0);
    if(length<=0||length>512)throw std::runtime_error("INPUT_INVALID_TEXT");std::wstring wide(length,L'\0');MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,text.data(),(int)text.size(),wide.data(),length);
@@ -162,7 +180,7 @@ struct NativeInput {
   if(SendInput(1,&value,sizeof(value))!=1)throw std::runtime_error("INPUT_INJECTION_FAILED_POSSIBLE_UIPI_OR_DESKTOP_RESTRICTION win32="+std::to_string(GetLastError()));
  }
  NativeInput(Capture& display,HANDLE input):capture(display),pipe(input),state([this](const json&e){inject(e);}){
-  watchdog=std::thread([this]{bool reported=false;while(!quitting){
+  watchdog=std::thread([this]{if(systemWorker&&!SetThreadDesktop(systemDesktop))return;bool reported=false;while(!quitting){
    {std::lock_guard<std::mutex> lock(mutex);try{
     DWORD available=0;if(!PeekNamedPipe(pipe,nullptr,0,nullptr,&available,nullptr))state.revoke();else state.tick(micros()/1000);
     reported=false;
@@ -240,7 +258,8 @@ struct Encoder{
 
 // The host owns authentication, authorization and network IO. This helper only
 // accepts a private inherited pipe. One frame credit bounds the output queue.
-void stream(){
+void workerTrace(const wchar_t* message){if(!systemWorker)return;HANDLE log=RegisterEventSourceW(nullptr,L"CAgentDesktopBroker");if(log){ReportEventW(log,EVENTLOG_INFORMATION_TYPE,0,1,nullptr,1,0,&message,nullptr);DeregisterEventSource(log);}}
+void stream(){workerTrace(L"Worker stream entered");
  _setmode(_fileno(stdout),_O_BINARY);
  HANDLE input=GetStdHandle(STD_INPUT_HANDLE);DWORD mode=0;
  if(GetFileType(input)!=FILE_TYPE_PIPE||GetConsoleMode(input,&mode))throw std::runtime_error("stream requires an inherited control pipe");
@@ -250,7 +269,7 @@ void stream(){
   DWORD available=0;if(!PeekNamedPipe(input,nullptr,0,nullptr,&available,nullptr)){stop=true;return;}
   while(available){char bytes[4096];DWORD read=0;if(!ReadFile(input,bytes,std::min<DWORD>(available,sizeof(bytes)),&read,nullptr)||!read){stop=true;return;}pending.append(bytes,read);
    size_t end;while((end=pending.find('\n'))!=std::string::npos){if(end>8192)throw std::runtime_error("control command too large");auto command=json::parse(pending.substr(0,end));pending.erase(0,end+1);auto op=command.value("op",std::string());
-    if(op=="configure"){settings=command;force=true;}else if(op=="ack")credit=true;else if(op=="keyframe")force=true;else if(op=="stop")stop=true;
+    if(op=="configure"){workerTrace(L"Worker configuration received");settings=command;force=true;}else if(op=="ack")credit=true;else if(op=="keyframe")force=true;else if(op=="stop")stop=true;
     else if(op=="input-grant"||op=="input-revoke"||op=="input-event"){
      try{packet(inputOwner.command(command,initialized));}catch(const std::exception&e){packet({{"type","input-error"},{"message",e.what()}});}
     }else throw std::runtime_error("unsupported control command");
@@ -267,8 +286,12 @@ void stream(){
    uint64_t memory=settings.value("memoryBudgetBytes",(uint64_t)256*1024*1024);
    if(!w||!h||!fps||!bitrate||w>capture.width||h>capture.height||(uint64_t)capture.width*capture.height*4+(uint64_t)w*h*4>memory||memory>SIZE_MAX)throw std::runtime_error("capture settings exceed source or memory budget");
    try{converter.open(capture,w,h,fps);encoder.open(w,h,fps,bitrate,capture.device.p);gpu=true;}catch(const std::exception&e){gpuFallback=e.what();encoder.open(w,h,fps,bitrate);}
-   active=settings;initialized=true;
-   packet({{"type","ready"},{"width",w},{"height",h},{"sourceWidth",capture.width},{"sourceHeight",capture.height},{"fps",fps},{"hardware",encoder.hardware},{"encoder",encoder.name},{"input",false},{"pixelPath",gpu?"d3d11-nv12-surface":"cpu-nv12"},{"gpuFallback",gpuFallback},{"colorMatrix","bt709"},{"fullRange",false},{"capturePath",capture.path},{"captureFallback",capture.fallback}});
+   active=settings;initialized=true;workerTrace(L"Worker capture ready");
+   bool secureAttention=false;
+#ifdef CAGENT_EXPERIMENTAL_SYSTEM_BROKER
+   secureAttention=systemWorker&&brokerSecureAttentionAvailable();
+#endif
+   packet({{"type","ready"},{"systemDesktop",systemWorker},{"secureAttention",secureAttention},{"width",w},{"height",h},{"sourceWidth",capture.width},{"sourceHeight",capture.height},{"fps",fps},{"hardware",encoder.hardware},{"encoder",encoder.name},{"input",false},{"pixelPath",gpu?"d3d11-nv12-surface":"cpu-nv12"},{"gpuFallback",gpuFallback},{"colorMatrix","bt709"},{"fullRange",false},{"capturePath",capture.path},{"captureFallback",capture.fallback}});
   }
   if(!credit){pauseMicros(1000);continue;}
   auto now=micros();if(last&&now-last<1000000/encoder.fps){pauseMicros(std::min<uint64_t>(1000,1000000/encoder.fps-(now-last)));continue;}
@@ -283,6 +306,14 @@ void stream(){
  }
 }
 int wmain(int argc,wchar_t**argv){
+ try{
+#ifdef CAGENT_EXPERIMENTAL_SYSTEM_BROKER
+  if(argc>2&&std::wstring(argv[1])==L"--system-pipe"){bindSystemDesktop();connectSystemWorker(argv[2]);}
+  else if(argc>1&&std::wstring(argv[1])==L"--stream"&&brokerStream())return 0;
+#else
+  if(argc>1&&std::wstring(argv[1])==L"--system-pipe")throw std::runtime_error("System broker is not enabled in this build");
+#endif
+ }catch(const std::exception&e){std::cerr<<e.what()<<std::endl;return 1;}
  SetProcessDPIAware();HRESULT co=CoInitializeEx(nullptr,COINIT_MULTITHREADED);if(FAILED(co))return 1;HRESULT mf=MFStartup(MF_VERSION);if(FAILED(mf)){std::cerr<<"Media Foundation unavailable";return 1;}
  try{
   if(argc>1&&std::wstring(argv[1])==L"--probe"){
@@ -295,7 +326,7 @@ int wmain(int argc,wchar_t**argv){
    for(UINT n=0;n<30;n++){for(UINT y=0;y<360;y++)for(UINT x=0;x<640;x++)input[y*640+x]=(uint8_t)(16+(x+y+n*8)%220);if(e.encode(input,bytes,key,n==0)){chunks.push_back({{"size",bytes.size()},{"key",key},{"timestamp",n*1000000/30}});out.write((char*)bytes.data(),bytes.size());frames++;}}
    std::ofstream manifest(utf8(argv[2])+".json");manifest<<chunks.dump();
    std::cout<<json({{"hardware",e.hardware},{"encoder",e.name},{"frames",frames},{"elapsedUs",micros()-start},{"fixture",true}}).dump()<<std::endl;
-  }else if(argc>1&&std::wstring(argv[1])==L"--stream")stream();
+  }else if(argc>1&&(std::wstring(argv[1])==L"--stream"||std::wstring(argv[1])==L"--system-pipe"))stream();
   else throw std::runtime_error("Usage: --probe | --test-encode output.h264 | --stream (private pipe)");
  }catch(const std::exception&e){std::cerr<<e.what()<<std::endl;MFShutdown();CoUninitialize();return 1;}
  MFShutdown();CoUninitialize();return 0;

@@ -27,6 +27,7 @@ import { toolsDefaults } from '../shared/docker';
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   HardDrive,
+  Files,
   BarChart3,
   Bot,
   Minimize2,
@@ -39,7 +40,6 @@ import {
   RotateCcw,
   Server,
   PanelLeft,
-  PanelRight,
   Plus,
   Search,
   Settings2,
@@ -216,6 +216,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
   }, []);
   const [drafts, setDrafts] = useState<Array<Profile | 'new'>>([]);
   const [localDock, setLocalDock] = useState(false);
+  const [fileReveal, setFileReveal] = useState({id: '', revision: 0});
   const [preview, setPreview] = useState<Preferences | null>(null);
   const [themeRequest, setThemeRequest] = useState<{ theme: Preferences['theme'] } | null>(null);
   const preferences = preview ?? config.preferences;
@@ -349,7 +350,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
       if (shortcut === 'search') setSearching((s) => !s);
       if (shortcut === 'settings') openSettings();
       if (shortcut === 'sidebar') togglePanel('serverVisible');
-      if (shortcut === 'tools') togglePanel('fileVisible');
+      if (shortcut === 'tools') openFiles();
       if (shortcut === 'nextTab' || shortcut === 'previousTab') {
         const views = [
           ...tabs.map((tab) => ({
@@ -548,6 +549,11 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
   const togglePanel = (key: 'serverVisible' | 'fileVisible') =>
     onLayout({ ...layout, [key]: !layout[key] });
   const docking = usePanelDrop(layout, onLayout);
+  const openFiles = () => {
+    if (!current || current.closed || current.local || current.client) return;
+    onLayout({...layout, fileVisible: true});
+    setFileReveal(value => ({id: current.id, revision: value.revision + 1}));
+  };
   const commands: WorkbenchCommand[] = [
     {
       id: 'new',
@@ -564,14 +570,14 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
       icon: PanelLeft,
       action: () => togglePanel('serverVisible'),
     },
-    ...(current && !current.closed
+    ...(current && !current.closed && !current.local && !current.client
       ? [
           {
             id: 'files',
-            name: t('tools'),
+            name: t('files'),
             hint: 'Ctrl+Shift+E',
-            icon: PanelRight,
-            action: () => togglePanel('fileVisible'),
+            icon: Files,
+            action: openFiles,
           },
         ]
       : []),
@@ -995,13 +1001,13 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
               <span>{t('localFiles')}</span>
             </button>
             <button
-              className="icon"
-              hidden={!current || current.closed}
-              aria-pressed={right}
-              title={`${t('tools')} (Ctrl+Shift+E)`}
-              onClick={() => togglePanel('fileVisible')}
+              className="workbench-tool ssh-files-toggle"
+              hidden={!current || current.closed || !!current.local || !!current.client}
+              aria-label={t('files')}
+              title={`${t('files')} (Ctrl+Shift+E)`}
+              onClick={openFiles}
             >
-              <PanelRight size={17} />
+              <Files size={15} /><span>{t('files')}</span>
             </button>
           </div>
           {wslSetupTarget && (
@@ -1272,6 +1278,8 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
                   hidden={!showTools || current?.id !== tab.id}
                 >
                   <ToolsPanel
+                    revealRevision={fileReveal.id === tab.id ? fileReveal.revision : 0}
+                    onClose={() => onLayout({...layout, fileVisible: false})}
                     dockerEnabled={pluginEnabled(config.plugins, 'docker')}
                     active={showTools && current?.id === tab.id}
                     sessionName={`${tab.profile.username}@${tab.profile.host}`}

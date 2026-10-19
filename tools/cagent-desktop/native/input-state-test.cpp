@@ -25,6 +25,10 @@ int main(){
  state.grant(5,6007);button["generation"]=5;button["sequence"]=1;button["down"]=false;const auto count=effects.size();state.apply(button,6008);require(state.allowed&&effects.size()==count);require(rejected(button,6009));
  auto late=button;late["kind"]="lease";late["sequence"]=2;bool expired=false;try{state.apply(late,11009);}catch(const std::exception&e){expired=std::string(e.what())=="INPUT_LEASE_EXPIRED";}require(expired&&!state.allowed);
  state.grant(6,12000);auto text=J{{"kind","text"},{"text","hello"},{"generation",6},{"sequence",1}};state.apply(text,12001);require(effects.back()["text"]=="hello");require(state.keys.empty());require(rejected(text,12002));text["sequence"]=2;text["text"]=std::string(2049,'x');require(rejected(text,12002));state.revoke();text["text"]="hello";require(rejected(text,12003));
+ auto sas=J{{"kind","secure-attention"},{"generation",7},{"sequence",2}};
+ require(rejected(sas,12004));state.grant(7,12005);key["generation"]=7;key["sequence"]=1;state.apply(key,12006);
+ state.apply(sas,12007);require(state.keys.empty()&&effects.back()["kind"]=="secure-attention");
+ require(rejected(sas,12008));state.revoke();sas["sequence"]=3;require(rejected(sas,12009));
  std::cout<<"{\"passed\":true,\"nativeInputInjected\":false,\"checks\":"<<checks<<",\"failedReleaseRetained\":true,\"strictIntegers\":true}"<<std::endl;
 }
 

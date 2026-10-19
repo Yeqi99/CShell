@@ -1,7 +1,7 @@
 {
   "name": "canpshell",
   "productName": "CShell",
-  "version": "0.6.36",
+  "version": "0.6.39",
   "private": true,
   "description": "CanpShell offline-first terminal workbench",
   "author": "CanpShell contributors",
@@ -62,7 +62,7 @@
     "appId": "org.canpshell.desktop",
     "productName": "CShell",
     "directories": {
-      "output": "release/0.6.36"
+      "output": "release/0.6.39"
     },
     "files": [
       "dist/**/*",

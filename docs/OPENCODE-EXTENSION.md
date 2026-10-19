@@ -5,11 +5,11 @@ OpenCode 作为可安装、停用和卸载的内置扩展 `cshell.opencode` 提�
 ## 接入
 
 1. 在插件市场启用 OpenCode，进入该扩展。
-2. 粘贴自己的控制台工作区页面地址并保存。点击“管理 API Key”打开该工作区的 Keys 页面；创建或复制 API Key。新版控制台可能先要求添加 Service Account，然后 Add API Key。不要把 Key 发到聊天里。
-3. 在扩展中输入 Key 并保存。Key 使用 CShell 后端凭据加密，不放进普通基座配置、外观导出或模型返回值。
+2. 点击“获取 API Key”进入官方控制台 Keys 创建 Service Account / API Key。只需要 Key，账号名和工作区网址可选；不要把 Key 发到聊天里。也可点击“通过浏览器登录”，在官方页面确认代码、工作区并批准。
+3. 在扩展中输入 Key，点击“保存并检测”；支持最多 32 个独立账号。保存后先验证认证配置，再发送最多 64 输出 token 的简短模型测试，随后加载模型和 Go 用量。检测失败仍保留已保存密钥并显示具体错误。Key 使用 CShell 后端凭据加密，不放进普通基座配置、外观导出或模型返回值。
 4. 默认选择 Go 套餐，搜索模型，添加为智能体基座。之后在智能体基座设置可以直接切换该目录的模型。
 
-Go 与按量计费使用不同目录和请求路径，扩展不自动将 Go 请求降级到按量计费。官方账号已经开启的超额余额设置仍由服务端决定，扩展只展示，不修改。浏览器登录状态不等于 API Key；本实现不读取浏览器 Cookie。当前采用 API Key 接入，没有实现 OAuth 登录。
+Go 与按量计费使用不同目录和请求路径，扩展不自动将 Go 请求降级到按量计费。官方账号已经开启的超额余额设置仍由服务端决定，扩展只展示，不修改。浏览器登录状态不等于 API Key；本实现不读取浏览器 Cookie。支持官方 OAuth Device Flow，须在浏览器明确批准；不复用或提取已登录浏览器的 Cookie。刷新令牌加密保存并串行轮换，刷新开始先落盘标记，异常或重启后结果未知时要求重新登录，避免重复使用单次刷新令牌。
 
 ## 模型与用量
 
@@ -32,3 +32,9 @@ Go 用量读取官方 `GET /inference/go/v1/usage` 的 rollingUsage、weeklyUsag
 - [推理接口](https://opencode.ai/v2/docs/console/api/inference/)
 - [已合并 Go 用量接口](https://github.com/anomalyco/opencode/pull/16513)
 - [官方旧路径到新 inference 的映射源码](https://github.com/anomalyco/opencode/blob/dev/packages/console/app/src/lib/inference-proxy.ts)
+
+## 多账号与验证边界（本次更新）
+
+模型引用包含稳定账号 ID、计费目录、模型 ID。旧单 Key 配置迁移为 default，旧模型引用保持绑定；删除账号后对应基座明确失败，不自动切到其他 Key。Go 与按量目录始终分离。官方公开目录及免费模型成功不能证明密钥有效，检测必须先通过认证的 `/console/api/v2/config`。账号摘要不返回密钥、设备代码或刷新令牌。
+
+设备授权与多账号流程已由隔离网络夹具验证；尚未使用真实用户 Key、真实浏览器批准验证在线登录或套餐额度。不提供不存在的现金余额接口；用户在扩展保存 Key 或批准登录后即可实际检测。

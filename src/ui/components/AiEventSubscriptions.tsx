@@ -12,7 +12,7 @@ export interface AiEventSubscriptionsProps extends AiEventSnapshot {
   onRemove: (id: string) => Promise<void>;
   onRefresh: () => Promise<void>;
   onOpenThread: (id: string) => void;
-  onStartSubscription?: (input: { targets: string[]; leaseSeconds: number }) => Promise<unknown>;
+  onStartSubscription?: (input: { source?:string; targets: string[]; leaseSeconds: number }) => Promise<unknown>;
 }
 const states = {
   queued: '排队中',
@@ -42,6 +42,7 @@ export function AiEventSubscriptions(props: AiEventSubscriptionsProps) {
   const [removeConfirm, setRemoveConfirm] = useState(false);
   const [listenTargets, setListenTargets] = useState('');
   const [leaseSeconds, setLeaseSeconds] = useState(1200);
+  const [listenSource,setListenSource]=useState('wechat');
   const draft = selected ? drafts[selected] : undefined;
   const saved = rules.find((r) => r.id === selected);
   const dirty = draft && JSON.stringify(draft) !== JSON.stringify(saved);
@@ -127,15 +128,19 @@ export function AiEventSubscriptions(props: AiEventSubscriptionsProps) {
       )}
       {!draft ? (
         <div className="event-list">
-          {sources.some((s) => s.id === 'wechat' && s.available) && props.onStartSubscription && (
+          {sources.some((s) => s.available) && props.onStartSubscription && (
             <details className="event-listener">
               <summary>
-                微信消息监听 · {subscriptions.filter((s) => s.source === 'wechat').length} 个订阅
+                微信消息监听 · {subscriptions.length} 个订阅
               </summary>
               <div className="event-options">
                 <p className="ai-section-note">
                   触发规则使用插件推送的事件。监听到期后停止接收，启用规则不会自动开启监听。
                 </p>
+                <label>监听机器<select aria-label="监听机器" value={listenSource} onChange={e=>setListenSource(e.target.value)}>
+                  {!sources.some(s=>s.id===listenSource&&s.available)&&<option value={listenSource}>请选择可用机器</option>}
+                  {sources.filter(s=>s.available).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+                </select></label>
                 <label>
                   监听聊天内部 ID（每行一个）
                   <textarea
@@ -160,6 +165,7 @@ export function AiEventSubscriptions(props: AiEventSubscriptionsProps) {
                   className="secondary"
                   disabled={
                     busy ||
+                    !sources.some(s=>s.id===listenSource&&s.available)||
                     !list(listenTargets).length ||
                     !Number.isInteger(leaseSeconds) ||
                     leaseSeconds < 60 ||
@@ -168,6 +174,7 @@ export function AiEventSubscriptions(props: AiEventSubscriptionsProps) {
                   onClick={() =>
                     void perform(async () => {
                       await props.onStartSubscription!({
+                        source:listenSource,
                         targets: list(listenTargets),
                         leaseSeconds,
                       });

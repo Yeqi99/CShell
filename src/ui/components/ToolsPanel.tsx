@@ -1,12 +1,14 @@
 import { DockerPanel } from './DockerPanel';
 import { Box } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { ChevronDown, ChevronRight, Files, X } from 'lucide-react';
 import type { Transfer } from '../../shared/contracts';
 import { useI18n } from '../i18n';
 import { FilePanel } from './FilePanel';
 import { MonitorPanel } from './MonitorPanel';
 export function ToolsPanel({
+  revealRevision = 0,
+  onClose,
   sessionId,
   transfers,
   onError,
@@ -16,6 +18,8 @@ export function ToolsPanel({
   dockerEnabled,
 }: {
   dragHandle?: ReactNode;
+  revealRevision?: number;
+  onClose?: () => void;
   sessionId: string;
   sessionName: string;
   active: boolean;
@@ -28,6 +32,9 @@ export function ToolsPanel({
   const dockerVisible = dockerEnabled && tool === 'docker';
   const [queue, setQueue] = useState(false);
   const [filesOpen, setFilesOpen] = useState(true);
+  useEffect(() => {
+    if (revealRevision > 0) { setTool('files'); setFilesOpen(true); }
+  }, [revealRevision]);
   return (
     <aside className="tools-panel">
       <header className="files-title" title={`${t('toolsFor')} · ${sessionName}`}>
@@ -56,6 +63,7 @@ export function ToolsPanel({
             Docker
           </button>
         )}
+        {onClose && <button className="icon" style={{marginLeft:'auto'}} aria-label={t('close') + ' ' + t('files')} title={t('close') + ' ' + t('files')} onClick={onClose}><X size={14}/></button>}
       </header>
       <div className="tool-content" hidden={!filesOpen || dockerVisible}>
         <FilePanel key={sessionId} sessionId={sessionId} transfers={transfers} onError={onError} />

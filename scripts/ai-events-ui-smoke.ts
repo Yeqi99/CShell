@@ -13,7 +13,7 @@ await build({
     contents: `
 import React,{useState} from 'react';import{createRoot}from'react-dom/client';
 import{AiEventSubscriptions}from'./src/ui/components/AiEventSubscriptions';
-function Fixture(){const[rules,setRules]=useState([]);const[hidden,setHidden]=useState(false);const[fail,setFail]=useState(false);const[available,setAvailable]=useState(true);return <><button onClick={()=>setHidden(!hidden)}>切换页面</button><button onClick={()=>setFail(!fail)}>切换保存故障</button><button onClick={()=>setAvailable(!available)}>切换来源</button><div hidden={hidden}><AiEventSubscriptions rules={rules} sources={available?[{id:'wechat',name:'微信',available:true,eventTypes:[{id:'message',name:'收到消息'}]}]:[]} runs={[]} threads={[{id:'11111111-1111-4111-8111-111111111111',title:'测试会话',providerId:'p'}]} onSave={async r=>{if(fail)throw Error('保存失败：测试故障');setRules(old=>[...old.filter(x=>x.id!==r.id),r]);return r}} onRemove={async id=>setRules(old=>old.filter(r=>r.id!==id))} onRefresh={async()=>{}} onOpenThread={()=>{}}/></div></>};createRoot(document.getElementById('root')).render(<Fixture/>);`,
+function Fixture(){const[rules,setRules]=useState([]);const[hidden,setHidden]=useState(false);const[fail,setFail]=useState(false);const[available,setAvailable]=useState(true);return <><button onClick={()=>setHidden(!hidden)}>切换页面</button><button onClick={()=>setFail(!fail)}>切换保存故障</button><button onClick={()=>setAvailable(!available)}>切换来源</button><div hidden={hidden}><AiEventSubscriptions rules={rules} sources={available?[{id:'wechat',name:'微信',available:true,eventTypes:[{id:'message',name:'收到消息'}]},{id:'wechat.remote.fixture',name:'微信 · 测试服务器',available:true,eventTypes:[{id:'message.received',name:'收到消息'}]}]:[]} runs={[]} threads={[{id:'11111111-1111-4111-8111-111111111111',title:'测试会话',providerId:'p'}]} onSave={async r=>{if(fail)throw Error('保存失败：测试故障');setRules(old=>[...old.filter(x=>x.id!==r.id),r]);return r}} onRemove={async id=>setRules(old=>old.filter(r=>r.id!==id))} onRefresh={async()=>{}} onOpenThread={()=>{}} onStartSubscription={async input=>{window.listenerInput=input}}/></div></>};createRoot(document.getElementById('root')).render(<Fixture/>);`,
     resolveDir: process.cwd(),
     loader: 'tsx',
   },
@@ -42,6 +42,11 @@ try {
   page.setDefaultTimeout(10000);
   page.on('pageerror', (error) => console.error(error.message));
   await page.goto(`http://127.0.0.1:${(server.address() as { port: number }).port}`);
+  await page.getByText('微信消息监听 · 0 个订阅', {exact:true}).click();
+  await page.getByLabel('监听机器', {exact:true}).selectOption('wechat.remote.fixture');
+  await page.getByLabel('监听聊天内部 ID（每行一个）', {exact:true}).fill('filehelper');
+  await page.getByRole('button', {name:'开启消息监听',exact:true}).click();
+  assert.deepEqual(await page.evaluate(()=>(window as any).listenerInput),{source:'wechat.remote.fixture',targets:['filehelper'],leaseSeconds:1200});
   await page.getByRole('button', { name: '新建事件订阅', exact: true }).click();
   assert.equal(await page.getByLabel('启用此订阅（保存后生效）').isChecked(), false);
   await page.getByText('频率与预算', { exact: true }).click();

@@ -56,6 +56,8 @@ struct InputState {
    auto&v=event.at("delta");if(!v.is_number_integer()||(v.is_number_unsigned()&&v.get<uint64_t>()>32767))throw std::runtime_error("integer wheel delta required");
    auto delta=v.get<int64_t>();if(delta < -32768 || delta>32767)throw std::runtime_error("wheel delta overflow");
    if(event.contains("horizontal"))boolean(event.at("horizontal"));sink(event);
+  }else if(kind=="secure-attention"){
+   release();sink(event);
   }else if(kind=="text"){
    const auto text=event.at("text").get<std::string>();if(text.empty()||text.size()>2048||text.find('\0')!=std::string::npos)throw std::runtime_error("invalid text input");sink(event);
   }else throw std::runtime_error("unsupported input kind");

@@ -1,1 +1,201 @@
-.opencode-extension{max-width:840px;margin:0 auto;padding:24px;display:grid;gap:24px}.opencode-extension h2,.opencode-extension h3{margin:0}.opencode-extension p{color:var(--muted);font-size:13px;line-height:1.6}.opencode-heading,.opencode-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.opencode-heading>div{flex:1}.opencode-extension form,.opencode-models{display:grid;gap:14px}.opencode-extension label{display:grid;gap:7px;min-width:0}.opencode-extension input,.opencode-extension select{width:100%;box-sizing:border-box}.opencode-extension button{width:auto;min-height:36px;justify-self:start;white-space:nowrap}.opencode-models,.opencode-usage{border-top:1px solid var(--border);padding-top:20px}.opencode-row label{flex:1;min-width:180px}.opencode-window{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:10px 0}.opencode-window progress{flex:1;min-width:90px}.opencode-window small{width:100%}
+.opencode-extension {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 28px;
+  display: grid;
+  gap: 20px;
+}
+.opencode-extension h2,
+.opencode-extension h3 {
+  margin: 0;
+}
+.opencode-extension h3 {
+  font-size: 15px;
+}
+.opencode-extension p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.65;
+  margin: 8px 0;
+}
+.opencode-heading,
+.opencode-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.opencode-heading > div,
+.opencode-row > h3 {
+  flex: 1;
+}
+.opencode-extension button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  width: auto;
+  white-space: nowrap;
+}
+.opencode-extension form,
+.opencode-models {
+  display: grid;
+  gap: 14px;
+}
+.opencode-extension label {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  font-size: 13px;
+}
+.opencode-extension input {
+  width: 100%;
+  box-sizing: border-box;
+}
+.opencode-card {
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+}
+.opencode-card form {
+  margin-top: 16px;
+}
+.opencode-accounts {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.opencode-accounts button {
+  max-width: 100%;
+  border-radius: 10px;
+}
+.opencode-accounts button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.opencode-extension .selected,
+.opencode-segments button[aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.opencode-badge {
+  color: var(--muted);
+  font-size: 12px;
+  background: var(--bg);
+  padding: 5px 9px;
+  border-radius: 20px;
+}
+.opencode-badge.verified {
+  color: var(--accent);
+}
+.opencode-extension details {
+  font-size: 12px;
+  color: var(--muted);
+}
+.opencode-extension details > label {
+  margin-top: 12px;
+}
+.opencode-extension summary {
+  cursor: pointer;
+  padding: 5px 0;
+}
+.opencode-segments {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  background: var(--bg);
+  border-radius: 10px;
+}
+.opencode-segments button {
+  border-radius: 7px;
+  min-height: 31px;
+}
+.opencode-extension .opencode-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 0 12px;
+  color: var(--muted);
+}
+.opencode-search input {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline-offset: -2px;
+}
+.opencode-model-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  max-height: 260px;
+  overflow: auto;
+  padding: 2px;
+}
+.opencode-model-list button {
+  justify-content: space-between;
+  text-align: left;
+  min-width: 0;
+  white-space: normal;
+  padding: 11px 12px;
+  border-radius: 9px;
+}
+.opencode-model-list button > span {
+  overflow-wrap: anywhere;
+}
+.opencode-model-list small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 3px;
+}
+.opencode-model-list svg {
+  flex-shrink: 0;
+}
+.opencode-window {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 10px 0;
+  font-size: 13px;
+}
+.opencode-window progress {
+  flex: 1;
+  min-width: 90px;
+  accent-color: var(--accent);
+  height: 7px;
+}
+.opencode-window small {
+  width: 100%;
+}
+.opencode-usage > small {
+  color: var(--muted);
+}
+.opencode-feedback [role='alert'] {
+  color: var(--danger, #b42332);
+}
+.opencode-extension button:focus-visible,
+.opencode-extension summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+@media (max-width: 600px) {
+  .opencode-extension {
+    padding: 16px;
+    gap: 14px;
+  }
+  .opencode-card {
+    padding: 14px;
+  }
+  .opencode-model-list {
+    grid-template-columns: 1fr;
+  }
+  .opencode-heading {
+    align-items: flex-start;
+  }
+}

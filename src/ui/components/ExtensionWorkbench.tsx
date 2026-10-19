@@ -1,3 +1,4 @@
+import {TavilyView} from '../../extensions/tavily/View';
 import { usePermissionNavigation } from '../permission-navigation';
 import {OpenCodeView} from '../../extensions/opencode/View';
 import './extension-market.css';
@@ -63,7 +64,7 @@ export function ExtensionWorkbench({
   const { locale } = useI18n(),
     zh = locale === 'zh-CN';
   const [section, setSection] = useState<
-    'plugins' | 'apps' | 'environment' | 'python' | 'wsl' | 'agent' | 'wechat' | 'opencode'
+    'plugins' | 'apps' | 'environment' | 'python' | 'wsl' | 'agent' | 'wechat' | 'opencode' | 'tavily'
   >('plugins');
   const [settingsPlugin, setSettingsPlugin] = useState<string | null>(null);
   const views = availablePluginViews(plugins);
@@ -174,14 +175,14 @@ export function ExtensionWorkbench({
                       ? 'WSL Linux'
                       : section === 'agent'
                         ? 'CAgent'
-                        : section === 'opencode' ? 'OpenCode' : section === 'wechat' ? '微信（实验）' : 'Python'}
+                        : section === 'tavily' ? 'Tavily 搜索' : section === 'opencode' ? 'OpenCode' : section === 'wechat' ? '微信（实验）' : 'Python'}
             </h1>
             <p>
               {section === 'plugins'
                 ? zh
                   ? '按需添加，随时停用。'
                   : 'Add the tools you need.'
-                : section === 'opencode' ? '模型接入扩展' : section === 'wechat' ? '本机微信 · 独立授权' : section === 'agent'
+                : section === 'tavily' ? '网络搜索扩展' : section === 'opencode' ? '模型接入扩展' : section === 'wechat' ? '本机微信 · 独立授权' : section === 'agent'
                   ? zh
                     ? '配置所选 Agent 的连接、权限与服务。'
                     : 'Manage connections, permissions and services on the selected Agent.'
@@ -192,7 +193,7 @@ export function ExtensionWorkbench({
                       : 'Actions belong to the selected connection.'}
             </p>
           </div>
-          {section !== 'plugins' && section !== 'wsl' && section !== 'agent' && section !== 'wechat' && section !== 'opencode' && (
+          {section !== 'plugins' && section !== 'wsl' && section !== 'agent' && section !== 'wechat' && section !== 'opencode' && section !== 'tavily' && (
             <label className="extension-server">
               {zh ? '目标服务器' : 'Target server'}
               <select
@@ -385,8 +386,9 @@ export function ExtensionWorkbench({
         {section === 'agent' && currentView && <AgentWorkbench />}
         {section === 'wechat' && currentView && <WechatPlugin />}
         {section === 'opencode' && currentView && <OpenCodeView />}
+        {section === 'tavily' && currentView && <TavilyView />}
         {section === 'wsl' && currentView && <WslPlugin onOpen={onLocal} />}
-        {section !== 'plugins' && section !== 'wsl' && section !== 'agent' && section !== 'wechat' && section !== 'opencode' && !target && (
+        {section !== 'plugins' && section !== 'wsl' && section !== 'agent' && section !== 'wechat' && section !== 'opencode' && section !== 'tavily' && !target && (
           <div className="extension-empty">
             {zh
               ? '先连接一台服务器，再选择安装或管理环境。'
@@ -398,7 +400,7 @@ export function ExtensionWorkbench({
             className="extension-session"
             key={s.id}
             hidden={
-              section === 'plugins' || section === 'wsl' || section === 'agent' || section === 'wechat' || section === 'opencode' || target !== s.id
+              section === 'plugins' || section === 'wsl' || section === 'agent' || section === 'wechat' || section === 'opencode' || section === 'tavily' || target !== s.id
             }
           >
             <ServerExtensions
@@ -408,10 +410,10 @@ export function ExtensionWorkbench({
                 target === s.id &&
                 section !== 'plugins' &&
                 section !== 'wsl' &&
-                section !== 'wechat' && section !== 'opencode' &&
+                section !== 'wechat' && section !== 'opencode' && section !== 'tavily' &&
                 section !== 'agent'
               }
-              section={section === 'wsl' || section === 'wechat' || section === 'opencode' ? 'plugins' : section}
+              section={section === 'wsl' || section === 'wechat' || section === 'opencode' || section === 'tavily' ? 'plugins' : section}
               plugins={plugins}
               appRequest={appRequest}
               fileRequest={request?.sessionId === s.id ? request : null}

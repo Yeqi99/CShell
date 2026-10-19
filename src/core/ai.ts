@@ -47,6 +47,8 @@ const providerRecord = aiProviderSchema.extend({ key: z.string().max(16000) });
 type Provider = z.infer<typeof providerRecord>;
 export type AiTriggeredRun = { signal: AbortSignal; maxModelCalls: number; maxTokensPerRun: number };
 const eventDeniedTools = new Set(['task_checkpoint','task_log_read','task_start','task_wait','task_stop','task_list','connect_machine','spawn_agent','list_agents','wait_agent','stop_agent','set_goal','resume_goal','pause_goal','report_goal','save_ai_provider','delete_ai_provider','test_ai_provider']);
+// Apply the same restriction to discovery and execution, including future rule mutations.
+const eventToolDenied = (name:string) => eventDeniedTools.has(name) || (name.startsWith('ai_event_') && name !== 'ai_event_list');
 const idSchema = z.string().uuid();
 export const modeSchema = z.enum(['review', 'restricted', 'allow']);
 export class AiService {
@@ -55,6 +57,7 @@ export class AiService {
   private async resolveProvider(p:Provider,session:string){
     return p.extension?{...p,...await this.providerExtensions.resolve(p.extension,session)}:{...p,transport:undefined};
   }
+  extensionTools?: ()=>import('./connections/contracts').ConnectionTool[];
   eventTools?: (threadId:string)=>import('./connections/contracts').ConnectionTool[];
   readonly work: AiWork;
   private childCounts = new Map<string, number>();
@@ -422,6 +425,7 @@ export class AiService {
       {name:'task_checkpoint',capability:'agents.manage',description:'保存目标、用户约束、决策、修改文件、验证与未知结果。检查点不是验收成功。',input:checkpointSchema,needsReview:()=>false,invoke:async(input:unknown)=>{t.checkpoint={...t.checkpoint,phase:'执行中',updatedAt:Date.now(),memory:checkpointSchema.parse(input)};await this.persist();return '检查点已保存';}},
       permissionLinkTool,
       ...(!t.parentId && !t.goal ? this.eventTools?.(t.id) ?? [] : []),
+      ...(this.extensionTools?.() ?? []),
       ...this.providerTools(t),
       ...(this.limits.wechat?.tools() ?? []),
       ...(this.remoteWechat.get(t.id)??[]),
@@ -701,6 +705,17 @@ export class AiService {
   canConsumeWechatEvent(id:string){
     try{return this.canReceiveEvent(id)&&this.allowed(this.thread(id),'wechat_events');}catch{return false;}
   }
+  canConsumeRemoteWechatEvent(id:string,sessionId:string){
+    try {
+      const thread=this.thread(id),scope=this.connections.scope(sessionId);
+      if(!this.canReceiveEvent(id)||thread.sessionId!==sessionId||!scope)return false;
+      if(thread.boundIdentity)this.checkWorkTarget(thread);
+      return [this.policy,thread.permissionCeiling].filter((p):p is AiPolicy=>!!p).every(p=>{
+        const caller=aiCallerPolicy(p);
+        return allowsApplication(caller,'wechat.read')&&allowsCapability(caller,scope,'agent.manage');
+      });
+    }catch{return false;}
+  }
   async sendTriggered(id:string,input:string,limits:AiTriggeredRun) {
     if(!this.canReceiveEvent(id))throw new Error('请选择普通智能体会话；目标任务或子任务不能由事件唤醒');
     z.number().int().min(1).max(4).parse(limits.maxModelCalls);
@@ -843,7 +858,7 @@ export class AiService {
       }
       const available = [...this.applicationTools(t), ...machineTools]
         .filter((d) => this.allowed(t, d.name))
-        .filter((d) => !triggered || !eventDeniedTools.has(d.name))
+        .filter((d) => !triggered || !eventToolDenied(d.name))
         .map((d) => ({
           type: 'function',
           function: {
@@ -938,8 +953,7 @@ export class AiService {
         let callTarget = call.function.name === 'connect_machine' ? '连接目标' : t.target;
         try {
           const args = JSON.parse(call.function.arguments);
-          if(triggered&&eventDeniedTools.has(call.function.name))throw new Error('事件运行不允许创建新任务或修改模型基座');
-          if(triggered && call.function.name.startsWith('ai_event_') && call.function.name!=='ai_event_list')throw new Error('事件触发任务不能修改事件订阅；请在普通对话中管理');
+          if(triggered&&eventToolDenied(call.function.name))throw new Error('事件运行不能修改订阅、创建新任务或修改模型基座；请在普通对话中管理');
           if (!this.allowed(t, call.function.name, args))
             throw new Error('Capability or server scope denied');
           if (call.function.name === 'connect_machine') {
