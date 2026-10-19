@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'node:net';
-import { writeFile } from 'node:fs/promises';
+import { realpath, writeFile } from 'node:fs/promises';
 import type { ElectronApplication, Page } from 'playwright';
 export async function mcpDesktopSmoke(app: ElectronApplication, page: Page) {
   const probe = createServer();
@@ -35,6 +35,9 @@ export async function mcpDesktopSmoke(app: ElectronApplication, page: Page) {
   // Stub only the native picker in this isolated test app; exercise the real
   // IPC identity capture, settings draft, persistence and API permission path.
   const selectedRoot = await app.evaluate(({ app }) => app.getPath('userData'));
+  // Native pickers can return Windows 8.3 paths (or macOS /var aliases).
+  // The grant stores/displays its canonical identity, not the picker spelling.
+  const grantedRoot = await realpath(selectedRoot);
   await writeFile(`${selectedRoot}/api-read-fixture.txt`, 'desktop root read');
   await app.evaluate(({ dialog }, path) => {
     const original = dialog.showOpenDialog;
@@ -45,7 +48,7 @@ export async function mcpDesktopSmoke(app: ElectronApplication, page: Page) {
   }, selectedRoot);
   await panel.locator('summary').filter({ hasText: '本机文件读取范围' }).click();
   await panel.getByRole('button', { name: '选择只读目录', exact: true }).click();
-  await panel.getByText(selectedRoot, { exact: true }).waitFor();
+  await panel.getByText(grantedRoot, { exact: true }).waitFor();
   await panel.locator('summary').filter({ hasText: '修改操作授权' }).click();
   assert.equal(await panel.getByLabel('创建文件', { exact: true }).isChecked(), false);
   assert.equal(await panel.getByLabel('写入文件', { exact: true }).isChecked(), false);
@@ -191,7 +194,7 @@ export async function mcpDesktopSmoke(app: ElectronApplication, page: Page) {
   );
   await panel.screenshot({ path: 'test-results/mcp-settings.png' });
   await panel.locator('summary').filter({ hasText: '本机文件读取范围' }).click();
-  await panel.getByText(selectedRoot, { exact: true }).waitFor();
+  await panel.getByText(grantedRoot, { exact: true }).waitFor();
   await panel.getByRole('button', { name: '移除范围', exact: true }).click();
   await save();
   await page.locator('.settings-savebar').waitFor({ state: 'hidden' });
