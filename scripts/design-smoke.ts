@@ -32,7 +32,8 @@ export async function designSmoke(app: ElectronApplication, page: Page) {
   assert.equal(await editor.getByLabel('用户名').inputValue(), 'root');
   await editor.getByRole('button', { name: '连接', exact: true }).click();
   assert.equal(await name.getAttribute('aria-invalid'), 'true');
-  await editor.getByRole('button', { name: '粘贴连接信息', exact: true }).click();
+  await editor.getByRole('button', { name: '从文本填写', exact: true }).click();
+  await editor.getByRole('button', { name: '粘贴文本', exact: true }).click();
   await editor.getByRole('button', { name: '提取并填写', exact: true }).click();
   await editor.getByText('已填入连接信息，仍可手动修改。', { exact: true }).waitFor();
   assert.equal(await name.inputValue(), 'example.test');
@@ -40,9 +41,10 @@ export async function designSmoke(app: ElectronApplication, page: Page) {
   assert.equal(await editor.getByLabel('端口').inputValue(), '2222');
   assert.equal(await editor.locator('.connection-secret input').inputValue(), 'draft-secret');
   await page.evaluate(() => window.cshell.copyText('ssh host -J jump'));
-  await editor.getByRole('button', { name: '粘贴连接信息', exact: true }).click();
+  await editor.getByRole('button', { name: '从文本填写', exact: true }).click();
+  await editor.getByRole('button', { name: '粘贴文本', exact: true }).click();
   await editor.getByRole('button', { name: '提取并填写', exact: true }).click();
-  await editor.getByRole('alert').filter({ hasText: '未找到可识别的 SSH 信息' }).waitFor();
+  await editor.getByRole('alert').filter({ hasText: '未找到与当前连接类型匹配的信息' }).waitFor();
   assert.equal(await name.inputValue(), 'example.test');
   await name.fill('127.0.0.1');
   await editor.getByLabel('用户名').fill('root');
