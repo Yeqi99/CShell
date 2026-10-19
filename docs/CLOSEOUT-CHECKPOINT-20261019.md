@@ -1,5 +1,13 @@
 # 2026-10-19 收口检查点
 
+## 发布完成（优先于下方历史）
+
+- 0.6.39 已公开为 GitHub 开源预览版：https://github.com/Yeqi99/CShell/releases/tag/v0.6.39 。共 15 个平台包及 SHA256SUMS.txt；上传后的大小和 SHA256 全部核对通过。
+- 所有附件来自 run 39259563403 的同一源码 667f538560e5658b22282f9256b8d24a5cf5be9a。Windows 失败作业重跑后成功，macOS/Linux 双架构、Android API 29/35 均成功。旧发布清单误要求 CAgent ZIP，已修为实际 EXE 并通过测试；使用修正后的同等校验流程恢复发布，没有跳过平台验收或混用旧包。
+- Windows 完整桌面烟测和 11 项专项最终通过；MCP 文件级进程异常未复现，单独 TAP 六次及 CI 重跑通过。AI 目标测试曾出现临时 fetch failed，后续原始传输两次及 CI 通过，未据此修改业务逻辑。
+- 本机 CShell/CAgent 已安装 0.6.39 并打开，设备身份保留。真实锁屏输入、虚拟驱动加载、纯无屏/重启、Android/macOS 用户设备和实际用户 Key 验收仍按用户安排延后，不能用构建或模拟器结果代替。
+- 发布回执与附件来源：.local/recovery-39259563403/provenance.json、published.json；本机安装回执见下方记录。
+
 ## 21:08 最新状态（优先于下方历史）
 
 - CShell 与 CAgent 0.6.39 已安装本机并打开，安装摘要核对通过，CAgent 设备身份保持不变。记录见 test-results/closeout-0.6.39-installed.json 和 cagent-0.6.39-installed.json。
