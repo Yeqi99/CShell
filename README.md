@@ -64,6 +64,8 @@ CAgent 新配置为已认证控制端提供较宽松的默认能力。部署到�
 
 ## 下载与平台
 
+详细差异见 [平台能力表](docs/PLATFORMS.md)。
+
 从 [GitHub Releases](https://github.com/Yeqi99/CShell/releases) 选择对应系统和架构，核对该版本的发布说明及 `SHA256SUMS.txt`。下表说明产品平台与包类型，不表示尚未上传的版本已经发布。
 
 | 平台 | CShell 客户端 | 独立 CAgent |

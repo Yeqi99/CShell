@@ -28,6 +28,10 @@ try {
       return { response: 1, checkboxChecked: false };
     }) as any;
   }, source);
+  // Local files belong to the terminal work surface, not the new home page.
+  await page.getByLabel('新建本机终端', { exact: true }).click();
+  await page.getByRole('menuitem', { name: 'CMD', exact: true }).click();
+  await page.locator('.session-tab').filter({ hasText: 'CMD' }).waitFor();
   await page.getByRole('button', { name: '本地文件', exact: true }).click();
   await page.getByRole('button', { name: '选择目录', exact: true }).click();
   const panes = page.locator('.local-directory-pane');
