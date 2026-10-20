@@ -68,6 +68,8 @@ CAgent 新配置为已认证控制端提供较宽松的默认能力。部署到�
 
 从 [GitHub Releases](https://github.com/Yeqi99/CShell/releases) 选择对应系统和架构，核对该版本的发布说明及 `SHA256SUMS.txt`。下表说明产品平台与包类型，不表示尚未上传的版本已经发布。
 
+[0.7.0 预发布](https://github.com/Yeqi99/CShell/releases/tag/v0.7.0) 已提供下列平台安装包，构建与检查结果见[发布验证](docs/RELEASE-0.7.0-VERIFIED.md)。
+
 | 平台 | CShell 客户端 | 独立 CAgent |
 | --- | --- | --- |
 | Windows x64 | `.exe` 安装包；完整桌面工作台 | `.exe` 安装包；原生小窗，Windows 应用能力 |
