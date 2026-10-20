@@ -32,5 +32,7 @@ CShell 设置 → 关于与更新 → 打开日志目录。默认路径为 `%APP
 - 真实 Electron 日志冒烟通过：渲染错误、IPC 错误、脱敏和日志目录入口。
 - SSH 文件面板关闭后重开、快捷键、目录和会话保留通过。
 - 设置分类、跨分类草稿、保存/取消、暗色/窄窗口和底部操作区通过。
+- Windows CShell 0.7.2 安装完成，版本、已安装 ASAR 与构建产物哈希一致，窗口重新打开。
+- CAgent 0.7.2 安装包完成隔离安装，并对安装后的真实运行时验证 CMD PTY、TLS、授权与停止流程。安装包未签名，本轮未创建 GitHub Release。
 
 本机详细产物位于 `test-results/windows-error-full-tests.log`、`windows-diagnostics-smoke.json`、`windows-wsl-recovery-verified.json`、`windows-ssh-reopen.log` 和 `windows-settings-smoke.log`。本轮未向用户的远端服务器发送控制输入，也未验证真实公网长时间视频播放或所有显示器/锁屏组合。
