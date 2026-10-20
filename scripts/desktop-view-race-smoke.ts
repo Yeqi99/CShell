@@ -167,7 +167,13 @@ try {
   assert.equal(state.starts.at(-1).quality.fps, 144);
   await page.reload();await page.getByLabel('控制键鼠',{exact:true}).check();await page.getByRole('button',{name:'连接桌面',exact:true}).click();
   await page.evaluate(()=>{const w=window as any;w.receive({id:w.starts.at(-1).id,type:'error',message:'INPUT_DISABLED: 测试输入不可用，保留画面'});w.pending.shift()();});
-  await page.getByText('仅观看',{exact:true}).waitFor();await page.getByText('测试输入不可用，保留画面',{exact:true}).waitFor();
+  await page.getByText('测试输入不可用，保留画面',{exact:true}).waitFor();
+  // The checkbox retains the user's preference while actual input stays disabled.
+  assert.equal(await page.getByLabel('控制键鼠',{exact:true}).isChecked(), true);
+  const deniedInputs = await page.evaluate(() => (window as any).inputs.length);
+  await page.locator('canvas').focus();
+  await page.keyboard.press('a');
+  assert.equal(await page.evaluate(() => (window as any).inputs.length), deniedInputs);
   assert.deepEqual(errors, []);
   await writeFile(
     'test-results/desktop-view-races.json',
