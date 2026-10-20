@@ -1,7 +1,7 @@
 import { LocalEnvironmentSettings } from './LocalEnvironmentSettings';
 import { Palette, Terminal, PanelsTopLeft, Blocks, ShieldCheck, Download } from 'lucide-react';
 import { UpdateSettings } from './UpdateSettings';
-import { useEffect, useLayoutEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { defaults, type Preferences } from '../../shared/contracts';
 import { useI18n } from '../i18n';
 import { PresetControls } from './PresetControls';
@@ -42,6 +42,7 @@ export function Settings({
     [fontState, setFontState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [busy, setBusy] = useState(false);
   const mcp = useMcpSettings();
+  const observedLayout = useRef(value.layout);
   useLayoutEffect(() => {
     if (themeRequest) {
       setDraft((current) => ({ ...current, theme: themeRequest.theme }));
@@ -66,12 +67,18 @@ export function Settings({
       onPreview(null);
     };
   }, [onPreview]);
-  useEffect(() => {
-    setDraft((current) => (current.layout === layout ? current : { ...current, layout }));
-  }, [layout]);
   useLayoutEffect(() => {
+    // Synchronize the external layout before publishing a preview. A passive
+    // layout update can otherwise chase the previous preview back from the
+    // parent when a form change and a workspace resize happen together.
+    const externalLayoutChanged = observedLayout.current !== layout;
+    observedLayout.current = layout;
+    if (externalLayoutChanged && draft.layout !== layout) {
+      setDraft(current => current.layout === layout ? current : { ...current, layout });
+      return;
+    }
     onPreview(draft);
-  }, [draft, onPreview]);
+  }, [draft, layout, onPreview]);
   const importBackground = async (token?: string) => {
     setBusy(true);
     setError('');

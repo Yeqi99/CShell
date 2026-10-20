@@ -28,7 +28,14 @@ async function main() {
   try {
     const page = await app.firstWindow();
     page.setDefaultTimeout(15000);
-    page.on('pageerror', (error) => errors.push(error.message));
+    page.on('pageerror', (error) => {
+      errors.push(error.message);
+      console.error(`[renderer error ${new Date().toISOString()}]`, error.stack ?? error.message);
+      void page.evaluate(() => ({
+        active: document.activeElement?.outerHTML,
+        workspace: [...document.querySelectorAll('.workspace-editor:not([hidden])')].map(el => el.textContent?.slice(0, 250)),
+      })).then(state => console.error('Renderer state:', JSON.stringify(state))).catch(() => {});
+    });
     await page.getByRole('heading', { name: '工作台', exact: true }).waitFor();
     await page.waitForFunction(
       () => document.querySelector<HTMLImageElement>('.brand-mark')?.naturalWidth === 256,

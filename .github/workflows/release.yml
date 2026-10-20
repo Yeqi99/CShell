@@ -39,6 +39,9 @@ jobs:
       - if: matrix.platform == 'win'
         run: pnpm exec tsx scripts/ai-ui-smoke.ts
       - if: matrix.platform == 'win'
+        name: Verify settings preview and layout update convergence
+        run: pnpm exec tsx scripts/settings-preview-race-smoke.ts
+      - if: matrix.platform == 'win'
         run: pnpm exec tsx scripts/activity-smoke.ts
       - if: matrix.platform == 'win'
         name: Verify compact workbench and desktop layouts
