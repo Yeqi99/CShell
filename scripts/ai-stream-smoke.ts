@@ -40,7 +40,7 @@ const app = await electron.launch({
 });
 try {
   const page = await app.firstWindow();
-  await page.getByRole('heading', { name: '尚未连接' }).waitFor();
+  await page.getByRole('heading', { name: '工作台', exact: true }).waitFor();
   await page.getByRole('button', { name: 'AI 智能体', exact: true }).click();
   const panel = page.getByRole('complementary', { name: 'AI 智能体' });
   await panel.getByRole('heading', { name: '连接你的 AI' }).waitFor();

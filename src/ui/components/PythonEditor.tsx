@@ -1,6 +1,6 @@
 import { HighlightStyle, syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
 import { useEffect, useRef, useState } from 'react';
-import { EditorState } from '@codemirror/state';
+import { EditorState, Compartment } from '@codemirror/state';
 import {
   EditorView,
   keymap,
@@ -14,6 +14,7 @@ import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirro
 import { linter, lintGutter } from '@codemirror/lint';
 import { Save, RotateCcw } from 'lucide-react';
 import { useI18n } from '../i18n';
+import { shellLanguage } from '../text-languages';
 
 const pythonHighlightStyle = HighlightStyle.define(
   defaultHighlightStyle.specs.map((style) =>
@@ -32,17 +33,30 @@ export function PythonEditor({
   path,
   connected,
   onDependency,
+  textFile = false,
+  initialRealtime = false,
+  languageMode = 'text',
 }: {
   sessionId: string;
   python: string;
   path?: string;
   connected: boolean;
   onDependency: () => void;
+  textFile?: boolean;
+  initialRealtime?: boolean;
+  languageMode?: 'text' | 'shell' | 'python';
 }) {
   const { locale } = useI18n(),
     zh = locale === 'zh-CN';
   const host = useRef<HTMLDivElement>(null),
     view = useRef<EditorView | null>(null);
+  const language = useRef(new Compartment());
+  const [realtime, setRealtime] = useState(initialRealtime);
+  const savingLock = useRef(false);
+  const versions = useRef<string[]>([]);
+  const [versionCount, setVersionCount] = useState(0);
+  const readFile = textFile ? window.cshell.textReadFile : window.cshell.pythonReadFile;
+  const writeFile = textFile ? window.cshell.textSaveFile : window.cshell.pythonSaveFile;
   const [code, setCode] = useState(''),
     [revision, setRevision] = useState(''),
     [savedCode, setSavedCode] = useState('');
@@ -78,7 +92,7 @@ export function PythonEditor({
   useEffect(() => {
     let cancelled = false;
     if (path)
-      void window.cshell.pythonReadFile(sessionId, path).then(
+      void readFile(sessionId, path).then(
         (result) => {
           if (!cancelled) {
             setCode(result.code);
@@ -96,27 +110,34 @@ export function PythonEditor({
     };
   }, [sessionId, path]);
   const save = async () => {
-    if (!path || !state.current.connected || saving) return;
+    if (!path || !state.current.connected || savingLock.current) return;
     const text = view.current?.state.doc.toString() ?? code;
+    if (text === savedCode) return;
+    savingLock.current = true;
     setSaving(true);
     setError('');
     try {
-      const result = await window.cshell.pythonSaveFile(sessionId, path, text, revision);
+      const result = await writeFile(sessionId, path, text, revision);
+      versions.current.push(savedCode);
+      while (versions.current.length > 8 || versions.current.reduce((n, value) => n + value.length * 2, 0) > 2_000_000) versions.current.shift();
+      setVersionCount(versions.current.length);
       setRevision(result.revision);
       setSavedCode(text);
     } catch (e) {
       setError(String(e));
     } finally {
+      savingLock.current = false;
       setSaving(false);
     }
   };
   const reload = async () => {
-    if (!path || !connected) return;
+    if (!path || !connected || savingLock.current) return;
+    savingLock.current = true;
     setReloadConfirm(false);
     setSaving(true);
     setError('');
     try {
-      const result = await window.cshell.pythonReadFile(sessionId, path);
+      const result = await readFile(sessionId, path);
       view.current?.dispatch({
         changes: { from: 0, to: view.current.state.doc.length, insert: result.code },
       });
@@ -127,11 +148,20 @@ export function PythonEditor({
     } catch (e) {
       setError(String(e));
     } finally {
+      savingLock.current = false;
       setSaving(false);
     }
   };
   const saveRef = useRef(save);
   saveRef.current = save;
+  useEffect(() => {
+    if (!realtime || !ready || !connected || saving || error || code === savedCode) return;
+    const timer = setTimeout(() => void saveRef.current(), 350);
+    return () => clearTimeout(timer);
+  }, [realtime, ready, connected, saving, error, code, savedCode]);
+  useEffect(() => {
+    view.current?.dispatch({ effects: language.current.reconfigure(!textFile || languageMode === 'python' ? pythonLanguage() : languageMode === 'shell' ? shellLanguage : []) });
+  }, [languageMode, textFile, ready]);
   useEffect(() => {
     if (!ready || !host.current) return;
     const editor = new EditorView({
@@ -142,8 +172,8 @@ export function PythonEditor({
           lineNumbers(),
           highlightActiveLine(),
           drawSelection(),
-          history(),
-          pythonLanguage(),
+          history({ minDepth: 20 }),
+          language.current.of(!textFile || languageMode === 'python' ? pythonLanguage() : languageMode === 'shell' ? shellLanguage : []),
           syntaxHighlighting(pythonHighlightStyle),
           lintGutter(),
           keymap.of([
@@ -252,6 +282,18 @@ export function PythonEditor({
           {path && code !== savedCode ? ' •' : ''}
         </span>
         {path && (
+          <select aria-label={zh ? '同步模式' : 'Sync mode'} value={realtime ? 'live' : 'save'} onChange={event => setRealtime(event.target.value === 'live')}>
+            <option value="save">{zh ? '保存模式' : 'Save manually'}</option>
+            <option value="live">{zh ? '实时模式' : 'Live sync'}</option>
+          </select>
+        )}
+        {path && versionCount > 0 && <button disabled={saving || !connected} title={zh ? '恢复上一个保存版本到编辑区，实时模式会暂停' : 'Restore previous saved content; pauses live sync'} onClick={() => {
+          const previous = versions.current.pop();
+          if (previous === undefined || !view.current) return;
+          setRealtime(false);setVersionCount(versions.current.length);
+          view.current.dispatch({ changes: { from: 0, to: view.current.state.doc.length, insert: previous } });
+        }}>{zh ? '回退' : 'Restore'}</button>}
+        {path && (
           <button
             className="icon"
             disabled={!connected || saving}
@@ -299,7 +341,7 @@ export function PythonEditor({
           )}
         </div>
       )}
-      {!python && (
+      {!python && !textFile && (
         <p className="muted">
           {zh
             ? '选择 Python 环境以启用语义补全。'
@@ -308,6 +350,8 @@ export function PythonEditor({
       )}
       <div className="python-code" ref={host} />
       <footer>
+        {saving ? (zh ? '同步中 · ' : 'Syncing · ') : path && code !== savedCode ? (zh ? '未保存 · ' : 'Unsaved · ') : path ? (zh ? '已同步 · ' : 'Synced · ') : ''}
+        {error && realtime ? (zh ? '实时同步已暂停 · ' : 'Live sync paused · ') : ''}
         {signature || (python ? `${python} · Ctrl+Space` : '')}
         {!connected && (zh ? ' · 已断开' : ' · Disconnected')}
       </footer>

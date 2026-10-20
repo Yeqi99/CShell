@@ -12,7 +12,7 @@ import {
 import './view.css';
 const call = (action: string, input?: unknown) =>
   window.cshell.aiExtensionCall('cshell.opencode', action, input) as Promise<any>;
-type Account = { id: string; name: string; workspace: string };
+type Account = { id: string; name: string; workspace: string; providerId?:string };
 type Model = { id: string; available: boolean };
 export function OpenCodeView() {
   const [login, setLogin] = useState<any>(null),
@@ -98,12 +98,13 @@ export function OpenCodeView() {
       if (polling) return;
       polling = true;
       void call('login-poll', { id: login.id })
-        .then((s) => {
+        .then(async (s) => {
           if (!active || s.pending) return;
           setAccounts(s.accounts);
           select(s.accounts.find((a: Account) => a.id === s.id));
           setLogin(null);
-          setMessage('浏览器登录成功，可检测并添加模型');
+          await call('connect', { id: s.id });
+          setMessage('浏览器登录成功，账号模型已加入智能体');
         })
         .catch((e) => {
           if (active) {
@@ -121,9 +122,17 @@ export function OpenCodeView() {
       void call('login-cancel', { id: login.id }).catch(() => {});
     };
   }, [login]);
-  const verify = async (id: string) => {
+  const verify = async (id: string, inference = false) => {
     setCheck(null);
     setUsage(null);
+    const connected=await call('connect', { id });
+    setAccounts(previous=>previous.map(a=>a.id===id?{...a,providerId:connected.id}:a));
+    if (!inference) {
+      setCheck({authenticated:true});
+      try { setUsage(await call('usage', {id})); } catch {}
+      setMessage('账号已验证并接入，可在智能体中选择 Go 与 Zen 模型');
+      return;
+    }
     const result = await call('check', { id, tier, ...(model ? { model } : {}) });
     setCheck(result);
     setModels(result.models);
@@ -203,8 +212,8 @@ export function OpenCodeView() {
               编辑密钥 <ChevronDown size={14} />
             </button>
           )}
-          <span className={'opencode-badge ' + (check ? 'verified' : '')}>
-            {check ? '已验证调用' : account ? '已保存，待检测' : '尚未配置'}
+          <span className={'opencode-badge ' + (check || account?.providerId ? 'verified' : '')}>
+            {check?.model ? '已验证调用' : check || account?.providerId ? '账号已接入' : account ? '已保存，待检测' : '尚未配置'}
           </span>
         </div>
         {(editing || !account) && (
@@ -286,7 +295,7 @@ export function OpenCodeView() {
           </form>
         )}
         <p className="opencode-hint">
-          检测会发送一条简短测试请求，使用所选套餐的少量额度。密钥仅加密保存在本机。
+          保存后验证密钥并接入账号。仅“检测所选模型”发送简短请求，可能使用少量额度。
         </p>
       </div>
       <div className="opencode-card opencode-models">
@@ -297,7 +306,7 @@ export function OpenCodeView() {
               Go 套餐
             </button>
             <button disabled={busy} aria-pressed={tier === 'zen'} onClick={() => setTier('zen')}>
-              按量计费
+              免费与按量
             </button>
           </div>
           <button
@@ -314,7 +323,7 @@ export function OpenCodeView() {
         <p className="opencode-hint">
           {tier === 'go'
             ? '使用 Go 目录，不自动切换到按量计费。'
-            : '使用按量计费目录，与 Go 套餐分别检测。'}
+            : 'Zen 目录包含免费与按量模型，实际计费与账号权限以官方为准。'}
         </p>
         <label className="opencode-search">
           <Search size={17} />
@@ -358,21 +367,17 @@ export function OpenCodeView() {
             className="primary"
             onClick={() =>
               void run(async () => {
-                await call('add', {
-                  accountId: selected,
-                  tier,
-                  model,
-                  name: `${account?.name} · ${model}`,
-                });
-                setMessage('已添加到智能体基座，可在智能体中选择');
+                const connected=await call('connect', { id: selected });
+                setAccounts(previous=>previous.map(a=>a.id===selected?{...a,providerId:connected.id}:a));
+                setMessage('已接入账号，可在智能体中直接选择其模型');
               })
             }
           >
-            添加为智能体基座
+            接入此账号
           </button>
           <button
             disabled={busy || !model || !account}
-            onClick={() => void run(() => verify(selected))}
+            onClick={() => void run(() => verify(selected, true))}
           >
             检测所选模型
           </button>

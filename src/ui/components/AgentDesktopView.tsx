@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Monitor, Square, SlidersHorizontal, Expand, Minimize, Maximize } from 'lucide-react';
+import { Monitor, Square, SlidersHorizontal, Expand, Minimize, Maximize, MoreHorizontal } from 'lucide-react';
 import {
   desktopQualitySchema,
   type DesktopVideoInfo,
@@ -14,21 +14,32 @@ export function AgentDesktopView({
   canView,
   canControl,
   onFiles,
+  autoConnect = false,
 }: {
   target: string;
   canView: boolean;
   canControl: boolean;
   onFiles?: () => void;
+  autoConnect?: boolean;
 }) {
   const [active, setActive] = useState(false),
     [busy, setBusy] = useState(false),
     [reconnecting, setReconnecting] = useState(''),
-    [control, setControl] = useState(canControl),
+    [control, setControl] = useState(true),
     [error, setError] = useState(''),
     [info, setInfo] = useState<DesktopVideoInfo>();
+  const requestedControl=useRef(true);
   const [qualityOpen,setQualityOpen]=useState(false);
+  const [toolsOpen,setToolsOpen]=useState(false);
   const [picture, setPicture] = useState('等待远端画面…');
+  const toolbar = useRef<HTMLDivElement>(null);
   const view = useRef<HTMLElement>(null), screen = useRef<HTMLDivElement>(null);
+  useEffect(()=>{
+    const bar=toolbar.current;if(!bar)return;
+    const resize=()=>view.current?.style.setProperty('--desktop-toolbar-height',`${Math.max(52,bar.getBoundingClientRect().height)}px`);
+    const observer=new ResizeObserver(resize);observer.observe(bar);resize();
+    return()=>observer.disconnect();
+  },[]);
   const [expanded,setExpanded]=useState(false),[fullscreen,setFullscreen]=useState(false);
   const [frameSize,setFrameSize]=useState<{width:number;height:number}>();
   useEffect(()=>{
@@ -102,9 +113,9 @@ export function AgentDesktopView({
     void window.cshell.desktopViewInput(session, event, wire).catch((e) => {
       if (id.current !== session) return;
       if (wire !== wireGeneration.current) return;
+      if(/not ready|正在重连|过期的桌面连接/.test(String(e)))return;
       setError(String(e));
       controlling.current = false;
-      setControl(false);
       release();
     });
   };
@@ -116,7 +127,7 @@ export function AgentDesktopView({
     setInfo(undefined);
     setPicture('等待远端画面…');
     setError('');
-    setControl(permissions.current.canControl);
+    setControl(requestedControl.current);
     const off = window.cshell.onDesktopViewEvent((event) => {
       if (event.id !== id.current) return;
       if ((event.generation ?? 1) < wireGeneration.current) return;
@@ -125,8 +136,9 @@ export function AgentDesktopView({
         stopDecoder();
         wireGeneration.current = event.generation ?? 1;
         const ready = event.state === 'connected';
-        controlling.current = ready && event.control && permissions.current.canControl;
-        setControl(controlling.current);
+        if(ready)inputDenied.current=false;
+        controlling.current = ready && event.control && requestedControl.current && permissions.current.canControl;
+
         setActive(true);
         setBusy(false);
         setReconnecting(
@@ -153,7 +165,9 @@ export function AgentDesktopView({
       if (event.type === 'error') {
         // Older agents transport this recoverable progress notice as an error.
         if(['桌面采集未输出首帧，正在切换兼容采集…','桌面采集暂未更新，正在切换兼容采集…'].includes(event.message)){setPicture(event.message);return;}
-        if(event.message.startsWith('INPUT_DISABLED: ')){inputDenied.current=true;controlling.current=false;setControl(false);release();}
+        if(event.message==='INPUT_RESUMED'){inputDenied.current=false;controlling.current=requestedControl.current&&permissions.current.canControl;setPicture('');setError('');return;}
+        if(event.message.startsWith('INPUT_SUSPENDED: ')){controlling.current=false;release();setPicture(event.message.slice(17));return;}
+        if(event.message.startsWith('INPUT_DISABLED: ')){inputDenied.current=true;controlling.current=false;release();}
         setError(event.message.replace(/^INPUT_DISABLED: /,''));
         return;
       }
@@ -257,7 +271,6 @@ export function AgentDesktopView({
   useEffect(() => {
     if (!canControl) {
       controlling.current = false;
-      setControl(false);
       release();
     }
     if (!canView) {
@@ -290,15 +303,15 @@ export function AgentDesktopView({
         id: key,
         target,
         quality: validated,
-        control: control && canControl,
+        control: canControl,
       });
       if (epoch !== generation.current || id.current !== key || !permissions.current.canView) {
         void window.cshell.desktopViewStop(key).catch(() => {});
         return;
       }
       setActive(true);
-      controlling.current = result.control && permissions.current.canControl && !inputDenied.current;
-      setControl(controlling.current);
+      controlling.current = result.control && requestedControl.current && permissions.current.canControl && !inputDenied.current;
+
       if (!controlling.current) release();
     } catch (e) {
       if (epoch === generation.current && id.current === key) {
@@ -311,6 +324,10 @@ export function AgentDesktopView({
       if (epoch === generation.current) setBusy(false);
     }
   };
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (autoConnect && canView && !autoStarted.current) { autoStarted.current = true; void start(); }
+  }, [autoConnect, canView]);
   const stop = async () => {
     const epoch = ++generation.current,
       key = id.current;
@@ -365,13 +382,14 @@ export function AgentDesktopView({
     }
   };
   return (
-    <section ref={view} className={'agent-desktop-view'+(expanded?' desktop-expanded':'')} aria-label="CAgent 远程桌面" onKeyDownCapture={event=>{
+    <section ref={view} className={'agent-desktop-view'+(expanded?' desktop-expanded':'')+(toolsOpen?' desktop-tools-open':'')+(active?' desktop-is-active':'')} aria-label="CAgent 远程桌面" onKeyDownCapture={event=>{
       if(event.key==='Escape'&&document.fullscreenElement===view.current){
         event.preventDefault();event.stopPropagation();release();
         void document.exitFullscreen().catch(e=>setError('无法退出全屏：'+String(e)));
       }
     }}>
-      <div className="desktop-toolbar">
+      <button className="desktop-compact-toggle" title={toolsOpen?'收起桌面工具':'展开桌面工具'} aria-label={toolsOpen?'收起桌面工具':'展开桌面工具'} aria-expanded={toolsOpen} onClick={()=>setToolsOpen(v=>!v)}><MoreHorizontal size={18}/></button>
+      <div ref={toolbar} className="desktop-toolbar">
         <strong>
           <Monitor size={16} />
           远程桌面
@@ -383,7 +401,7 @@ export function AgentDesktopView({
                 type="checkbox"
                 checked={control}
                 disabled={!canControl || busy}
-                onChange={(e) => setControl(e.target.checked)}
+                onChange={(e) => {requestedControl.current=e.target.checked;setControl(e.target.checked);}}
               />
               控制键鼠
             </label>
@@ -393,7 +411,7 @@ export function AgentDesktopView({
           </>
         ) : (
           <>
-            <span>{control ? '键鼠控制' : '仅观看'}</span>
+            <label><input type="checkbox" checked={control} disabled={!canControl} onChange={e=>{requestedControl.current=e.target.checked;setControl(e.target.checked);controlling.current=e.target.checked&&canControl&&!inputDenied.current;release();}}/>控制键鼠</label>
             <button onClick={() => void stop()}>
               <Square size={13} />
               断开
@@ -409,11 +427,14 @@ export function AgentDesktopView({
       </div>
       {qualityOpen && (
           <div className="desktop-quality">
+            <div className="desktop-presets" aria-label="画质预设">{(['低','中','高','超高','无上限'] as const).map((name,index)=><button key={name} aria-pressed={index===4?!!quality.unlimited:!quality.unlimited&&quality.fps===[24,30,60,90][index]&&quality.bitrate===[2000000,5000000,12000000,30000000][index]} onClick={()=>setQuality({display:quality.display,fps:[24,30,60,90,60][index],bitrate:[2000000,5000000,12000000,30000000,12000000][index],adaptive:true,...(index===4?{unlimited:true}:{})})}>{name}</button>)}</div>
+            {quality.unlimited&&<small>无上限：从原生分辨率、60 帧开始，持续测量网络和编解码余量，逐步提升，拥塞时降低。需要新版 CAgent。</small>}
             <label>
               目标帧率
               <input
                 type="number"
                 min={1}
+                disabled={quality.unlimited}
                 value={quality.fps}
                 onChange={(e) => setQuality({ ...quality, fps: Number(e.target.value) })}
               />
@@ -424,6 +445,7 @@ export function AgentDesktopView({
                 type="number"
                 min={0.001}
                 step={1}
+                disabled={quality.unlimited}
                 value={quality.bitrate / 1000000}
                 onChange={(e) =>
                   setQuality({ ...quality, bitrate: Math.round(Number(e.target.value) * 1000000) })
@@ -474,6 +496,7 @@ export function AgentDesktopView({
             <label>
               <input
                 type="checkbox"
+                disabled={quality.unlimited}
                 checked={quality.adaptive}
                 onChange={(e) => setQuality({ ...quality, adaptive: e.target.checked })}
               />

@@ -81,7 +81,7 @@ export function desktopPercentile(values:readonly number[],fraction=.75){if(!val
 export class DesktopAdaptation {
  private clean=0;private networkBad=0;private computeBad=0;private lastChange=-Infinity;
  decision='hold';
- constructor(public current:DesktopQuality,readonly desired:DesktopQuality){
+ constructor(public current:DesktopQuality,readonly desired:DesktopQuality,readonly unlimited=false){
   for(const q of [current,desired])if(!Number.isFinite(q.fps)||!Number.isFinite(q.bitrate)||!Number.isFinite(q.scale)||q.fps<=0||q.bitrate<=0||q.scale<=0||q.scale>1)throw new Error('Invalid quality');
  }
  update(sample:DesktopFeedback,now=performance.now()):DesktopQuality{
@@ -106,7 +106,11 @@ export class DesktopAdaptation {
    this.decision=networkDown?'network-down':'compute-down';this.networkBad=0;this.computeBad=0;
   }else if(this.clean>=4&&now-this.lastChange>=8000){
    this.clean=0;const headroom=compute>0&&compute<interval*.75;
-   const next={bitrate:Math.min(this.desired.bitrate,this.current.bitrate*1.12),fps:headroom?Math.min(this.desired.fps,this.current.fps*1.08):this.current.fps,scale:headroom?Math.min(this.desired.scale,this.current.scale*1.06):this.current.scale};
+   // Unlimited probes capacity gradually; static content cannot establish link
+   // capacity, so do not increase bitrate until video uses the current budget.
+   const bitrateCeiling=this.unlimited?(sample.deliveredBitsPerSecond>this.current.bitrate*.6?0xffffffff:this.current.bitrate):this.desired.bitrate;
+   const fpsCeiling=this.unlimited?Math.min(0xffffffff,compute>0?1000/compute*.85:this.current.fps):this.desired.fps;
+   const next={bitrate:Math.min(bitrateCeiling,this.current.bitrate*1.12),fps:headroom?Math.min(fpsCeiling,this.current.fps*1.08):this.current.fps,scale:headroom?Math.min(this.desired.scale,this.current.scale*1.06):this.current.scale};
    if(next.bitrate!==this.current.bitrate||next.fps!==this.current.fps||next.scale!==this.current.scale){this.lastChange=now;this.current=next;this.decision='recover';}
   }
   return {...this.current};

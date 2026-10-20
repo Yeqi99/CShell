@@ -409,6 +409,8 @@ export class SshService {
         disk: parsed.disk,
         diskUsed: parsed.diskUsed,
         diskTotal: parsed.diskTotal,
+        disks: parsed.disks,
+        physicalDisks: parsed.physicalDisks,
         latency: Math.round(performance.now() - start),
         ...(!parsed.sample ? { error: 'Linux /proc monitoring unavailable' } : {}),
       };

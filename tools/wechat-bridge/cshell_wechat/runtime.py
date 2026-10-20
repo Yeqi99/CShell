@@ -81,16 +81,18 @@ class Instrument:
         if self in self.retained:self.retained.remove(self)
         return {'codeRestored':restored,'unloaded':True,'retained':False,'errors':failures}
 
-def send(memory,binding,path,base,recipient,text,check):
+def send(memory,binding,path,base,recipient,text,check,attachment=None):
     adapter=Instrument(memory,binding,path,base); result={'status':'unknown','deliveryConfirmed':False}
     try:
-        guards={key:adapter.guard(rva) for key,rva in SEND_RVAS.items()}
+        offsets=dict(SEND_RVAS)
+        if attachment is not None:offsets['make_text']=0x2c18c40
+        guards={key:adapter.guard(rva) for key,rva in offsets.items()}
         # Pin the TLS layout to the faulting getter's actual code bytes.
         context_guard=adapter.guard(0x4a09e0)
         tls_bytes=memory.read(base+0xbb63820,4)
         require(len(tls_bytes)==4 and int.from_bytes(tls_bytes,'little')<64,
                 'CONTEXT_LAYOUT', 'Unsupported static TLS index')
-        source='const config='+json.dumps({'offsets':SEND_RVAS,'guards':guards,'contextGuard':context_guard,'recipient':recipient,'text':text,'code':(ROOT/'native/send.c').read_text()})+';'+'''
+        source='const config='+json.dumps({'offsets':offsets,'guards':guards,'contextGuard':context_guard,'recipient':recipient,'text':text,'attachment':attachment,'code':(ROOT/'native/send.c').read_text()})+';'+'''
 const base=Process.getModuleByName('Weixin.dll').base,symbols={};
 for(const [name,rva] of Object.entries(config.offsets)){
  const p=base.add(rva);
@@ -104,6 +106,9 @@ if(symbols.tls_index.readU32()>=64)throw Error('CONTEXT_LAYOUT');
 const state=Memory.alloc(64);state.writeByteArray(new Uint8Array(64));
 const recipient=Memory.allocUtf8String(config.recipient),content=Memory.allocUtf8String(config.text);
 symbols.state=state;symbols.recipient=recipient;symbols.content=content;
+symbols.attachment_path=Memory.allocUtf16String(config.attachment?.path||'');
+symbols.attachment_size=Memory.alloc(8);symbols.attachment_size.writeU64(config.attachment?.size||0);
+symbols.attachment_mode=Memory.alloc(4);symbols.attachment_mode.writeInt(config.attachment?1:0);
 const cm=new CModule(config.code,symbols);
 const hook=Interceptor.attach(symbols.get_coro,{onEnter:cm.on_enter});
 rpc.exports={arm(){state.writeU32(1)},status(){return Array.from({length:8},(_,i)=>state.add(i*8).readU64().toNumber())},stop(){state.writeU32(0);hook.detach();return {active:state.add(56).readU32(),nativeState:this.status()};}};

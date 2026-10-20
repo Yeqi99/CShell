@@ -29,7 +29,7 @@ async function main() {
     const page = await app.firstWindow();
     page.setDefaultTimeout(15000);
     page.on('pageerror', (error) => errors.push(error.message));
-    await page.getByRole('heading', { name: '尚未连接' }).waitFor();
+    await page.getByRole('heading', { name: '工作台', exact: true }).waitFor();
     await page.waitForFunction(
       () => document.querySelector<HTMLImageElement>('.brand-mark')?.naturalWidth === 256,
     );

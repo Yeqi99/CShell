@@ -1,217 +1,138 @@
+<p align="center"><img src="assets/icon-512.png" width="80" alt="CShell" /></p>
+
 # CShell
 
-CanpShell 是面向高频操作的终端与 AI 工作台，采用 **MIT** 许可证。独立智能体 **CAgent（Canp Agent）** 可单独运行，也可为 CShell 提供已授权的机器能力。**0.6.13 开发预览已发布**，包含内置 CAgent 的 Windows CShell 与五个平台的独立 CAgent 包。
+CShell（CanpShell）是一款开源终端与智能体工作台，将 SSH、文件管理、远程桌面、多机器视图和自动化工具放在同一个工作空间中。适合日常服务器运维、开发环境管理，以及需要同时观察多台机器的工作。
 
-[源码](https://github.com/Yeqi99/CShell) · [版本下载](https://github.com/Yeqi99/CShell/releases) · [问题反馈](https://github.com/Yeqi99/CShell/issues) · [构建状态](https://github.com/Yeqi99/CShell/actions)
+CAgent（Canp Agent）是配套的轻量独立智能体。它可以单独运行，也可以作为 CShell 的机器代理，提供目标电脑上的终端、文件、应用能力和受授权的子任务执行。
 
-0.6.13 的 Windows 工作台、独立 CAgent 与验证边界见 [发布说明](docs/RELEASE-0.6.13.md)。Windows CShell 安装包内置 CAgent；不需要完整工作台时，可选择独立 CAgent。新版独立包的 Windows x64、macOS arm64/x64、Linux x64/arm64 已通过[五平台原生构建与解包 PTY/TLS 验收](https://github.com/Yeqi99/CShell/actions/runs/39086200375)。
+[下载](https://github.com/Yeqi99/CShell/releases) · [0.7.0 版本说明](docs/RELEASE-0.7.0.md) · [使用文档](#文档) · [问题反馈](https://github.com/Yeqi99/CShell/issues) · [构建状态](https://github.com/Yeqi99/CShell/actions) · [MIT 许可证](LICENSE)
 
-白色默认界面、多标签终端、可收纳文件和资源侧栏；暗色可在右下角切换。极简模式仅保留标签与终端，并提供还原按钮。窗口依据当前屏幕可用区域缩放，切换工作区保留会话、滚动历史和草稿。SSH、配置和随包插件可离线使用，无产品账号、云同步、遥测或在线授权。
+## 一个工作台，多种工作方式
 
-## 版本与下载
+### 连接与终端
 
-发行产物统一放到 [GitHub Releases](https://github.com/Yeqi99/CShell/releases)；市场目录固定到已发布的源码标签，不需要部署市场服务器。仓库为 [Yeqi99/CShell](https://github.com/Yeqi99/CShell)，以实际发布完成的附件为准。
+SSH 和 CAgent 连接共用服务器列表，支持分组、收藏、搜索和双击连接。桌面端提供多标签终端、文件与资源面板、命令搜索，以及可以随时还原的极简窗口。切换页面时保留正在运行的会话、滚动历史和编辑草稿。
 
-- [Windows 0.6.13 发行附件](https://github.com/Yeqi99/CShell/releases/download/v0.6.13/CShell-0.6.13-win-x64.exe)
-- [Android APK](https://github.com/Yeqi99/CShell/releases/download/v0.6.0/CShell-0.6.0-android-test.apk)
-- [全部 0.6.0 下载与发布说明](https://github.com/Yeqi99/CShell/releases/tag/v0.6.0) · [SHA-256 校验文件](https://github.com/Yeqi99/CShell/releases/download/v0.6.0/SHA256SUMS.txt)
+SSH 支持密码和私钥认证，首次连接核对主机指纹。Windows 本机终端使用 ConPTY，提供 CMD、PowerShell 和实际安装的 WSL 环境。Windows 系统 RDP 连接可保存地址与认证配置；它与 CAgent 自研远程桌面是不同的连接方式。
 
-以下表格记录**已发布的 CShell 0.6.0**，不是 0.6.13 的跨平台验证结果。macOS、Linux 和 Android 的旧版附件继续保留。
+### 文件与编辑
 
-| 平台    | 格式 / 架构                           | 当前验证状态                                                        |
-| ------- | ------------------------------------- | ------------------------------------------------------------------- |
-| Windows | NSIS `.exe`，x64                      | 单测、桌面回归、成品 SSH/文件通过；本机安装验证                     |
-| macOS   | `.dmg` / `.zip`，Apple Silicon、Intel | 两种原生架构构建与成品 SSH/文件通过；真机交互待验收                 |
-| Linux   | `.AppImage` / `.deb`，x64、ARM64      | 两种原生架构构建与成品 SSH/文件通过                                 |
-| Android | 测试 `.apk`，Android 8+               | 编译、lint、持久签名校验和 API 29 / 35 原生连接测试通过；真机待验收 |
+在所属机器的工作区浏览和传输文件，使用拖放、复制粘贴及传输队列管理操作。SSH 文本文件可直接进入内置编辑器，选择手动保存或实时同步；冲突、写入失败与断连时保留草稿并暂停同步。
 
-独立 CAgent 0.6.13 发行附件（构建与解包验收已通过，上传摘要已核对）：[发行页](https://github.com/Yeqi99/CShell/releases/tag/v0.6.13) · [SHA256 校验文件](https://github.com/Yeqi99/CShell/releases/download/v0.6.13/SHA256SUMS.txt)。
+编辑器提供有界的会话内版本回退。启用 Python 扩展后，可按目标机器的真实解释器使用 Jedi 补全、签名和诊断。文本编辑目前主要面向 SSH UTF-8 文件，完整 IDE 调试、全部语言服务以及移动端编辑尚未对齐。
 
-| 平台                        | 附件                                                    | 界面与状态                                                              |
-| --------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------- |
-| Windows x64                 | [Windows x64 安装 ZIP](https://github.com/Yeqi99/CShell/releases/download/v0.6.13/CAgent-Setup-0.6.13-win-x64.zip)                       | 原生 WPF 小窗；完整解压后运行 `Install CAgent.cmd`，安装到当前用户目录  |
-| macOS Apple Silicon / Intel | [Apple Silicon](https://github.com/Yeqi99/CShell/releases/download/v0.6.13/CAgent-0.6.13-mac-arm64.tar.gz) / [Intel](https://github.com/Yeqi99/CShell/releases/download/v0.6.13/CAgent-0.6.13-mac-x64.tar.gz)     | 独立运行时与系统浏览器入口，非 Windows 同款原生界面；原生架构构建与解包 PTY/TLS 验收通过 |
-| Linux x64 / ARM64           | [x64](https://github.com/Yeqi99/CShell/releases/download/v0.6.13/CAgent-0.6.13-linux-x64.tar.gz) / [ARM64](https://github.com/Yeqi99/CShell/releases/download/v0.6.13/CAgent-0.6.13-linux-arm64.tar.gz) | 独立运行时与系统浏览器入口；原生架构构建与解包 PTY/TLS 验收通过                          |
+### 多机器视图
 
-每个平台包含本架构 Node 与原生 PTY，无须预装 CShell、Electron 或 Chromium。安装不自动开启远程监听、不扩大权限；尚不自动注册系统服务。历史 [0.6.0 Agent 附件](https://github.com/Yeqi99/CShell/releases/tag/v0.6.0) 使用 `CShell-Agent-*` 名称，不能视为新版功能包。使用与兼容范围见 [CAgent](docs/CAGENT.md)。
-尚无商业代码签名证书，macOS 未公证。核对附件的 SHA256SUMS.txt。完整范围见 [发布说明](docs/RELEASE.md)，已执行的检查见 [验证记录](docs/VALIDATION.md)。
+把 SSH、CAgent 终端、远程桌面及本机终端组合成一个视图：
 
-## Android 工作台与更新
+- **平铺**：均匀排列多个工作区域。
+- **主次**：突出当前关注的区域，其他来源保持可见。
+- **小窗预览**：同时观察，点击需要的区域放大操作。
 
-Android 默认进入概览首页，底部导航为首页、连接、终端、文件、设置。支持搜索、分组、会话切换与独立连接页。文件页绑定所选在线会话，支持目录浏览、只读文本预览、上传与下载；使用系统文件选择器，不请求整个设备存储权限。切页保留终端和未提交草稿，连接按钮固定在操作区；密码与私钥不落盘。设置中可切换明暗、检查和下载更新。
+可以保存明确的机器、目录和会话来源，也可以直接编排当前连接；支持多显示器分配、布局微调和下次恢复。借用当前终端不会重新执行命令，关闭临时视图也不会关闭原终端。适合组合服务器日志、screen 会话和远程桌面等信息。详见 [视图使用说明](docs/MONITOR-VIEWS.md)。
 
-0.6.0 支持 Agent 连接和真实终端环境选择，需要 Android 10+；SSH 仍支持 Android 8+。文件功能目前用于 SSH，Agent 暂无文件传输。原生测试覆盖身份拒绝、TLS/PTY、8 MiB 输出、撤权与取消；模拟器结果不代表真机输入法和后台恢复已经验收。
+### 智能体与自动化
 
-桌面与 Android 均从 GitHub Releases 检查更新并校验 SHA256，随后进入系统安装流程。Linux 当前提供 AppImage 下载和文件位置，需要手动替换与授权执行。更新不会自动关闭正在操作的会话。
+配置自己的模型服务，让智能体在授权范围内检查机器、处理文件、执行命令和调用扩展工具。会话显示实际绑定的机器与模型，工具结果可以展开查看；执行审核与机器权限分别控制。
 
-**从 Android 0.3.1 升级需注意签名变化**：旧版是临时调试签名，需要卸载后重装，卸载会清除本地配置。0.3.2 开始复用持久化发布签名，后续版本可覆盖更新。
+- 兼容 OpenAI 风格接口，并通过模型扩展接入其他服务。
+- **OpenCode** 支持多个账号、官方设备授权、Go / Zen 模型目录选择与 Go 用量显示。
+- **Tavily** 提供多 Key 网络搜索和用量查询，作为智能体工具按需启用。
+- 支持子任务委派、任务检查点、上下文压缩、后台命令和有界持续执行。
+- **事件订阅** 将本机或已授权远端 CAgent 的微信消息交给指定会话，配置提示词、筛选、冷却及运行预算；人工智能体会话也可通过工具管理规则。
 
-<img src="docs/images/android-home.png" width="260" alt="Android 服务器首页，默认浅色" /> <img src="docs/images/android-settings.png" width="260" alt="Android 深色设置及应用更新" />
+智能体使用用户选择的模型供应商。消息和被授权的工具结果可能发送到该供应商；本地保存配置不等于模型推理在本机执行。停止、撤权、任务预算及未知结果处理见 [智能体文档](docs/AI.md) 与 [可靠性说明](docs/AGENT-RELIABILITY-0.6.35.md)。
 
-## 统计与连接架构
+## CAgent：机器上的轻量智能体
 
-顶栏“统计与历史”展示本设备真实记录：成功连接、文件操作请求、传输字节、AI 请求和活跃日期；支持日期/类型筛选、搜索、CSV/HTML 导出、暂停及清空。仅本机存储，最多一年/50,000 条，不采集终端输入、密码、文件路径或聊天正文，不伪造旧历史、Token 数或效率收益。
+<p><img src="assets/cagent-icon-512.png" width="56" alt="CAgent" /></p>
 
-连接生命周期与 Agent 工具采用 [Connection Provider Architecture](docs/CONNECTION-PROVIDERS.md)。SSH、Windows 本机终端和 CShell Agent 使用独立 Provider。Agent 与 SSH 共用左侧服务器列表，支持命名、分组、收藏、编辑和双击连接，旧 Client 记录迁移保留身份、凭据与授权。RDP 可保存主机、端口、用户名及可选的加密密码，与其他连接共用左侧列表；双击调用 Windows mstsc 打开独立窗口，系统策略仍可能要求再次认证。VNC 与直连 Docker TLS 尚未实现。现有 Docker 插件使用真实 Engine HTTP API，经 SSH socket 隧道访问。
+CAgent 不依赖完整 CShell、Electron 或捆绑 Chromium。Windows 提供可置顶的原生小窗口，会话、应用市场和设置按需展开；macOS / Linux 当前提供独立运行时与系统浏览器界面。
 
-### CAgent（原 CShell Agent）
+CShell 连接 CAgent 后进入整台机器的工作区，在同一上下文打开终端、文件、远程桌面、应用市场、智能体及设置。能力由目标系统、安装状态和实际授权决定，不会把控制端本机能力冒充远端能力。
 
-在被管理电脑上独立安装 Agent，无需完整 CShell、Electron、Chromium 或 SSH 服务。运行 Agent 后，CShell 的 Agent 插件可以发现本机服务，也可以管理明确选择且具有管理授权的远程 Agent。插件配置监听地址、端口、密码及能力权限；安装和发现不自动授权远程控制。
+Windows CAgent 的应用能力包括：
 
-控制端新建连接选择 CShell Agent，填写信息或显式粘贴，核对设备指纹后连接。普通复制信息不含密码，凭据独立加密保存，不进入外观方案。连接共用左侧命名、分组、收藏和双击操作。
+- **自研远程桌面**：原生采集、视频编码与键鼠输入，支持画质调整、网络自适应、断线恢复及中继连接。管理通道模式可复用 CAgent 的连接端口。
+- **微信掌控**：在适配版本内提供通讯录、消息与文件收发、历史、备注及部分朋友圈能力；也可供已授权的 CShell 连接方调用。
+- **Linux / WSL**：检查虚拟化与发行版，显示安装计划及执行结果，安装后将真实 Linux 环境加入终端选择。
 
-CAgent 提供 Windows CMD / PowerShell 与 Linux、macOS 的原生 Shell；Windows CAgent 的 WSL 管理作用于目标机器。HTTP 服务托管、中继与管理权限独立控制，默认关闭。Windows 使用以对话与输入框为主体的原生小窗，会话、市场、设置与权限按需展开；macOS/Linux 当前提供运行时和系统浏览器入口。旧数据目录、设备身份与命令别名继续兼容。
+CAgent 新配置为已认证控制端提供较宽松的默认能力。部署到公网前，请在“设置与权限”检查密码、监听地址、映射端口及需要开放的操作；升级保留已明确关闭的设置。设备身份核对和密码认证始终独立生效。
 
-应用市场将系统应用安装和工具能力授权分开。自研远程桌面作为可选能力包，Windows 被控端使用原生采集、编码和键鼠控制，CShell 提供观看器；服务、观看与控制权限分别配置。本机真实画面、输入和断线恢复已验证，公网完整验收尚未完成；macOS/Linux 被控端与手机观看器不在此次已验证范围。它与调用系统 mstsc 的 RDP 连接是两个独立入口。详见 [远程桌面实现与边界](docs/CAGENT-DESKTOP.md)。
+远控锁屏与无显示器方案涉及可选系统服务和虚拟显示驱动，仍有硬件与实机验收限制；Windows Server 的无头支持属于实验范围。详情见 [CAgent](docs/CAGENT.md)、[系统桌面服务](docs/DESKTOP-SYSTEM-BROKER.md) 和 [虚拟显示](docs/CAGENT-VIRTUAL-DISPLAY.md)。
 
-## HTTP 扩展
+## 下载与平台
 
-安装 HTTP 后可新建请求工作区，保存多个目标、请求和历史，选择本机、SSH 或支持 HTTP 的 Agent 发送。人工与智能体共用执行及历史；工具默认勾选，但调用仍须授权。详见 [HTTP 使用与边界](docs/HTTP.md)。
+从 [GitHub Releases](https://github.com/Yeqi99/CShell/releases) 选择对应系统和架构，核对该版本的发布说明及 `SHA256SUMS.txt`。下表说明产品平台与包类型，不表示尚未上传的版本已经发布。
 
-## AI 智能体
+| 平台 | CShell 客户端 | 独立 CAgent |
+| --- | --- | --- |
+| Windows x64 | `.exe` 安装包；完整桌面工作台 | `.exe` 安装包；原生小窗，Windows 应用能力 |
+| macOS Apple Silicon / Intel | `.dmg` / `.zip`；桌面客户端 | `.tar.gz`；独立运行时与浏览器界面 |
+| Linux x64 / ARM64 | `.AppImage` / `.deb`；桌面客户端 | `.tar.gz`；独立运行时与浏览器界面 |
+| Android | `.apk`；SSH、文件及 CAgent 连接客户端 | 暂无受控端应用 |
 
-顶栏机器人入口管理多个 OpenAI 兼容 API URL、Key、模型和会话。按应用能力与机器范围统一授权，支持单台机器覆盖；全提示、限制执行、全放行只改变审核方式，不扩大已授权范围。默认权限关闭，密钥与历史在本机加密保存。用户发送后，消息及授权工具结果发送至选定供应商。翻译、输入辅助与连接提取可选择各自基座，生成候选不会自动执行。详见 [基座、会话和权限](docs/AI.md) 与 [文字助手](docs/TEXT-ASSIST.md)。
+Android 的 SSH 支持 Android 8+；CAgent 连接要求 Android 10+。移动端已实现连接 Windows CAgent 远程桌面及触摸键鼠映射，但插件、应用安装、文件编辑和智能体工作流并不与桌面端完全相同。macOS / Linux 作为控制端与作为被控端也是不同能力，Windows 原生采集不能视为其他系统已经具备。
 
-## 开发与构建
+各平台构建结果、原生测试和真实设备验收分别记录。Android / macOS 用户设备、多个实体显示器及部分远控硬件场景仍待进一步验收。安装包签名、公证与具体兼容情况以对应发行说明为准。
 
-桌面构建需要 Node.js 24 和 pnpm 11.25.0，在目标操作系统打包。Android 另需 JDK、Gradle 与 Android SDK，见 [移动端说明](android/README.md)。
+## 开始使用
+
+1. 安装 CShell，通过“新建连接”选择 SSH 或 CAgent；本机终端可以直接打开。
+2. 需要管理未运行 SSH 服务的机器时，在目标机器安装 CAgent，配置连接信息后从 CShell 连接并核对身份。
+3. 在机器工作区打开终端、文件或可用应用。需要同时观察多台机器时，从工作台创建视图。
+4. 使用智能体前先配置模型服务和访问范围；OpenCode、Tavily、Docker、Python 等能力从扩展入口启用。
+
+基础连接和本地配置不要求 CShell 产品账号。首次下载、软件更新、模型服务和在线搜索需要相应网络连接。偏好与布局可保存、导入和导出，凭据及授权不混入外观方案。
+
+## 插件、应用与 API
+
+**插件**扩展 CShell 的工作方式，例如 Vim / Nano 辅助、Python、Docker、HTTP、OpenCode 和 Tavily。**应用市场**面向选定机器，提供系统应用安装及能力包配置；安装计划与执行反馈留在目标机器上下文中。
+
+目录与发行附件托管在 GitHub，随包目录可作为离线回退，无需单独部署市场服务。第三方包受清单、版本和摘要校验约束；安装应用与授予工具权限分别处理。
+
+CShell 也提供默认关闭的版本化 HTTP API 与 MCP 服务，支持独立调用方、连接范围、能力授权、审核和异步任务。详见 [扩展协议](docs/PLUGINS.md)、[API](docs/API.md) 与 [MCP](docs/MCP.md)。
+
+## 开发
+
+桌面开发使用 Node.js 24 与仓库指定的 pnpm 版本（见 `package.json`）。原生 PTY、桌面组件及安装包需在匹配的系统与架构上构建。
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm build
 pnpm start
 pnpm test
-pnpm test:desktop
+```
+
+Windows 安装包：
+
+```sh
 pnpm run dist
 ```
 
-构建输出目录由 `package.json` 的版本决定：`release/<version>/CShell-<version>-win-x64.exe` 为 NSIS 安装包，`release/<version>/win-unpacked/CShell.exe` 为目录版。从 0.6.15 起，CShell 与 CAgent 分别打包；Windows CAgent 自带自研远控组件，首次启动安装但不自动授权或监听。独立 Agent 使用 `node scripts/agent-build.mjs` 构建，并通过 `node scripts/package-agent.mjs` 打包；在对应操作系统和架构上构建及验证。macOS 使用 `pnpm exec electron-builder --mac --arm64 --publish never`，Linux 使用 `pnpm exec electron-builder --linux --x64 --publish never`。首次安装依赖和构建需要网络。
+独立 CAgent：
 
-## 插件与应用
+```sh
+node scripts/agent-build.mjs
+```
 
-顶栏“插件与应用”打开工作区扩展页。Vim、Nano、Shell 联想、Docker、Anaconda、Python 统一支持安装、启停与卸载，状态独立于外观方案。默认插件与应用目录指向 GitHub `marketplace/`，随包目录作为离线回退；读取目录与安装显式操作，下载验证 SHA-256。完整协议和包制作命令见 [插件协议](docs/PLUGINS.md)。内置功能提供器随客户端编译，第三方 v1 包只支持声明式命令；应用目录只引用当前客户端支持的安装配方，不执行任意远程清单脚本。
+Android 另需 JDK、Gradle 和 Android SDK，见 [Android 构建说明](android/README.md)。平台打包、许可证和验证流程见 [发布检查清单](docs/RELEASE-CHECKLIST.md) 与 [依赖说明](docs/DEPENDENCIES.md)。
 
-应用市场选择已连接服务器，检查安装条件并显示安装计划，点击后执行并记录输出。提供 Miniconda、Anaconda、Conda Python 环境、JupyterLab、Jedi，以及 Debian/Ubuntu 的 Nginx、Redis 配方；安装目录、Python 版本、环境和权限限制见协议文档。不会自动在你的服务器上安装任何软件。
+## 文档
 
-Anaconda 插件识别实际 Conda 环境，可创建、删除非 base 环境、查看和安装依赖，在选定环境新开终端；Jupyter 通过 SSH 回环隧道打开并可停止。Python 插件双击远端 .py 文件即进入编辑页，按所选解释器提供 Jedi 补全、签名、语法诊断、保存冲突检查；编辑草稿在工作区切换时保留。终端观察到 Python/IPython 启动后按实际提示符提供补全；无法确认解释器时选择环境，不猜测虚拟环境。Vim/Nano 内 Python LSP、完整调试和重构不在当前实现中。
+| 内容 | 文档 |
+| --- | --- |
+| 版本范围、升级与已知限制 | [0.7.0 说明](docs/RELEASE-0.7.0.md) |
+| 连接与机器能力 | [连接架构](docs/CONNECTION-PROVIDERS.md)、[CAgent](docs/CAGENT.md) |
+| 多机器工作区 | [视图](docs/MONITOR-VIEWS.md)、[文件编辑](docs/TEXT-EDITOR.md) |
+| 模型与自动化 | [智能体](docs/AI.md)、[OpenCode](docs/OPENCODE-EXTENSION.md)、[事件订阅](docs/AI-EVENTS.md)、[Tavily](docs/TAVILY-EXTENSION.md) |
+| 远程桌面与平台 | [桌面协议](docs/CAGENT-DESKTOP.md)、[移动远控与 WSL](docs/MOBILE-DESKTOP-AND-WSL.md) |
+| 微信适配 | [CAgent 微信](docs/CAGENT-WECHAT.md)、[文件发送](docs/WECHAT-FILE-SEND.md) |
+| 外部工具接入 | [API](docs/API.md)、[MCP](docs/MCP.md)、[插件协议](docs/PLUGINS.md) |
 
-## 外观、布局与配置
+## 反馈与贡献
 
-默认浅色，右下角可一键切换明暗主题并保存选择。连接页只展开地址、端口和认证；手动填写是默认方式。复制 `ssh user@host -p 2222` 后，点击“从剪贴板提取”才填入地址、端口和用户名，也支持 `-l user`；保留认证方式与已填密码。主机输入框只填主机，不隐式提取命令；命令不执行，不支持的选项会就地报错。名称选填，默认使用主机名。
+欢迎通过 [Issues](https://github.com/Yeqi99/CShell/issues) 报告问题或提出建议，也欢迎提交 Pull Request。报告问题时请提供版本、系统、复现步骤，以及去除凭据和个人信息后的日志或截图。涉及平台差异时，请注明控制端和被控端各自的系统与版本。
 
-默认“连接”为临时会话，不保存配置或凭据。勾选“保存到服务器列表”才展开名称、分组与凭据保存选项，此时按钮为“保存并连接”和“仅保存”：前者先保存配置，认证成功后才按选择保存凭据；连接失败仍保留配置。通过标签上的关闭按钮放弃草稿。常规尺寸下操作按钮紧跟内容，不采用遮挡表单的固定底栏。
-
-标签整块可点击、可关闭；会话标签支持拖动排序、F2/双击重命名。切换终端、编辑、设置和不同服务器，保留终端内容、连接草稿及各会话的文件目录。命令搜索为顶栏下方的紧凑列表，支持方向键、Enter 和 Escape，不挤动工作区；还原布局通过搜索查找。
-
-监控采用紧凑信息行，展示 CPU 使用率和逻辑核心数、内存及根文件系统的已用/总容量（二进制单位）、SSH 命令往返耗时。CPU 使用率需要两次采样，连续三次无有效数据时显示不可用并可重试；采集失败清除过期数据。内存使用量按总量减可用量计算，磁盘百分比采用文件系统报告值。文件与资源可分别折叠；隐藏监控时停止轮询，切换时只采集当前连接。
-
-偏好设置自动列出本机字体，支持筛选、即时预览、拖入或选择字体文件。界面背景可选择或拖入图片，并调整可见度、模糊与填充方式；取消恢复原样。字体和图片仅存本机。
-
-拖动面板标题处的把手可交换服务器、终端、文件面板的位置；拖动边界调整宽度，键盘也支持 Alt+方向键换位及分隔条方向键缩放。命令菜单内提供“还原默认布局”。设置中可保存命名配置、切换预览、导入导出；导出包含自定义字体和背景，不含服务器凭据。
-
-右下角语言按钮展开选择菜单。右侧文件面板中文为“文件”，英文为“File”。文件路径可直接编辑与复制；操作栏使用统一图标、悬停/键盘焦点提示，根据选择显示上传、新建、下载、复制、粘贴、重命名和删除。文件错误留在所属面板，传输队列按会话归属过滤。
-
-默认终端字号 14 px、行高 1.2，可分别配置；切换主题同步更新背景、前景、16 色 ANSI 色板、光标和选区。快捷操作提示放在右键菜单，不长期挤占终端。
-
-## Vim / Nano 操作面板
-
-识别到常见 Vim、Neovim 或 Nano 全屏界面时，终端底部显示紧凑图标面板。点击直接跳到文件开头/结尾、跳行、搜索、切换匹配、撤销/重做和保存，操作后焦点回到终端。快捷键仅在悬浮提示中展示，没有教学列表或长期说明。
-
-Vim 搜索和跳行按需展开一行输入，搜索按字面匹配，特殊字符经过引用处理；发送操作前统一返回普通模式。常驻入口支持退出当前模式、切入插入模式和退出编辑器；更多菜单包含行尾插入、字符/行/块选择、替换，以及保存退出、退出所有窗口。Nano 搜索、跳行、保存和退出交给原生提示继续处理，保留文件名确认与未保存修改判断；支持默认/现代键位切换。Vim 放弃全部未保存修改并退出需要确认；Nano 提供取消当前搜索/文件名输入入口。
-
-只向当前活动、仍在全屏缓冲区且未断开的会话发送用户点击的操作。发现编辑器正等待确认或输入时，就地提示，不继续发送其他操作。识别依据当前屏幕特征及最近的编辑器启动输入，不执行远端进程探测；定制状态栏、映射、别名及 tmux/screen 可能需要手动识别或直接使用终端。右键菜单可切换 Vim / Nano、恢复自动或关闭面板；手动选择也不能向普通 Shell 发送编辑器命令。
-
-## Linux 命令联想
-
-默认启用常用 Linux、Git 与 Docker 命令前缀联想。在可识别的普通 Shell 提示符处输入，点击候选或按 Ctrl+Space 只补全剩余内容，不发送 Enter；Alt+上下方向键切换候选，Escape 收起。保留 Shell 原生 Tab 和上下历史操作。密码提示、全屏程序、光标移到行中或不确定的输入状态不提供联想；自定义提示符和多行命令不保证支持。可在“偏好设置 → 终端与 Docker”关闭。候选为本地命令库，不读取或上传历史，也不推断远端是否安装了对应程序。
-
-## Docker 工作台
-
-在“偏好设置 → 终端与 Docker”启用 Docker 面板并保存，当前已连接会话右侧出现 Docker 入口。容器支持全部/运行中/已停止/已暂停分类，按名称、镜像、Compose 项目或 ID 搜索；所选运行容器每 5 秒采集 CPU、内存、累计网络流量和 PIDs。CPU 100% 表示占满一个逻辑核心。镜像列表支持从本地镜像创建容器、端口映射和启动；没有隐式拉取镜像。
-
-使用当前 SSH 连接的 Unix Socket 转发访问 Docker Engine，默认路径为 /var/run/docker.sock，rootless 可填写 /run/user/UID/docker.sock。SSH 用户需要已有 Socket 访问权限，SSH 服务必须允许 StreamLocal 转发。不会自动 sudo、改变权限或开放 Docker TCP 端口。Docker 和命令联想设置独立持久化，不随外观方案导入导出。
-
-容器可启动、停止、重启、暂停/恢复；删除需要确认，不强制删除运行中容器，不删除数据卷。修改端口需要确认重建：先停止原容器，提交可写层快照，再用原配置、环境变量和挂载创建新容器；保留停止状态的旧容器及本地快照，失败尝试恢复原容器名称、重启策略和原运行状态。备份可在列表中管理。网络累计流量、tmpfs 等运行时状态不会跨重建保留。断线/超时可能需要刷新并核实操作结果，不能视为事务保证。
-
-Compose / Swarm 管理的容器不通过该入口重建，避免与部署声明冲突；其端口应在部署配置中修改。host/none/container 网络模式、自动删除和异常状态容器不支持端口重建。其他生命周期操作仍按 Docker 的实际响应反馈。当前验证使用 SSH 上的 Engine API 测试服务，真实 Docker 发行版、存储驱动、复杂网络和大型容器重建仍需兼容性验收。
-
-依据：[Docker Engine API](https://docs.docker.com/reference/api/engine/)、[端口发布](https://docs.docker.com/engine/network/port-publishing/)。
-
-## 子智能体与定期目标（本地开发构建）
-
-智能体“基座与权限”增加独立的“分配与管理子任务”和“管理定期目标”能力，默认关闭。主智能体可通过 `spawn_agent`、`list_agents`、`wait_agent`、`send_agent`、`stop_agent` 分配、观察、继续与汇总子任务；对话内提供紧凑任务树，点击查看输出或处理授权。子任务固定继承目标连接、模型与审核模式，权限取创建时上限和当前授权的交集；不能自行换机器，父任务停止或结束会停止尚未完成的子任务。
-
-通过智能体的“目标管理”创建、编辑、立即检查、暂停、恢复或移除目标，也可在对话里请求模型调用 `set_goal`（保存前确认）。默认每 15 分钟执行，间隔可调整；`get_goal` 查询，`report_goal` 报告继续、达成或缺少条件，`pause_goal` 暂停。每个目标固定目标机器，同一目标不重叠运行。完成、缺少条件、接口失败或没有明确结果报告时停止；不会自动猜密码、切换机器或重连。重启后须连接同一机器并显式恢复，不补跑错过的检查。目标和记录保存在加密 AI 存储中，不随外观方案导出。
-
-例如：“每 15 分钟检查这台机器上带 `cleanup=true` 标签的容器，只删除已退出超过 7 天的容器，不删卷，持续检查。”未说明“不活跃”的范围、状态和时长时，模型应先询问；低 CPU 不等于可删除。远端命令仍使用原有机器权限和审核策略，全放行只减少已授权操作的审核，不增加权限。未配置的目标不会自行执行清理。
-
-用户修改权限后，目标管理中的“恢复 / 立即检查”会按当前授权重新确定该目标的权限上限，目标机器不变；模型和子任务不能自行扩大上限。
-
-轻量限制：全局最多 6 个运行中的智能体，每个父任务最多 3 个并行子任务、两层嵌套，每轮最多创建 8 个直属子任务；单轮最多 5 分钟、16 次模型调用。最多 20 个目标，每个目标保留最近 30 条检查摘要，子任务保留最近记录。只在 CShell 运行时调度，不安装系统服务。
-
-## MCP 服务
-
-默认关闭。偏好设置中配置本机服务、独立客户端令牌、机器与本机环境范围、能力授权及审核策略；审核策略不扩大权限。版本化 API 与 MCP 共用能力目录，支持按预算渐进发现、异步任务、终端与实际 Provider 工具。详见 [API 与 MCP 接入说明](docs/API.md) 和 [当前覆盖及验证边界](docs/API-IMPLEMENTATION.md)。
-
-## 当前功能
-
-- SSH 密码 / 私钥认证；首次主机指纹确认，主机密钥变化拒绝连接。
-- 分组、收藏、搜索、连接编辑；多标签终端、调整尺寸、历史滚动、搜索及 Unicode 11 字宽处理。
-- SFTP 浏览、上传/下载、递归目录传输、重命名、删除文件/空目录、新建目录。
-- 原生文件选择器上传、从资源管理器拖入上传；应用内本地/远端面板间拖拽、Ctrl+C/V 文件复制粘贴；目录间复制与移动。
-- 传输队列、流式进度、取消；文件写入临时路径后提交；上传覆盖依赖服务器原子重命名扩展，不支持时保留原件并报错。
-- Windows DPAPI 保护可选保存的密码、私钥内容和私钥口令。凭据不会返回界面。
-- Linux CPU、内存、根磁盘监控；命令往返耗时（不是 ICMP ping）。
-- 中英运行时切换、深浅主题、界面/终端字体独立配置。
-
-配置位于 Electron 的用户数据目录：Windows 通常为 `%APPDATA%/canpshell/config.json`。连接名称、地址和主机指纹不是秘密，配置中保持可读；凭据单独加密。损坏配置会阻止启动并保留原文件，不会静默覆盖。
-
-新建连接和偏好设置使用工作区页签；查找以及文件新建、重命名在界面内展开。仅当前终端已连接时显示对应的 SFTP 和监控面板。
-
-## 常用操作
-
-双击服务器直接连接；星标按钮收藏；右键或省略号打开紧凑菜单，可编辑、移至分组或删除连接。菜单浮于列表上方，不挤动布局，支持方向键、Enter 和 Escape。
-
-服务器列表上方提供“新建分组”；分组标题右侧菜单可重命名或删除分组。空分组会保留；删除分组只将连接移回“未分组”，不会删除连接或凭据。移动和改名不影响正在运行的终端。连接表单的分组字段可选择已有名称或输入新名称。
-
-| 快捷键                        | 行为                       |
-| ----------------------------- | -------------------------- |
-| Ctrl+Shift+N                  | 新建连接                   |
-| Ctrl+Shift+P                  | 命令面板                   |
-| Ctrl+Shift+F                  | 搜索当前终端               |
-| Ctrl+Shift+C / V              | 终端复制 / 粘贴            |
-| Ctrl+C                        | 终端发送中断控制字符       |
-| Ctrl+,                        | 偏好设置                   |
-| Ctrl+Shift+B / E              | 左侧 / 右侧面板            |
-| Ctrl+Tab / Ctrl+Shift+Tab     | 下一个 / 上一个工作区标签  |
-| Ctrl+Shift+= / - / 0          | 放大 / 缩小 / 重置终端字号 |
-| F2、双击（会话标签）          | 重命名当前会话标签         |
-| Ctrl+C / V（文件面板）        | 应用内文件复制 / 粘贴      |
-| Ctrl+A、Ctrl+单击（文件面板） | 全选、多选                 |
-| F2 / Delete（文件面板）       | 重命名 / 确认删除          |
-
-本地和远端之间的拖放为复制；同一远端会话内拖入目录默认移动，Ctrl 修饰为复制。移动需要确认。文件剪贴板是应用内部的，不宣称支持 Windows 资源管理器的系统文件剪贴板，也不支持将远端条目直接拖出到资源管理器。目录删除仅允许空目录，避免误删整棵树。
-
-## 已知边界
-
-详见 [路线图](docs/ROADMAP.md) 和 [验证记录](docs/VALIDATION.md)。未完成能力包括：标签内多终端拆分、SSH Agent/系统密钥发现、SSH Config 导入、系统级远端拖出、断点续传、跨盘移动回退、递归删除、代理/跳板机、主机指纹管理界面、正式签名、真实 Linux 服务器和长时间压力验收、Web 嵌入、Android 桌面功能补齐。界面没有为这些能力放置不可用入口。macOS/Linux 已打包，真机交互验证尚未完成。
-
-本地开发构建已支持 SSH 连接取消、关闭连接页停止请求，以及保留旧输出的显式重连；切换工作区不会取消连接。重连创建新会话，不恢复远端进程，也不重发旧命令。
-
-本预览版不适用于不可信多租户 Web 嵌入。未来浏览器版本必须通过授权服务端网关连接 SSH，详情见 [架构决策](docs/ARCHITECTURE.md)。AI 不在后台自动读取终端输入；只有用户发送任务或显式启用定期目标后，才会请求配置的基座与已授权工具。
-
-## 许可证
-
-自有代码采用 [MIT](LICENSE)，允许使用、修改和商业分发，并保留版权及许可声明。第三方组件保持各自许可证；运行 `pnpm run licenses` 更新 [依赖清单](docs/dependency-licenses.json) 和 [第三方声明](THIRD_PARTY_NOTICES.txt)。Electron/Chromium 与 Android 依赖的许可证随各自发行物保留。
-
-### Windows 本机终端
-
-标签栏的终端图标可新建 CMD 或 Windows PowerShell，会话使用原生 ConPTY，可与 SSH 标签同时运行，并可放入极简模式或独立小窗。
-
-“偏好设置 → 本机终端”可查看继承的系统、用户环境变量并设置 CShell 覆盖值。新会话重新读取 Windows 环境；覆盖值在本机加密保存，不修改注册表、不混入外观方案，也不影响已运行的会话。
-
-“插件市场 → WSL Linux”提供本机 Linux 发行版发现与终端入口。需要 Windows 已启用 WSL 并安装发行版；插件不会自动启用系统组件或下载 Linux。没有可用环境时会显示安装命令入口。
-
-## 旧 Client 兼容开发入口
-
-Windows 受控端与 CShell 工作台使用独立的设备配对和加密直连通道，当前支持真实 CMD / PowerShell 终端。开发启动 `pnpm start:client`；使用步骤、权限与实验协议边界见 [Client 说明](docs/CLIENT.md)。本地开发能力不代表已发布版本支持。
+CShell 与 CAgent 的项目源码采用 [MIT License](LICENSE)。随包第三方依赖保留各自许可证，详见 [第三方声明](THIRD_PARTY_NOTICES.txt)。

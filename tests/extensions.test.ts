@@ -195,6 +195,17 @@ test('remote environments, semantic analysis, installation jobs and disconnect u
     const saved = await files.save(sessionId, '/sample.py', 'print(3)\n', fresh.revision);
     assert.equal((await files.read(sessionId, '/sample.py')).code, 'print(3)\n');
     assert.notEqual(saved.revision, fresh.revision);
+    const textFiles = new PythonFiles(ssh, true);
+    await writeFile(join(server.root, 'settings.conf'), '\uFEFFfirst=1\r\n');
+    const config = await textFiles.read(sessionId, '/settings.conf');
+    assert.equal(config.code, '\uFEFFfirst=1\r\n');
+    await textFiles.save(sessionId, '/settings.conf', config.code.replace('1', '2'), config.revision);
+    assert.equal((await textFiles.read(sessionId, '/settings.conf')).code, '\uFEFFfirst=2\r\n');
+    await assert.rejects(files.read(sessionId, '/settings.conf'), /Only Python/);
+    await writeFile(join(server.root, 'binary.txt'), Buffer.from([65, 0, 66]));
+    await assert.rejects(textFiles.read(sessionId, '/binary.txt'), /Binary/);
+    await writeFile(join(server.root, 'large.txt'), Buffer.alloc(1_000_001, 65));
+    await assert.rejects(textFiles.read(sessionId, '/large.txt'), /exceeds/);
     const cancelledStart = env.startJupyter(sessionId, python, 8888);
     const cancelledResult = assert.rejects(cancelledStart, /stopped|abort|cancel/i);
     env.stopJupyter(sessionId, python);

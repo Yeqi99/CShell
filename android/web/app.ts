@@ -34,7 +34,7 @@ declare global {
 }
 const $ = (id: string) => document.getElementById(id)!;
 const desktop=new MobileDesktop(window.CShellNative);
-const desktopStatus=new Map<string,{packageReady?:boolean;viewAllowed?:boolean;controlAllowed?:boolean;inputFeatures?:string[]}>();
+const desktopStatus=new Map<string,{packageReady?:boolean;viewAllowed?:boolean;controlAllowed?:boolean;inputFeatures?:string[];qualityModes?:string[]}>();
 const icons: Record<string, string> = {
   home: '<path d="m3 10 9-7 9 7v10H3Z M9 20v-7h6v7"/>',
   folder: '<path d="M3 7V4h6l3 3h9v13H3Z"/>',

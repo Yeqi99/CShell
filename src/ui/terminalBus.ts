@@ -12,6 +12,7 @@ export function terminalClosed(id: string) {
 }
 export function terminalEvent(event: SessionEvent) {
   if (event.type === 'closed') {
+    backlog.delete(event.sessionId);
     closed.add(event.sessionId);
     if (event.error) closeReasons.set(event.sessionId, event.error);
     if (closed.size > 1000) {

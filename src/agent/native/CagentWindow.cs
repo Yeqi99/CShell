@@ -281,8 +281,8 @@ public class CagentWindow : Window {
     foreach(var raw in A(V(state,"processes"))){var item=D(raw);var choice=new ComboBoxItem{Content="微信 "+S(item,"version")+" · "+S(item,"pid"),Tag=V(item,"pid")};process.Items.Add(choice);if(S(item,"pid")==S(config,"pid"))process.SelectedItem=choice;}
     ActionButton(p,"刷新进程",WechatSettings);
     var checks=new Dictionary<string,CheckBox>();
-    string[] keys={"enabled","experimental","readContacts","readSessions","readMoments","publishMoments"};
-    string[] labels={"启用微信控制","了解崩溃风险并允许实验控制","读取通讯录","读取最近会话","读取朋友圈缓存","发布纯文字朋友圈"};
+    string[] keys={"enabled","experimental","readContacts","readSessions","readMoments","publishMoments","sendFiles"};
+    string[] labels={"启用微信控制","了解崩溃风险并允许实验控制","读取通讯录","读取最近会话","读取朋友圈缓存","发布纯文字朋友圈","发送本机文件（仍遵守发送名单）"};
     for(int i=0;i<keys.Length;i++)checks[keys[i]]=Check(p,labels[i],B(config,keys[i]));
     var fields=new Dictionary<string,TextBox>();string[] scopes={"send","sendBlocked","receive","history","remarks"};string[] names={"允许发送","发送黑名单","允许接收","允许读取历史","允许修改备注"};
     p.Children.Add(Text("范围用内部 ID，逗号分隔；* 表示全部，黑名单只接受准确 ID。",11));

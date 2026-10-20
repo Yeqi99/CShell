@@ -28,7 +28,7 @@ delete env.ELECTRON_RUN_AS_NODE;
 const app = await electron.launch({ args: ['.'], env });
 try {
   const page = await app.firstWindow();
-  await page.getByRole('heading', { name: '尚未连接' }).waitFor();
+  await page.getByRole('heading', { name: '工作台', exact: true }).waitFor();
   await page.locator('.topbar').getByRole('button', { name: '统计与历史' }).click();
   await page.getByRole('heading', { name: '统计与历史' }).waitFor();
   await page.locator('.activity-recent').waitFor();

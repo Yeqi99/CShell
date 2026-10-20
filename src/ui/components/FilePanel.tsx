@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import {
   ArrowUp,
   Download,
@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import type { FileEntry, FileRef, Transfer } from '../../shared/contracts';
 import { useI18n } from '../i18n';
+const TextFileEditor = lazy(() => import('./TextFileEditor').then(module => ({default: module.TextFileEditor})));
+import { textCandidate } from '../text-path';
 import {
   copyFiles,
   pastedFiles,
@@ -35,6 +37,16 @@ export function FilePanel({
   localRoot?: string;
 }) {
   const { t, locale } = useI18n();
+  const [editors, setEditors] = useState<string[]>([]);
+  const [activeEditor, setActiveEditor] = useState('');
+  const [closingEditor, setClosingEditor] = useState('');
+  const openText = (file: string) => {
+    if (!editors.includes(file) && editors.length >= 6) {
+      setError('最多同时打开 6 个文本文件，请先关闭不需要的编辑页。');return;
+    }
+    setEditors(current => current.includes(file) ? current : [...current, file]);
+    setActiveEditor(file);
+  };
   const [path, setPath] = useState('.'),
     [draft, setDraft] = useState('.'),
     [entries, setEntries] = useState<FileEntry[]>([]),
@@ -160,8 +172,21 @@ export function FilePanel({
     setName('');
     await load(path);
   }
-  return (
+  return (<>
+    {!!editors.length && <nav className="text-file-tabs" aria-label="文件编辑页">
+      <button aria-pressed={!activeEditor} onClick={() => setActiveEditor('')}>文件</button>
+      {editors.map(file => <span key={file}><button title={file} aria-pressed={file === activeEditor} onClick={() => setActiveEditor(file)}>{file.split('/').pop()}</button>
+        <button aria-label={`关闭 ${file}`} title="关闭编辑页（请先保存）" onClick={() => {
+          // Keep the draft until the user explicitly confirms closing it.
+          setClosingEditor(file);
+        }}><X size={13}/></button></span>)}
+    </nav>}
+    {closingEditor && <div className="text-editor-options" role="alert">关闭编辑页会丢弃未保存修改。
+      <button onClick={() => setClosingEditor('')}>保留编辑页</button>
+      <button onClick={() => { setEditors(current => current.filter(p => p !== closingEditor));if (activeEditor === closingEditor) setActiveEditor('');setClosingEditor(''); }}>关闭</button>
+    </div>}
     <div
+      hidden={!!activeEditor}
       className={`file-panel ${dropping ? 'drop-active' : ''}`}
       onKeyDown={(e) => {
         if (e.key === 'Escape') {
@@ -374,12 +399,8 @@ export function FilePanel({
               entry.directory
                 ? void load(entry.path)
                 : !localRoot &&
-                  (entry.path.endsWith('.py')
-                    ? window.dispatchEvent(
-                        new CustomEvent('cshell:open-python', {
-                          detail: { sessionId, path: entry.path },
-                        }),
-                      )
+                  (textCandidate(entry.path)
+                    ? openText(entry.path)
                     : run(window.cshell.download(sessionId, [entry.path])))
             }
             onKeyDown={(e) => {
@@ -527,5 +548,6 @@ export function FilePanel({
         </section>
       )}
     </div>
-  );
+    {editors.map(file => <div className="text-file-slot" hidden={activeEditor !== file} key={file}><Suspense fallback={<p role="status">正在打开编辑器…</p>}><TextFileEditor sessionId={sessionId} path={file}/></Suspense></div>)}
+  </>);
 }

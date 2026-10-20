@@ -192,8 +192,8 @@ export function AiPanel({
     window.addEventListener('cshell:analyze-selection', handler);
     return () => window.removeEventListener('cshell:analyze-selection', handler);
   }, []);
-  const create = async () => {
-    const t = await window.cshell.aiThreadCreate(location, providerId, mode, sessionId);
+  const create = async (extensionModel?: string) => {
+    const t = await window.cshell.aiThreadCreate(location, providerId, mode, sessionId, extensionModel);
     setThreadId(t.id);
     return t;
   };

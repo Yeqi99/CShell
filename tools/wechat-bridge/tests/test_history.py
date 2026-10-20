@@ -37,4 +37,14 @@ class HistoryTest(unittest.TestCase):
         self.assertEqual(decode_body('ff','0','1',1)[1],'decode-failed')
         self.assertEqual(decode_body('','0','3',0)[1],'non-text')
 
+    def test_article_card_and_non_article(self):
+        import json
+        xml='<msg><appmsg><type>5</type><title>Article</title><des>Summary</des><url>https://mp.weixin.qq.com/s?x=1&amp;y=2</url><secret>omit</secret></appmsg></msg>'
+        blob=zstandard.ZstdCompressor().compress(xml.encode())
+        text,status=decode_body(blob.hex(),'4',str((5<<32)|49),len(blob))
+        self.assertEqual(status,'article-card')
+        self.assertEqual(json.loads(text),{'title':'Article','description':'Summary','url':'https://mp.weixin.qq.com/s?x=1&y=2'})
+        for value,expected in [(xml.replace('<type>5','<type>6'),'non-text'),(xml.replace('https://mp.weixin.qq.com/s?x=1&amp;y=2','javascript:alert(1)'),'invalid-article'),('<!DOCTYPE msg>'+xml,'invalid-article')]:
+            self.assertEqual(decode_body(value.encode().hex(),'0','49',len(value.encode()))[1],expected)
+
 if __name__=='__main__':unittest.main()

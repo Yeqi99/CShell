@@ -152,6 +152,9 @@ export async function workbenchSmoke(
     .dragTo(page.locator(`[data-session="${firstId}"]`));
   assert.equal(await page.locator('.session-tab').first().getAttribute('data-session'), secondId);
   await page.keyboard.press('Control+Tab');
+  await page.getByRole('heading', { name: '工作台', exact: true }).waitFor();
+  assert.equal(await page.locator('.session-tab.active').count(), 0);
+  await page.keyboard.press('Control+Tab');
   assert.equal(await page.locator('.session-tab.active').getAttribute('data-session'), secondId);
   await page.getByRole('button', { name: '切换为深色', exact: true }).click();
   await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark');

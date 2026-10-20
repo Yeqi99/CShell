@@ -5942,3 +5942,17 @@ input[type='radio']:focus-visible {
   flex-shrink: 0;
 }
 
+
+/* Adapt extensions to the available workspace, including an open agent sidebar. */
+.extension-workspace-slot { container: extensions-workspace / inline-size; }
+.extension-main:has(.opencode-extension) { padding: 20px; }
+.extension-main .opencode-extension { padding: 0; }
+@container extensions-workspace (max-width: 680px) {
+  .extension-workbench { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .extension-nav { display: flex; align-items: center; gap: 6px; padding: 10px 16px; border-right: 0; border-bottom: 1px solid var(--border); }
+  .extension-nav h2 { margin: 0 8px 0 0; }
+  .extension-nav > button { width: auto; margin: 0; padding: 8px 12px; }
+  .extension-main { padding: 16px; }
+  .extension-main:has(.opencode-extension) { padding: 16px; }
+  .extension-heading { gap: 12px; flex-wrap: wrap; }
+}

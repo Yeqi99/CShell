@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import { permissionHref,parsePermissionHref,permissionNodes } from '../src/shared/permission-links';
 import { permissionLinkTool } from '../src/core/permission-link-tool';
 test('permission links allow only known navigation nodes, never arbitrary URLs or operations',async()=>{
+ assert.equal(parsePermissionHref(permissionHref('wechat/sendFiles'))?.label,'微信：发送文件');
+ assert.equal(parsePermissionHref(permissionHref('wechat/send'))?.label,'微信：发送范围');
+ assert.equal(parsePermissionHref(permissionHref('wechat/remarks'))?.label,'微信：修改备注范围');
  for(const node of permissionNodes)assert.equal(parsePermissionHref(permissionHref(node.id))?.id,node.id);
  for(const bad of ['javascript:alert(1)','file:///C:/x','https://example.com/#cshell-permission/wechat/readSessions','#cshell-permission/wechat/readSessions?enable=true','#cshell-permission/wechat/unknown'])assert.equal(parsePermissionHref(bad),undefined);
  assert.throws(()=>permissionHref('wechat/unknown'));

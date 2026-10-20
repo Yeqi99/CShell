@@ -1,7 +1,10 @@
 """Bounded message_0.db history, on the database-owning thread. No key extraction."""
 import base64,hashlib,json,time
+import xml.etree.ElementTree as ET
+from urllib.parse import urlsplit
 from .contracts import require,identifier,fingerprint
 from .database_read import query_database,FUNCTIONS
+from .payment_card import transfer_card
 
 def prepare(params):
     target=params.get('target')
@@ -30,7 +33,8 @@ def prepare(params):
     return target,limit,direction,cursor,sql
 
 def decode_body(hex_data,encoding,native_type,size):
-    if int(native_type)&0xffffffff != 1:return None,'non-text'
+    kind=int(native_type)&0xffffffff
+    if kind not in (1,49):return None,'non-text'
     if int(size)>4096:return None,'oversized'
     data=bytes.fromhex(hex_data or '')
     try:
@@ -41,7 +45,22 @@ def decode_body(hex_data,encoding,native_type,size):
             with zstd.ZstdDecompressor().stream_reader(data) as reader:data=reader.read(65537)
             if len(data)>65536:return None,'oversized'
         elif encoding not in (None,'0',0):return None,'unsupported-encoding'
-        return data.decode('utf8'),'text'
+        decoded=data.decode('utf8')
+        if kind==49:
+            if '<!DOCTYPE' in decoded.upper() or '<!ENTITY' in decoded.upper():return None,'invalid-article'
+            root=ET.fromstring(decoded)
+            app=root if root.tag=='appmsg' else root.find('appmsg')
+            if app is None:return None,'non-text'
+            payment=transfer_card(app)
+            if payment is not None:return json.dumps(payment,ensure_ascii=False),'payment-card'
+            if app.findtext('type')!='5':return None,'non-text'
+            url=(app.findtext('url') or '').strip()
+            parsed=urlsplit(url)
+            if parsed.scheme not in ('http','https') or not parsed.hostname or parsed.username or parsed.password:return None,'invalid-article'
+            # Only expose card fields, never the full XML or embedded account tokens.
+            card={'title':(app.findtext('title') or '')[:1024],'description':(app.findtext('des') or '')[:4096],'url':url[:8192]}
+            return json.dumps(card,ensure_ascii=False),'article-card'
+        return decoded,'text'
     except Exception:return None,'decode-failed'
 
 def result_page(raw,params):
@@ -66,7 +85,7 @@ def result_page(raw,params):
     def token(row):return base64.b64encode(json.dumps({'version':1,'target':target,'database':database,'localId':row[0],'serverId':row[1] or '0'}).encode()).decode()
     return {'events':events,'newerCursor':token(selected[-1]) if selected else params.get('cursor'),
             'olderCursor':token(selected[0]) if selected else params.get('cursor'),'hasMore':more,
-            'gap':any(e['contentStatus'] not in ('text','non-text') for e in events),
+            'gap':any(e['contentStatus'] not in ('text','non-text','article-card','payment-card') for e in events),
             'coverage':'local message_0.db only; other shards, deleted records and remote history are not covered',
             'complete':False,'snapshot':False,'cursorAdvancesOnlyAfterRead':True}
 

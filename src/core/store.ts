@@ -10,6 +10,7 @@ import { toolsDefaults, toolsSettingsSchema, type ToolsSettings } from '../share
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { monitorViewSchema, type MonitorView } from '../shared/monitor-views';
 import { z } from 'zod';
 import {
   defaults,
@@ -27,6 +28,7 @@ import {
 
 const schema = z.object({
   version: z.literal(1),
+  monitorViews: z.array(monitorViewSchema).max(100).default([]),
   tools: toolsSettingsSchema.default(toolsDefaults),
   plugins: z.array(installedPluginSchema).max(100).optional(),
   pluginSource: z
@@ -54,6 +56,18 @@ export interface SecretCodec {
   decrypt(value: string): Promise<string>;
 }
 export class Store {
+  monitorViews(): MonitorView[] { return structuredClone(this.data.monitorViews); }
+  async saveMonitorView(value: MonitorView) {
+    const view = monitorViewSchema.parse(value);
+    const next = [...this.data.monitorViews.filter(v => v.id !== view.id), view];
+    if (next.length > 100) throw new Error('最多保存 100 个视图');
+    this.data.monitorViews = next;
+    await this.persist();
+  }
+  async deleteMonitorView(id: string) {
+    this.data.monitorViews = this.data.monitorViews.filter(v => v.id !== id);
+    await this.persist();
+  }
   private data: Data = schema.parse({
     version: 1,
     profiles: [],

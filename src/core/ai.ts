@@ -143,6 +143,7 @@ export class AiService {
       title: task.slice(0, 48),
       location: parent.location,
       providerId: parent.providerId,
+      extensionModel: parent.extensionModel,
       mode: parent.mode,
       sessionId: parent.sessionId,
       target: parent.target,
@@ -219,6 +220,7 @@ export class AiService {
       // Only our encrypted local file supplies history; no pending action survives restart.
       this.threads = (data.threads as AiThread[]).map((t) => ({
         ...t,
+        extensionModel: t.extensionModel ?? this.providers.find(p => p.id === t.providerId)?.extension?.model,
         checkpoint:t.checkpoint?{...t.checkpoint,recoveryRequired:true,phase:'恢复前核查'}:undefined,
         pending: undefined,
         execution: undefined,
@@ -387,14 +389,21 @@ export class AiService {
     if (!thread) throw new Error('Unknown conversation');
     return thread;
   }
-  async create(location: unknown, providerId: string, mode: AiMode, sessionId?: string) {
+  async create(location: unknown, providerId: string, mode: AiMode, sessionId?: string, extensionModel?: string) {
     if (!this.providers.some((p) => p.id === providerId)) throw new Error('Select an AI provider');
+    if (extensionModel) {
+      const provider = this.providers.find(p => p.id === providerId)!;
+      if (!provider.extension) throw Error('此基座不支持扩展模型选择');
+      const choices = await this.providerExtensions.call(provider.extension.id,'choices',{reference:provider.extension.model}) as {ref:string;available:boolean}[];
+      if (!choices.some(c => c.ref === extensionModel && c.available)) throw Error('所选模型不可用');
+    }
     const target = sessionId ? this.connections.describe(idSchema.parse(sessionId)) : undefined;
     const thread: AiThread = {
       id: randomUUID(),
       title: '新会话',
       location: z.enum(aiLocations).parse(location),
       providerId,
+      extensionModel: extensionModel ?? this.providers.find(p => p.id === providerId)?.extension?.model,
       mode: modeSchema.parse(mode),
       sessionId,
       target: target?.label,
@@ -814,7 +823,7 @@ export class AiService {
   private async loop(t: AiThread, signal: AbortSignal, triggered?: AiTriggeredRun) {
     const stored = this.providers.find((p) => p.id === t.providerId);
     if (!stored) throw new Error('AI provider was removed');
-    const p=await this.resolveProvider(stored,t.id);
+    const p=await this.resolveProvider(t.extensionModel && stored.extension ? {...stored,extension:{...stored.extension,model:t.extensionModel}} : stored,t.id);
     const messages: any[] = [
       {
         role: 'system',

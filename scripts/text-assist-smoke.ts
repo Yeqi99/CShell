@@ -45,7 +45,7 @@ try {
   await app.evaluate('globalThis.__name = (fn) => fn');
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.getByRole('heading', { name: '尚未连接' }).waitFor();
+  await page.getByRole('heading', { name: '工作台', exact: true }).waitFor();
   await page.evaluate(
     async ({ id, url }) => {
       await window.cshell.saveProfile({
@@ -79,7 +79,7 @@ try {
     ipcMain.handle('local-terminal:wsl-account', () => ({ ready: false }));
   });
   await page.reload();
-  await page.getByRole('heading', { name: '尚未连接' }).waitFor();
+  await page.getByRole('heading', { name: '工作台', exact: true }).waitFor();
   await page.getByRole('button', { name: '新建连接', exact: true }).click();
   await page.getByRole('heading', { name: '新建连接', exact: true }).waitFor();
   assert.equal(await page.getByLabel('主机地址', { exact: true }).isVisible(), false);

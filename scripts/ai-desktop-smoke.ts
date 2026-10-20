@@ -13,7 +13,7 @@ const app = await electron.launch({
 });
 try {
   const page = await app.firstWindow();
-  await page.getByRole('heading', { name: '尚未连接' }).waitFor();
+  await page.getByRole('heading', { name: '工作台', exact: true }).waitFor();
   const fit = await app.evaluate(({ BrowserWindow, screen }) => {
     const b = BrowserWindow.getAllWindows()[0].getBounds(),
       a = screen.getDisplayMatching(b).workArea;

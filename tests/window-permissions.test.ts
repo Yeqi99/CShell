@@ -1,8 +1,9 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
+import {EventEmitter} from 'node:events';
 import {installWindowPermissions} from '../src/desktop/window-permissions';
 test('fullscreen is limited to the trusted main document; other browser grants remain denied',()=>{
- let request:any,check:any;const entry='file:///app/index.html';const wc={getURL:()=>entry};
+ let request:any,check:any;const entry='file:///app/index.html';const wc=Object.assign(new EventEmitter(),{getURL:():string=>entry});
  installWindowPermissions({setPermissionRequestHandler:(f:any)=>request=f,setPermissionCheckHandler:(f:any)=>check=f} as any,wc as any,entry);
  const ask=(permission:string,contents:any=wc,url=entry,isMainFrame=true)=>{let result;request(contents,permission,(v:boolean)=>result=v,{requestingUrl:url,isMainFrame});return result;};
  assert.equal(ask('fullscreen'),true);assert.equal(check(wc,'fullscreen','file://',{requestingUrl:entry,isMainFrame:true}),true);

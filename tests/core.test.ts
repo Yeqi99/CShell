@@ -152,6 +152,14 @@ test('resource capacities and logical CPUs stay unknown for missing or invalid d
   assert.equal(full.memory, 100);
   assert.equal(full.disk, 100);
 });
+test('disk monitoring keeps separate filesystems and avoids counting duplicate mounts', () => {
+  const result = parseMetrics('__DISK__\nFilesystem 1024-blocks Used Available Capacity Mounted on\n/dev/sda1 100 50 50 50% /\n/dev/sdb1 200 100 100 50% /data volume\n/dev/sdb1 200 100 100 50% /bind\ntmpfs 100 0 100 0% /run\n/dev/sdc1 0 0 0 0% /empty\n__MODEL__\nCPU');
+  assert.deepEqual(result.disks.map(d => [d.device, d.mount, d.total, d.used]), [
+    ['/dev/sda1', '/', 102400, 51200], ['/dev/sdb1', '/data volume', 204800, 102400],
+  ]);
+  assert.deepEqual(parseMetrics('unsupported').disks, []);
+  assert.deepEqual(parseMetrics('__DRIVES__\nsda 1000000 disk\nloop0 100 loop\nsdb 2000000 disk\n__MODEL__\nCPU').physicalDisks, [{name:'sda',size:1000000},{name:'sdb',size:2000000}]);
+});
 test('local directory capability, copy and conflict preservation', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'cshell-local-'));
   try {

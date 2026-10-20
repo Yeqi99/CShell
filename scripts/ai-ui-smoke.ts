@@ -59,9 +59,10 @@ try {
   page.setDefaultTimeout(10000);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.getByRole('heading', { name: '尚未连接' }).waitFor({ timeout: 60000 });
-  assert.equal(await page.getByRole('button', { name: '新建连接', exact: true }).count(), 1);
-  assert.equal(await page.locator('.empty-terminal button').count(), 0);
+  await page.getByRole('heading', { name: '工作台', exact: true }).waitFor({ timeout: 60000 });
+  assert.equal(await page.getByRole('button', { name: '新建连接', exact: true }).count(), 2);
+  assert.equal(await page.locator('.workbench-home .home-mode-options button:disabled').count(), 3);
+  assert.equal(await page.locator('.monitor-panel').count(), 0);
   await page.keyboard.press('Control+Shift+B');
   await page.locator('.sidebar').waitFor({ state: 'hidden' });
   assert.equal(await page.getByRole('button', { name: '新建连接', exact: true }).count(), 1);

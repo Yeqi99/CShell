@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import {SharedDesktop} from './desktop-shared';
 import {
   desktopViewStartSchema,
   desktopViewInputSchema,
@@ -60,6 +61,7 @@ export function desktopNetworkFailure(error: unknown) {
 /** Every reconnect reopens authorization and gets a fresh single-use ticket. */
 export class DesktopViews {
   private views = new Map<string, View>();
+  private shared = new Map<string,Promise<{host:Host;hub:SharedDesktop}>>();
   private disposed = false;
   private guardTimer: ReturnType<typeof setInterval>;
   constructor(
@@ -106,7 +108,7 @@ export class DesktopViews {
     this.views.set(request.id, view);
     try {
       await this.attach(request.id, view);
-      return { id: request.id, control: view.host!.ticket.control, generation: view.generation };
+      return { id: request.id, control: view.host!.ticket.control && !!request.control, generation: view.generation };
     } catch (error) {
       await this.stop(request.id);
       throw error;
@@ -115,20 +117,26 @@ export class DesktopViews {
   private async attach(id: string, view: View) {
     this.options.authorize(view.target);
     const generation = view.generation;
-    const host = await this.options.open(view.request);
-    if (!this.live(id, view) || generation !== view.generation) {
-      await host.close().catch(() => {});
-      throw new Error('桌面连接已取消');
+    let pending=this.shared.get(view.target);
+    if(!pending){
+      pending=(async()=>{
+        const host=await this.options.open(view.request);
+        try{
+          if(![...this.views.values()].some(v=>!v.closed&&v.target===view.target))throw new Error('桌面连接已取消');
+          const upstream=await (host.connect?host.connect():(this.options.connect??connectDesktop)(host.ticket,{host:host.host,expectedHostIdentity:host.identity,local:host.local}));
+          const hub=new SharedDesktop(upstream,host.close,()=>{if(this.shared.get(view.target)===pending)this.shared.delete(view.target);});
+          return {host,hub};
+        }catch(error){await host.close().catch(()=>{});throw error;}
+      })();
+      this.shared.set(view.target,pending);
+      void pending.catch(()=>{if(this.shared.get(view.target)===pending)this.shared.delete(view.target);});
     }
-    view.host = host;
-    this.options.authorize(view.target);
-    const client = await (host.connect
-      ? host.connect()
-      : (this.options.connect ?? connectDesktop)(host.ticket, {
-          host: host.host,
-          expectedHostIdentity: host.identity,
-          local: host.local,
-        }));
+    const shared=await pending;
+    const host={...shared.host,close:async()=>{}};
+    const client=shared.hub.acquire();
+    view.host=host;
+    try{this.options.authorize(view.target);}catch(error){await client.close();throw error;}
+    if(view.request.control&&!host.ticket.control){await client.close();throw new Error('当前桌面连接为仅观看；请先断开原桌面，再启用键鼠控制连接。');}
     if (!this.live(id, view) || generation !== view.generation) {
       await client.close();
       throw new Error('桌面连接已取消');
@@ -152,9 +160,10 @@ export class DesktopViews {
       state: 'connected',
       attempt: 0,
       delayMs: 0,
-      control: host.ticket.control,
+      control: host.ticket.control && !!view.request.control,
     });
     if (client.videoInfo) publish({ id, type: 'config', info: client.videoInfo });
+    client.requestKeyframe();
     client.on('frame', (frame: MediaFrame) => {
       if (!current()) return;
       try {
@@ -271,7 +280,9 @@ export class DesktopViews {
     return view;
   }
   input(id: unknown, raw: unknown, generation?: unknown) {
-    return this.get(id, generation).client!.input(desktopViewInputSchema.parse(raw));
+    const view=this.get(id,generation);
+    if(!view.request.control)throw new Error('此视图为仅观看');
+    return view.client!.input(desktopViewInputSchema.parse(raw));
   }
   release(id: unknown, generation?: unknown) {
     return this.get(id, generation).client!.releaseInput();

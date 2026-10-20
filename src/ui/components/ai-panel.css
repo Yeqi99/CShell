@@ -937,3 +937,24 @@
 }
 
 .permission-location { outline: 2px solid var(--accent, #2563eb); outline-offset: 4px; border-radius: 5px; scroll-margin: 32px; }
+.agent-running .agent-wait-dots{display:inline-flex;width:auto;height:16px;gap:4px;align-items:center;background:none;animation:none;border-radius:0}
+.agent-wait-dots i{width:4px;height:4px;background:var(--accent);border-radius:50%;animation:agent-wait 1.4s ease-in-out infinite}
+.agent-wait-dots i:nth-child(2){animation-delay:.16s}.agent-wait-dots i:nth-child(3){animation-delay:.32s}
+@keyframes agent-wait{0%,70%,100%{opacity:.35;transform:translateY(0)}35%{opacity:1;transform:translateY(-3px)}}
+@media(prefers-reduced-motion:reduce){.agent-wait-dots i{animation:none;opacity:.7}}
+.agent-account-model{max-width:220px;min-width:110px;width:auto;font-size:12px;padding:4px 8px}.agent-thread-model{max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--muted)}.agent-composer-tools{flex-wrap:wrap;gap:8px}
+
+/* Use pane width rather than desktop viewport width for composer controls. */
+.ai-panel { container: agent-pane / inline-size; }
+.agent-composer-tools .agent-model { flex: 1 1 120px; max-width: 100%; }
+.agent-composer-tools .agent-account-model { flex: 1 1 150px; min-width: 0; max-width: 240px; text-overflow: ellipsis; }
+.agent-composer-tools .agent-thread-model { flex: 1 1 120px; min-width: 0; }
+.agent-composer-tools .agent-policy { margin-left: auto; margin-right: 0; }
+@container agent-pane (max-width: 480px) {
+  .agent-composer-tools { gap: 6px; }
+  .agent-composer-tools .agent-model { flex-basis: calc(50% - 6px); }
+  .agent-composer-tools .agent-account-model { flex-basis: calc(50% - 6px); max-width: calc(50% - 6px); }
+  .agent-composer-tools .agent-policy { margin-left: auto; }
+  .ai-panel > header { padding-inline: 10px; gap: 8px; }
+  .ai-panel .ai-toolbar { gap: 2px; }
+}

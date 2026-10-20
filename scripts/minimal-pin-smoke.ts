@@ -10,7 +10,7 @@ delete env.ELECTRON_RUN_AS_NODE;
 const app = await electron.launch({ args: ['.'], env, timeout: 15000 });
 try {
   const page = await app.firstWindow();
-  await page.getByRole('heading', { name: '尚未连接' }).waitFor();
+  await page.getByRole('heading', { name: '工作台', exact: true }).waitFor();
   const pinned = () =>
     app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isAlwaysOnTop());
   const waitPinned = async (expected: boolean) => {

@@ -40,6 +40,13 @@ jobs:
         run: pnpm exec tsx scripts/ai-ui-smoke.ts
       - if: matrix.platform == 'win'
         run: pnpm exec tsx scripts/activity-smoke.ts
+      - if: matrix.platform == 'win'
+        name: Verify compact workbench and desktop layouts
+        run: |
+          pnpm exec tsx scripts/workbench-layout-smoke.ts
+          pnpm exec tsx scripts/monitor-layout-smoke.ts
+          pnpm exec tsx scripts/opencode-pane-smoke.ts
+          pnpm exec tsx scripts/desktop-compact-ui-smoke.ts
       - run: pnpm run licenses
       - if: matrix.platform == 'win'
         name: Prepare checksum-pinned desktop compiler
@@ -103,6 +110,7 @@ jobs:
           pnpm exec playwright install chromium
           pnpm exec tsx scripts/desktop-view-race-smoke.ts
           pnpm exec tsx scripts/desktop-fullscreen-smoke.ts
+          pnpm exec tsx scripts/desktop-compact-ui-smoke.ts
       - if: matrix.platform != 'linux'
         run: pnpm exec tsx scripts/platform-package-smoke.ts
       - if: matrix.platform == 'linux'

@@ -12,6 +12,7 @@ import {
 } from '../shared/plugins';
 import type { Store } from '../core/store';
 import type { SshService } from '../core/ssh';
+import { PythonFiles } from '../core/python-files';
 import { createExtensionServices, type ExtensionServices } from '../core/api/extensions';
 export function registerExtensionHandlers(
   handle: (name: string, fn: (...args: any[]) => any) => void,
@@ -29,6 +30,13 @@ export function registerExtensionHandlers(
     ssh.get(value);
     return value;
   };
+  const textFiles = new PythonFiles(ssh, true);
+  handle('text:read', (id, path) => textFiles.read(connected(id), z.string().max(4096).parse(path)));
+  handle('text:save', (id, path, code, revision) => textFiles.save(connected(id), z.string().max(4096).parse(path), code, revision));
+  handle('text:environments', (id, path) => {
+    requirePlugin('python');
+    return environments.inspectForFile(connected(id), z.string().max(4096).parse(path));
+  });
   const requirePlugin = (provider: 'conda' | 'python') => {
     if (!pluginEnabled(store.plugins(), provider))
       throw new Error(`${provider} plugin is not enabled`);

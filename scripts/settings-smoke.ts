@@ -9,7 +9,7 @@ delete env.ELECTRON_RUN_AS_NODE;
 const app = await electron.launch({ args: ['.'], env });
 try {
   const page = await app.firstWindow();
-  await page.getByRole('heading', { name: '尚未连接' }).waitFor();
+  await page.getByRole('heading', { name: '工作台', exact: true }).waitFor();
   await page.locator('.topbar button').last().click();
   const nav = page.locator('.settings-nav');
   assert.deepEqual(await nav.getByRole('button').allTextContents(), [

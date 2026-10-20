@@ -19,7 +19,7 @@ def execute(request):
             except Exception:pass
             finally:
                 if memory:memory.close()
-        return {'processes':processes,'readProtocolVersion':2,'subscriptionProtocolVersion':1,'conversationsProtocolVersion':1,'momentsProtocolVersion':1,'momentsPublishProtocolVersion':1,'momentsInteractionsProtocolVersion':1}
+        return {'processes':processes,'readProtocolVersion':2,'subscriptionProtocolVersion':1,'conversationsProtocolVersion':1,'momentsProtocolVersion':1,'momentsPublishProtocolVersion':1,'momentsInteractionsProtocolVersion':1,'momentsDetailProtocolVersion':1,'fileSendProtocolVersion':1}
     if method=='events':
         from .events import EventJournal
         directory=pathlib.Path(request['directory'])
@@ -36,6 +36,9 @@ def execute(request):
         def check():require(not cancelled.exists(),'CANCELLED','Operation cancelled; submitted effects cannot be undone')
         check()
         with exclusive(state_dir()/'operation.lock'):
+            if method=='send_file':
+                from .file_send import attempt
+                return attempt(memory,binding,path,base,params,state_dir(),check)
             if method in ('remark_read','remark_set'):
                 from .remark import native_remark,attempt
                 if method=='remark_read':return native_remark(memory,binding,path,base,params,check,False)
@@ -52,6 +55,9 @@ def execute(request):
             if method=='moments_interactions':
                 from .moments_interactions import interactions
                 return interactions(memory,binding,path,base,params,check)
+            if method=='moment_detail':
+                from .moments_detail import details
+                return details(memory,binding,path,base,params,check)
             if method=='conversations':
                 from .conversations import conversations
                 return conversations(memory,binding,path,base,params,check)

@@ -18,9 +18,9 @@ export class DesktopClient extends EventEmitter {
   this.timer=setInterval(()=>{if(!this.closed){this.publishFeedback();session.ping();if(controlAllowed&&this.videoReady)session.input({kind:'lease',generation:1,sequence:++this.sequence});}},2000);this.timer.unref();
  }
  ack(id:string|bigint){if(!/^\d{1,10}$/.test(String(id)))throw new Error('Invalid frame ID');return this.session.ack(BigInt(id));}
- input(value:DesktopClientInput){if(!this.controlAllowed||!this.videoReady)throw new Error('Desktop control is not ready or permitted');return this.session.input({...value,generation:1,sequence:++this.sequence} as NativeDesktopInput);}
+ input(value:DesktopClientInput){if(!this.controlAllowed)throw new Error('远端未授予键鼠控制权限');if(this.closed||!this.videoReady)return;return this.session.input({...value,generation:1,sequence:++this.sequence} as NativeDesktopInput);}
  releaseInput(){return this.session.releaseInput();}
- quality(value:DesktopQuality){return this.session.quality(value);}
+ quality(value:DesktopQuality){if(value.unlimited&&!this.videoInfo?.unlimitedQuality)throw new Error('无上限画质需要更新远端 CAgent');return this.session.quality(value);}
  requestKeyframe(){return this.session.requestKeyframe();}
  feedback(value:DesktopFeedback){return this.session.feedback(value);}
  /** Decode duration and renderer queue age must be measured by the viewer.

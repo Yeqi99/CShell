@@ -18,6 +18,7 @@ const accountSchema = z.object({
   refreshToken: z.string().max(16000).optional(),
   expiresAt: z.number().finite().optional(),
   refreshPending: z.boolean().optional(),
+  providerId: z.string().uuid().optional(),
 });
 const configSchema = z.object({ accounts: z.array(accountSchema).max(32) });
 const legacySchema = z.object({
@@ -32,14 +33,15 @@ export function quotaWindows(raw: any) {
     ['weeklyUsage', '每周'],
     ['monthlyUsage', '每月'],
   ].flatMap(([key, label]) => {
-    const v = raw?.[key];
-    if (!v || typeof v.usagePercent !== 'number' || !Number.isFinite(v.usagePercent)) return [];
+    const v = raw?.usage?.[key.replace('Usage', '')] ?? raw?.[key];
+    const percent = v?.percent ?? v?.usagePercent;
+    if (!v || typeof percent !== 'number' || !Number.isFinite(percent)) return [];
     return [
       {
         label,
-        usedPercent: v.usagePercent,
+        usedPercent: percent,
         resetAt:
-          typeof v.resetAt === 'string'
+          typeof v.resetsAt === 'string' ? v.resetsAt : typeof v.resetAt === 'string'
             ? v.resetAt
             : typeof v.resetInSec === 'number' && Number.isFinite(v.resetInSec) && v.resetInSec >= 0
               ? new Date(Date.now() + v.resetInSec * 1000).toISOString()
@@ -374,12 +376,13 @@ export class OpenCodeExtension implements AiProviderExtension {
       return {
         hasKey: this.config.accounts.length > 0,
         workspace: a?.workspace ?? '',
-        accounts: this.config.accounts.map(({ id, name, workspace, refreshToken }) => ({
+        accounts: this.config.accounts.map(({ id, name, workspace, refreshToken, providerId }) => ({
           id,
           name,
           workspace: workspace ?? '',
           hasKey: true,
           login: !!refreshToken,
+          providerId,
         })),
         usageUrl: this.consoleUrl('go'),
       };
@@ -403,6 +406,7 @@ export class OpenCodeExtension implements AiProviderExtension {
           id: p.id,
           name: p.name ?? old?.name ?? '默认账号',
           key: p.key || old?.key,
+          providerId: old?.providerId,
           workspace: p.workspace === undefined ? old?.workspace : workspace || undefined,
           ...(!p.key && old?.refreshToken
             ? {
@@ -434,11 +438,15 @@ export class OpenCodeExtension implements AiProviderExtension {
           .parse((input as any)?.reference),
       );
       this.account(p.accountId);
-      return (await this.models(p.tier)).map((m) => ({
-        ref: `${p.legacy ? '' : p.accountId + '/'}${p.tier}/${m.id}`,
-        model: m.id,
-        available: m.available,
-      }));
+      const groups = await Promise.allSettled((['go', 'zen'] as const).map(async tier =>
+        (await this.models(tier)).map(m => ({
+          ref: `${p.accountId}/${tier}/${m.id}`,
+          model: m.id, label: `${m.id} · ${tier === 'go' ? 'Go' : 'Zen'}`,
+          available: m.available,
+        }))));
+      const models = groups.flatMap(g => g.status === 'fulfilled' ? g.value : []);
+      if (!models.length) throw Error('OpenCode 模型目录暂不可用，请稍后刷新');
+      return models;
     }
     if (action === 'usage') {
       const id = idSchema.parse((input as any)?.id ?? 'default');
@@ -537,6 +545,19 @@ export class OpenCodeExtension implements AiProviderExtension {
         extension: { id: this.id, model: reference },
       });
       return { id };
+    }
+    if (action === 'connect') {
+      const id = idSchema.parse((input as any)?.id ?? 'default');
+      const account = this.account(id);
+      await this.json('https://opencode.ai/console/api/v2/config', await this.credential(id));
+      const choices = await this.call('choices', {reference:`${id}/go/placeholder`}) as {ref:string;model:string;available:boolean}[];
+      const choice = choices.find(m => m.available);
+      const model = choice?.model;
+      if (!model) throw Error('没有已适配的模型');
+      const providerId = account.providerId ?? randomUUID();
+      await this.host.saveProvider({id:providerId,name:`OpenCode · ${account.name}`,url:'https://model-extension.invalid',model,extension:{id:this.id,model:choice!.ref}});
+      await this.mutate(() => ({accounts:this.config.accounts.map(a => a.id === id ? {...a,providerId} : a)}));
+      return {id:providerId};
     }
     throw Error('不支持的模型扩展操作');
   }

@@ -470,3 +470,63 @@ test('unknown refresh outcome remains blocked across restart and metadata edits'
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test('live Go usage schema includes zero and all reset windows',()=>{
+ const windows=quotaWindows({usage:{rolling:{status:'ok',percent:0,resetsAt:'2026-10-20T13:21:18.000Z'},weekly:{status:'ok',percent:51,resetsAt:'2026-10-26T00:00:00.000Z'},monthly:{status:'ok',percent:99,resetsAt:'2026-11-16T15:19:56.000Z'}}});
+ assert.deepEqual(windows.map(w=>w.usedPercent),[0,51,99]);
+ assert.equal(windows[0].resetAt,'2026-10-20T13:21:18.000Z');
+});
+test('one authenticated account provider exposes Go and Zen without inference or duplicate providers',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'opencode-account-')); const saved:any[]=[]; let calls=0;
+ const host={directory,enabled:()=>true,encrypt:async(s:string)=>s,decrypt:async(s:string)=>s,saveProvider:async(p:any)=>{saved.push(p)},open:async()=>{}};
+ const e=new OpenCodeExtension(host,async(url,init)=>{
+  assert.notEqual(init?.method,'POST','account connect must not spend inference credits');
+  if(String(url).endsWith('/models'))return Response.json({data:[{id:String(url).includes('/go/')?'glm-5.3':'beam-free'}]});
+  calls++; return Response.json({});
+ });
+ try{
+  await e.load(); await e.call('save',{key:'private-key'});
+  const a=await e.call('connect',{id:'default'}),b=await e.call('connect',{id:'default'});
+  assert.equal(a.id,b.id); assert.equal(saved.length,2); assert.equal(calls,2);
+  const choices=await e.call('choices',{reference:saved[0].extension.model});
+  assert.deepEqual(choices.map((m:any)=>m.ref),['default/go/glm-5.3','default/zen/beam-free']);
+  assert.equal(JSON.stringify(choices).includes('private-key'),false);
+ }finally{await rm(directory,{recursive:true,force:true})}
+});
+test('thread model selection is pinned, inherited and persisted independently of provider default',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'opencode-thread-'));
+ const store=new Store(directory,{encrypt:async(s)=>s,decrypt:async(s)=>s});
+ const ai=new AiService(directory,store,new ConnectionRegistry(()=>undefined));const resolved:string[]=[];
+ const extension={id:'test.account',call:async()=>[{ref:'account/zen/beam-free',available:true}],resolve:async(ref:string)=>{resolved.push(ref);return {url:'https://model-extension.invalid',model:'fixture',key:'',transport:async()=>Response.json({choices:[{message:{content:'OK'}}]})}}};
+ ai.providerExtensions.register(extension);
+ try{
+  await store.load();await ai.load();const p={id:randomUUID(),name:'Account',url:'https://model-extension.invalid',model:'default',extension:{id:extension.id,model:'account/go/default'}};
+  await ai.saveProvider(p);const t=await ai.create('workspace',p.id,'review',undefined,'account/zen/beam-free');
+  await assert.rejects(()=>ai.create('workspace',p.id,'review',undefined,'other/zen/beam-free'),/不可用/);
+  await ai.saveProvider({...p,extension:{...p.extension,model:'account/go/changed'}});
+  await ai.send(t.id,'hi');while(ai.snapshot().threads.find(v=>v.id===t.id)?.state==='running')await new Promise(r=>setTimeout(r,10));
+  assert.equal(resolved.at(-1),'account/zen/beam-free');
+  (ai as any).runs.set(t.id,new AbortController());
+  const child=await (ai as any).spawn(ai.snapshot().threads.find(v=>v.id===t.id),'child');
+  (ai as any).runs.delete(t.id);
+  assert.equal(child.extensionModel,t.extensionModel);
+  while(ai.snapshot().threads.find(v=>v.id===child.id)?.state==='running')await new Promise(r=>setTimeout(r,10));
+  await ai.flush();const reload=new AiService(directory,store,new ConnectionRegistry(()=>undefined));await reload.load();
+  assert.equal(reload.snapshot().threads.find(v=>v.id===t.id)?.extensionModel,t.extensionModel);reload.dispose();
+ }finally{ai.dispose();await ai.flush();await rm(directory,{recursive:true,force:true})}
+});
+
+test('normalized streaming exposes first text before upstream completion',async()=>{
+ let source!:ReadableStreamDefaultController<Uint8Array>;
+ const raw=new Response(new ReadableStream<Uint8Array>({start(c){source=c}}),{headers:{'content-type':'text/event-stream'}});
+ let first!:()=>void;const firstText=new Promise<void>(resolve=>{first=resolve});let seen='';
+ const completion=readAiResponse(normalizeResponse(raw,'responses',true),text=>{seen=text;first()});
+ source.enqueue(new TextEncoder().encode('data: {"type":"response.output_text.delta","delta":"first"}\n\n'));
+ let timeout:ReturnType<typeof setTimeout>|undefined;
+ try{
+  await Promise.race([firstText,new Promise((_,reject)=>{timeout=setTimeout(()=>reject(Error('first token buffered')),1000)})]);
+  assert.equal(seen,'first');
+  source.enqueue(new TextEncoder().encode('data: {"type":"response.completed"}\n\n'));source.close();
+  assert.equal((await completion).content,'first');
+ }finally{clearTimeout(timeout)}
+});

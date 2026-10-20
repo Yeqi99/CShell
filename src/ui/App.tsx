@@ -1,4 +1,7 @@
 import {SavedAgentConnection} from './components/SavedAgentConnection';
+import { MonitorViews } from './components/MonitorViews';
+import { WorkbenchHome } from './components/WorkbenchHome';
+import type { CurrentViewSource } from '../shared/monitor-views';
 import {AgentMachineWorkspace} from './components/AgentMachineWorkspace';
 import type {AgentTarget} from '../shared/agent';
 import { RdpConnectionForm } from './components/RdpConnectionForm';
@@ -27,6 +30,7 @@ import { toolsDefaults } from '../shared/docker';
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   HardDrive,
+  LayoutDashboard,
   Files,
   BarChart3,
   Bot,
@@ -186,6 +190,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
     return () => window.removeEventListener('cshell:open-ai', open);
   }, []);
   const [activityOpen, setActivityOpen] = useState(false);
+  const [viewsOpen, setViewsOpen] = useState(false);
   const openActivity = () => {
     setActivityOpen(true);
     setSurface('activity');
@@ -227,16 +232,26 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
     [form, setForm] = useState<Profile | 'new' | null>(null),
     [settings, setSettings] = useState(false),
     [surface, setSurface] = useState<
-      'terminal' | 'connection' | 'quick' | 'settings' | 'extensions' | 'activity' | 'wsl' | 'machine'
-    >('terminal'),
+      'terminal' | 'connection' | 'quick' | 'settings' | 'extensions' | 'activity' | 'wsl' | 'machine' | 'views' | 'home'
+    >('home'),
     [palette, setPalette] = useState(false),
     [error, setError] = useState(''),
     [searching, setSearching] = useState(false),
     [transfers, setTransfers] = useState<Transfer[]>([]),
     [confirmDelete, setConfirmDelete] = useState<Profile | null>(null),
     [confirmClose, setConfirmClose] = useState<Tab | null>(null);
+  const [machineSessionIds,setMachineSessionIds]=useState<Record<string,string[]>>({});
   const [machineSessionCounts,setMachineSessionCounts]=useState<Record<string,number>>({});
   const [machines,setMachines]=useState<{device:ClientDevice;target:AgentTarget}[]>([]),[machineId,setMachineId]=useState('');
+  const currentSsh = [...tabs.filter(tab => !tab.closed).map(t=>({id:t.id})),...machines.flatMap(m=>(machineSessionIds[m.target.id]??[]).map(id=>({id})))];
+  const currentDevices = [...new Set([...machines.map(m => m.device.deviceId), ...tabs.filter(t => !t.closed && t.client).map(t => t.client!.device.deviceId)])];
+  const openCurrentView = async (mode: 'tile' | 'focus' | 'overview') => {
+    const sources: CurrentViewSource[] = await Promise.all(currentSsh.map(async tab => ({
+      kind: 'terminal' as const, sessionId: tab.id, snapshot: await terminalSnapshot(tab.id),
+    })));
+    sources.push(...currentDevices.map(profileId => ({ kind: 'desktop' as const, profileId })));
+    await window.cshell.openCurrentView(sources, mode);
+  };
   async function openMachineDevice(device:ClientDevice){
     const existing=machines.find(m=>m.device.deviceId===device.deviceId);
     const latest=await window.cshell.config();const opened=existing?.target??await window.cshell.agentMachineOpen(device.deviceId);
@@ -353,6 +368,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
       if (shortcut === 'tools') openFiles();
       if (shortcut === 'nextTab' || shortcut === 'previousTab') {
         const views = [
+          { key: 'home', select: () => setSurface('home') },
           ...tabs.map((tab) => ({
             key: tab.id,
             select: () => {
@@ -379,7 +395,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
           ...(settings ? [{ key: 'settings', select: () => setSurface('settings') }] : []),
         ];
         const key =
-          surface === 'terminal'
+          surface === 'home' ? 'home' : surface === 'terminal'
             ? active
             : surface === 'quick'
               ? `quick-${quickId}`
@@ -608,6 +624,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
           <strong>CShell</strong>
         </div>
         <div className="titlebar-space" />
+        <button className="icon" title="视图" aria-label="视图" onClick={() => { setViewsOpen(true); setSurface('views'); }}><LayoutDashboard size={18}/></button>
         <button
           className="icon"
           title={config.preferences.locale === 'zh-CN' ? '统计与历史' : 'Activity & history'}
@@ -762,6 +779,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
               </button>
             </div>
             <TabStrip>
+              <div className={`tab welcome-tab ${surface === 'home' ? 'active' : ''}`} onClick={() => setSurface('home')}><button onClick={() => setSurface('home')}><LayoutDashboard size={15}/>{t('workspace')}</button></div>
               {machines.map(m=><div key={m.target.id} className={'tab '+(surface==='machine'&&machineId===m.target.id?'active':'')} onClick={()=>{setMachineId(m.target.id);setSurface('machine');}}><button onClick={()=>{setMachineId(m.target.id);setSurface('machine');}}>{m.target.name}</button><button className="icon" title="关闭机器工作区及其会话" aria-label={'关闭 '+m.target.name} onClick={e=>{e.stopPropagation();void closeMachine(m.target.id).catch(onError);}}>×</button></div>)}
 
               {tabs.length ? (
@@ -792,11 +810,6 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
                     }
                   />
                 ))
-              ) : !form && !settings && !quickConnections.length && !machines.length ? (
-                <div className="tab active welcome-tab">
-                  <TerminalIcon size={15} />
-                  {t('workspace')}
-                </div>
               ) : null}
 
               {wslSetupTarget && (
@@ -882,6 +895,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
                   </button>
                 </div>
               ))}
+              {viewsOpen && <div className={`tab ${surface === 'views' ? 'active' : ''}`}><button onClick={() => setSurface('views')}>视图</button><button className="icon" aria-label="关闭视图设置" onClick={() => { setViewsOpen(false); if (surface === 'views') setSurface('terminal'); }}><X size={13}/></button></div>}
               {extensions && (
                 <div
                   className={`tab ${surface === 'extensions' ? 'active' : ''}`}
@@ -1172,7 +1186,11 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
               />
             </div>
           )}
-          {machines.map(m=><div key={m.target.id} className="workspace-editor" hidden={surface!=='machine'||machineId!==m.target.id}><AgentMachineWorkspace onDisconnect={()=>closeMachine(m.target.id)} device={m.device} target={m.target} preferences={preferences} onSessionCount={count=>setMachineSessionCounts(v=>v[m.target.id]===count?v:{...v,[m.target.id]:count})} active={surface==='machine'&&machineId===m.target.id}/></div>)}
+          {viewsOpen && <div className="workspace-editor" hidden={surface !== 'views'}><MonitorViews config={config}/></div>}{machines.map(m=><div key={m.target.id} className="workspace-editor" hidden={surface!=='machine'||machineId!==m.target.id}><AgentMachineWorkspace onDisconnect={()=>closeMachine(m.target.id)} device={m.device} target={m.target} preferences={preferences} onSessionCount={(count,ids)=>{setMachineSessionCounts(v=>v[m.target.id]===count?v:{...v,[m.target.id]:count});setMachineSessionIds(v=>JSON.stringify(v[m.target.id])===JSON.stringify(ids)?v:{...v,[m.target.id]:ids});}} active={surface==='machine'&&machineId===m.target.id}/></div>)}
+          <div className="workspace-editor" hidden={surface !== 'home' && !(surface === 'terminal' && !tabs.length)}>
+            <WorkbenchHome config={config} active={surface === 'home' || (surface === 'terminal' && !tabs.length)} currentCount={currentSsh.length + currentDevices.length}
+              onNew={() => openConnection('new')} onViews={() => { setViewsOpen(true); setSurface('views'); }} onConnect={openSaved} onCurrent={openCurrentView}/>
+          </div>
           {surface === 'terminal' && current?.closed && (
             <div className="disconnected-session-bar" role="status">
               <span>
@@ -1223,6 +1241,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
                   id={tab.id}
                   active={surface === 'terminal' && active === tab.id}
                   pythonInterpreter={tab.python}
+                  textEditingSupported={!tab.local && !tab.client}
                   plugins={tab.local || tab.client ? [] : config.plugins}
                   suggestionsEnabled={
                     !tab.local &&
@@ -1239,13 +1258,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
                 />
               ))}
             </div>
-          ) : (
-            <div className="empty-terminal" hidden={surface !== 'terminal'}>
-              <TerminalIcon size={30} strokeWidth={1.2} />
-              <h1>{t('noActiveSession')}</h1>
-              <p>{t('openConnectionHint')}</p>
-            </div>
-          )}
+          ) : null}
 
           {localDock && surface === 'terminal' && !minimal && (
             <LocalDock

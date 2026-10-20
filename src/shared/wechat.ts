@@ -4,7 +4,7 @@ export const wechatFriendSchema = z.string().regex(/^wxid_[A-Za-z0-9_]{3,64}$/);
 const targets = z.array(z.union([wechatTargetSchema,z.literal('*')])).max(100);
 export const wechatConfigSchema = z.object({
   enabled: z.boolean(), experimental: z.boolean(), pid: z.number().int().positive().nullable(),
-  publishMoments: z.boolean().default(false), readMoments: z.boolean().default(false), readSessions: z.boolean().default(false), readContacts: z.boolean(), send: targets, sendBlocked: z.array(wechatTargetSchema).max(100).default([]), receive: targets, history: targets.default([]),
+  sendFiles: z.boolean().default(false), publishMoments: z.boolean().default(false), readMoments: z.boolean().default(false), readSessions: z.boolean().default(false), readContacts: z.boolean(), send: targets, sendBlocked: z.array(wechatTargetSchema).max(100).default([]), receive: targets, history: targets.default([]),
   remarks: z.array(z.union([wechatFriendSchema,z.literal('*')])).max(100).default([]),
 }).strict();
 export type WechatConfig = z.infer<typeof wechatConfigSchema>;
@@ -14,7 +14,7 @@ export interface WechatBridge {
   onWechatEvent(listener:(event:{id:string;cursor:string})=>void):()=>void;
   wechatSave(config: WechatConfig): Promise<void>;
 }
-export const emptyWechatConfig = (): WechatConfig => ({enabled:false,experimental:false,pid:null,readContacts:false,readSessions:false,readMoments:false,publishMoments:false,send:[],sendBlocked:[],receive:[],history:[],remarks:[]});
+export const emptyWechatConfig = (): WechatConfig => ({enabled:false,experimental:false,pid:null,readContacts:false,readSessions:false,readMoments:false,publishMoments:false,sendFiles:false,send:[],sendBlocked:[],receive:[],history:[],remarks:[]});
 
 export function parseWechatConfig(input: unknown): WechatConfig {
   const result = wechatConfigSchema.safeParse(input);

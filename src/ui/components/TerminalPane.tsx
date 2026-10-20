@@ -1,7 +1,7 @@
 import { SerializeAddon } from '@xterm/addon-serialize';
 import { pluginEnabled, type InstalledPlugin } from '../../shared/plugins';
 import { suggestCommands, shellPromptInput, linuxCommands } from '../command-suggestions';
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { SearchAddon } from '@xterm/addon-search';
@@ -17,6 +17,8 @@ import { editorActionInput, editorPromptBusy, vimExitFromPrompt } from '../edito
 import '@xterm/xterm/css/xterm.css';
 import { openTextAssist, analyzeSelection } from '../text-assist';
 import { useAiProviders } from '../use-ai-providers';
+import { editorFileFromCommand } from '../text-path';
+const TextFileEditor = lazy(() => import('./TextFileEditor').then(module => ({default: module.TextFileEditor})));
 function currentShellInput(terminal: Terminal) {
   const buffer = terminal.buffer.active;
   const row = buffer.getLine(buffer.baseY + buffer.cursorY);
@@ -31,6 +33,7 @@ export function TerminalPane({
   suggestionsEnabled,
   plugins,
   pythonInterpreter,
+  textEditingSupported = false,
   searching,
   onSearchClose,
   onError,
@@ -42,6 +45,7 @@ export function TerminalPane({
   suggestionsEnabled: boolean;
   plugins: InstalledPlugin[];
   pythonInterpreter?: string;
+  textEditingSupported?: boolean;
   searching: boolean;
   onSearchClose: () => void;
   onError: (e: unknown) => void;
@@ -54,6 +58,9 @@ export function TerminalPane({
   const { t } = useI18n();
   const aiAvailable = useAiProviders().providers.length > 0;
   const [zoom, setZoom] = useState(0);
+  const [textPath, setTextPath] = useState('');
+  const [editingPath, setEditingPath] = useState('');
+  const [showTextEditor, setShowTextEditor] = useState(false);
   const [commandInput, setCommandInput] = useState('');
   const [commandPosition, setCommandPosition] = useState({ left: 12, top: 12 });
   const [suggestionIndex, setSuggestionIndex] = useState(0);
@@ -394,6 +401,7 @@ export function TerminalPane({
               }
             }
             const kind = editorFromCommand(commandLine);
+            if (kind) setTextPath(editorFileFromCommand(commandLine) || '');
             pending = kind ? { kind, time: Date.now() } : null;
             commandLine = '';
           } else if (char === '\x7f' || char === '\b') commandLine = commandLine.slice(0, -1);
@@ -544,6 +552,15 @@ export function TerminalPane({
       }}
       onClick={() => setContextMenu(null)}
     >
+      {textEditingSupported && !!detected && !closed && <form className="text-editor-options" onSubmit={event => {event.preventDefault();if(textPath.startsWith('/')){setEditingPath(textPath);setShowTextEditor(true);}}}>
+        <input aria-label="文件完整路径" placeholder="文件完整路径，如 /etc/config.conf" value={textPath} onChange={event => setTextPath(event.target.value)}/>
+        <button disabled={!textPath.startsWith('/')}>内置编辑器</button>
+        <small>先在终端编辑器保存修改；内置编辑器默认实时同步。</small>
+      </form>}
+      {editingPath && <div className="terminal-text-overlay" hidden={!showTextEditor}>
+        <div className="text-editor-options"><button onClick={() => setShowTextEditor(false)}>返回终端</button><span>编辑内容会保留；实时同步仍继续。</span></div>
+        <Suspense fallback={<p role="status">正在打开编辑器…</p>}><TextFileEditor key={editingPath} sessionId={id} path={editingPath} realtime/></Suspense>
+      </div>}
       {pythonContext && !closed && pluginEnabled(plugins, 'python') && (
         <div className="python-repl-context">
           <span>Python</span>

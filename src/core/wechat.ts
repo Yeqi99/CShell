@@ -50,6 +50,8 @@ export class WechatService {
       invoke:async(args,signal)=>JSON.stringify(await this.invoke(method,args,signal)),
     });
     return [
+      tool('wechat_moment_detail','moment_detail','wechat.read',z.object({postId:z.string().regex(/^[0-9]{1,20}$/),limit:z.number().int().min(1).max(50).default(20),cursor:z.string().max(1024).optional()}).strict(),'Read one exact locally cached Moment and its cached likes, comments and reply references without opening UI. Requires readMoments. Follow nextCursor; if the account or cached post changes, restart paging. Not a complete server comment list; no server refresh. locallyAdded is not delivery confirmation. Keeps 32-bit and 64-bit comment ID namespaces distinct. Does not send any interaction.'),
+      tool('wechat_send_file','send_file','wechat.send',z.object({recipient:wechatTargetSchema,path:z.string().min(1).max(32767).refine(s=>!s.includes('\0')),idempotencyKey:z.string().regex(/^[A-Za-z0-9_-]{8,128}$/)}).strict(),'Send one real file from THIS computer through its bound WeChat. path is an absolute local file on the target machine, never the controller machine. Requires sendFiles plus recipient send grant; sendBlocked wins. File size 1 byte to 128 MiB. Copies a stable snapshot before native upload. Use the SAME idempotency key on retries; never retry unknown outcomes with a new key. native_returned does not confirm upload or recipient delivery. Retains staged files for asynchronous upload (512 MiB / 64 files budget). Experimental exact-build adapter.',true),
       tool('wechat_subscribe','subscribe','wechat.read',z.object({targets:z.array(z.union([wechatTargetSchema,z.literal('*')])).min(1).max(100),leaseSeconds:z.number().int().min(10).max(86400).default(3600)}).strict(),'Start a persistent local message subscription for exact conversations or * only when receive * is granted. Pushes event notifications to CShell; consume with wechat_events. Binds current process/account; stops on revocation, parent exit or lease expiry. Does NOT auto-reply or auto-resume after restart; gaps are explicit. At most one active listener; durable bounded queues retain 7 days/10000 events. Save subscription ID and cursor.',true),
       tool('wechat_subscriptions','subscriptions','wechat.read',z.object({}).strict(),'List locally authorized subscription queues and listener status. No messages are sent.'),
       tool('wechat_events','events','wechat.read',z.object({subscriptionId:z.string().uuid(),cursor:z.string().max(100).optional(),limit:z.number().int().min(1).max(100).default(50),waitSeconds:z.number().int().min(0).max(30).default(0)}).strict(),'Read durable subscription events after cursor, optionally wait for push up to 30 seconds. Store nextCursor only after processing. Duplicate delivery after consumer failure is possible; dedupe by message ID and conversation. Inspect gap/status; no automatic history replay. Each queue belongs to its original process binding and target grants.'),
@@ -118,10 +120,11 @@ export class WechatService {
       return this.subscriptions.start(args.targets,binding,args.leaseSeconds??3600,authorized,signal);
     }
     if(method==='moments_publish'&&!this.config.publishMoments)throw new Error(`未授权发布朋友圈。[前往授权](${permissionHref('wechat/publishMoments')})`);
-    if((method==='moments'||method==='moments_interactions')&&!this.config.readMoments)throw new Error(`未授权读取朋友圈缓存。[前往授权](${permissionHref('wechat/readMoments')})`);
+    if((method==='moments'||method==='moments_interactions'||method==='moment_detail')&&!this.config.readMoments)throw new Error(`未授权读取朋友圈缓存。[前往授权](${permissionHref('wechat/readMoments')})`);
     if(method==='conversations'&&!this.config.readSessions)throw new Error(`未授权读取最近会话。[前往授权](${permissionHref('wechat/readSessions')})`);
     if(method==='contacts'&&!this.config.readContacts)throw new Error(`未授权读取联系人。[前往授权](${permissionHref('wechat/readContacts')})`);
-    if(method==='send'){
+    if(method==='send_file'&&!this.config.sendFiles)throw new Error(`未授权发送文件。[前往授权](${permissionHref('wechat/sendFiles')})`);
+    if(method==='send'||method==='send_file'){
       wechatTargetSchema.parse(args.recipient);
       if(this.config.sendBlocked.includes(args.recipient))throw new Error(`收件人在微信发送黑名单中。[前往授权](${permissionHref('wechat/sendBlocked')})`);
       if(!this.config.send.includes('*')&&!this.config.send.includes(args.recipient))throw new Error(`收件人不在微信发送授权列表。[前往授权](${permissionHref('wechat/send')})`);
@@ -141,8 +144,14 @@ export class WechatService {
     const revision=this.revision;this.busy=true;
     const authorized=()=>revision===this.revision&&this.isEnabled()&&this.config.enabled;
     try{
-      if(method==='contacts'||method==='history'||method==='conversations'||method==='moments'||method==='moments_interactions'||method==='moments_publish'){
+      if(method==='send_file'){
         const runtime=await this.run({method:'discover'},signal,authorized);
+        if(runtime.fileSendProtocolVersion!==1)throw new Error('请先安装支持文件发送的新版本微信工具包');
+        signal.throwIfAborted();if(!authorized())throw new Error('微信授权已变更');
+      }
+      if(method==='contacts'||method==='history'||method==='conversations'||method==='moments'||method==='moments_interactions'||method==='moments_publish'||method==='moment_detail'){
+        const runtime=await this.run({method:'discover'},signal,authorized);
+        if(method==='moment_detail'&&runtime.momentsDetailProtocolVersion!==1)throw new Error('请先安装支持朋友圈详情读取的新版本微信工具包');
         if(method==='moments_interactions'&&runtime.momentsInteractionsProtocolVersion!==1)throw new Error('请先安装支持朋友圈互动通知读取的新版本微信工具包');
         if(method==='moments_publish'&&runtime.momentsPublishProtocolVersion!==1)throw new Error('请先安装支持朋友圈发布的微信工具包 0.1.4');
         if(method==='moments'&&runtime.momentsProtocolVersion!==1)throw new Error('请先安装支持朋友圈读取的微信工具包 0.1.3');

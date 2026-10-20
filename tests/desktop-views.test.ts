@@ -74,7 +74,7 @@ test('viewer keeps one renderer frame, rejects stale ack and asks for recovery a
     f.manager.ack(r.id, '999', true, 2);
     assert.deepEqual(f.client.acks, ['2']);
     f.manager.ack(r.id, '1', true, 2);
-    assert.deepEqual(f.client.acks, ['2', '1']);
+    assert.deepEqual(f.client.acks, ['2']);
     assert.throws(() => f.manager.input(r.id, { kind: 'move', x: 4, y: 0 }));
     f.revoke();
     assert.throws(() => f.manager.input(r.id, { kind: 'key', code: 30, down: true }), /revoked/);
@@ -83,6 +83,34 @@ test('viewer keeps one renderer frame, rejects stale ack and asks for recovery a
   }
   assert.equal(f.client.closed, 1);
   assert.equal(f.hostClosed, 1);
+});
+test('two windows share upstream, slow preview does not block other renderer and only last close stops host',async()=>{
+ const f=fixture(),a=request(),b=request();
+ try{
+  await f.manager.start(a);await f.manager.start(b);
+  f.client.emit('frame',{id:1n,timestamp:10n,key:true,data:Buffer.from([1])});
+  assert.equal(f.events.filter(e=>e.type==='frame').length,2);
+  f.manager.ack(b.id,'1',true,2);
+  f.client.emit('frame',{id:2n,timestamp:20n,key:true,data:Buffer.from([2])});
+  assert.equal(f.events.filter(e=>e.type==='frame'&&e.id===a.id).length,1);
+  assert.equal(f.events.filter(e=>e.type==='frame'&&e.id===b.id).length,2);
+  await f.manager.stop(a.id);assert.equal(f.client.closed,0);assert.equal(f.hostClosed,0);
+  f.manager.ack(b.id,'2',true,2);
+  f.client.emit('frame',{id:3n,timestamp:30n,key:true,data:Buffer.from([3])});
+  assert.equal(f.events.filter(e=>e.type==='frame'&&e.id===b.id).length,3);
+  await f.manager.stop(b.id);assert.equal(f.client.closed,1);assert.equal(f.hostClosed,1);
+ }finally{await f.manager.dispose();}
+});
+test('revocation closes every shared subscriber without double closing transport',async()=>{
+ const f=fixture(),a=request(),b=request();
+ try{
+  await Promise.all([f.manager.start(a),f.manager.start(b)]);
+  f.revoke();
+  assert.throws(()=>f.manager.input(a.id,{kind:'key',code:30,down:true}),/revoked/);
+  assert.throws(()=>f.manager.input(b.id,{kind:'key',code:30,down:true}),/revoked/);
+  await f.manager.dispose();
+  assert.equal(f.client.closed,1);assert.equal(f.hostClosed,1);
+ }finally{await f.manager.dispose();}
 });
 test('cancelling while ticket is created releases the eventual ticket without connecting', async () => {
   let resolve!: (value: any) => void,
@@ -191,7 +219,7 @@ function reconnectFixture(delays = [5, 10]) {
 }
 test('network reconnect obtains fresh ticket, keeps quality and rejects prior generation input and frames', async () => {
   const f = reconnectFixture(),
-    r = request();
+    r = {...request(),control:true};
   try {
     await f.manager.start(r);
     f.manager.quality(r.id, { ...r.quality, fps: 90 }, 1);

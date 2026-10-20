@@ -43,6 +43,15 @@ test('quality drops quickly and recovers slowly up to actual requested capabilit
 });
 
 const healthy={rttMs:12,jitterMs:2,loss:0,queueMs:3,encodeMs:8,decodeMs:2,deliveredBitsPerSecond:1000};
+test('unlimited probes real headroom beyond starting rate without inflating static-content bitrate',()=>{
+ const initial={fps:60,bitrate:12000000,scale:1},adapt=new DesktopAdaptation({...initial},initial,true);
+ for(let i=0;i<8;i++)adapt.update({...healthy,encodeMs:2},i*2000);
+ assert.ok(adapt.current.fps>60);assert.equal(adapt.current.bitrate,12000000);
+ for(let i=0;i<8;i++)adapt.update({...healthy,encodeMs:2,deliveredBitsPerSecond:adapt.current.bitrate*.8},20000+i*2000);
+ assert.ok(adapt.current.bitrate>12000000);
+ const before={...adapt.current};adapt.update({...healthy,loss:.4,queueMs:500},50000);
+ assert.ok(adapt.current.bitrate<before.bitrate);assert.ok(adapt.current.fps<before.fps);
+});
 test('static content goodput and isolated IPC/encoder spikes never collapse quality',()=>{
  const desired={fps:60,bitrate:12000000,scale:1},adapt=new DesktopAdaptation({...desired},desired);
  for(let i=0;i<20;i++)adapt.update({...healthy,...(i===5?{queueMs:90,encodeMs:90}:{} )},i*2000);

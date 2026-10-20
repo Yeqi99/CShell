@@ -771,3 +771,5 @@ body.minimal #terminal-tools {
 .mobile-desktop details input{width:90px}
 .mobile-desktop textarea{min-height:80px;flex-shrink:0}
 .agent-desktop-shortcut{position:absolute;right:12px;top:8px;z-index:2}
+
+.mobile-desktop .desktop-presets{display:flex;flex-wrap:wrap;gap:6px}.mobile-desktop .desktop-presets button[aria-pressed="true"]{color:var(--accent,#246cff);background:var(--hover,#e5edf8)}

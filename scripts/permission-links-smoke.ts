@@ -20,7 +20,7 @@ const env={...process.env,CSHELL_TEST_DATA:data};delete env.ELECTRON_RUN_AS_NODE
 const app=await electron.launch({args:['.'],env});
 try{
  const page=await app.firstWindow();page.setDefaultTimeout(20000);const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
- await page.getByRole('heading',{name:'尚未连接'}).waitFor();
+ await page.getByRole('heading',{name:'工作台',exact:true}).waitFor();
  await page.evaluate(async({id,url})=>{await window.cshell.pluginInstall('cshell.wechat');await window.cshell.aiProviderSave({id,name:'Link test',url,model:'test'},'');},{id:randomUUID(),url:`http://127.0.0.1:${(server.address() as any).port}/v1`});
  await page.reload();await page.getByRole('button',{name:'AI 智能体',exact:true}).click();
  const composer=page.getByLabel('发送给智能体');await composer.fill('定位缺少的权限');await composer.press('Enter');

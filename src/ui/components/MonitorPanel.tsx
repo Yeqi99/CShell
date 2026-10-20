@@ -139,7 +139,7 @@ export function MonitorPanel({
               </svg>
             )}
           </div>
-          {(['memory', 'disk'] as const).map((key) => {
+          {(['memory', 'disk'] as const).filter(key => key !== 'disk' || !metrics?.disks?.length).map((key) => {
             const Icon = key === 'memory' ? Database : HardDrive;
             const used = key === 'memory' ? metrics?.memoryUsed : metrics?.diskUsed;
             const total = key === 'memory' ? metrics?.memoryTotal : metrics?.diskTotal;
@@ -173,6 +173,17 @@ export function MonitorPanel({
               </div>
             );
           })}
+          {metrics?.disks?.map(disk => <div className="resource-row metric-disk" key={disk.device} title={`${disk.device} · ${disk.mount}`}>
+            <span className="resource-name"><HardDrive size={13}/>{disk.mount}</span>
+            <span className="resource-detail">{capacity(disk.used, locale)} / {capacity(disk.total, locale)}</span>
+            <strong>{percent(disk.percent)}</strong>
+            <div className="resource-meter" role="meter" aria-label={disk.mount} aria-valuenow={Math.min(100, disk.percent)} aria-valuemin={0} aria-valuemax={100}><i style={{width: `${Math.min(100, disk.percent)}%`}}/></div>
+          </div>)}
+          {metrics?.physicalDisks?.map(drive => <div className="resource-row metric-disk" key={drive.name} title={locale === 'zh-CN' ? '物理磁盘容量（不与文件系统容量重复相加）' : 'Physical disk capacity'}>
+            <span className="resource-name"><HardDrive size={13}/>{drive.name}</span>
+            <span className="resource-detail">{locale === 'zh-CN' ? '磁盘容量' : 'Disk capacity'}</span>
+            <strong>{capacity(drive.size, locale)}</strong>
+          </div>)}
           <div className="resource-row metric-latency">
             <span className="resource-name">
               <Activity size={13} />

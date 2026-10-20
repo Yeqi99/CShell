@@ -11,7 +11,7 @@ const app = await electron.launch({ args: ['.'], env });
 try {
   const page = await app.firstWindow();
   page.setDefaultTimeout(30000);
-  await page.getByRole('heading', { name: '尚未连接' }).waitFor();
+  await page.getByRole('heading', { name: '工作台', exact: true }).waitFor();
   const ready = await page.evaluate(async () => {
     await window.cshell.pluginInstall('cshell.wsl');
     const list = await window.cshell.wslDistributions();

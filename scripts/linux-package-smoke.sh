@@ -19,3 +19,6 @@ test "$(timeout 20s secret-tool lookup application cshell-ci)" = 'cshell-keyring
 timeout 20s secret-tool clear application cshell-ci
 echo 'Secret Service encrypted keyring read/write preflight passed'
 pnpm exec tsx scripts/platform-package-smoke.ts
+# Exercise the shared controller UI inside the same isolated display, without
+# attempting Linux desktop capture or injecting any host input.
+pnpm exec tsx scripts/desktop-compact-ui-smoke.ts

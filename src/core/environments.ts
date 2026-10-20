@@ -2,6 +2,8 @@ import { randomBytes } from 'node:crypto';
 import { createServer, type Server } from 'node:net';
 import type { ClientChannel } from 'ssh2';
 import { z } from 'zod';
+import { posix } from 'node:path';
+import { remotePath } from './paths';
 import type { SshService } from './ssh';
 import { RemoteJobs, quote } from './remote-jobs';
 import {
@@ -40,6 +42,27 @@ export class EnvironmentService {
     private ssh: SshService,
     private jobs: RemoteJobs,
   ) {}
+  async inspectForFile(sessionId: string, file: string): Promise<EnvironmentSnapshot> {
+    const base = await this.inspect(sessionId);
+    const directory = posix.dirname(remotePath(file));
+    const output = await this.jobs.exec(sessionId, `# cshell:editor-environments
+d=${quote(directory)}
+n=0
+while [ "$n" -lt 12 ]; do
+ for env in .venv venv env; do
+  p="$d/$env/bin/python"
+  if [ -x "$p" ]; then printf '%s\\n' "$p"; fi
+ done
+ [ "$d" = / ] && break
+ d=$(dirname "$d"); n=$((n+1))
+done
+for p in /usr/bin/python /usr/bin/python3 /usr/local/bin/python /usr/local/bin/python3 "$HOME"/.pyenv/versions/*/bin/python "$HOME"/.virtualenvs/*/bin/python; do
+ if [ -x "$p" ]; then printf '%s\\n' "$p"; fi
+done`);
+    const discovered = output.split(/\r?\n/).filter(p => remoteExecutable.safeParse(p).success).slice(0, 200);
+    const entries = [...discovered.map(p => ({prefix: posix.dirname(posix.dirname(p)), python: p, name: p})), ...base.environments];
+    return {...base, environments: entries.filter((entry, i) => entries.findIndex(e => e.python === entry.python) === i)};
+  }
   async inspect(sessionId: string): Promise<EnvironmentSnapshot> {
     const detected = await this.jobs.exec(
       sessionId,

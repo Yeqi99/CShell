@@ -10,13 +10,13 @@ const app = await electron.launch({ args: ['.'], env });
 await mkdir('test-results', { recursive: true });
 try {
   const page = await app.firstWindow();
-  await page.getByRole('heading', { name: '尚未连接' }).waitFor();
+  await page.getByRole('heading', { name: '工作台', exact: true }).waitFor();
   await page.evaluate(async () => {
     await window.cshell.pluginInstall('cshell.http');
     await window.cshell.pluginToggle('cshell.http', true);
   });
   await page.reload();
-  await page.getByRole('heading', { name: '尚未连接' }).waitFor();
+  await page.getByRole('heading', { name: '工作台', exact: true }).waitFor();
   // A stalled shell/environment probe must never delay the protocol chooser.
   await app.evaluate(({ ipcMain }) => {
     ipcMain.removeHandler('local-terminal:environment');

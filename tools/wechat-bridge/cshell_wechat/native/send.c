@@ -5,6 +5,9 @@ typedef uint64_t U;
 extern volatile U state[];
 extern char recipient[];
 extern char content[];
+extern unsigned short attachment_path[];
+extern U attachment_size[];
+extern int attachment_mode[];
 extern void get_coro(U *out);
 extern unsigned int tls_index[];
 
@@ -38,6 +41,14 @@ static int assign(void *field,char *text){
  for(U i=0;i<=n;i++)p[i]=text[i];
  *(U*)((char*)field+16)=n;*(U*)((char*)field+24)=cap;return 1;
 }
+static int assign_path(void *field){
+ U n=0;while(attachment_path[n]&&n<1024)n++;
+ if(!n||n>=1024)return 0;
+ U cap=n<=7?7:(n|7);unsigned short *p=field;
+ if(n>7){p=chat_alloc((cap+1)*2);if(!p)return 0;*(void**)field=p;}
+ for(U i=0;i<=n;i++)p[i]=attachment_path[i];
+ *(U*)((char*)field+16)=n;*(U*)((char*)field+24)=cap;return 1;
+}
 static void release(U *sp){
  char *c=(char*)sp[1];if(!c)return;
  if(atomic_add((int*)(c+8),-1)==1){
@@ -59,8 +70,15 @@ void on_enter(GumInvocationContext *ic){
  state[3]=3;get_ctx(svc[0],ctx);if(!ctx[0])goto done;
  state[3]=4;make_text(msg);if(!msg[0]||!msg[1])goto done;
  state[3]=5;
- if(!assign((char*)msg[0]+0xb0,recipient)||!assign((char*)msg[0]+0x758,content))goto done;
- *(U*)((char*)msg[0]+0x118)=1;
+ if(!assign((char*)msg[0]+0xb0,recipient))goto done;
+ if(*attachment_mode){
+  if(!assign((char*)msg[0]+0x1a8,content)||!assign_path((char*)msg[0]+0x120))goto done;
+  *(U*)((char*)msg[0]+0x118)=0x600000031ULL;
+  *(U*)((char*)msg[0]+0x1c8)=*attachment_size;
+ }else{
+  if(!assign((char*)msg[0]+0x758,content))goto done;
+  *(U*)((char*)msg[0]+0x118)=1;
+ }
  *(unsigned int*)((char*)msg[0]+0x9c)=1;
  vec[0]=(U)msg;vec[1]=(U)(msg+2);vec[2]=vec[1];
  state[3]=6;do_send(ctx[0],result,vec,1);state[3]=7;

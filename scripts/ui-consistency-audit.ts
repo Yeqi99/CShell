@@ -9,7 +9,7 @@ const app=await electron.launch({args:['.'],env});
 const results:unknown[]=[];
 try {
  const page=await app.firstWindow();page.setDefaultTimeout(15000);
- await page.getByRole('heading',{name:'尚未连接'}).waitFor();
+ await page.getByRole('heading',{name:'工作台',exact:true}).waitFor();
  for(const theme of ['light','dark'])for(const width of [1440,900]){
   await app.evaluate(({BrowserWindow},width)=>BrowserWindow.getAllWindows()[0].setSize(width,850),width);
   await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);

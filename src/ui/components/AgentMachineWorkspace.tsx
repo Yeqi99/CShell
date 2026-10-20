@@ -10,9 +10,9 @@ import {AgentApplications} from './AgentApplications';
 import {AgentConfiguration} from './AgentWorkbench';
 import {terminalClosed} from '../terminalBus';
 import './agent-machine.css';
-export function AgentMachineWorkspace({device,target,preferences,active,onSessionCount,onDisconnect}:{onDisconnect:()=>Promise<void>;onSessionCount:(count:number)=>void;device:ClientDevice;target:AgentTarget;preferences:Preferences;active:boolean}){
+export function AgentMachineWorkspace({device,target,preferences,active,onSessionCount,onDisconnect}:{onDisconnect:()=>Promise<void>;onSessionCount:(count:number,ids:string[])=>void;device:ClientDevice;target:AgentTarget;preferences:Preferences;active:boolean}){
  const [section,setSection]=useState('terminal'),[visited,setVisited]=useState(['terminal']),[shells,setShells]=useState<AgentShellOption[]>([]),[sessions,setSessions]=useState<{id:string;name:string}[]>([]),[selected,setSelected]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[desktop,setDesktop]=useState<any>();
- useEffect(()=>{onSessionCount(sessions.filter(s=>!terminalClosed(s.id)).length);},[sessions,preferences,active]);
+ useEffect(()=>{const ids=sessions.filter(s=>!terminalClosed(s.id)).map(s=>s.id);onSessionCount(ids.length,ids);},[sessions,preferences,active]);
  useEffect(()=>window.cshell.events(event=>{if(event.type==='closed')setSessions(v=>v.some(s=>s.id===event.sessionId)?[...v]:v);}),[]);
  const [pendingFiles,setPendingFiles]=useState<globalThis.File[]>([]);
  const running=useRef<string[]>([]),mounted=useRef(true);

@@ -46,30 +46,33 @@ try {
   console.log(await page.locator('body').innerText());
   await page.screenshot({ path: 'test-results/opencode-debug-ui.png', fullPage: true });
   await page.getByRole('radio', { name: 'glm-5.3 可接入' }).click();
-  await page.getByRole('button', { name: '添加为智能体基座' }).click();
-  await page.getByText('已添加到智能体基座，可在智能体中选择').waitFor();
+  await page.getByRole('button', { name: '接入此账号' }).click();
+  await page.getByText('已接入账号，可在智能体中直接选择其模型').waitFor();
   await page.getByRole('button', { name: '刷新用量' }).click();
   await page.getByText('已用 23.0%').waitFor();
   await page.getByRole('button', { name: '添加密钥', exact: true }).click();
   await page.getByLabel('API Key', { exact: true }).fill('fixture-secret');
   await page.getByRole('button', { name: '保存并检测' }).click();
-  await page.getByText('已验证调用', { exact: true }).waitFor();
+  await page.getByText('账号已接入', { exact: true }).waitFor();
   assert.equal(await page.getByRole('button', { name: '账号 2', exact: false }).count(), 1);
   await page.getByLabel('查找模型').fill('missing');
   await page.getByText('没有匹配的模型').waitFor();
   await page.getByLabel('查找模型').fill('');
   await page.screenshot({ path: 'test-results/opencode-extension-ui.png', fullPage: true });
-  await page.setViewportSize({ width: 560, height: 900 });
+  await page.setViewportSize({ width: 340, height: 900 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   await page.evaluate(() => {document.documentElement.dataset.theme='light';});
   await page.screenshot({path:'test-results/opencode-extension-ui-light-narrow.png',fullPage:true});
   assert.deepEqual(errors, []);
   assert.equal(
     await page.evaluate(
-      () => (window as any).calls.find((c: any) => c.action === 'add').input.tier,
+      () => (window as any).calls.find((c: any) => c.action === 'connect').input.id,
     ),
-    'go',
+    'default',
   );
+  assert.equal(await page.evaluate(() => (window as any).calls.some((c:any)=>c.action==='check')),false);
+  const boxes=await page.getByRole('radio').evaluateAll(els=>els.map(el=>({top:el.getBoundingClientRect().top,bottom:el.getBoundingClientRect().bottom})));
+  for(let i=1;i<boxes.length;i++)assert.ok(boxes[i].top>=boxes[i-1].bottom,'model rows must not overlap');
   console.log('PASS OpenCode extension model selection, usage and narrow layout');
 } finally {
   await browser.close();

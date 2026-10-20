@@ -42,12 +42,16 @@ export function AiConversation({
   busy: boolean;
   setProviderId: (value: string) => void;
   setMode: (value: AiMode) => void;
-  create: () => Promise<AiThread>;
+  create: (model?: string) => Promise<AiThread>;
   run: (fn: () => Promise<unknown>) => Promise<void>;
   configure: () => void;
   executionVisible: boolean;
 }) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [modelChoices,setModelChoices]=useState<{ref:string;model:string;label?:string;available:boolean}[]>([]);
+  const [chosenModel,setChosenModel]=useState('');
+  const [modelsLoading,setModelsLoading]=useState(false);
+  const [modelsError,setModelsError]=useState('');
   const composer = useRef<HTMLTextAreaElement>(null),
     inserted = useRef('');
   useEffect(() => {
@@ -89,10 +93,23 @@ export function AiConversation({
     thread?.pending?.id,
     thread?.state,
   ]);
+  useEffect(()=>{
+    let alive=true;setChosenModel('');setModelChoices([]);setModelsError('');
+    setModelsLoading(!!provider?.extension && !thread);
+    if(provider?.extension && !thread)void window.cshell.aiExtensionCall(provider.extension.id,'choices',{reference:provider.extension.model}).then(v=>{
+      if(!alive)return;
+      if(!Array.isArray(v))throw Error('模型目录不可用');
+      const choices=v as typeof modelChoices;
+      setModelChoices(choices);
+      const ref=provider.extension!.model;
+      setChosenModel(choices.find(c=>c.ref===ref)?.ref ?? choices.find(c=>c.ref===`default/${ref}`)?.ref ?? choices.find(c=>c.available)?.ref ?? '');
+    }).catch(e=>{if(alive)setModelsError(String(e.message??e))}).finally(()=>{if(alive)setModelsLoading(false)});
+    return()=>{alive=false};
+  },[provider?.id,provider?.extension?.model,thread?.id]);
   const send = () => {
-    if (busy || active || !text.trim() || !provider) return;
+    if (busy || active || modelsLoading || !text.trim() || !provider) return;
     void run(async () => {
-      const target = thread ?? (await create());
+      const target = thread ?? (await create(chosenModel || undefined));
       if (!thread) setDrafts((previous) => ({ ...previous, [target.id]: text }));
       await window.cshell.aiSend(target.id, text);
       setDrafts((previous) => ({
@@ -219,8 +236,8 @@ export function AiConversation({
           )}
           {thread?.state === 'running' && (
             <div className="agent-running" role="status">
-              <span />
-              正在处理
+              <span className="agent-wait-dots" aria-hidden="true"><i/><i/><i/></span>
+              {thread.messages.at(-1)?.role === 'assistant' && thread.messages.at(-1)?.content ? '正在生成回复' : '正在思考与处理'}
             </div>
           )}
         </div>
@@ -295,6 +312,10 @@ export function AiConversation({
               </div>
             )}
           </div>
+          {!thread && modelChoices.length>0 && <select className="agent-account-model" aria-label="账号模型" value={chosenModel} onChange={e=>setChosenModel(e.target.value)}>{modelChoices.map(c=><option key={c.ref} value={c.ref} disabled={!c.available}>{c.label??c.model}</option>)}</select>}
+          {modelsLoading && <span className="agent-thread-model" role="status">加载模型…</span>}
+          {modelsError && <span className="agent-thread-model" title={modelsError}>模型目录暂不可用</span>}
+          {thread?.extensionModel && <span className="agent-thread-model" title={thread.extensionModel}>{thread.extensionModel.split('/').slice(1).join(' / ')}</span>}
           <div className="agent-policy">
             <ShieldCheck size={13} />
             <select

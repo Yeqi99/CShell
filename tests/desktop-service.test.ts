@@ -28,7 +28,7 @@ test('default off and separate owner view/control grants',{timeout:5000},async()
 });
 test('ticket bootstrap, frame credit, no implicit input, single-use ticket',{timeout:8000},async()=>{
  const {service,captures}=await fixture();try{const ticket=service.open('viewer',{quality});const client=await connectDesktop(ticket,{host:'127.0.0.1',expectedHostIdentity:'device-1',local:true});const frame=once(client,'frame');await frame;
- await new Promise(resolve=>setTimeout(resolve,60));assert.ok(captures[0].frames>1,'capture must not wait one RTT per frame');assert.equal(captures[0].grants,0);assert.throws(()=>client.input({kind:'key',code:30,down:true}),/permitted/);
+ await new Promise(resolve=>setTimeout(resolve,60));assert.ok(captures[0].frames>1,'capture must not wait one RTT per frame');assert.equal(captures[0].grants,0);assert.throws(()=>client.input({kind:'key',code:30,down:true}),/未授予键鼠控制权限/);
  const second=once(client,'frame');client.ack('0');await second;assert.ok(captures[0].frames>1);
  await assert.rejects(connectDesktop(ticket,{host:'127.0.0.1',expectedHostIdentity:'device-1',local:true}));await client.close();
  }finally{await service.shutdown();}
@@ -102,21 +102,21 @@ test('release during native initialization never grants input before capture rea
 test('native input denial disables input but retains frame delivery',{timeout:8000},async()=>{
  const {service,captures}=await fixture(true);try{const ticket=service.open('viewer',{quality,control:true});const client=await connectDesktop(ticket,{host:'127.0.0.1',expectedHostIdentity:'device-1',local:true});await once(client,'frame');
  captures[0].emit('input-error',new Error('INPUT_SECURE_OR_INACCESSIBLE_DESKTOP'));
- const frame=once(client,'frame');client.ack('0');await frame;assert.equal(client.session.ready,true);assert.equal((service as any).active.control,false);assert.equal(captures[0].revokes,1);
+ const frame=once(client,'frame');client.ack('0');await frame;assert.equal(client.session.ready,true);assert.equal(service.status('viewer').active?.control,false);assert.equal(captures[0].revokes,1);
  client.input({kind:'key',code:30,down:true});await new Promise(r=>setTimeout(r,30));assert.equal(captures[0].inputs.length,0);assert.equal(service.status('viewer').lastFailure?.code,'INPUT_DESKTOP_UNAVAILABLE');await client.close();
  }finally{await service.shutdown();}
 });
 
 test('unexpected native exit recovers video without replaying held input, with bounded retries',{timeout:8000},async()=>{
  const {service,captures}=await fixture(true);try{const ticket=service.open('viewer',{quality,control:true});const client=await connectDesktop(ticket,{host:'127.0.0.1',expectedHostIdentity:'device-1',local:true});client.on('frame',f=>client.ack(f.id));await once(client,'frame');
- for(let i=0;i<2;i++){const frame=once(client,'frame');captures[i].emit('closed',{code:1,error:'capture frame: HRESULT 0x887a0001'});await frame;assert.equal(captures.length,i+2);assert.equal(captures[i+1].grants,0);assert.equal(captures[i+1].config.forceGdi,1);assert.equal(client.session.ready,true);}
+ for(let i=0;i<2;i++){const frame=once(client,'frame');captures[i].emit('closed',{code:1,error:'capture frame: HRESULT 0x887a0001'});await frame;assert.equal(captures.length,i+2);assert.equal(captures[i+1].grants,1);assert.equal(captures[i+1].inputs.length,0);assert.equal(captures[i+1].config.forceGdi,1);assert.equal(client.session.ready,true);}
  const closed=once(client,'closed');captures[2].emit('closed',{code:1,error:'capture frame: HRESULT 0x887a0001'});assert.match(String((await closed)[0]),/CAPTURE_CLOSED/);assert.equal(captures.length,3);await client.close();
  }finally{await service.shutdown();}
 });
 
 test('Windows desktop unavailability keeps channel and recovers with fresh resources without input replay',{timeout:8000},async()=>{
  const {service,captures}=await fixture(true);try{const ticket=service.open('viewer',{quality,control:true});const client=await connectDesktop(ticket,{host:'127.0.0.1',expectedHostIdentity:'device-1',local:true});client.on('frame',f=>client.ack(f.id));await once(client,'frame');
- const frame=once(client,'frame');captures[0].emit('closed',{code:1,error:'GDI BitBlt failed: 5'});assert.equal(client.session.ready,true);assert.equal((service as any).active.nativeReady,false);assert.equal((service as any).active.control,false);client.quality({...quality,bitrate:1234567});await frame;assert.equal(captures[1].config.bitrate,1234567);assert.equal(captures.length,2);assert.equal(captures[1].grants,0);assert.equal(captures[1].config.forceGdi,undefined);assert.equal(service.status('viewer').lastFailure,undefined);await client.close();
+ const frame=once(client,'frame');captures[0].emit('closed',{code:1,error:'GDI BitBlt failed: 5'});assert.equal(client.session.ready,true);assert.equal((service as any).active.nativeReady,false);assert.equal(service.status('viewer').active?.control,false);client.quality({...quality,bitrate:1234567});await frame;assert.equal(captures[1].config.bitrate,1234567);assert.equal(captures.length,2);assert.equal(captures[1].grants,1);assert.equal(captures[1].inputs.length,0);assert.equal(captures[1].config.forceGdi,undefined);assert.equal(service.status('viewer').lastFailure,undefined);await client.close();
  }finally{await service.shutdown();}
 });
 test('disconnect and revoke cancel pending desktop recovery',{timeout:8000},async()=>{

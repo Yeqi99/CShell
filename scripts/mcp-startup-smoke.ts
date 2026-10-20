@@ -30,7 +30,7 @@ try {
   await mkdir('test-results', { recursive: true });
   let page = await firstPage();
   page.setDefaultTimeout(15000);
-  await page.getByRole('heading', { name: '尚未连接' }).waitFor();
+  await page.getByRole('heading', { name: '工作台', exact: true }).waitFor();
   await mcpDesktopSmoke(app, page);
   // A real second process must reveal the same hidden/minimized window.
   const executable = await app.evaluate(() => process.execPath);
@@ -110,7 +110,7 @@ try {
   await app.close();
   app = await launch();
   page = await firstPage();
-  await page.getByRole('heading', { name: '尚未连接' }).waitFor();
+  await page.getByRole('heading', { name: '工作台', exact: true }).waitFor();
   await open();
   await page.locator('.mcp-settings').getByText('MCP 正在运行', { exact: true }).waitFor();
   assert.equal(await page.getByLabel('在本机启用 MCP').isChecked(), true);

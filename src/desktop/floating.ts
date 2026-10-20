@@ -2,7 +2,7 @@ import { BrowserWindow, ipcMain, screen, clipboard } from 'electron';
 import { z } from 'zod';
 import type { Preferences, SessionEvent } from '../shared/contracts';
 import type { TerminalSnapshot } from '../shared/floating';
-const snapshotSchema = z
+export const snapshotSchema = z
   .object({
     data: z.string().max(32000000),
     sequence: z.number().int().nonnegative(),
@@ -202,6 +202,13 @@ export class FloatingWindows {
       window.destroy();
       throw error;
     }
+  }
+  tail(sessionId: string, sequence: number) {
+    const stream = this.streams.get(sessionId);
+    const chunks = stream?.chunks.filter(c => c.sequence > sequence) ?? [];
+    if (stream && stream.sequence > sequence && chunks[0]?.sequence !== sequence + 1)
+      throw new Error('终端输出变化过快，请重新打开当前连接视图');
+    return chunks;
   }
   dispose() {
     for (const view of this.views.values()) view.window.destroy();

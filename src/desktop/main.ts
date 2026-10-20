@@ -1,3 +1,4 @@
+import {localViewProfiles} from '../shared/monitor-views';
 import { openRdpProfile, rdpProfileSchema } from '../core/rdp';
 import { installWindowPermissions } from './window-permissions';
 import { HttpWorkspaces } from '../core/http-workspaces';
@@ -19,7 +20,8 @@ import type { ConnectionManager } from '../core/connections/manager';
 import { ActivityStore } from '../core/activity';
 import { registerActivity } from './activity';
 import type { Activity } from '../shared/activity';
-import { FloatingWindows } from './floating';
+import { FloatingWindows, snapshotSchema } from './floating';
+import { MonitorWindows } from './monitor-windows';
 import { registerExtensionHandlers } from './extensions';
 import { createExtensionServices } from '../core/api/extensions';
 import { registerUpdateHandlers } from './updates';
@@ -142,6 +144,9 @@ else
       installWindowPermissions(session.defaultSession, window.webContents, entry);
       let connections: ConnectionManager | undefined;
       let floating: FloatingWindows | undefined;
+      const monitorWindows = new MonitorWindows(store, entry, join(__dirname, 'preload.cjs'),
+        (id, sequence) => floating?.tail(id, sequence) ?? []);
+      const viewHandlers = new Map<string, (...args: any[]) => any>();
       let mcp: McpService | undefined;
       const emit = (event: SessionEvent) => {
         if (event.type === 'closed') connections?.closed(event.sessionId);
@@ -170,6 +175,7 @@ else
         }
         event = floating?.event(event) ?? event;
         if (!window.isDestroyed()) window.webContents.send('session:event', event);
+        monitorWindows.publish('session:event', event);
       };
       ssh = new SshService(emit, async (profile, fingerprint, signal) => {
         signal.throwIfAborted();
@@ -267,15 +273,19 @@ else
       };
       const validateSender = (event: Electron.IpcMainInvokeEvent | Electron.IpcMainEvent) => {
         if (
-          event.sender !== window.webContents ||
+          !monitorWindows.accepts(event) && (event.sender !== window.webContents ||
           event.senderFrame !== window.webContents.mainFrame ||
-          event.senderFrame.url !== entry
+          event.senderFrame.url !== entry)
         )
           throw new Error('Untrusted IPC sender');
       };
-      const handle = (name: string, fn: (...args: any[]) => any) =>
+      const handle = (name: string, fn: (...args: any[]) => any) => {
+        viewHandlers.set(name, fn);
         ipcMain.handle(name, async (event, ...args) => {
           validateSender(event);
+          const viewSender = monitorWindows.accepts(event);
+          if (viewSender) monitorWindows.authorize(event, name, args);
+          if (viewSender && monitorWindows.skip(event, name, args)) return;
           const types: Record<string, Activity['kind']> = {
             connect: 'connection',
             'connect:temporary': 'connection',
@@ -301,6 +311,8 @@ else
             start = Date.now();
           try {
             const result = await fn(...args);
+            if (viewSender) monitorWindows.track(event.sender.id, name, args, result,
+              async (method, id) => viewHandlers.get(method)!(id));
             if (kind)
               activity.record({
                 kind,
@@ -317,6 +329,7 @@ else
               });
             return result;
           } catch (error) {
+            if (viewSender) monitorWindows.failed(event.sender.id, name);
             if (kind)
               activity.record({
                 kind,
@@ -328,6 +341,29 @@ else
             throw error;
           }
         });
+      };
+      handle('views:list', () => store.monitorViews());
+      handle('views:save', value => store.saveMonitorView(value));
+      handle('views:delete', id => store.deleteMonitorView(idSchema.parse(id)));
+      handle('views:displays', () => monitorWindows.displays());
+      handle('views:open', id => monitorWindows.open(id));
+      handle('views:current', (raw, rawMode) => {
+        const mode = z.enum(['tile', 'focus', 'overview']).parse(rawMode);
+        const sources = z.array(z.discriminatedUnion('kind', [
+          z.object({ kind: z.literal('ssh'), sessionId: idSchema, snapshot: snapshotSchema }).strict(),
+          z.object({ kind: z.literal('terminal'), sessionId: idSchema, snapshot: snapshotSchema }).strict(),
+          z.object({ kind: z.literal('desktop'), profileId: idSchema }).strict(),
+        ])).min(1).max(96).parse(raw);
+        if (sources.reduce((n, source) => n + (source.kind !== 'desktop' ? source.snapshot.data.length : 0), 0) > 32_000_000)
+          throw new Error('当前终端历史过大，请减少本次展示的区域');
+        return monitorWindows.current(sources.map(source => {
+          if(source.kind === 'desktop')return {profile:store.profile(source.profileId)};
+          const target=connections!.tools.describe(source.sessionId);connections!.tools.terminal(source.sessionId);
+          let profile;try{profile=ssh.get(source.sessionId).profile}catch{profile=store.snapshot().profiles.find(p=>p.id===target.resourceId)??localViewProfiles.find(p=>p.name===target.label)??{id:source.sessionId,name:target.label,host:'localhost',port:1,username:'local',group:'',favorite:false,auth:'password' as const};}
+          return {profile,shell:/\bcmd$/i.test(target.label)?'cmd' as const:/\bsh$/i.test(target.label)?'sh' as const:'powershell' as const,terminal:{sessionId:source.sessionId,snapshot:source.snapshot}};
+        }), mode);
+      });
+      handle('views:close', id => monitorWindows.close(idSchema.parse(id)));
       handle('client:download-page', () =>
         shell.openExternal('https://github.com/Yeqi99/CShell/releases'),
       );
@@ -442,6 +478,7 @@ else
       handle('http:cancel', id => http.cancel(id));
       const agent = await registerAgent(handle, store, clientProvider, connections.tools, event => {
         if (!window.isDestroyed()) window.webContents.send('desktop:view-event', event);
+        monitorWindows.publish('desktop:view-event', event);
       });
       const disposeAi = await registerAiHandlers(
         handle,
@@ -816,7 +853,7 @@ else
       handle(
         'resize',
         (id, cols, rows) =>
-          (window.isFocused() || !floating) &&
+          (window.isFocused() || monitorWindows.ownsSession(id) || !floating) &&
           connections!.tools
             .terminal(idSchema.parse(id))
             .resize(
@@ -941,6 +978,7 @@ else
         void agent.dispose();
         void activity.flush().catch(() => {});
         floating?.dispose();
+        monitorWindows.dispose();
         void mcp.stop();
         transfers.dispose();
         clientProvider.dispose();

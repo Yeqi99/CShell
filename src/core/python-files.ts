@@ -5,11 +5,11 @@ import type { SshService } from './ssh';
 import { remotePath } from './paths';
 const hash = (data: Buffer) => createHash('sha256').update(data).digest('hex');
 export class PythonFiles {
-  private writes = new Set<string>();
-  constructor(private ssh: SshService) {}
+  private static writes = new Set<string>();
+  constructor(private ssh: SshService, private textFiles = false) {}
   private path(input: string) {
-    const path = remotePath(input);
-    if (!path.endsWith('.py')) throw new Error('Only Python files are supported by this editor');
+    const path = posix.normalize(remotePath(input));
+    if (!this.textFiles && !path.endsWith('.py')) throw new Error('Only Python files are supported by this editor');
     return path;
   }
   async read(sessionId: string, input: string) {
@@ -27,7 +27,9 @@ export class PythonFiles {
       stream.once('error', reject);
       stream.once('end', () => resolve(Buffer.concat(chunks)));
     });
-    return { code: new TextDecoder('utf-8', { fatal: true }).decode(bytes), revision: hash(bytes) };
+    const code = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
+    if (/[\x00-\x08\x0b\x0e-\x1f]/.test(code)) throw new Error('Binary files cannot be opened in the text editor');
+    return { code, revision: hash(bytes) };
   }
   async save(
     sessionId: string,
@@ -39,13 +41,14 @@ export class PythonFiles {
     const path = this.path(input),
       key = `${sessionId}:${path}`;
     const sftp = await this.ssh.sftp(sessionId);
-    if (this.writes.has(key)) throw new Error('A save is already in progress');
+    if (PythonFiles.writes.has(key)) throw new Error('A save is already in progress');
     z.string().max(1_000_000).parse(code);
     z.string()
       .regex(/^[a-f0-9]{64}$/)
       .parse(revision);
     if (Buffer.byteLength(code) > 1_000_000) throw new Error('File exceeds 1 MB');
-    this.writes.add(key);
+    if (code.includes('\0')) throw new Error('Binary content cannot be saved in the text editor');
+    PythonFiles.writes.add(key);
     const temporary = posix.join(posix.dirname(path), `.cshell-${randomUUID()}.tmp`);
     try {
       beforeWrite?.();
@@ -78,7 +81,7 @@ export class PythonFiles {
       );
       return { revision: hash(Buffer.from(code)) };
     } finally {
-      this.writes.delete(key);
+      PythonFiles.writes.delete(key);
       sftp.unlink(temporary, () => {});
     }
   }

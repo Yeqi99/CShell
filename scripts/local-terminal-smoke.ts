@@ -14,7 +14,7 @@ const app = await electron.launch({
 try {
   const page = await app.firstWindow();
   page.setDefaultTimeout(15000);
-  await page.getByRole('heading', { name: '尚未连接' }).waitFor();
+  await page.getByRole('heading', { name: '工作台', exact: true }).waitFor();
   await page.evaluate(() => {
     (window as any).localOutput = {};
     window.cshell.events((e) => {

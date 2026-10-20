@@ -46,6 +46,7 @@ export async function designSmoke(app: ElectronApplication, page: Page) {
   await editor.getByRole('button', { name: '提取并填写', exact: true }).click();
   await editor.getByRole('alert').filter({ hasText: '未找到与当前连接类型匹配的信息' }).waitFor();
   assert.equal(await name.inputValue(), 'example.test');
+  await editor.getByRole('button', { name: '关闭提取', exact: true }).click();
   await name.fill('127.0.0.1');
   await editor.getByLabel('用户名').fill('root');
   await editor.getByLabel('端口').fill('22');

@@ -114,8 +114,8 @@ export async function registerAiHandlers(
     publish?.('ai:providers-changed');
   });
   handle('ai:permission', (p) => ai.permission(p));
-  handle('ai:create', (location, provider, mode, session) =>
-    ai.create(location, provider, mode, session),
+  handle('ai:create', (location, provider, mode, session, model) =>
+    ai.create(location, provider, mode, session, model),
   );
   handle('ai:delete', (id) => ai.remove(id));
   handle('ai:send', (id, text) => ai.send(id, text));

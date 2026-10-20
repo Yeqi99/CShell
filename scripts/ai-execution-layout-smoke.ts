@@ -14,7 +14,7 @@ const app = await electron.launch({ args: ['.'], env });
 try {
   const page = await app.firstWindow();
   page.setDefaultTimeout(10000);
-  await page.getByRole('heading', { name: '尚未连接' }).waitFor();
+  await page.getByRole('heading', { name: '工作台', exact: true }).waitFor();
   await page.getByRole('button', { name: 'AI 智能体', exact: true }).click();
   const slot = page.locator('.ai-panel-slot');
   const before = (await slot.boundingBox())!;
@@ -33,7 +33,7 @@ try {
   await slot.getByLabel('显示方式').selectOption('silent');
   await page.waitForFunction(() => window.cshell.config().then((c) => !c.preferences.showAiExecution));
   await page.reload();
-  await page.getByRole('heading', { name: '尚未连接' }).waitFor();
+  await page.getByRole('heading', { name: '工作台', exact: true }).waitFor();
   const preferences = await page.evaluate(() => window.cshell.config().then((c) => c.preferences));
   assert.equal(preferences.layout.agentWidth, 590);
   assert.equal(preferences.showAiExecution, false);
@@ -72,4 +72,3 @@ try {
   await remote.close();
   await rm(data, { recursive: true, force: true });
 }
-

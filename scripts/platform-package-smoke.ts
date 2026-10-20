@@ -99,7 +99,7 @@ try {
   assert.equal(actual.platform, process.platform);
   assert.ok(actual.packaged && actual.sandbox && actual.isolated);
   stage('Package identity and sandbox verified; connecting fixture SSH');
-  await page.getByRole('heading', { name: '尚未连接' }).waitFor();
+  await page.getByRole('heading', { name: '工作台', exact: true }).waitFor();
   await page.getByRole('button', { name: '新建连接', exact: true }).first().click();
   await page.getByRole('button', { name: 'SSH 终端', exact: true }).click();
   const form = page.locator('.connection-editor:visible');

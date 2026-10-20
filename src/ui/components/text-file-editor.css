@@ -1,0 +1,25 @@
+.text-file-tabs,.text-editor-options{display:flex;align-items:center;gap:8px;padding:10px 12px;flex-wrap:wrap;border-bottom:1px solid var(--border);background:var(--panel)}
+.text-file-tabs{flex-wrap:nowrap;overflow-x:auto;flex-shrink:0}
+.text-file-tabs>span{display:flex;flex-shrink:0;gap:2px;align-items:center}
+.text-file-tabs button,.text-editor-options button,.text-editor-options select{min-height:32px;max-width:100%}
+.text-file-tabs button[aria-pressed=true]{color:var(--accent);background:var(--hover)}
+.text-editor-options label{display:flex;align-items:center;gap:8px;min-width:0}
+.text-editor-options input{min-width:180px;flex:1}
+.text-editor-options select{min-width:100px;max-width:320px}
+.text-file-slot,.text-file-editor{display:flex;flex-direction:column;min-height:0;flex:1;overflow:hidden}
+.text-file-slot[hidden],.file-panel[hidden]{display:none!important}
+.text-file-editor>.python-editor{flex:1;min-height:0}
+.text-file-editor>.python-editor{display:flex;flex-direction:column}
+.text-file-editor .python-code{flex:1;min-height:80px;height:auto;overflow:hidden}
+.text-file-editor>.text-editor-options,.text-file-editor .python-editor>header,.text-file-editor .python-editor>footer,.text-file-editor .extension-error{flex-shrink:0}
+.text-file-editor .python-editor>header select{width:auto;max-width:130px;padding:6px 8px}
+.text-file-editor .text-editor-options{padding:6px 10px;font-size:12px}
+.text-file-editor .text-editor-options select{width:auto;padding:6px 8px}
+.tools-panel:has(.text-file-slot:not([hidden])) .tool-content{min-height:340px}
+.tools-panel:has(.text-file-slot:not([hidden])) .compact-monitor{max-height:30vh}
+.text-file-editor.expanded{position:fixed;inset:120px 24px 40px 24px;z-index:40;background:var(--panel);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 32px #0002}
+.text-file-editor .python-editor>header{gap:8px;flex-wrap:wrap;padding:10px 12px}
+.text-file-editor .python-editor>header>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:100px}
+.text-file-editor .python-editor>footer{padding:8px 12px}
+.terminal-text-overlay{position:absolute;inset:0;z-index:5;background:var(--panel);display:flex;flex-direction:column;min-height:0}
+.terminal-text-overlay[hidden]{display:none}

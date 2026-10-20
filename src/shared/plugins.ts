@@ -256,6 +256,9 @@ export interface PythonAnalysis {
   }[];
 }
 export interface ExtensionBridge {
+  textEnvironments(sessionId: string, path: string): Promise<EnvironmentSnapshot>;
+  textReadFile(sessionId: string, path: string): Promise<{ code: string; revision: string }>;
+  textSaveFile(sessionId: string, path: string, code: string, revision: string): Promise<{ revision: string }>;
   applicationCatalog(): Promise<typeof applications>;
   pythonReadFile(sessionId: string, path: string): Promise<{ code: string; revision: string }>;
   pythonSaveFile(

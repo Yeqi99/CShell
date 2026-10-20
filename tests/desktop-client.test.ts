@@ -3,6 +3,16 @@ import assert from 'node:assert/strict';
 import {EventEmitter,once} from 'node:events';
 import {DesktopClient} from '../src/core/desktop-client';
 import type {DesktopSession} from '../src/agent/desktop-session';
+test('authorized input before video is ignored without losing authorization; old hosts reject unlimited quality',async()=>{
+ class FakeSession extends EventEmitter{inputs:unknown[]=[];ping(){}input(value:unknown){this.inputs.push(value);}async close(){this.emit('closed','done');}}
+ const session=new FakeSession(),client=new DesktopClient(session as unknown as DesktopSession,true);
+ try{
+  assert.doesNotThrow(()=>client.input({kind:'key',code:30,down:true}));assert.equal(session.inputs.length,0);
+  session.emit('video',{width:64,height:64,sourceWidth:64,sourceHeight:64,fps:30,codec:'avc1.4d001e',encoder:'fixture',hardware:false});
+  client.input({kind:'key',code:30,down:true});assert.equal(session.inputs.length,1);
+  assert.throws(()=>client.quality({fps:60,bitrate:12000000,display:0,adaptive:true,unlimited:true}),/更新远端/);
+ }finally{await client.close();}
+});
 test('client feedback combines measured transport counters and supplied decoder timing without fabricated encode duration',{timeout:5000},async()=>{
  class FakeSession extends EventEmitter{mediaStats={droppedFrames:1,completedFrames:3};ping(){} input(){}feedback(value:unknown){this.emit('reported',value);return true;}async close(){this.emit('closed','done');}}
  const session=new FakeSession(),client=new DesktopClient(session as unknown as DesktopSession,false);

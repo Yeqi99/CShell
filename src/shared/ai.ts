@@ -108,6 +108,7 @@ export type AiThread = {
   title: string;
   location: AiLocation;
   providerId: string;
+  extensionModel?: string;
   sessionId?: string;
   target?: string;
   mode: AiMode;
@@ -167,6 +168,7 @@ export interface AiBridge {
     providerId: string,
     mode: AiMode,
     sessionId?: string,
+    extensionModel?: string,
   ): Promise<AiThread>;
   aiThreadDelete(id: string): Promise<void>;
   aiSend(id: string, text: string): Promise<void>;

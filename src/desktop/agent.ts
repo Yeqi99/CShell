@@ -55,8 +55,9 @@ export async function registerAgent(
           deviceId: string;
         };
         const desktop = (await callAgent('desktop.status', undefined, directory)) as {
-          config: { bindAddress: string; directListener: boolean };
+          config: { bindAddress: string; directListener: boolean }; qualityModes?:string[];
         };
+        if(input.quality.unlimited&&!desktop.qualityModes?.includes('unlimited'))throw new Error('无上限画质需要更新受控端 CAgent；可先选择高画质连接。');
         const ticket = (await callAgent(
           'desktop.open',
           { control: input.control, quality: input.quality },
@@ -75,6 +76,7 @@ export async function registerAgent(
       const deviceId = targets.resolve(input.target);
       const device = provider.list().find((d) => d.deviceId === deviceId);
       if (!device) throw new Error('未找到已验证的 Agent');
+      if(input.quality.unlimited){const capabilities=await provider.call(deviceId,{method:'desktop.status'}) as {qualityModes?:string[]};if(!capabilities.qualityModes?.includes('unlimited'))throw new Error('无上限画质需要更新远端 CAgent；可先选择高画质连接。');}
       let ticket: DesktopTicket;
       try {
         ticket = await provider.call(deviceId, {method:'desktop.open', params:{control:input.control, quality:input.quality, transport:'management', mediaTransport:'udp'}}) as DesktopTicket;

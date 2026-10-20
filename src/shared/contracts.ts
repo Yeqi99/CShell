@@ -8,6 +8,7 @@ import type { LocalTerminalBridge } from './local-terminal';
 import { localShellSchema } from './local-terminal';
 import type { ActivityBridge } from './activity';
 import type { FloatingBridge } from './floating';
+import type { MonitorViewsBridge } from './monitor-views';
 import type { ExtensionBridge, InstalledPlugin } from './plugins';
 import type { AiBridge } from './ai';
 import type { UpdateBridge } from './updates';
@@ -300,6 +301,8 @@ export const fileRefSchema = z.discriminatedUnion('kind', [
 ]);
 export type FileRef = z.infer<typeof fileRefSchema>;
 export interface Metrics {
+  physicalDisks?: { name: string; size: number }[];
+  disks?: { device: string; mount: string; total: number; used: number; percent: number }[];
   cpuModel?: string | null;
   cpu: number | null;
   cpuCount: number | null;
@@ -328,6 +331,7 @@ export interface Bridge
     AiBridge,
     UpdateBridge,
     FloatingBridge,
+    MonitorViewsBridge,
     ActivityBridge {
   readonly platform: string;
   setAlwaysOnTop(enabled: boolean): Promise<boolean>;

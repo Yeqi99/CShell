@@ -61,7 +61,7 @@ const app = await electron.launch({
 try {
   const page = await app.firstWindow();
   page.setDefaultTimeout(20000);
-  await page.getByRole('heading', { name: '尚未连接' }).waitFor();
+  await page.getByRole('heading', { name: '工作台', exact: true }).waitFor();
   await app.evaluate(({ dialog }) => {
     dialog.showMessageBox = (async () => ({ response: 1, checkboxChecked: false })) as any;
   });
