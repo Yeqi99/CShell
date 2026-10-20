@@ -65,7 +65,7 @@ try {
   assert.equal(await page.locator('.monitor-panel').count(), 0);
   await page.keyboard.press('Control+Shift+B');
   await page.locator('.sidebar').waitFor({ state: 'hidden' });
-  assert.equal(await page.getByRole('button', { name: '新建连接', exact: true }).count(), 1);
+  assert.equal(await page.locator('.workbench-home').getByRole('button', { name: '新建连接', exact: true }).count(), 1);
   await page.keyboard.press('Control+Shift+B');
 
   await page.locator('.sidebar').waitFor({ state: 'visible' });
