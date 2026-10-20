@@ -49,6 +49,7 @@ class ClientChannel {
     readonly socket: TLSSocket,
     event: (event: string, data?: string) => void,
   ) {
+    let closeReason: string | undefined;
     socket.on('error', () => {});
     socket.once('close', () => {
       clearInterval(this.heartbeat);
@@ -57,7 +58,7 @@ class ClientChannel {
         p.reject(new Error('Client disconnected'));
       }
       this.pending.clear();
-      event('closed');
+      event('closed', closeReason);
     });
     frames(socket, (raw) => {
       const value = z
@@ -74,7 +75,7 @@ class ClientChannel {
         .parse(raw);
       if (value.event) {
         if (value.event === 'data' && value.data !== undefined) event('data', value.data);
-        else if (value.event === 'closed') socket.destroy();
+        else if (value.event === 'closed') { closeReason = value.error; socket.destroy(); }
         return;
       }
       const pending = value.id && this.pending.get(value.id);
@@ -411,7 +412,7 @@ export class ClientProvider implements ManagedProvider {
           } else this.emit({ type: 'data', sessionId: id, data: data! });
         } else {
           this.sessions.delete(id);
-          if (ready) this.emit({ type: 'closed', sessionId: id });
+          if (ready) this.emit({ type: 'closed', sessionId: id, ...(data ? { error: data } : {}) });
         }
       },
       signal,

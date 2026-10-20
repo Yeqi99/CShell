@@ -1,4 +1,5 @@
 import {localViewProfiles} from '../shared/monitor-views';
+import { Diagnostics } from '../core/diagnostics';
 import { openRdpProfile, rdpProfileSchema } from '../core/rdp';
 import { installWindowPermissions } from './window-permissions';
 import { HttpWorkspaces } from '../core/http-workspaces';
@@ -74,6 +75,23 @@ const pathSchema = z
 const clientMode = process.argv.includes('--client') || app.getName() === 'CShell Client';
 if (clientMode) app.setPath('userData', join(app.getPath('appData'), 'CShell Client'));
 if (process.env.CSHELL_TEST_DATA) app.setPath('userData', process.env.CSHELL_TEST_DATA);
+const diagnostics = new Diagnostics(app.getPath('userData'), app.getVersion());
+process.on('uncaughtExceptionMonitor', error => diagnostics.record('main.uncaught', error));
+process.on('unhandledRejection', error => diagnostics.record('main.rejection', error));
+app.on('child-process-gone', (_event, details) => diagnostics.record('process.' + details.type, `${details.reason} (${details.exitCode})`));
+app.on('web-contents-created', (_event, contents) => {
+  contents.on('render-process-gone', (_event, details) => diagnostics.record('renderer.gone', `${details.reason} (${details.exitCode})`));
+  contents.on('preload-error', (_event, _path, error) => diagnostics.record('preload.error', error));
+  contents.on('unresponsive', () => diagnostics.record('renderer.unresponsive', 'Window did not respond'));
+});
+ipcMain.on('diagnostics:error', (event, value) => {
+  const entry = pathToFileURL(join(__dirname, '../renderer/index.html')).href;
+  if (event.senderFrame !== event.sender.mainFrame || event.senderFrame?.url.split('?')[0] !== entry) return;
+  if (!value || typeof value.message !== 'string' || value.message.length > 12000) return;
+  const error = new Error(value.message);
+  if (typeof value.stack === 'string') error.stack = value.stack.slice(0, 12000);
+  diagnostics.record('renderer.error', error);
+});
 const hasLock = app.requestSingleInstanceLock();
 // A launcher may leave the first window hidden. Focusing alone cannot reveal it.
 // Register before async initialization so a second launch is never missed.
@@ -149,6 +167,8 @@ else
       const viewHandlers = new Map<string, (...args: any[]) => any>();
       let mcp: McpService | undefined;
       const emit = (event: SessionEvent) => {
+        if (event.type === 'closed' && event.error) diagnostics.record('session.closed', event.error);
+        if (event.type === 'transfer' && event.transfer.state === 'failed') diagnostics.record('transfer.failed', 'Transfer failed');
         if (event.type === 'closed') connections?.closed(event.sessionId);
         if (mcp?.event(event)) return;
         if (
@@ -329,6 +349,7 @@ else
               });
             return result;
           } catch (error) {
+            diagnostics.record('ipc.' + name, error);
             if (viewSender) monitorWindows.failed(event.sender.id, name);
             if (kind)
               activity.record({
@@ -342,6 +363,11 @@ else
           }
         });
       };
+      handle('diagnostics:open', async () => {
+        diagnostics.record('diagnostics.open', 'Opened local diagnostic directory');
+        const error = await shell.openPath(diagnostics.directory);
+        if (error) throw new Error(error);
+      });
       handle('views:list', () => store.monitorViews());
       handle('views:save', value => store.saveMonitorView(value));
       handle('views:delete', id => store.deleteMonitorView(idSchema.parse(id)));
@@ -477,6 +503,9 @@ else
       handle('http:history', id => http.histories(id));
       handle('http:cancel', id => http.cancel(id));
       const agent = await registerAgent(handle, store, clientProvider, connections.tools, event => {
+        if (event.type === 'error') diagnostics.record('desktop.error', event.message);
+        if (event.type === 'closed' && event.reason) diagnostics.record('desktop.closed', event.reason);
+        if (event.type === 'state' && event.reason) diagnostics.record('desktop.' + event.state, event.reason);
         if (!window.isDestroyed()) window.webContents.send('desktop:view-event', event);
         monitorWindows.publish('desktop:view-event', event);
       });
@@ -988,6 +1017,7 @@ else
       await window.loadURL(entry);
     })
     .catch((error) => {
+      diagnostics.record('startup.failed', error);
       dialog.showErrorBox('CShell', error.message);
       app.quit();
     });

@@ -244,3 +244,29 @@ test('Client password enrollment pins identity, limits attempts, persists access
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test('native terminal exit reasons reach the controller once without leaving a live session', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'cshell-terminal-exit-'));
+  const terminalId = randomUUID();
+  const terminal: ManagedProvider = {
+    id: 'test.terminal', version: '1.0.0', capabilities: ['terminal.interactive'],
+    configuration: z.enum(['cmd']),
+    async connect() { return terminalId; },
+    disconnect() {},
+    resolve() { return { target: { providerId:'test.terminal',resourceId:terminalId,identity:terminalId,label:'test' }, tools:[], terminal:{input(){},resize(){},acknowledge(){}} }; },
+  };
+  const server = new ClientServer(new ClientVault(join(dir,'server'),codec),terminal);
+  const events: SessionEvent[]=[];
+  const client = new ClientProvider(new ClientVault(join(dir,'controller'),codec),event=>events.push(event));
+  try {
+    await server.load();await client.load();
+    await server.start({bind:'127.0.0.1',port:await freePort()});
+    const device=await client.pair(server.invite({host:'127.0.0.1',shells:['cmd']}));
+    const session=await client.connect({deviceId:device.deviceId,shell:'cmd'},undefined,new AbortController().signal);
+    server.event({type:'closed',sessionId:terminalId,error:'进程退出 (4294967295)'});
+    const deadline=Date.now()+3000;
+    while(!events.some(e=>e.type==='closed')&&Date.now()<deadline)await new Promise(r=>setTimeout(r,10));
+    assert.deepEqual(events.filter(e=>e.type==='closed'),[{type:'closed',sessionId:session,error:'进程退出 (4294967295)'}]);
+    assert.throws(()=>client.resolve(session),/closed/);
+  } finally { client.dispose();await server.stop();await rm(dir,{recursive:true,force:true,maxRetries:5}); }
+});

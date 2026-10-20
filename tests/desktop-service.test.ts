@@ -17,6 +17,43 @@ class FakeCapture extends EventEmitter {
 }
 async function fixture(control=false){const captures:FakeCapture[]=[];let allowed=true,controlAllowed=true;const service=new DesktopService({identity:'device-1',nativeExecutable:'unused',authorize:(_owner,permission)=>allowed&&(permission!=='control'||controlAllowed),captureFactory:()=>{const c=new FakeCapture();c.frameData=Buffer.from('synthetic-frame-'+captures.length);captures.push(c);return c as unknown as NativeDesktop;}});await service.configure({enabled:true,bindAddress:'127.0.0.1',...await ports(),local:{view:true,control},ownerGrants:{viewer:{view:true,control}}});return {service,captures,revoke:()=>{allowed=false;},denyControl:()=>{controlAllowed=false;}};}
 const quality={fps:30,bitrate:2000000,display:0,adaptive:false};
+test('initialization without any ready packet has a bounded compatible retry and terminal failure',{timeout:8000},async()=>{
+ const captures:FakeCapture[]=[];
+ const service=new DesktopService({identity:'never-ready',nativeExecutable:'unused',authorize:()=>true,captureFactory:()=>{const c=new FakeCapture();c.start=()=>{};captures.push(c);return c as unknown as NativeDesktop;}});
+ await service.configure({enabled:true,bindAddress:'127.0.0.1',...await ports(),local:{view:true,control:false},ownerGrants:{viewer:{view:true,control:false}}});
+ try{
+  const client=await connectDesktop(service.open('viewer',{quality}),{host:'127.0.0.1',expectedHostIdentity:'never-ready',local:true});
+  await new Promise(r=>setTimeout(r,30));
+  const active=(service as any).active;
+  assert.ok(active.captureTimer,'watchdog must exist before native ready');
+  assert.equal(active.captureTimer._idleTimeout,10000);
+  // Invoke the installed timeout callback without waiting ten seconds per attempt.
+  const first=active.captureTimer._onTimeout;clearTimeout(active.captureTimer);first();
+  await new Promise(r=>setTimeout(r,30));
+  assert.equal(captures.length,2);assert.equal(captures[0].stopped,true);
+  assert.equal(active.forceGdi,true);assert.equal(active.nativeReady,false);
+  const closed=once(client,'closed');
+  const second=active.captureTimer._onTimeout;clearTimeout(active.captureTimer);second();
+  assert.equal((await closed)[0],'CAPTURE_NO_FRAMES');
+  assert.equal(captures[1].stopped,true);assert.equal(service.status('viewer').lastFailure?.code,'CAPTURE_NO_FRAMES');
+  await client.close();
+ }finally{await service.shutdown();}
+});
+
+test('native credit pipe failure after media completion closes cleanly instead of rejecting an async callback',{timeout:8000},async()=>{
+ const {service,captures}=await fixture();
+ try{
+  const client=await connectDesktop(service.open('viewer',{quality}),{host:'127.0.0.1',expectedHostIdentity:'device-1',local:true});
+  await once(client,'frame');
+  const closed=once(client,'closed');
+  captures[0].requestFrame=()=>{throw new Error('Native control backpressure secret path');};
+  assert.equal((await closed)[0],'CAPTURE_FAILED');
+  assert.equal(service.status('viewer').lastFailure?.stage,'capture.command');
+  assert.ok(!JSON.stringify(service.status('viewer').lastFailure).includes('secret'));
+  assert.equal(captures[0].stopped,true);await client.close();
+ }finally{await service.shutdown();}
+});
+
 test('silent first capture retries compatible capture instead of leaving a black connection',{timeout:10000},async()=>{
  const captures:FakeCapture[]=[];
  const service=new DesktopService({identity:'first-frame-test',nativeExecutable:'unused',authorize:()=>true,captureFactory:()=>{const c=new FakeCapture();if(!captures.length)c.requestFrame=()=>{};captures.push(c);return c as unknown as NativeDesktop;}});

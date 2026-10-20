@@ -2,6 +2,8 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { Bridge, SessionEvent } from '../shared/contracts';
 const bridge: Bridge = {
   platform: process.platform,
+  reportError: error => ipcRenderer.send('diagnostics:error', error),
+  openDiagnostics: () => ipcRenderer.invoke('diagnostics:open'),
   aiEventsSnapshot:()=>ipcRenderer.invoke('ai:events-snapshot'),
   aiEventSave:rule=>ipcRenderer.invoke('ai:event-save',rule),
   aiEventRemove:id=>ipcRenderer.invoke('ai:event-remove',id),

@@ -272,7 +272,7 @@ export class ClientServer {
         try {
           if (event.type === 'data') {
             for (const data of textChunks(event.data)) send(c.socket, { event: 'data', data });
-          } else send(c.socket, { event: 'closed' });
+          } else send(c.socket, { event: 'closed', ...(event.error ? { error: event.error.slice(0, 200) } : {}) });
         } catch {
           c.socket.destroy();
         }

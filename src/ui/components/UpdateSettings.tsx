@@ -140,6 +140,13 @@ export function UpdateSettings({ english }: { english: boolean }) {
               'Installation uses the system installer. Save your work first.',
             )}
       </p>
+      <section className="settings-section">
+        <h3>{t('错误日志', 'Error logs')}</h3>
+        <p className="muted">{t('运行错误保存在本机，日志自动轮换。分享前请检查内容。', 'Runtime errors stay on this device and logs rotate automatically. Review before sharing.')}</p>
+        <button type="button" className="secondary" onClick={() => void window.cshell.openDiagnostics().catch(e => setError(e.message))}>
+          {t('打开日志目录', 'Open log folder')}
+        </button>
+      </section>
       {(error || state?.error) && (
         <p role="alert" className="error">
           {failureHint}

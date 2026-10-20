@@ -28,6 +28,7 @@ export class HostingService {
   private errors = new Map<string, string>();
   private queue: Promise<unknown> = Promise.resolve();
   private closed = false;
+  private terminating = new WeakMap<ChildProcess, Promise<void>>();
   constructor(private readonly directory: string) {}
   private exclusive<T>(action: () => Promise<T>): Promise<T> {
     const result = this.queue.then(action);
@@ -294,10 +295,13 @@ export class HostingService {
         done = true;
         clearTimeout(timer);
         signal.removeEventListener('abort', abort);
-        void this.kill(child).finally(() => {
+        void this.kill(child).then(() => {
           active.children.delete(child);
           if (error) reject(error);
           else resolve(result ?? {});
+        }, (terminationError) => {
+          // Keep a live worker tracked so a later stop can retry cleanup.
+          reject(terminationError);
         });
       };
       const timer = setTimeout(() => finish(new Error('代码执行超过 5 秒')), 5000);
@@ -333,28 +337,45 @@ export class HostingService {
         });
     });
   }
-  private async kill(child: ChildProcess): Promise<void> {
-    if (!child.pid || child.exitCode !== null || child.signalCode !== null) return;
-    const exited = new Promise<void>((resolve) => {
-      child.once('exit', () => resolve());
-    });
-    if (process.platform === 'win32') {
-      const killer = spawn('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], {
-        windowsHide: true,
-        stdio: 'ignore',
-      });
-      killer.on('error', () => child.kill());
-      killer.on('exit', (code) => {
-        if (code) child.kill();
-      });
-    } else {
-      try {
-        process.kill(-child.pid, 'SIGKILL');
-      } catch {
-        child.kill('SIGKILL');
+  private kill(child: ChildProcess): Promise<void> {
+    const pending = this.terminating.get(child);
+    if (pending) return pending;
+    if (!child.pid || child.exitCode !== null || child.signalCode !== null) return Promise.resolve();
+    // Abort handlers and stop/dispose can reach the same worker in one turn.
+    // Share the operation instead of starting competing taskkill processes.
+    const operation = new Promise<void>((resolve, reject) => {
+      let killer: ChildProcess | undefined;
+      let fallback: ReturnType<typeof setTimeout> | undefined;
+      const finish = (error?: Error) => {
+        clearTimeout(deadline);
+        clearTimeout(fallback);
+        child.removeListener('exit', exited);
+        if (error) reject(error); else resolve();
+      };
+      const exited = () => finish();
+      const forceWorker = () => {
+        if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+      };
+      const deadline = setTimeout(() => {
+        killer?.kill();
+        forceWorker();
+        finish(new Error('代码工作进程未能及时退出，请重试停止服务'));
+      }, 3000);
+      child.once('exit', exited);
+      if (process.platform === 'win32') {
+        killer = spawn(join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'taskkill.exe'),
+          ['/PID', String(child.pid), '/T', '/F'], {windowsHide: true, stdio: 'ignore'});
+        killer.once('error', forceWorker);
+        killer.once('exit', (code) => { if (code) forceWorker(); });
+        // A stuck OS helper must not leave a busy worker running indefinitely.
+        fallback = setTimeout(() => { killer?.kill(); forceWorker(); }, 1500);
+      } else {
+        try { process.kill(-child.pid!, 'SIGKILL'); } catch { forceWorker(); }
       }
-    }
-    await exited;
+    });
+    this.terminating.set(child, operation);
+    void operation.then(() => this.terminating.delete(child), () => this.terminating.delete(child));
+    return operation;
   }
   stop(id: string): Promise<HostingStatus> {
     return this.exclusive(async () => {
@@ -365,10 +386,14 @@ export class HostingService {
   private async stopNow(id: string) {
     const active = this.active.get(id);
     if (!active) return;
+    // Stop accepting requests before waiting for OS process termination.
+    const listeningClosed = new Promise<void>((resolve) => active.server.close(() => resolve()));
     active.abort.abort();
-    await Promise.all([...active.children].map((child) => this.kill(child)));
     active.server.closeAllConnections();
-    await new Promise<void>((resolve) => active.server.close(() => resolve()));
+    const terminated = await Promise.allSettled([...active.children].map((child) => this.kill(child)));
+    await listeningClosed;
+    const failure = terminated.find((result) => result.status === 'rejected');
+    if (failure?.status === 'rejected') throw failure.reason;
     this.active.delete(id);
   }
   remove(id: string): Promise<void> {

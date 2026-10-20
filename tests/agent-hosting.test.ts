@@ -154,10 +154,25 @@ test('hosting stop cancels a running worker and releases listening socket', asyn
       (r) => r.status,
       () => 0,
     );
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    // Synchronize with the actual worker, not a sleep that can expire before fetch arrives.
+    const active = (f.service as any).active.get(input.id);
+    const until = Date.now() + 5000;
+    while (!active.children.size && Date.now() < until)
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.equal(active.children.size, 1);
+    const worker = [...active.children][0] as import('node:child_process').ChildProcess;
+    const originalKill = (f.service as any).kill.bind(f.service);
+    const terminations: Promise<void>[] = [];
+    (f.service as any).kill = (child: import('node:child_process').ChildProcess) => {
+      const result = originalKill(child); terminations.push(result); return result;
+    };
     const start = Date.now();
     await f.service.stop(input.id);
     assert.ok(Date.now() - start < 4000);
+    assert.ok(terminations.length >= 2, 'abort and service stop both request termination');
+    assert.equal(terminations[0], terminations[1], 'concurrent termination shares one OS operation');
+    assert.ok(worker.exitCode !== null || worker.signalCode !== null, 'stop waits for actual process exit');
+    assert.equal(active.children.size, 0);
     assert.ok([0, 504].includes(await response));
     assert.equal(f.service.list()[0].running, false);
     await assert.rejects(fetch(`http://127.0.0.1:${actualPort}/`));

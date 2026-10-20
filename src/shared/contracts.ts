@@ -334,6 +334,8 @@ export interface Bridge
     MonitorViewsBridge,
     ActivityBridge {
   readonly platform: string;
+  reportError(error: { message: string; stack?: string }): void;
+  openDiagnostics(): Promise<void>;
   setAlwaysOnTop(enabled: boolean): Promise<boolean>;
   setMinimalMode(enabled: boolean): Promise<void>;
   configureTools(settings: ToolsSettings): Promise<void>;
