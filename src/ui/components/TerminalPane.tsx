@@ -305,7 +305,9 @@ export function TerminalPane({
       setCommandInput('');
       setDetected(latched);
     });
-    const parsed = terminal.onWriteParsed(() => {
+    let parsedFrame: number | undefined;
+    const syncParsedUi = () => {
+      parsedFrame = undefined;
       if (!detectionTimer) detectionTimer = setTimeout(scanEditor, 120);
       const buffer = terminal.buffer.active;
       if (runtime.current.active && currentShellInput(terminal) === '') {
@@ -323,7 +325,7 @@ export function TerminalPane({
           const cursorTop = screen.top - bounds.top + buffer.cursorY * rowHeight;
           const height = Math.max(1, suggestionsFor(input).length) * 34 + 12;
           const width = Math.min(540, bounds.width - 24);
-          setCommandPosition({
+          const position = {
             left: Math.max(
               12,
               Math.min(
@@ -337,9 +339,18 @@ export function TerminalPane({
               cursorTop + rowHeight + height + 8 < bounds.height
                 ? cursorTop + rowHeight + 4
                 : Math.max(4, cursorTop - height - 4),
-          });
+          };
+          setCommandPosition((previous) =>
+            previous.left === position.left && previous.top === position.top ? previous : position,
+          );
         }
       }
+    };
+    // Parser callbacks can run synchronously while React is committing another
+    // terminal update. Coalesce presentation updates outside that call stack;
+    // terminal parsing, input, acknowledgements and snapshots remain immediate.
+    const parsed = terminal.onWriteParsed(() => {
+      parsedFrame ??= requestAnimationFrame(syncParsedUi);
     });
     const data = terminal.onData((value) => {
       const entered = typed.current;
@@ -472,6 +483,7 @@ export function TerminalPane({
       clearTimeout(detectionTimer);
       bufferChange.dispose();
       parsed.dispose();
+      if (parsedFrame !== undefined) cancelAnimationFrame(parsedFrame);
       terminal.dispose();
     };
   }, [id]);
