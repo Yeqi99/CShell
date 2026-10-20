@@ -261,6 +261,27 @@
         <p id="form-error" role="alert" class="error"></p>
         <button id="delete-profile" class="danger" type="button" hidden>删除此连接配置</button>
       </form>
+      <section id="extensions" class="page" hidden>
+        <div class="page-heading"><h1>扩展</h1></div>
+        <button id="cagent-open" class="extension-card"><span class="extension-icon" data-icon="server"></span><span class="extension-description"><strong>CAgent</strong><small>将这台手机连接到其他 CShell</small></span><span id="cagent-card-state" class="muted">未启用</span></button>
+      </section>
+      <section id="cagent" class="page" hidden>
+        <div class="page-heading"><div><h1>CAgent</h1><p class="muted caption">此手机的远程连接</p></div><label class="cagent-toggle"><input id="cagent-enabled" type="checkbox" />启用</label></div>
+        <p id="cagent-status" role="status" aria-live="polite">未启用</p>
+        <form id="cagent-config" autocomplete="off"><fieldset id="cagent-fields">
+          <div class="cagent-port-row"><label>监听端口<input id="cagent-port" type="number" min="1" max="65535" required value="24443" inputmode="numeric" /></label><label>对外端口<input id="cagent-public-port" type="number" min="1" max="65535" placeholder="同监听端口" inputmode="numeric" /></label></div>
+          <label>对外地址<input id="cagent-host" placeholder="可访问手机的 IP 或域名" autocapitalize="none" spellcheck="false" maxlength="253" /></label>
+          <label>连接密码<span class="cagent-password"><input id="cagent-password" type="password" autocomplete="new-password" maxlength="256" /><button id="cagent-password-toggle" type="button" aria-label="显示连接密码" aria-pressed="false">显示</button></span></label>
+          <p class="muted caption">监听所有网卡。其他设备需要能访问该地址和端口。</p>
+          <div class="cagent-actions"><button type="submit" class="primary">保存设置</button><button id="cagent-copy" type="button">复制连接信息</button></div>
+        </fieldset></form>
+        <div class="cagent-permissions">
+          <div class="setting-row"><div><strong>屏幕共享</strong><p id="cagent-screen-state" class="muted caption">未开始</p></div><button id="cagent-start">开始共享</button><button id="cagent-stop" hidden>停止共享</button></div>
+          <div class="setting-row"><div><strong>触摸与键盘控制</strong><p id="cagent-access-state" class="muted caption">需要开启系统无障碍服务</p></div><button id="cagent-access">去设置</button></div>
+          <p class="muted caption">屏幕共享由 Android 确认授权；可随时在这里停止。</p>
+        </div>
+        <p id="cagent-feedback" role="status" aria-live="polite"></p>
+      </section>
       <section id="settings" class="page" hidden>
         <div class="page-heading">
           <div>
@@ -321,6 +342,7 @@
       ><button data-page="session-page">
         <span data-icon="terminal"></span>终端<span id="session-badge" hidden></span></button
       ><button data-page="files"><span data-icon="folder"></span>文件</button
+      ><button data-page="extensions"><span data-icon="extensions"></span>扩展</button
       ><button data-page="settings"><span data-icon="settings"></span>设置</button>
     </nav>
     <script src="app.js"></script>

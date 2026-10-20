@@ -75,9 +75,11 @@ CAgent 新配置为已认证控制端提供较宽松的默认能力。部署到�
 | Windows x64 | `.exe` 安装包；完整桌面工作台 | `.exe` 安装包；原生小窗，Windows 应用能力 |
 | macOS Apple Silicon / Intel | `.dmg` / `.zip`；桌面客户端 | `.tar.gz`；独立运行时与浏览器界面 |
 | Linux x64 / ARM64 | `.AppImage` / `.deb`；桌面客户端 | `.tar.gz`；独立运行时与浏览器界面 |
-| Android | `.apk`；SSH、文件及 CAgent 连接客户端 | 暂无受控端应用 |
+| Android | `.apk`；SSH、文件及 CAgent 连接客户端 | CShell 内置 CAgent 扩展，无需另装应用 |
 
-Android 的 SSH 支持 Android 8+；CAgent 连接要求 Android 10+。移动端已实现连接 Windows CAgent 远程桌面及触摸键鼠映射，但插件、应用安装、文件编辑和智能体工作流并不与桌面端完全相同。macOS / Linux 作为控制端与作为被控端也是不同能力，Windows 原生采集不能视为其他系统已经具备。
+Android 的 SSH 支持 Android 8+；CAgent 连接与内置受控扩展要求 Android 10+。启用扩展并通过系统屏幕共享授权后，其他 CShell 客户端可按可达地址连接手机；键鼠操作需要在手机系统设置中启用 CAgent 无障碍服务。支持局域网或公网地址及端口映射，尚不包含同账号云端发现。配置与限制见 [Android CAgent](docs/ANDROID-CAGENT.md)。
+
+移动端已实现连接 Windows CAgent 远程桌面及触摸键鼠映射，但插件、应用安装、文件编辑和智能体工作流并不与桌面端完全相同。macOS / Linux 作为控制端与作为被控端也是不同能力，Windows 原生采集不能视为其他系统已经具备。
 
 各平台构建结果、原生测试和真实设备验收分别记录。Android / macOS 用户设备、多个实体显示器及部分远控硬件场景仍待进一步验收。安装包签名、公证与具体兼容情况以对应发行说明为准。
 

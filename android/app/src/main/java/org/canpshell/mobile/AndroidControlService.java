@@ -1,0 +1,135 @@
+package org.canpshell.mobile;
+
+import android.accessibilityservice.AccessibilityService;
+import android.accessibilityservice.GestureDescription;
+import android.graphics.Path;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.view.accessibility.AccessibilityEvent;
+import android.view.accessibility.AccessibilityNodeInfo;
+import org.json.JSONObject;
+
+/** Explicitly enabled Android accessibility controls; not a privileged input injector. */
+public final class AndroidControlService extends AccessibilityService {
+  private static volatile AndroidControlService instance;
+  private final Handler main=new Handler(Looper.getMainLooper());
+  private float x=.5f,y=.5f;
+  private Path drag;
+  private long downAt;
+  private int points;
+  private final java.util.ArrayDeque<JSONObject> queue=new java.util.ArrayDeque<>();
+  private boolean pending;
+  private boolean gestureBusy;
+  private boolean shiftLeft,shiftRight,control,alt,caps;
+  @Override protected void onServiceConnected(){instance=this;AndroidAgentService.changed(this);}
+  @Override public void onAccessibilityEvent(AccessibilityEvent event){}
+  @Override public void onInterrupt(){reset();}
+  @Override public void onDestroy(){if(instance==this)instance=null;synchronized(this){queue.clear();}reset();AndroidAgentService.changed(this);super.onDestroy();}
+  static boolean isAvailable(){return instance!=null;}
+  /** Returns queued, not proof that a target application accepted the action. */
+  static boolean dispatch(JSONObject event){
+    AndroidControlService service=instance;if(service==null)return false;
+    String kind=event.optString("kind");
+    if(kind.equals("lease"))return true;
+    synchronized(service){
+      if(kind.equals("move")&&!service.queue.isEmpty()&&service.queue.peekLast().optString("kind").equals("move"))service.queue.removeLast();
+      if(service.queue.size()>=128)return false;
+      service.queue.addLast(event);
+      if(service.pending)return true;
+      service.pending=true;
+    }
+    service.main.post(service::drainInputs);return true;
+  }
+  private void drainInputs(){
+    for(int n=0;n<16;n++){JSONObject event;synchronized(this){event=queue.pollFirst();if(event==null){pending=false;return;}}apply(event);}
+    main.post(this::drainInputs);
+  }
+  static void releaseAll(){AndroidControlService s=instance;if(s!=null){synchronized(s){s.queue.clear();}s.main.post(s::reset);}}
+  private void reset(){drag=null;points=0;downAt=0;shiftLeft=false;shiftRight=false;control=false;alt=false;}
+  private float px(float value,boolean horizontal){
+    android.util.DisplayMetrics dm=new android.util.DisplayMetrics();
+    ((android.view.WindowManager)getSystemService(WINDOW_SERVICE)).getDefaultDisplay().getRealMetrics(dm);
+    return Math.max(0,Math.min((horizontal?dm.widthPixels:dm.heightPixels)-1,value*(horizontal?dm.widthPixels:dm.heightPixels)));
+  }
+  private static float normalized(double value){if(!Double.isFinite(value)||value<0||value>1)throw new IllegalArgumentException("Invalid pointer coordinate");return (float)value;}
+  private void apply(JSONObject value){
+    try {
+      switch(value.optString("kind")){
+        case "move":
+          x=normalized(value.getDouble("x"));y=normalized(value.getDouble("y"));
+          if(drag!=null&&points++<2048)drag.lineTo(px(x,true),px(y,false));break;
+        case "button":
+          int button=value.optInt("button");
+          if(button==0){
+            if(value.optBoolean("down")){drag=new Path();drag.moveTo(px(x,true),px(y,false));downAt=android.os.SystemClock.uptimeMillis();points=1;}
+            else if(drag!=null){Path path=drag;long duration=Math.min(points>1?500:1500,Math.max(40,android.os.SystemClock.uptimeMillis()-downAt));reset();gesture(path,duration);}
+          } else if(button==1&&!value.optBoolean("down")) { // Existing CShell clients map secondary button to 1.
+            Path path=new Path();path.moveTo(px(x,true),px(y,false));gesture(path,650);
+          }
+          break;
+        case "wheel":
+          int delta=value.optInt("delta");if(delta==0)break;
+          boolean horizontal=value.optBoolean("horizontal");float end=Math.max(.05f,Math.min(.95f,(horizontal?x:y)+(delta>0?.25f:-.25f)));
+          Path path=new Path();path.moveTo(px(x,true),px(y,false));path.lineTo(px(horizontal?end:x,true),px(horizontal?y:end,false));gesture(path,180);break;
+        case "text": insert(value.optString("text"));break;
+        case "key":
+          key(value.optInt("code"),value.optBoolean("down"));break;
+        case "global":
+          String action=value.optString("action");
+          if(action.equals("back"))performGlobalAction(GLOBAL_ACTION_BACK);
+          else if(action.equals("home"))performGlobalAction(GLOBAL_ACTION_HOME);
+          else if(action.equals("recents"))performGlobalAction(GLOBAL_ACTION_RECENTS);
+          break;
+      }
+    }catch(Exception ignored){reset();}
+  }
+  private void key(int code,boolean down){
+    if(code==42){shiftLeft=down;return;}if(code==54){shiftRight=down;return;}
+    if(code==29||code==0x11d){control=down;return;}if(code==56||code==0x138){alt=down;return;}
+    if(!down)return;
+    if(code==1){performGlobalAction(GLOBAL_ACTION_BACK);return;}
+    if(code==0x15b||code==0x15c){performGlobalAction(GLOBAL_ACTION_HOME);return;}
+    if(code==58){caps=!caps;return;}
+    if(code==14){backspace();return;}
+    if(code==28&&!control&&!alt){
+      AccessibilityNodeInfo node=focused();if(node==null)return;
+      try{if(node.isEditable()&&!node.isPassword()){
+        if(android.os.Build.VERSION.SDK_INT>=30)node.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.getId());
+      }}finally{node.recycle();}return;
+    }
+    if(control||alt)return;
+    boolean shift=shiftLeft||shiftRight;char letter=0;
+    if(code>=16&&code<=25)letter="qwertyuiop".charAt(code-16);
+    if(code>=30&&code<=38)letter="asdfghjkl".charAt(code-30);
+    if(code>=44&&code<=50)letter="zxcvbnm".charAt(code-44);
+    if(letter!=0){insert(String.valueOf(shift^caps?Character.toUpperCase(letter):letter));return;}
+    if(code>=2&&code<=11){insert(String.valueOf((shift?"!@#$%^&*()":"1234567890").charAt(code-2)));return;}
+    int[] codes={12,13,26,27,39,40,41,43,51,52,53,57};
+    String normal="-=[];'`\\,./ ",upper="_+{}:\"~|<>? ";
+    for(int i=0;i<codes.length;i++)if(code==codes[i]){insert(String.valueOf((shift?upper:normal).charAt(i)));return;}
+    // System shortcuts and arbitrary scan codes cannot be injected by Accessibility.
+  }
+  private void gesture(Path path,long duration){
+    if(gestureBusy)return;gestureBusy=true;
+    boolean accepted=dispatchGesture(new GestureDescription.Builder().addStroke(new GestureDescription.StrokeDescription(path,0,duration)).build(),new GestureResultCallback(){
+      @Override public void onCompleted(GestureDescription g){gestureBusy=false;}
+      @Override public void onCancelled(GestureDescription g){gestureBusy=false;}
+    },main);
+    if(!accepted)gestureBusy=false;
+  }
+  private AccessibilityNodeInfo focused(){AccessibilityNodeInfo root=getRootInActiveWindow();if(root==null)return null;try{AccessibilityNodeInfo node=root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);if(node!=null&&!node.refresh()){node.recycle();return null;}return node;}finally{root.recycle();}}
+  private void insert(String text){
+    if(text.length()>4096)return;AccessibilityNodeInfo node=focused();if(node==null)return;
+    try{if(!node.isEditable()||node.isPassword())return;String old=node.isShowingHintText()||node.getText()==null?"":node.getText().toString();if(old.length()>1_000_000)return;
+      int start=node.getTextSelectionStart(),end=node.getTextSelectionEnd();if(start<0||end<0){start=old.length();end=start;}int lo=Math.min(start,end),hi=Math.max(start,end);if(hi>old.length())return;
+      Bundle args=new Bundle();args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,old.substring(0,lo)+text+old.substring(hi));
+      if(node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT,args)){Bundle selection=new Bundle();selection.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT,lo+text.length());selection.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT,lo+text.length());node.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION,selection);}
+    }finally{node.recycle();}
+  }
+  private void backspace(){AccessibilityNodeInfo node=focused();if(node==null)return;
+    try{if(!node.isEditable()||node.isPassword())return;String old=node.isShowingHintText()||node.getText()==null?"":node.getText().toString();int a=node.getTextSelectionStart(),b=node.getTextSelectionEnd();if(a<0||b<0||a>old.length()||b>old.length())return;int lo=Math.min(a,b),hi=Math.max(a,b);if(lo==hi&&lo>0)lo=old.offsetByCodePoints(lo,-1);Bundle args=new Bundle();args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,old.substring(0,lo)+old.substring(hi));node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT,args);}finally{node.recycle();}}
+}
+
+
+

@@ -25,6 +25,9 @@ public class MainActivity extends Activity {
   private final ExecutorService workers = Executors.newCachedThreadPool();
   private final Map<String, Connection> connections = new ConcurrentHashMap<>();
   private volatile boolean destroyed;
+  private final android.content.BroadcastReceiver cagentEvents=new android.content.BroadcastReceiver(){
+    @Override public void onReceive(android.content.Context context,Intent intent){event("","cagent-status",AndroidAgentService.status(MainActivity.this).toString());}
+  };
   private final Object trustLock = new Object();
   private static class Connection {
     Session session; ChannelShell shell; OutputStream output; AgentConnection agent, desktop; String agentEndpoint, agentHost; int agentPort;
@@ -35,6 +38,7 @@ public class MainActivity extends Activity {
   }
   @Override public void onCreate(Bundle state) {
     super.onCreate(state);
+    androidx.core.content.ContextCompat.registerReceiver(this,cagentEvents,new android.content.IntentFilter(AndroidAgentService.CHANGED),androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED);
     Security.removeProvider("BC"); Security.addProvider(new BouncyCastleProvider());
     web = new WebView(this);
     updates = new AppUpdates(this, workers, value -> runOnUiThread(() -> {
@@ -47,6 +51,7 @@ public class MainActivity extends Activity {
     web.getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
     web.addJavascriptInterface(new Bridge(), "CShellNative");
     web.setWebViewClient(new WebViewClient() {
+      @Override public void onPageFinished(WebView view,String url){if("https://cshell.local/index.html".equals(url))event("","cagent-status",AndroidAgentService.status(MainActivity.this).toString());}
       @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) { return true; }
       @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
         Uri uri = request.getUrl();
@@ -95,6 +100,37 @@ public class MainActivity extends Activity {
     } catch (Exception e) { return false; }
   }
   public class Bridge {
+    @JavascriptInterface public String cagentStatus(){return AndroidAgentService.status(MainActivity.this).toString();}
+    @JavascriptInterface public String cagentConfigure(String json){return AndroidAgentService.configure(MainActivity.this,json).toString();}
+    @JavascriptInterface public void cagentStop(){
+      stopService(new Intent(MainActivity.this,AndroidAgentService.class));
+      AndroidAgentService.starting(MainActivity.this,false,"");
+    }
+    @JavascriptInterface public void cagentAccessibility(){
+      runOnUiThread(()->{try{startActivity(new Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS));}catch(Exception e){AndroidAgentService.starting(MainActivity.this,false,"无法打开无障碍设置");}});
+    }
+    @JavascriptInterface public void cagentCopyConnection(){
+      try{
+        String value=AndroidAgentService.connection(MainActivity.this).toString(2);
+        android.content.ClipboardManager clipboard=getSystemService(android.content.ClipboardManager.class);
+        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("CAgent 连接信息",value));
+      }catch(Exception e){AndroidAgentService.starting(MainActivity.this,false,e.getMessage());}
+    }
+    @JavascriptInterface public void cagentStart(){runOnUiThread(()->{
+      try{
+        if(android.os.Build.VERSION.SDK_INT<29)throw new IllegalStateException("CAgent 受控端需要 Android 10 或更新版本");
+        JSONObject status=AndroidAgentService.status(MainActivity.this);
+        if(status.optBoolean("running")||status.optBoolean("starting"))return;
+        JSONObject settings=AndroidAgentSettings.read(MainActivity.this);
+        if(!settings.getBoolean("enabled")||settings.getString("password").isEmpty())throw new IllegalStateException("请先启用 CAgent 并保存连接密码");
+        android.media.projection.MediaProjectionManager manager=getSystemService(android.media.projection.MediaProjectionManager.class);
+        Intent consent=android.os.Build.VERSION.SDK_INT>=34
+          ?manager.createScreenCaptureIntent(android.media.projection.MediaProjectionConfig.createConfigForDefaultDisplay())
+          :manager.createScreenCaptureIntent();
+        AndroidAgentService.starting(MainActivity.this,true,"");
+        startActivityForResult(consent,7107);
+      }catch(Exception e){AndroidAgentService.starting(MainActivity.this,false,e.getMessage());}
+    });}
     @JavascriptInterface public void setTheme(boolean dark) {
       runOnUiThread(() -> {
         int color = android.graphics.Color.parseColor(dark ? "#141b24" : "#ffffff");
@@ -260,6 +296,14 @@ public class MainActivity extends Activity {
   }
   @Override protected void onActivityResult(int code,int result,Intent data) {
     super.onActivityResult(code,result,data);
+    if(code==7107){
+      if(result!=RESULT_OK||data==null){AndroidAgentService.starting(this,false,"未开始共享：屏幕录制未获授权");return;}
+      try{
+        if(!AndroidAgentSettings.read(this).getBoolean("enabled")){AndroidAgentService.starting(this,false,"");return;}
+        androidx.core.content.ContextCompat.startForegroundService(this,new Intent(this,AndroidAgentService.class).putExtra("result",result).putExtra("consent",data));
+      }catch(Exception e){AndroidAgentService.starting(this,false,e.getMessage());}
+      return;
+    }
     if(code!=4401 || pendingTransfer==null)return;
     JSONObject request=pendingTransfer;pendingTransfer=null;
     try {
@@ -316,8 +360,10 @@ public class MainActivity extends Activity {
   }
   @Override public void onDestroy() {
     destroyed = true; for (Connection c : connections.values()) c.close(); connections.clear(); workers.shutdownNow();
+    unregisterReceiver(cagentEvents);
     web.removeJavascriptInterface("CShellNative"); web.destroy(); super.onDestroy();
   }
+  @Override protected void onResume(){super.onResume();if(web!=null)event("","cagent-status",AndroidAgentService.status(this).toString());}
   @Override protected void onPause(){super.onPause();for(Connection c:connections.values()){synchronized(c){if(c.desktop!=null)c.desktop.close();c.desktop=null;}}}
   private void navigateBack() {
     web.evaluateJavascript("window.mobileBack()", result -> {

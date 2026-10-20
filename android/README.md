@@ -18,7 +18,7 @@ gradle -p android assembleDebug lint
 
 发行构建使用持久化私有签名，环境变量 `ANDROID_KEYSTORE`、`ANDROID_STORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD`，随后 `gradle -p android assembleRelease`。签名文件不得提交 Git；不能每次生成临时发行密钥，否则用户无法覆盖升级。
 
-SSH 输入每连接顺序写入；输出最多 8 个待渲染数据块，xterm 回调确认后继续读取。WebView 仅加载内置资源，拒绝导航、远程脚本、文件/内容协议和额外 Android 权限。
+SSH 输入每连接顺序写入；输出最多 8 个待渲染数据块，xterm 回调确认后继续读取。WebView 仅加载内置资源，拒绝导航、远程脚本和文件/内容协议。录屏与无障碍权限由 Android 系统单独控制。
 
 参考：JSch 2.28.8（BSD-style license）、Bouncy Castle 1.86（MIT）、xterm.js 6.0.0（MIT）。发行前须随 APK 包含各依赖许可证。
 
@@ -58,3 +58,9 @@ adb shell am instrument -w \
 测试覆盖指纹拒绝、连接前取消、真实 Shell 执行、KeyStore 身份无密码重连、撤权断开与撤权后的拒绝重连。必须检查输出 `OK (3 tests)` 且无 `FAILURES!!!`，不能只依据 adb 退出码；仪器测试使用临时凭据，不得上传 fixture JSON。移动真机 IME、旋转与后台生命周期仍需独立验收。
 
 Agent 连接编辑页的「设备身份」提供「重新核对设备身份」。经原生安全确认后只清除该地址的已记住指纹、断开该地址旧 Agent 会话；其他连接、收藏、分组及系统私钥保留。下一次连接仍需手动核对新指纹，并提供必要凭证，不自动接受身份变化。已取消的握手不能重新写回清除的 pin。
+
+## 内置 CAgent 受控扩展（0.7.1）
+
+Android 10+ 从「扩展」启用 CAgent，设置密码、监听端口、对外地址及映射端口。系统录屏授权启动前台共享服务，无障碍服务提供可选输入；无需另装 CAgent APK。配置、输入映射及网络边界见 [Android CAgent](../docs/ANDROID-CAGENT.md)。
+
+隔离模拟器安装 debug 与 androidTest APK 后，可以用同一 runner 的 `-e hostMode true` 验证受控端 TLS、配对、视频分片、重连和撤权。该测试会修改测试应用的配对记录，不能在用户手机上执行。必须检查输出中的 `OK (Android host`，不能只依据 adb 退出码。

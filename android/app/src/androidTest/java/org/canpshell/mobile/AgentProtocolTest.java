@@ -19,6 +19,8 @@ public final class AgentProtocolTest extends Instrumentation {
   private Bundle arguments;
   @Override public void onCreate(Bundle arguments) { super.onCreate(arguments); this.arguments=arguments; start(); }
   @Override public void onStart() {
+    if(arguments.getBoolean("hostFixture",false)||"true".equals(arguments.getString("hostFixture"))||arguments.getBoolean("captureMode",false)||"true".equals(arguments.getString("captureMode"))){Bundle result=new Bundle();try{boolean capture=arguments.getBoolean("captureMode",false)||"true".equals(arguments.getString("captureMode"));result.putString("stream",capture?AndroidCaptureTest.run(this):AndroidHostProtocolTest.fixture(this));}catch(Throwable error){StringWriter detail=new StringWriter();error.printStackTrace(new PrintWriter(detail));result.putString("stream","FAILURES!!! Android host integration\n"+detail);}finish(Activity.RESULT_OK,result);return;}
+    if(arguments.getBoolean("hostMode",false)||"true".equals(arguments.getString("hostMode"))){Bundle result=new Bundle();try{result.putString("stream",AndroidHostProtocolTest.run(getTargetContext()));}catch(Throwable error){StringWriter detail=new StringWriter();error.printStackTrace(new PrintWriter(detail));result.putString("stream","FAILURES!!! Android host\n"+detail);}finish(Activity.RESULT_OK,result);return;}
     if(arguments.getBoolean("desktopMode",false)||"true".equals(arguments.getString("desktopMode"))){desktopTest();return;}
     String[] tests={"testRejectIdentityBeforeSendingSecret","testCancelBeforeConnect","testPinnedNativePtyReconnectAndRevocation"};
     int failures=0;StringBuilder report=new StringBuilder();

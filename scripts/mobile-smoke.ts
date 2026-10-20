@@ -38,6 +38,13 @@ try {
       connect: (data: string) => {
         const p = JSON.parse(data);
         calls.push(p);
+        if (p.protocol === 'agent' && p.host === 'phone.test') {
+          setTimeout(() => {
+            (window as any).receive(p.id, 'environments', '[]');
+            (window as any).receive(p.id, 'desktop-status', JSON.stringify({packageReady:true,viewAllowed:false,controlAllowed:false}));
+          }, 50);
+          return;
+        }
         if (p.protocol === 'agent') {
           setTimeout(
             () =>
@@ -58,6 +65,9 @@ try {
           (window as any).receive(p.id, 'data', btoa('test-session$ '));
         }, 50);
       },
+      desktopOpen: (id:string,options:string) => calls.push({desktopOpen:id,options:JSON.parse(options)}),
+      desktopClose: (id:string) => calls.push({desktopClose:id}),
+      desktopCommand: () => {},
       resetAgentTrust: (host: string, port: number) => {
         calls.push({ resetTrust: host, port });
         for (const call of calls)
@@ -131,7 +141,7 @@ try {
   await page.screenshot({ path: 'test-results/android-servers.png' });
   await page.locator('#server-list .server-open').click();
   await page.locator('[name=password]').fill('secret');
-  await page.locator('button[type=submit]').click();
+  await page.locator('#connect-actions button[type=submit]').click();
   try {
     await page.waitForFunction(
       () => document.getElementById('status')?.textContent === '已连接',
@@ -192,7 +202,7 @@ try {
   await page.locator('[name=name]').fill('我的电脑');
   await page.locator('[name=password]').fill('agent-secret-not-persisted');
   await page.locator('[name=favorite]').check();
-  await page.locator('button[type=submit]').click();
+  await page.locator('#connect-actions button[type=submit]').click();
   await page.getByRole('button', { name: 'Ubuntu · WSL', exact: true }).waitFor();
   await page.screenshot({ path: 'test-results/android-agent-environments.png' });
   await page.getByRole('button', { name: 'Ubuntu · WSL', exact: true }).click();
@@ -229,6 +239,26 @@ try {
   assert.equal(resetProfiles.length, 2);
   assert.equal(resetProfiles.find((p: any) => p.protocol === 'agent').agentAuthorized, false);
   assert.equal(resetProfiles.find((p: any) => p.protocol === 'agent').favorite, true);
+  await page.locator('#new').click();
+  await page.locator('#protocol-agent').click();
+  await page.locator('[name=host]').fill('phone.test');
+  await page.locator('[name=name]').fill('测试手机');
+  await page.locator('[name=password]').fill('phone-test');
+  await page.locator('#connect-actions button[type=submit]').click();
+  const phonePicker=page.locator('.agent-environments:visible');
+  await phonePicker.getByText('此设备未提供终端，可使用已开放的远程桌面。',{exact:true}).waitFor();
+  assert.equal(await phonePicker.getByRole('button',{name:'远程桌面',exact:true}).isDisabled(),true);
+  assert.equal(await phonePicker.getByRole('button').count(),1);
+  await page.evaluate(()=>{
+    const phone=(window as any).nativeCalls.find((call:any)=>call.host==='phone.test');
+    (window as any).receive(phone.id,'desktop-status',JSON.stringify({packageReady:true,viewAllowed:true,controlAllowed:true,qualityModes:['bounded']}));
+  });
+  await phonePicker.getByRole('button',{name:'远程桌面',exact:true}).click();
+  await page.locator('.mobile-desktop:visible').waitFor();
+  assert.ok(await page.evaluate(()=>(window as any).nativeCalls.some((call:any)=>call.desktopOpen)));
+  assert.equal(await page.evaluate(()=>{const phone=(window as any).nativeCalls.find((call:any)=>call.host==='phone.test');return (window as any).nativeCalls.some((call:any)=>call.openAgent===phone.id);}),false);
+  await page.locator('.mobile-desktop:visible').getByRole('button',{name:'断开',exact:true}).click();
+  await phonePicker.waitFor();
   assert.deepEqual(errors, []);
   console.log(
     'Android web workbench: navigation, persistence, drafts, sessions, minimal mode, narrow/landscape, update feedback passed. Native SSH/installer require device validation.',

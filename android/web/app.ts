@@ -7,6 +7,12 @@ import {MobileDesktop} from './desktop';
 declare global {
   interface Window {
     CShellNative: {
+      cagentStatus?(): string;
+      cagentConfigure?(data: string): string;
+      cagentStart?(): void;
+      cagentStop?(): void;
+      cagentAccessibility?(): void;
+      cagentCopyConnection?(): void;
       fileRequest(data: string): void;
       connect(data: string): void;
       openAgent(id: string, index: number): void;
@@ -36,6 +42,7 @@ const $ = (id: string) => document.getElementById(id)!;
 const desktop=new MobileDesktop(window.CShellNative);
 const desktopStatus=new Map<string,{packageReady?:boolean;viewAllowed?:boolean;controlAllowed?:boolean;inputFeatures?:string[];qualityModes?:string[]}>();
 const icons: Record<string, string> = {
+  extensions: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 17.5h7m-3.5-3.5v7"/>',
   home: '<path d="m3 10 9-7 9 7v10H3Z M9 20v-7h6v7"/>',
   folder: '<path d="M3 7V4h6l3 3h9v13H3Z"/>',
   file: '<path d="M5 3h9l5 5v13H5Z M14 3v6h5"/>',
@@ -205,6 +212,8 @@ function navigate(next: string) {
     'session-page',
     'connect',
     'settings',
+    'extensions',
+    'cagent',
     'terminals',
   ])
     $(key).hidden = key !== next;
@@ -213,16 +222,17 @@ function navigate(next: string) {
   $('tabs').hidden = !terminal;
   $('terminal-tools').hidden = !terminal;
   $('minimal').hidden = !terminal;
-  $('back').hidden = !['connect', 'terminals'].includes(next);
+  $('back').hidden = !['connect', 'terminals', 'cagent'].includes(next);
   $('minimal').setAttribute('aria-label', '极简模式');
   for (const b of document.querySelectorAll<HTMLElement>('[data-page]')) {
-    const selected = b.dataset.page === (terminal ? 'session-page' : next);
+    const selected = b.dataset.page === (terminal ? 'session-page' : next === 'cagent' ? 'extensions' : next);
     b.classList.toggle('selected', selected);
     if (selected) b.setAttribute('aria-current', 'page');
     else b.removeAttribute('aria-current');
   }
   render();
   if (next === 'files') syncFileSessions();
+  if (next === 'cagent' || next === 'extensions') refreshCAgent();
   if (terminal) requestAnimationFrame(resize);
 }
 function setAuth(value: 'password' | 'key') {
@@ -450,7 +460,7 @@ $('remember').onchange = profileFields;
 $('auth-password').onclick = () => setAuth('password');
 $('auth-key').onclick = () => setAuth('key');
 for (const id of ['new', 'empty-new', 'session-new', 'home-new']) $(id).onclick = () => openForm();
-$('back').onclick = () => navigate('home');
+$('back').onclick = () => navigate(page === 'cagent' ? 'extensions' : 'home');
 window.mobileBack = () => {
   if(desktop.visible){desktop.close();return true;}
   if (document.body.classList.contains('minimal')) {
@@ -459,7 +469,7 @@ window.mobileBack = () => {
     return true;
   }
   if (page !== 'home') {
-    navigate('home');
+    navigate(page === 'cagent' ? 'extensions' : 'home');
     return true;
   }
   return false;
@@ -572,9 +582,25 @@ form.onsubmit = (e) => {
   select(id);
   window.CShellNative.connect(JSON.stringify({ ...p, ...credentials, id, port: Number(p.port) }));
 };
+function updateAgentDesktopEntry(id: string) {
+  const session=sessions.get(id),status=desktopStatus.get(id);
+  const picker=session?.element.querySelector('.agent-environments');
+  if(!session||!picker)return;
+  picker.querySelector('.agent-desktop-entry')?.remove();
+  session.element.querySelector('.agent-desktop-shortcut')?.remove();
+  const entry=document.createElement('div');entry.className='agent-desktop-entry';
+  if(status?.packageReady){
+    const button=document.createElement('button');button.textContent='远程桌面';button.disabled=!status.viewAllowed;
+    button.onclick=()=>desktop.open(id,status);entry.append(button);
+    if(status.viewAllowed){const shortcut=document.createElement('button');shortcut.className='agent-desktop-shortcut';shortcut.textContent='远程桌面';shortcut.onclick=()=>desktop.open(id,status);session.element.append(shortcut);}
+    else{const note=document.createElement('p');note.className='muted caption';note.textContent='远程桌面尚不可用，请在被控设备开启屏幕共享并确认授权后重新连接。';entry.append(note);}
+  }else{const note=document.createElement('p');note.className='muted caption';note.textContent=status?'此设备尚未提供远程桌面。':'正在读取远程桌面状态…';entry.append(note);}
+  picker.insertBefore(entry,picker.children[2]||null);
+}
 window.receive = (id, type, value) => {
+  if (type === 'cagent-status') { receiveCAgent(value); return; }
   if(type.startsWith('desktop-')){
-    if(type==='desktop-status')try{desktopStatus.set(id,JSON.parse(value));}catch{}
+    if(type==='desktop-status')try{desktopStatus.set(id,JSON.parse(value));updateAgentDesktopEntry(id);}catch{}
     else desktop.event(id,type,value);
     return;
   }
@@ -608,9 +634,6 @@ window.receive = (id, type, value) => {
       const target = document.createElement('p');
       target.textContent = s.profile.name + ' · ' + s.profile.host;
       picker.append(title, target);
-      const status=desktopStatus.get(id);
-      if(status?.packageReady&&status.viewAllowed){const b=document.createElement('button');b.textContent='远程桌面';b.onclick=()=>desktop.open(id,status);picker.append(b);
-        const shortcut=document.createElement('button');shortcut.className='agent-desktop-shortcut';shortcut.textContent='远程桌面';shortcut.onclick=()=>desktop.open(id,status);s.element.append(shortcut);}
       choices.forEach((choice, index) => {
         const button = document.createElement('button');
         button.textContent = choice.distribution ? choice.distribution + ' · WSL' : choice.label;
@@ -622,7 +645,10 @@ window.receive = (id, type, value) => {
         };
         picker.append(button);
       });
+      s.element.querySelector('.agent-environments')?.remove();
       s.element.append(picker);
+      if (!choices.length) { const note=document.createElement('p');note.className='muted caption';note.textContent='此设备未提供终端，可使用已开放的远程桌面。';picker.append(note); }
+      updateAgentDesktopEntry(id);
       s.state = '已连接 CAgent';
     } catch {
       s.state = '环境列表无效';
@@ -807,3 +833,95 @@ window.fileEvent = (json) => {
       requestFiles('list', filePaths.get(fileSession) || '.');
   }
 };
+
+type CAgentState = { supported?: boolean; enabled?: boolean; running?: boolean; sharing?: boolean; starting?: boolean; accessibilityEnabled?: boolean; port?: number; advertisedHost?: string; advertisedPort?: number; password?: string; error?: string };
+let cagentState: CAgentState = {};
+let cagentDraftDirty = false;
+const cagentInput = (id: string) => $(id) as HTMLInputElement;
+function cagentFeedback(message: string, error = false) {
+  $('cagent-feedback').textContent = message;
+  $('cagent-feedback').classList.toggle('error', error);
+}
+function renderCAgent(fill = false) {
+  const available = !!window.CShellNative?.cagentStatus && cagentState.supported !== false;
+  const enabled = available && !!cagentState.enabled;
+  cagentInput('cagent-enabled').checked = enabled;
+  cagentInput('cagent-enabled').disabled = !available;
+  ($('cagent-fields') as HTMLFieldSetElement).disabled = !enabled;
+  $('cagent-card-state').textContent = !available ? '不可用' : cagentState.sharing ? '共享中' : enabled ? '已启用' : '未启用';
+  $('cagent-status').textContent = !available ? '手机受控端需要 Android 10 或更新版本。' : cagentState.error || (cagentState.running ? '已监听 · ' + (cagentState.port || 24443) : enabled ? '已启用 · 等待启动' : '启用后可设置连接地址，按需共享此手机屏幕。');
+  $('cagent-status').classList.toggle('error', !!cagentState.error);
+  $('cagent-screen-state').textContent = cagentState.sharing ? '正在共享此手机屏幕' : cagentState.starting ? '等待 Android 屏幕共享授权' : '未共享';
+  $('cagent-access-state').textContent = cagentState.accessibilityEnabled ? '已开启 · 可接收远程操作' : '未开启 · 仅能观看画面';
+  $('cagent-start').hidden = !!cagentState.sharing;
+  ($('cagent-start') as HTMLButtonElement).disabled = !enabled || !!cagentState.starting || cagentDraftDirty;
+  $('cagent-stop').hidden = !cagentState.sharing && !cagentState.starting;
+  ($('cagent-access') as HTMLButtonElement).disabled = !enabled;
+  ($('cagent-copy') as HTMLButtonElement).disabled = !enabled || !cagentState.running || cagentDraftDirty;
+  if (fill || !cagentDraftDirty) {
+    cagentInput('cagent-port').value = String(cagentState.port || 24443);
+    cagentInput('cagent-public-port').value = cagentState.advertisedPort ? String(cagentState.advertisedPort) : '';
+    cagentInput('cagent-host').value = cagentState.advertisedHost || '';
+    cagentInput('cagent-password').value = cagentState.password || '';
+  }
+}
+function receiveCAgent(json: string) {
+  try {
+    const state = JSON.parse(json);
+    if (!state || typeof state !== 'object' || Array.isArray(state)) throw new Error('无效的 CAgent 状态');
+    cagentState = state;
+    renderCAgent();
+  } catch { cagentFeedback('无法读取 CAgent 状态，请重新打开扩展。', true); }
+}
+function refreshCAgent() {
+  try {
+    if (window.CShellNative?.cagentStatus) receiveCAgent(window.CShellNative.cagentStatus());
+    else renderCAgent();
+  } catch { cagentFeedback('无法读取 CAgent 状态，请重新打开扩展。', true); }
+}
+function configureCAgent(config: Record<string, unknown>): boolean {
+  try {
+    if (!window.CShellNative.cagentConfigure) throw new Error('此版本未提供 CAgent');
+    const state = JSON.parse(window.CShellNative.cagentConfigure(JSON.stringify(config))) as CAgentState;
+    cagentState = state;
+    if (state.error) { renderCAgent(); cagentFeedback(state.error, true); return false; }
+    renderCAgent();
+    return true;
+  } catch (error) { cagentFeedback(error instanceof Error ? error.message : '设置未保存', true); renderCAgent(); return false; }
+}
+$('cagent-open').onclick = () => navigate('cagent');
+$('cagent-enabled').onchange = () => {
+  const enabled = cagentInput('cagent-enabled').checked;
+  if (configureCAgent({ enabled })) cagentFeedback(enabled ? '已启用。保存连接设置后可开始共享。' : '已停用，远程连接已停止。');
+};
+$('cagent-config').oninput = () => { cagentDraftDirty = true; renderCAgent(); cagentFeedback('设置未保存'); };
+$('cagent-config').onsubmit = (event) => {
+  event.preventDefault();
+  const config = {
+    port: Number(cagentInput('cagent-port').value),
+    advertisedPort: Number(cagentInput('cagent-public-port').value) || 0,
+    advertisedHost: cagentInput('cagent-host').value.trim(),
+    password: cagentInput('cagent-password').value,
+  };
+  if (configureCAgent(config)) { cagentDraftDirty = false; renderCAgent(true); cagentFeedback('已保存'); }
+};
+$('cagent-password-toggle').onclick = () => {
+  const field = cagentInput('cagent-password');
+  const show = field.type === 'password';
+  field.type = show ? 'text' : 'password';
+  $('cagent-password-toggle').textContent = show ? '隐藏' : '显示';
+  $('cagent-password-toggle').setAttribute('aria-label', show ? '隐藏连接密码' : '显示连接密码');
+  $('cagent-password-toggle').setAttribute('aria-pressed', String(show));
+};
+for (const [id, action] of [
+  ['cagent-start', () => window.CShellNative.cagentStart?.()],
+  ['cagent-stop', () => window.CShellNative.cagentStop?.()],
+  ['cagent-access', () => window.CShellNative.cagentAccessibility?.()],
+  ['cagent-copy', () => window.CShellNative.cagentCopyConnection?.()],
+] as const) $(id).onclick = () => {
+  try { action(); refreshCAgent(); if (!cagentState.error) cagentFeedback(id === 'cagent-copy' ? '已复制连接信息，不包含密码' : ''); }
+  catch (error) { cagentFeedback(error instanceof Error ? error.message : '操作未完成', true); }
+};
+window.addEventListener('focus', () => { if (page === 'cagent') refreshCAgent(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && page === 'cagent') refreshCAgent(); });
+window.addEventListener('cagent-status', ((event: CustomEvent) => receiveCAgent(typeof event.detail === 'string' ? event.detail : JSON.stringify(event.detail))) as EventListener);

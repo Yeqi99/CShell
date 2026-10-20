@@ -88,6 +88,36 @@ try {
   )
     throw new Error(safeReport);
   console.log(safeReport);
+  for (const [mode, expected] of [
+    ['hostMode', 'OK (Android host'],
+    ['captureMode', 'PASS real Android system screen-sharing'],
+  ]) {
+    const hostReport = await adb([
+      'shell', 'am', 'instrument', '-w', '-e', mode, 'true',
+      'org.canpshell.mobile.test/org.canpshell.mobile.AgentProtocolTest',
+    ]);
+    await writeFile(`test-results/android-${mode}.txt`, hostReport);
+    if (!hostReport.includes(expected) ||
+        /FAILURES!!!|INSTRUMENTATION_FAILED|Process crashed/.test(hostReport))
+      throw new Error(`Android ${mode} failed: ${hostReport}`);
+    console.log(hostReport);
+    if (mode === 'hostMode') {
+      await new Promise<void>((resolve, reject) => {
+        const check = spawn(process.execPath, [
+          '--import', 'tsx', 'scripts/android-host-node-interop.ts',
+        ], { stdio: 'inherit' });
+        const timer = setTimeout(() => {
+          check.kill();
+          reject(new Error('Android host interoperability test timed out'));
+        }, 180_000);
+        check.once('error', error => { clearTimeout(timer); reject(error); });
+        check.once('close', code => {
+          clearTimeout(timer);
+          code === 0 ? resolve() : reject(new Error(`Android host interoperability failed (${code})`));
+        });
+      });
+    }
+  }
   if (process.env.CSHELL_ANDROID_RELEASE_DIR) {
     const releases = (await readdir(process.env.CSHELL_ANDROID_RELEASE_DIR)).filter((name) =>
       name.endsWith('.apk'),

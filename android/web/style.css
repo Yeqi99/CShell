@@ -773,3 +773,27 @@ body.minimal #terminal-tools {
 .agent-desktop-shortcut{position:absolute;right:12px;top:8px;z-index:2}
 
 .mobile-desktop .desktop-presets{display:flex;flex-wrap:wrap;gap:6px}.mobile-desktop .desktop-presets button[aria-pressed="true"]{color:var(--accent,#246cff);background:var(--hover,#e5edf8)}
+
+/* The host extension uses the same mobile work area, never a separate application. */
+.extension-card{width:100%;display:flex;gap:12px;padding:16px;text-align:left;min-width:0;background:var(--surface);border-color:transparent}
+.extension-icon{color:var(--accent);flex:none}
+.extension-description{display:flex;flex:1;min-width:0;flex-direction:column;gap:5px}
+.extension-description small{color:var(--muted);font-weight:400;line-height:1.5}
+#cagent-card-state{font-size:12px;flex:none}
+#cagent fieldset{border:0;padding:0;margin:0;min-width:0}
+#cagent .page-heading{margin-bottom:12px}
+#cagent .cagent-toggle{display:flex;flex-direction:row;align-items:center;gap:8px;margin:0;white-space:nowrap}
+#cagent .cagent-toggle input{width:20px;height:20px;min-height:0;margin:0;accent-color:var(--accent)}
+#cagent-status{padding:12px 14px;background:var(--surface);border-radius:10px;line-height:1.6;overflow-wrap:anywhere;font-size:13px}
+.cagent-port-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.cagent-port-row>*{min-width:0}
+#cagent input{min-width:0}
+.cagent-password{display:flex;align-items:center;gap:6px}
+.cagent-password input{flex:1;margin:0}
+.cagent-password button{flex:none;padding:0 10px;border:0;background:var(--surface)}
+.cagent-actions{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 20px}
+.cagent-actions button{padding:0 12px}
+.cagent-permissions .setting-row{gap:12px;padding:14px 0}
+.cagent-permissions .setting-row>div{flex:1;min-width:0}
+.cagent-permissions .setting-row button{flex:none;padding:0 12px}
+#cagent-feedback{font-size:13px;line-height:1.6;overflow-wrap:anywhere;min-height:21px}
