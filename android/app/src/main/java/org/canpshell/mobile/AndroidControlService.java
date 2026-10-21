@@ -26,7 +26,9 @@ public final class AndroidControlService extends AccessibilityService {
   private volatile boolean editBusy;
   private boolean shiftLeft,shiftRight,control,alt,caps;
   private static volatile String lastEditState="none";
-  static String editState(){return lastEditState;}
+  private volatile long processed;
+  private volatile String phase="idle";
+  static String editState(){AndroidControlService s=instance;return lastEditState+(s==null?", disconnected":", processed="+s.processed+", phase="+s.phase+", editing="+s.editBusy);}
   static boolean isEditing(){AndroidControlService s=instance;return s!=null&&s.editBusy;}
   @Override protected void onServiceConnected(){inputThread=new android.os.HandlerThread("cagent-accessibility-input");inputThread.start();inputHandler=new Handler(inputThread.getLooper());instance=this;AndroidAgentService.changed(this);}
   @Override public void onAccessibilityEvent(AccessibilityEvent event){}
@@ -62,6 +64,7 @@ public final class AndroidControlService extends AccessibilityService {
   }
   private static float normalized(double value){if(!Double.isFinite(value)||value<0||value>1)throw new IllegalArgumentException("Invalid pointer coordinate");return (float)value;}
   private void apply(JSONObject value){
+    processed++;phase=value.optString("kind");
     try {
       switch(value.optString("kind")){
         case "move":
@@ -90,7 +93,7 @@ public final class AndroidControlService extends AccessibilityService {
           else if(action.equals("recents"))performGlobalAction(GLOBAL_ACTION_RECENTS);
           break;
       }
-    }catch(Exception error){lastEditState="input-error:"+error.getClass().getSimpleName();reset();}
+    }catch(Exception error){lastEditState="input-error:"+error.getClass().getSimpleName();reset();}finally{phase="idle";}
   }
   private void key(int code,boolean down){
     if(code==42){shiftLeft=down;return;}if(code==54){shiftRight=down;return;}
