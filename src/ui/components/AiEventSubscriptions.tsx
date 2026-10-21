@@ -131,11 +131,11 @@ export function AiEventSubscriptions(props: AiEventSubscriptionsProps) {
           {sources.some((s) => s.available) && props.onStartSubscription && (
             <details className="event-listener">
               <summary>
-                微信消息监听 · {subscriptions.length} 个订阅
+                微信事件监听 · {subscriptions.length} 个订阅
               </summary>
               <div className="event-options">
                 <p className="ai-section-note">
-                  触发规则使用插件推送的事件。监听到期后停止接收，启用规则不会自动开启监听。
+                  消息、转账和红包共用已授权的聊天监听。监听到期后停止接收，启用规则不会自动开启监听。
                 </p>
                 <label>监听机器<select aria-label="监听机器" value={listenSource} onChange={e=>setListenSource(e.target.value)}>
                   {!sources.some(s=>s.id===listenSource&&s.available)&&<option value={listenSource}>请选择可用机器</option>}
@@ -179,11 +179,11 @@ export function AiEventSubscriptions(props: AiEventSubscriptionsProps) {
                         leaseSeconds,
                       });
                       await props.onRefresh();
-                      setNotice('消息监听已开启。请在规则中选择来源订阅。');
+                      setNotice('微信事件监听已开启。请在规则中选择事件类型和来源订阅。');
                     })
                   }
                 >
-                  开启消息监听
+                  开启事件监听
                 </button>
                 <p className="ai-section-note">只能监听已授权接收的聊天，不会修改微信权限。</p>
               </div>
@@ -265,6 +265,7 @@ export function AiEventSubscriptions(props: AiEventSubscriptionsProps) {
               <label>
                 事件源
                 <select
+                  aria-label="事件源"
                   value={draft.source}
                   onChange={(e) => {
                     const s = sources.find((s) => s.id === e.target.value);
@@ -288,6 +289,7 @@ export function AiEventSubscriptions(props: AiEventSubscriptionsProps) {
               <label>
                 触发事件
                 <select
+                  aria-label="触发事件"
                   value={draft.eventType}
                   onChange={(e) => patch({ eventType: e.target.value })}
                 >
@@ -301,6 +303,9 @@ export function AiEventSubscriptions(props: AiEventSubscriptionsProps) {
                   ))}
                 </select>
               </label>
+              {['transfer.received', 'red_packet.received'].includes(draft.eventType) && (
+                <p className="ai-section-note">收到转账或红包通知时触发；金额未知时保持为空，事件不代表已领取。需要微信工具包 0.1.5；远端请升级 CAgent 至 0.7.3。</p>
+              )}
               <label>
                 来源订阅
                 <select

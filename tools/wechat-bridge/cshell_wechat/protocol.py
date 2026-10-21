@@ -2,6 +2,7 @@
 import re
 import xml.etree.ElementTree as ET
 from .contracts import require, normalize
+from .payment_card import transfer_card
 
 def decode(params):
     raw=params.get('message')
@@ -24,6 +25,20 @@ def decode(params):
     result['format']='xml';result['xmlRoot']=root.tag
     app=root if root.tag=='appmsg' else root.find('appmsg')
     if app is not None:
+        # Payment events come only from native app messages. Text that happens
+        # to contain payment XML is not a payment notification.
+        native_type=result.get('nativeType')
+        if type(native_type) is int and native_type & 0xffffffff == 49:
+            payment=transfer_card(app)
+            if payment is not None:
+                result['payment']={key:payment.get(key) for key in
+                    ('kind','messageState','amountMinor','currency','paymentReference','settlementStatus')}
+                result['format']='payment-card'
+                result['text']=None
+                result['liveFormatVerified']=False
+                # Do not persist raw XML, URLs, tickets, memo or embedded
+                # reference text in the live journal or send them to models.
+                return result
         result['appMessage']={k:app.findtext(k) for k in ('type','title','des','url') if app.find(k) is not None}
         attachment=app.find('appattach')
         if attachment is not None:

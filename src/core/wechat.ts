@@ -8,6 +8,7 @@ import { WechatSubscriptions } from './wechat-subscriptions';
 import type { Store } from './store';
 import type { ConnectionTool } from './connections/contracts';
 import { pluginEnabled } from '../shared/plugins';
+import { wechatEventTypes } from '../shared/wechat-events';
 import { emptyWechatConfig,wechatConfigSchema,wechatTargetSchema,wechatFriendSchema,parseWechatConfig } from '../shared/wechat';
 
 export class WechatService {
@@ -73,7 +74,7 @@ export class WechatService {
   eventSource(){
     if(process.platform!=='win32'||!this.isEnabled())return null;
     const available=this.config.enabled&&this.config.experimental&&!!this.binding;
-    return {id:'wechat',name:'微信',eventTypes:[{id:'message.received',name:'收到消息'}],available,...(!available?{reason:'请先在微信扩展中绑定进程并开启接收授权'}:{})};
+    return {id:'wechat',name:'微信',eventTypes:wechatEventTypes(),available,...(!available?{reason:'请先在微信扩展中绑定进程并开启接收授权'}:{})};
   }
   eventAuthorized(subscriptionId:string,accountId:string,conversationId:string){
     try{

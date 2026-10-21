@@ -126,6 +126,10 @@ CShell 的 `wechat_recent_conversations` 需要单独勾选“允许读取最近
 CShell 工具 `wechat_moments` 对应后端 `moments`，要求独立 `readMoments` 授权。每页 1–5 条，`cursor` 使用上一页 `nextCursor`。无需打开朋友圈页面。返回正文、作者 ID、媒体元数据以及本页 observed/updated 变化；缓存最多 1000 条，账号隔离、重启保留。源 XML 超过 8192 字节明确省略，格式未知不猜测。无媒体下载、服务端刷新或发布。不能将本地缓存视为完整或最新朋友圈，不能从分页缺失推断删除；原生 signed tid 排序不保证时间顺序。详情见仓库 docs/WECHAT-MOMENTS-RESEARCH.md。
 
 
+## 0.1.5：转账与红包订阅元数据
+
+实时订阅可识别转账和红包通知，携带安全的 `payment` 元数据；CShell 0.7.3 可将其映射为独立事件规则，本机和远端 CAgent 使用相同协议。通知不代表领取或到账，红包金额保持未知。支付卡原始 XML、原生 URL 和票据不会写入实时订阅事件。参见仓库 `docs/WECHAT-PAYMENT-EVENTS.md`。
+
 ## 0.1.4：原生纯文字朋友圈发布
 
 新增 momentsPublishProtocolVersion=1 与 moments_publish；CShell 工具名 wechat_publish_moment。必须单独开启 publishMoments，且通过智能体 wechat.send 授权；聊天发送通配符不会启用朋友圈发布。

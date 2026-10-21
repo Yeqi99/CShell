@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { AiEventService } from '../core/ai-events';
 import { aiEventTools } from '../core/ai-event-tools';
-import { wechatAiEvent } from '../core/wechat-ai-events';
+import { wechatAiEvents } from '../core/wechat-ai-events';
 import { aiEventRuleSchema } from '../shared/ai-events';
 import { RemoteWechatEvents } from '../core/remote-wechat-events';
 import { readFile, writeFile, rename } from 'node:fs/promises';
@@ -73,10 +73,10 @@ export async function registerAiHandlers(
   await remoteEvents.init();
   let ingress=0,eventError='';
   if(wechat)wechat.subscriptions.onMessage=notification=>{
-    const event=wechatAiEvent(notification);if(!event)return;
+    const incoming=wechatAiEvents(notification);if(!incoming.length)return;
     if(ingress>=64){eventError='消息突发超过入口容量，部分事件未触发';return;}
     ingress++;
-    void events.ingest(event).catch(()=>{eventError='事件处理失败，请检查订阅状态';}).finally(()=>{ingress--;});
+    void (async()=>{for(const event of incoming)await events.ingest(event);})().catch(()=>{eventError='事件处理失败，请检查订阅状态';}).finally(()=>{ingress--;});
   };
   const revalidate=setInterval(()=>{void remoteEvents.tick().catch(()=>{eventError='远端事件读取失败';});void events.revalidate().catch(()=>{eventError='事件调度不可用';});},1000);
   const listenerAbort=new AbortController();

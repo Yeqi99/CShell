@@ -8,6 +8,7 @@ import {capabilityDigest} from '../src/agent/capability-catalog';
 import {CapabilityRuntime} from '../src/agent/capability-runtime';
 import {ClientVault} from '../src/core/client/identity';
 import type {AgentApplicationService} from '../src/agent/applications';
+import {agentCapabilityManifestSchema} from '../src/shared/agent-capability-packages';
 
 test('target WeChat is unavailable until installed, configured and granted; revocation and tampering stop tools', {skip:process.platform!=='win32'},async()=>{
  const directory=await mkdtemp(join(tmpdir(),'cagent-wechat-')),runtime=join(directory,'runtime');
@@ -17,6 +18,9 @@ test('target WeChat is unavailable until installed, configured and granted; revo
  await writeFile(join(runtime,'files.json'),JSON.stringify(Object.fromEntries(Object.entries(files).map(([name,value])=>[name,capabilityDigest(value)]))));
  let authorized=true;
  const capability=await createWechatCapability({directory,runtime,authorize:owner=>authorized&&owner==='controller-a'});
+ const manifest=agentCapabilityManifestSchema.parse(JSON.parse(JSON.parse(capability.extraPackages[0].entry.bundle!).manifest));
+ assert.deepEqual(manifest.events.map(event=>event.id),['message.received','transfer.received','red_packet.received']);
+ assert(manifest.events.every(event=>event.permissions.length===1&&event.permissions[0]==='wechat.read'));
  const vault=new ClientVault(directory,{encrypt:async value=>Buffer.from(value).toString('base64'),decrypt:async value=>Buffer.from(value,'base64').toString()});
  const packages=new CapabilityRuntime({directory,vault,applications:{} as AgentApplicationService,agentVersion:'0.6.32',extraPackages:capability.extraPackages});
  try{

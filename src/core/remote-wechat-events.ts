@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
+import { wechatEventTypes } from '../shared/wechat-events';
 import { z } from 'zod';
-import { wechatAiEvent } from './wechat-ai-events';
+import { wechatAiEvents } from './wechat-ai-events';
 import type { AiEventSource, AiPluginEvent } from '../shared/ai-events';
 import type { AgentCall } from '../shared/agent';
 
@@ -19,7 +20,7 @@ export class RemoteWechatEvents {
   constructor(private host:{targets():RemoteEventTarget[];ingest(event:AiPluginEvent):Promise<unknown>;load():Promise<Record<string,string>>;save(cursors:Record<string,string>):Promise<void>}){}
   async init(){this.cursors=z.record(z.string().max(256),z.string().max(100)).parse(await this.host.load());if(Object.keys(this.cursors).length>512)throw new Error('远端事件游标数量超过限制');}
   private live(source:string){if(this.closed)return undefined;const state=this.states.get(source);return state&&this.host.targets().some(t=>t.sessionId===state.target.sessionId&&t.identity===state.target.identity)?state:undefined;}
-  sources():AiEventSource[]{return this.host.targets().map(target=>{const id=remoteWechatSource(target.identity),state=this.live(id);return {id,name:`微信 · ${target.label}`,eventTypes:[{id:'message.received',name:'收到消息'}],available:!!state&&!state.error&&Date.now()-state.checked<10000,...((state?.error||state?.warning)?{reason:state.error||state.warning}:{})};});}
+  sources():AiEventSource[]{return this.host.targets().map(target=>{const id=remoteWechatSource(target.identity),state=this.live(id);return {id,name:`微信 · ${target.label}`,eventTypes:wechatEventTypes(),available:!!state&&!state.error&&Date.now()-state.checked<10000,...((state?.error||state?.warning)?{reason:state.error||state.warning}:{})};});}
   subscriptions(){return [...this.states.keys()].flatMap(source=>{const state=this.live(source);return state&&!state.error?state.items.filter(s=>s.state==='listening').map(s=>({id:s.id,source,name:`${state.target.label} · ${s.targets.join(', ')}`})):[];});}
   session(source:string){return this.live(source)?.target.sessionId;}
   authorized(source:string,id:string,account:string,conversation:string){const state=this.live(source),item=state?.items.find(s=>s.id===id);return !!state&&!state.error&&Date.now()-state.checked<10000&&item?.state==='listening'&&item.accountId===account&&(item.targets.includes('*')||item.targets.includes(conversation));}
@@ -48,8 +49,8 @@ export class RemoteWechatEvents {
             if(page.gap)state.warning='消息队列存在缺口；已保留消息继续处理，缺失消息不会补造';
             for(const raw of page.events){
               if(!this.live(source))throw new Error('连接已改变');signal.throwIfAborted();
-              const event=wechatAiEvent({id:item.id,accountId:item.accountId,event:raw});
-              if(event&&(item.targets.includes('*')||item.targets.includes(event.conversationId)))await this.host.ingest({...event,source});
+              const incoming=wechatAiEvents({id:item.id,accountId:item.accountId,event:raw});
+              for(const event of incoming)if(item.targets.includes('*')||item.targets.includes(event.conversationId))await this.host.ingest({...event,source});
             }
             this.cursors[key]=page.nextCursor;
             this.writes=this.writes.then(()=>this.host.save({...this.cursors})).catch(error=>{this.closed=true;this.abort.abort();throw error;});await this.writes;

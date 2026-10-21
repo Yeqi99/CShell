@@ -12,8 +12,8 @@ await build({
   stdin: {
     contents: `
 import React,{useState} from 'react';import{createRoot}from'react-dom/client';
-import{AiEventSubscriptions}from'./src/ui/components/AiEventSubscriptions';
-function Fixture(){const[rules,setRules]=useState([]);const[hidden,setHidden]=useState(false);const[fail,setFail]=useState(false);const[available,setAvailable]=useState(true);return <><button onClick={()=>setHidden(!hidden)}>切换页面</button><button onClick={()=>setFail(!fail)}>切换保存故障</button><button onClick={()=>setAvailable(!available)}>切换来源</button><div hidden={hidden}><AiEventSubscriptions rules={rules} sources={available?[{id:'wechat',name:'微信',available:true,eventTypes:[{id:'message',name:'收到消息'}]},{id:'wechat.remote.fixture',name:'微信 · 测试服务器',available:true,eventTypes:[{id:'message.received',name:'收到消息'}]}]:[]} runs={[]} threads={[{id:'11111111-1111-4111-8111-111111111111',title:'测试会话',providerId:'p'}]} onSave={async r=>{if(fail)throw Error('保存失败：测试故障');setRules(old=>[...old.filter(x=>x.id!==r.id),r]);return r}} onRemove={async id=>setRules(old=>old.filter(r=>r.id!==id))} onRefresh={async()=>{}} onOpenThread={()=>{}} onStartSubscription={async input=>{window.listenerInput=input}}/></div></>};createRoot(document.getElementById('root')).render(<Fixture/>);`,
+import{AiEventSubscriptions}from'./src/ui/components/AiEventSubscriptions';import{wechatEventTypes}from'./src/shared/wechat-events';
+function Fixture(){const[rules,setRules]=useState([]);const[hidden,setHidden]=useState(false);const[fail,setFail]=useState(false);const[available,setAvailable]=useState(true);return <><button onClick={()=>setHidden(!hidden)}>切换页面</button><button onClick={()=>setFail(!fail)}>切换保存故障</button><button onClick={()=>setAvailable(!available)}>切换来源</button><div hidden={hidden}><AiEventSubscriptions rules={rules} sources={available?[{id:'wechat',name:'微信',available:true,eventTypes:wechatEventTypes()},{id:'wechat.remote.fixture',name:'微信 · 测试服务器',available:true,eventTypes:wechatEventTypes()}]:[]} runs={[]} threads={[{id:'11111111-1111-4111-8111-111111111111',title:'测试会话',providerId:'p'}]} onSave={async r=>{if(fail)throw Error('保存失败：测试故障');setRules(old=>[...old.filter(x=>x.id!==r.id),r]);return r}} onRemove={async id=>setRules(old=>old.filter(r=>r.id!==id))} onRefresh={async()=>{}} onOpenThread={()=>{}} onStartSubscription={async input=>{window.listenerInput=input}}/></div></>};createRoot(document.getElementById('root')).render(<Fixture/>);`,
     resolveDir: process.cwd(),
     loader: 'tsx',
   },
@@ -42,12 +42,18 @@ try {
   page.setDefaultTimeout(10000);
   page.on('pageerror', (error) => console.error(error.message));
   await page.goto(`http://127.0.0.1:${(server.address() as { port: number }).port}`);
-  await page.getByText('微信消息监听 · 0 个订阅', {exact:true}).click();
+  await page.getByText('微信事件监听 · 0 个订阅', {exact:true}).click();
   await page.getByLabel('监听机器', {exact:true}).selectOption('wechat.remote.fixture');
   await page.getByLabel('监听聊天内部 ID（每行一个）', {exact:true}).fill('filehelper');
-  await page.getByRole('button', {name:'开启消息监听',exact:true}).click();
+  await page.getByRole('button', {name:'开启事件监听',exact:true}).click();
   assert.deepEqual(await page.evaluate(()=>(window as any).listenerInput),{source:'wechat.remote.fixture',targets:['filehelper'],leaseSeconds:1200});
   await page.getByRole('button', { name: '新建事件订阅', exact: true }).click();
+  await page.getByLabel('触发事件', {exact:true}).waitFor();
+  assert.deepEqual(await page.getByLabel('触发事件', {exact:true}).locator('option').allTextContents(), ['收到消息', '收到转账', '收到红包']);
+  await page.getByLabel('触发事件', {exact:true}).selectOption('transfer.received');
+  await page.getByText('收到转账或红包通知时触发；金额未知时保持为空，事件不代表已领取。需要微信工具包 0.1.5；远端请升级 CAgent 至 0.7.3。', {exact:true}).waitFor();
+  await page.getByLabel('事件源', {exact:true}).selectOption('wechat.remote.fixture');
+  await page.getByLabel('触发事件', {exact:true}).selectOption('red_packet.received');
   assert.equal(await page.getByLabel('启用此订阅（保存后生效）').isChecked(), false);
   await page.getByText('频率与预算', { exact: true }).click();
   assert.equal(await page.getByLabel('每次预留 token', { exact: true }).inputValue(), '32768');
@@ -89,6 +95,7 @@ try {
         passed: true,
         checks: [
           'new-disabled',
+          'local-and-remote-payment-event-selection',
           'draft-preserved-across-page-and-rule-switch',
           'save-error-retains-draft',
           'enabled-only-after-save',

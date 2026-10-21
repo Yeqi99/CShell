@@ -27,7 +27,7 @@ export const agentCapabilityManifestSchema = z.object({
   files: z.array(z.object({ path: relativeFile, sha256: z.string().regex(/^[a-f0-9]{64}$/), bytes: z.number().int().min(0).max(2 ** 31) }).strict()).min(1).max(128),
   permissions: z.array(name).max(64),
   tools: z.array(z.object({ id: callableName, description: z.string().min(1).max(1000), inputSchema: schema, outputSchema: schema, permissions: z.array(name).max(64), sideEffect: z.boolean() }).strict()).max(100),
-  events: z.array(z.object({ id: name, description: z.string().min(1).max(1000), payloadSchema: schema, permissions: z.array(name).max(64) }).strict()).max(100).default([]),
+  events: z.array(z.object({ id: callableName, description: z.string().min(1).max(1000), payloadSchema: schema, permissions: z.array(name).max(64) }).strict()).max(100).default([]),
 }).strict().superRefine((manifest, ctx) => {
   const prefix = `${manifest.source.repository}/releases/download/${manifest.source.releaseTag}/`;
   if (!manifest.source.assetUrl.startsWith(prefix) || !/^[A-Za-z0-9_.-]+$/.test(manifest.source.assetUrl.slice(prefix.length))) ctx.addIssue({ code: 'custom', path: ['source', 'assetUrl'], message: 'Asset must belong to this exact GitHub repository and release' });

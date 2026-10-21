@@ -41,3 +41,18 @@ test('cursor storage failure fails closed instead of advancing an unpersisted ch
  await service.init();await service.tick();const count=f.calls.length;await service.tick();assert.equal(f.calls.length,count);
  assert.equal(service.authorized(remoteWechatSource(f.target.identity),f.id,'wxid_owner','filehelper'),false);
 });
+
+test('remote payment notifications share authorized source and advance cursor only after both event types',async()=>{
+ const f=fixture(),original=f.target.call;let complete=false;
+ f.target.call=async(call,signal)=>{
+  if((call.params as any).toolId!=='wechat_events')return original(call,signal);
+  return {events:complete?[]:[{kind:'message',messageId:'42',senderId:'filehelper',recipientId:'wxid_owner',conversationId:'filehelper',conversationType:'private',nativeType:49,timestampRaw:'1792241000',format:'payment-card',text:null,
+   payment:{kind:'red_packet',messageState:'red_packet_notice',paymentReference:'b'.repeat(64),amountMinor:null,currency:null,settlementStatus:'unverified'}}],nextCursor:'payment-cursor',gap:false,listenerState:'listening'};
+ };
+ await f.service.init();await f.service.tick();
+ assert.deepEqual(f.events.map(e=>e.type),['message.received','red_packet.received']);
+ assert(f.events.every(e=>e.source===remoteWechatSource(f.target.identity)&&e.subscriptionId===f.id));
+ assert.equal(Object.values(f.getSaved())[0],'payment-cursor');
+ assert(f.service.sources()[0].eventTypes.some(t=>t.id==='transfer.received'));
+ complete=true;await f.service.tick();assert.equal(f.events.length,2);await f.service.close();
+});
