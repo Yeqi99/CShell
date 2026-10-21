@@ -24,37 +24,44 @@ final class AndroidCaptureTest {
     int port;try(java.net.ServerSocket reserve=new java.net.ServerSocket(0)){port=reserve.getLocalPort();}
     MainActivity activity=null;
     AndroidInputTest inputFixture=null;
-    AtomicReference<android.animation.ValueAnimator> animation=new AtomicReference<>();
+    android.os.Handler compositor=new android.os.Handler(android.os.Looper.getMainLooper());
+    AtomicInteger markerUpdates=new AtomicInteger();
     AtomicReference<android.view.View> marker=new AtomicReference<>();
     try {
       context.stopService(new Intent(context,AndroidAgentService.class));Thread.sleep(300);
       AndroidAgentSettings.update(context,new JSONObject().put("enabled",true).put("port",port).put("password",password).put("advertisedHost","127.0.0.1").put("advertisedPort",port));
       activity=(MainActivity)test.startActivitySync(new Intent(context,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
       MainActivity app=activity;
-      test.runOnMainSync(()->app.new Bridge().cagentStart());
+      test.runOnMainSync(()->{app.getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);app.new Bridge().cagentStart();});
       approveProjection(test);
       long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(20);
-      while(!AndroidAgentService.status(context).optBoolean("running")&&System.nanoTime()<deadline){Thread.sleep(100);String error=AndroidAgentService.status(context).optString("error");check(error.isEmpty(),error);}
-      check(AndroidAgentService.status(context).optBoolean("running"),"Screen-sharing service did not start");
+      while((!AndroidAgentService.status(context).optBoolean("running")||!AndroidAgentService.status(context).optBoolean("sharing"))&&System.nanoTime()<deadline){Thread.sleep(100);String error=AndroidAgentService.status(context).optString("error");check(error.isEmpty(),error);}
+      check(AndroidAgentService.status(context).optBoolean("sharing"),"Screen-sharing service did not start: "+captureState(context));
+      check(AndroidAgentService.status(context).optBoolean("interactive")&&!AndroidAgentService.status(context).optBoolean("screenLocked"),"Capture fixture must be awake and unlocked: "+captureState(context));
       JSONObject invitation=AndroidAgentService.connection(context);
       // Produce genuine compositor changes instead of relying on an otherwise static home screen.
       test.runOnMainSync(()->{
         android.view.View square=new android.view.View(app);
         ((android.widget.FrameLayout)app.findViewById(android.R.id.content)).addView(square,new android.widget.FrameLayout.LayoutParams(64,64));
-        android.animation.ValueAnimator motion=android.animation.ValueAnimator.ofArgb(0xff0055ff,0xffff5500);
-        motion.setDuration(300);motion.setRepeatCount(android.animation.ValueAnimator.INFINITE);
-        motion.addUpdateListener(value->square.setBackgroundColor((Integer)value.getAnimatedValue()));
-        marker.set(square);animation.set(motion);motion.start();
+        marker.set(square);
+        // CI disables animator duration scaling. Drive real View invalidations directly;
+        // ValueAnimator would finish immediately and leave the compositor static there.
+        compositor.post(new Runnable(){public void run(){
+          square.setBackgroundColor((markerUpdates.incrementAndGet()&1)==0?0xff0055ff:0xffff5500);
+          compositor.postDelayed(this,100);
+        }});
       });
       inputFixture=new AndroidInputTest(test,app);inputFixture.awaitReady();
       StringBuilder result=new StringBuilder("PASS real Android system screen-sharing consent and foreground service\n");
       for(int attempt=0;attempt<2;attempt++){
         if(attempt==1){check(test.getUiAutomation(android.app.UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES).setRotation(android.app.UiAutomation.ROTATION_FREEZE_90),"Emulator rotation request failed");Thread.sleep(700);}
-        AtomicReference<Throwable> failure=new AtomicReference<>();AtomicInteger decoded=new AtomicInteger();AtomicBoolean pixels=new AtomicBoolean();AtomicInteger width=new AtomicInteger(),height=new AtomicInteger();CountDownLatch frames=new CountDownLatch(4);
+        AtomicReference<Throwable> failure=new AtomicReference<>();AtomicInteger decoded=new AtomicInteger(),received=new AtomicInteger(),formats=new AtomicInteger();AtomicBoolean pixels=new AtomicBoolean();AtomicInteger width=new AtomicInteger(),height=new AtomicInteger();CountDownLatch frames=new CountDownLatch(4);
+        final int markerStart=markerUpdates.get();
         AtomicReference<MediaCodec> decoder=new AtomicReference<>();final AgentConnection[] reference=new AgentConnection[1];
         reference[0]=new AgentConnection((type,value)->{
           try {
             if(type.equals("desktop-video")){
+              formats.incrementAndGet();
               JSONObject video=new JSONObject(value);check(video.getString("codec").startsWith("avc1."),"Missing actual AVC codec");
               width.set(video.getInt("width"));height.set(video.getInt("height"));
               MediaCodec old=decoder.getAndSet(null);if(old!=null){old.stop();old.release();}
@@ -62,6 +69,7 @@ final class AndroidCaptureTest {
               fresh.configure(MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC,width.get(),height.get()),null,null,0);fresh.start();decoder.set(fresh);
             }
             if(type.equals("desktop-frame")){
+              received.incrementAndGet();
               JSONObject frame=new JSONObject(value);byte[] data=Base64.decode(frame.getString("data"),Base64.DEFAULT);
               check(data.length>4&&data[0]==0&&data[1]==0,"Frame not Annex-B H264");
               MediaCodec current=decoder.get();check(current!=null,"Frame arrived before video metadata");
@@ -87,7 +95,7 @@ final class AndroidCaptureTest {
         try {
           reference[0].connect("127.0.0.1",port,attempt==0?password:"",certificate->{try{return java.util.Arrays.equals(certificate,java.security.cert.CertificateFactory.getInstance("X.509").generateCertificate(new java.io.ByteArrayInputStream(invitation.getString("certificate").getBytes(java.nio.charset.StandardCharsets.US_ASCII))).getEncoded());}catch(Exception e){return false;}});
           reference[0].desktop(new JSONObject().put("fps",attempt==0?24:15).put("bitrate",attempt==0?2_000_000:1_000_000).put("adaptive",false).put("display",0).put("width",attempt==0?480:320).put("height",attempt==0?800:534),attempt==0);
-          check(frames.await(25,TimeUnit.SECONDS),"No 4 decoded frames within 25 seconds");if(failure.get()!=null)throw new Exception(failure.get());
+          check(frames.await(25,TimeUnit.SECONDS),"No 4 decoded frames within 25 seconds; attempt="+(attempt+1)+", received="+received.get()+", decoded="+decoded.get()+", formats="+formats.get()+", markerUpdates="+(markerUpdates.get()-markerStart)+", size="+width.get()+"x"+height.get()+", "+captureState(context));if(failure.get()!=null)throw new Exception(failure.get());
           check(decoded.get()>=4,"Expected decoded pixel frames");check(pixels.get(),"Decoded screen contained no visible luma variation");check(width.get()>0&&height.get()>0,"Invalid video size");
           if(attempt==0)result.append(inputFixture.verify(reference[0]));
           if(attempt==1){check(width.get()<=320,"Quality reconfiguration did not change output size");check(width.get()>height.get(),"Rotation did not update capture aspect ratio");}
@@ -100,7 +108,12 @@ final class AndroidCaptureTest {
       check(!AndroidAgentService.status(context).optBoolean("running"),"Service still sharing after stop");
       boolean closed=false;for(int n=0;n<30;n++){try(java.net.Socket socket=new java.net.Socket()){socket.connect(new java.net.InetSocketAddress("127.0.0.1",port),100);}catch(java.io.IOException expected){closed=true;break;}Thread.sleep(100);}
       check(closed,"Listener still accepting after stop");return result.append("PASS sharing stop closes TCP listener\nOK (actual Android capture, H264 decode, same-consent reconnect, quality resize, stop)").toString();
-    }finally{context.stopService(new Intent(context,AndroidAgentService.class));if(inputFixture!=null)inputFixture.close();test.getUiAutomation(android.app.UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES).setRotation(android.app.UiAutomation.ROTATION_FREEZE_0);test.getUiAutomation(android.app.UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES).setRotation(android.app.UiAutomation.ROTATION_UNFREEZE);AndroidAgentSettings.update(context,previous);MainActivity app=activity;if(app!=null)test.runOnMainSync(()->{if(animation.get()!=null)animation.get().cancel();android.view.View square=marker.get();if(square!=null&&square.getParent() instanceof android.view.ViewGroup)((android.view.ViewGroup)square.getParent()).removeView(square);app.finish();});}
+    }finally{context.stopService(new Intent(context,AndroidAgentService.class));if(inputFixture!=null)inputFixture.close();test.getUiAutomation(android.app.UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES).setRotation(android.app.UiAutomation.ROTATION_FREEZE_0);test.getUiAutomation(android.app.UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES).setRotation(android.app.UiAutomation.ROTATION_UNFREEZE);AndroidAgentSettings.update(context,previous);MainActivity app=activity;if(app!=null)test.runOnMainSync(()->{compositor.removeCallbacksAndMessages(null);app.getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);android.view.View square=marker.get();if(square!=null&&square.getParent() instanceof android.view.ViewGroup)((android.view.ViewGroup)square.getParent()).removeView(square);app.finish();});}
+  }
+  private static String captureState(Context context){
+    // status also contains configuration: only expose bounded, non-secret diagnostics.
+    JSONObject state=AndroidAgentService.status(context);
+    return "running="+state.optBoolean("running")+", sharing="+state.optBoolean("sharing")+", interactive="+state.optBoolean("interactive")+", locked="+state.optBoolean("screenLocked")+", needsConsent="+state.optBoolean("needsProjectionConsent");
   }
   private static void approveProjection(Instrumentation test)throws Exception {
     long until=System.nanoTime()+TimeUnit.SECONDS.toNanos(15);

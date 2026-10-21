@@ -21,25 +21,50 @@ await new Promise<void>((r) => stalled.listen(0, '127.0.0.1', r));
 const port = (stalled.address() as { port: number }).port;
 const env = { ...process.env, CSHELL_TEST_DATA: data };
 delete env.ELECTRON_RUN_AS_NODE;
-const app = await electron.launch({
-  args: process.env.CSHELL_EXECUTABLE ? [] : ['.'],
-  ...(process.env.CSHELL_EXECUTABLE ? { executablePath: process.env.CSHELL_EXECUTABLE } : {}),
-  env,
-});
+let app: Awaited<ReturnType<typeof electron.launch>> | undefined;
+let currentStage = 'startup';
+const stage = (message: string) => { currentStage = message; console.log('[lifecycle '+new Date().toISOString()+'] '+message); };
+async function bounded<T>(label: string, operation: Promise<T>, milliseconds: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try { return await Promise.race([operation, new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(label+' exceeded '+milliseconds+' ms at '+currentStage)), milliseconds);
+  })]); } finally { clearTimeout(timer); }
+}
+const killIsolatedApp = () => {
+  const child = app?.process();
+  if (child && child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+};
+// The unreferenced watchdog also detects orphan handles after cleanup; it never targets a user instance.
+const watchdog = setTimeout(() => {
+  console.error('Lifecycle smoke exceeded 4 minutes at '+currentStage);
+  killIsolatedApp(); server.disconnectAll();
+  for (const socket of sockets) socket.destroy();
+  process.exit(1);
+}, 240000);
+watchdog.unref();
 async function settled(predicate: () => boolean) {
   for (let i = 0; i < 300; i++) {
     if (predicate()) return;
     await delay(10);
   }
-  assert.fail('Socket did not settle');
+  assert.fail('Socket did not settle at '+currentStage+'; stalled='+sockets.size+' SSH='+server.connectionsCount());
 }
 try {
-  const page = await app.firstWindow();
+  stage('launch isolated app');
+  app = await electron.launch({
+  args: process.env.CSHELL_EXECUTABLE ? [] : ['.'],
+  ...(process.env.CSHELL_EXECUTABLE ? { executablePath: process.env.CSHELL_EXECUTABLE } : {}),
+  env, timeout: 30000,
+});
+  const runningApp = app;
+  await bounded('Lifecycle scenario', (async () => {
+  const page = await runningApp.firstWindow();
   page.setDefaultTimeout(15000);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
+  stage('initial UI and temporary cancellation');
   await page.getByRole('heading', { name: '工作台', exact: true }).waitFor();
-  await app.evaluate(({ dialog }) => {
+  await runningApp.evaluate(({ dialog }) => {
     dialog.showMessageBox = (async () => ({ response: 1, checkboxChecked: false })) as any;
   });
   await page.getByRole('button', { name: '新建连接', exact: true }).first().click();
@@ -59,6 +84,7 @@ try {
   await mkdir('test-results', { recursive: true });
   await page.screenshot({ path: 'test-results/connection-cancel-light.png' });
 
+  stage('workspace switch and close pending editor');
   // Changing workspaces must not cancel the attempt; closing its tab must cancel it.
   await form.getByRole('button', { name: '连接', exact: true }).click();
   await settled(() => sockets.size === 1);
@@ -69,6 +95,7 @@ try {
   assert.equal(await page.locator('.session-tab').count(), 0);
   assert.equal(await page.locator('.toast').count(), 0);
 
+  stage('saved connection cancellation');
   // Saved connections must remain closeable while authentication is pending.
   const target = {
     id: randomUUID(),
@@ -94,6 +121,7 @@ try {
   await settled(() => sockets.size === 0);
   assert.equal(await page.locator('.session-tab').count(), 0);
 
+  stage('real terminal and retained scrollback');
   // Connect temporarily through the real form and type into the real terminal.
   await page.getByRole('button', { name: '新建连接', exact: true }).first().click();
   await page.getByRole('button', { name: 'SSH 终端', exact: true }).click();
@@ -135,6 +163,7 @@ try {
   assert.equal(config.profiles.length, 1);
   assert.equal(config.savedCredentials.length, 0);
   await page.locator(`.session-tab[data-session="${firstId}"]`).getByRole('button').first().click();
+  stage('old scrollback search and theme');
   // Search retained scrollback through xterm's actual search UI.
   await page.keyboard.press('Control+Shift+F');
   const search = page.locator('.terminal-search:visible input');
@@ -144,17 +173,33 @@ try {
   assert.equal((await terminal.locator('.xterm-selection div').count()) > 0, true);
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: '切换为深色', exact: true }).click();
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(900, 640));
+  await runningApp.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(900, 640));
   await page.screenshot({ path: 'test-results/connection-disconnected-dark.png' });
   assert.equal(await page.getByRole('dialog').count(), 0);
   assert.deepEqual(errors, []);
   console.log(
     'PASS: real desktop cancellation, close during connection, hidden attempt retained, scoped disconnect, temporary reconnect, old scrollback retained, no replay or secret persistence, light/dark compact layouts',
   );
+  })(), 180000);
+} catch (error) {
+  console.error('Lifecycle failed at '+currentStage+'; stalled='+sockets.size+' SSH='+server.connectionsCount());
+  await mkdir('test-results', {recursive:true});
+  const page = app?.windows()[0];
+  if (page) await bounded('Failure screenshot', page.screenshot({path:'test-results/connection-lifecycle-failure.png',timeout:5000}),6000).catch(e=>console.error(String(e)));
+  throw error;
 } finally {
-  await app.close();
-  await server.close();
+  stage('cleanup isolated app');
+  // Tear down fixture sockets before app quit so a stalled SSH handshake cannot delay shutdown.
+  server.disconnectAll();
   for (const socket of sockets) socket.destroy();
-  await new Promise<void>((r) => stalled.close(() => r()));
-  await rm(data, { recursive: true, force: true });
+  try { await bounded('Application close', app?.close() ?? Promise.resolve(), 10000); }
+  catch (error) { console.error(error); process.exitCode=1; killIsolatedApp(); }
+  stage('cleanup fixture');
+  try { await bounded('SSH fixture close', server.close(), 5000); }
+  catch (error) { console.error(error); process.exitCode=1; }
+  try { await bounded('Stalled server close', new Promise<void>(resolve=>stalled.close(()=>resolve())),5000); }
+  catch (error) { console.error(error); process.exitCode=1; }
+  try { await bounded('Test data cleanup', rm(data,{recursive:true,force:true,maxRetries:5}),10000); }
+  catch (error) { console.error(error); process.exitCode=1; }
+  stage('cleanup completed');
 }
