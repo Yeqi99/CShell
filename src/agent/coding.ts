@@ -307,11 +307,13 @@ export class CodingService {
     const candidates = [
       join(dirname(process.execPath), 'node_modules/npm/bin/npm-cli.js'),
       join(dirname(process.execPath), '../lib/node_modules/npm/bin/npm-cli.js'),
+      join(dirname(process.execPath), '../share/nodejs/npm/bin/npm-cli.js'),
       ...(process.env.PATH ?? '')
         .split(process.platform === 'win32' ? ';' : ':')
         .flatMap((p) => [
           join(p, 'node_modules/npm/bin/npm-cli.js'),
           join(p, '../lib/node_modules/npm/bin/npm-cli.js'),
+          join(p, '../share/nodejs/npm/bin/npm-cli.js'),
         ]),
     ];
     try {
