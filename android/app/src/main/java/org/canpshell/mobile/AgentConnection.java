@@ -30,6 +30,7 @@ final class AgentConnection implements AutoCloseable {
   private volatile boolean opened;
   private volatile DesktopTransport desktop;
   private String deviceId;
+  String browserIdentity(){return deviceId;}
   Object manage(String method, Object params)throws Exception { return requestValue("manage",new JSONObject().put("method",method).put("params",params)); }
   void desktop(JSONObject quality,boolean control)throws Exception {
     JSONObject ticket=(JSONObject)manage("desktop.open",new JSONObject().put("quality",quality).put("control",control).put("transport","management").put("mediaTransport","tcp"));
@@ -90,6 +91,11 @@ final class AgentConnection implements AutoCloseable {
     try { events.emit("desktop-status",manage("desktop.status",new JSONObject()).toString()); } catch(AgentDenied unavailable) { events.emit("desktop-status","{}"); }
     heartbeat.scheduleAtFixedRate(()->{try{request("ping",null);}catch(Exception e){fail(e);}},15,15,TimeUnit.SECONDS);
     events.emit("environments",environments.toString());
+    JSONObject apps=new JSONObject();
+    try{JSONObject browser=(JSONObject)manage("browser.status",new JSONObject());apps.put("browser",browser.optBoolean("available"));}catch(AgentDenied unavailable){}
+    try{JSONObject ide=(JSONObject)manage("ide.status",new JSONObject());apps.put("ide",ide.optBoolean("supported")||ide.optBoolean("ready"));}catch(AgentDenied unavailable){}
+    try{manage("coding.status",new JSONObject());apps.put("coding",true);}catch(AgentDenied unavailable){}
+    events.emit("machine-apps",apps.toString());
   }
   private static boolean contains(JSONArray values,String value)throws JSONException{for(int i=0;i<values.length();i++)if(value.equals(values.getString(i)))return true;return false;}
   synchronized void open(int index)throws Exception {
@@ -151,7 +157,7 @@ final class AgentConnection implements AutoCloseable {
     if(closed.get()||pending.size()>=64)throw new IOException("Agent 已断开或忙碌");String id=UUID.randomUUID().toString();CompletableFuture<JSONObject> future=new CompletableFuture<>();pending.put(id,future);
     try{
       write(id,op,payload);
-      JSONObject reply=future.get(15,TimeUnit.SECONDS);if(reply.has("error"))throw new AgentDenied(reply.optString("error"));return reply.get("result");
+      JSONObject reply=future.get(30,TimeUnit.SECONDS);if(reply.has("error"))throw new AgentDenied(reply.optString("error"));return reply.get("result");
     }catch(TimeoutException e){close();throw new IOException("Agent 请求超时，未重复执行");}finally{pending.remove(id);scheduleAcknowledgement();}
   }
   private void read(){try(InputStream in=new BufferedInputStream(socket.getInputStream())){

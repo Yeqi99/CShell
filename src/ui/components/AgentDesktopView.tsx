@@ -15,12 +15,18 @@ export function AgentDesktopView({
   canControl,
   onFiles,
   autoConnect = false,
+  visible = true,
+  embedded = false,
+  optionsOpen = false,
 }: {
   target: string;
   canView: boolean;
   canControl: boolean;
   onFiles?: () => void;
   autoConnect?: boolean;
+  visible?: boolean;
+  embedded?: boolean;
+  optionsOpen?: boolean;
 }) {
   const [active, setActive] = useState(false),
     [busy, setBusy] = useState(false),
@@ -28,6 +34,8 @@ export function AgentDesktopView({
     [control, setControl] = useState(true),
     [error, setError] = useState(''),
     [info, setInfo] = useState<DesktopVideoInfo>();
+  const visibleRef = useRef(visible);
+  visibleRef.current = visible;
   const requestedControl=useRef(true);
   const [qualityOpen,setQualityOpen]=useState(false);
   const [toolsOpen,setToolsOpen]=useState(false);
@@ -107,6 +115,7 @@ export function AgentDesktopView({
       void window.cshell.desktopViewRelease(id.current, wireGeneration.current).catch(() => {});
   };
   const input = (event: DesktopViewInput) => {
+    if (!visibleRef.current) return;
     const session = id.current;
     if (!session || !controlling.current || !permissions.current.canControl) return;
     const wire = wireGeneration.current;
@@ -285,6 +294,10 @@ export function AgentDesktopView({
       if (old) void window.cshell.desktopViewStop(old).catch(() => {});
     }
   }, [canView, canControl]);
+  useEffect(() => {
+    if (!visible) { release(); controlling.current = false; }
+    else controlling.current = control && canControl && !inputDenied.current;
+  }, [visible, control, canControl]);
   const start = async () => {
     if (id.current || !permissions.current.canView) return;
     inputDenied.current=false;
@@ -382,7 +395,7 @@ export function AgentDesktopView({
     }
   };
   return (
-    <section ref={view} className={'agent-desktop-view'+(expanded?' desktop-expanded':'')+(toolsOpen?' desktop-tools-open':'')+(active?' desktop-is-active':'')} aria-label="CAgent 远程桌面" onKeyDownCapture={event=>{
+    <section ref={view} className={'agent-desktop-view'+(embedded?' desktop-embedded':'')+(optionsOpen?' desktop-options-open':'')+(expanded?' desktop-expanded':'')+(toolsOpen?' desktop-tools-open':'')+(active?' desktop-is-active':'')} aria-label="CAgent 远程桌面" onKeyDownCapture={event=>{
       if(event.key==='Escape'&&document.fullscreenElement===view.current){
         event.preventDefault();event.stopPropagation();release();
         void document.exitFullscreen().catch(e=>setError('无法退出全屏：'+String(e)));

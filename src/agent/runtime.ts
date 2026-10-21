@@ -1,3 +1,7 @@
+import {IdeService} from './ide';
+import {AgentBrowserNetwork} from './browser-network';
+import {CodingService} from './coding';
+import {LinuxVisualApps} from './linux-visual-apps';
 import {createWechatCapability} from './wechat-capability';
 import {AgentFiles} from './files';
 import {AgentUpdater} from './update';
@@ -75,6 +79,7 @@ export async function createAgentRuntime(
   options: { directory?: string; terminal?: AgentTerminalProvider; onClose?:()=>void; desktopExecutable?:string; extraPackages?:ConstructorParameters<typeof CapabilityRuntime>[0]['extraPackages'] } = {},
 ) {
   const files=new AgentFiles();
+  const visual=new LinuxVisualApps();
   const directory = options.directory ?? agentDirectory(); const updater=new AgentUpdater(directory,agentVersion);
   let canImportLegacy = false;
   try {
@@ -138,6 +143,10 @@ export async function createAgentRuntime(
     return terminal.execute(input,signal,output);
   },allowed:owner=>server.managementAllowed(owner),capabilityTools:()=>packages.tools(),capabilityInvoke:(input,signal,owner)=>packages.invoke(input,owner,signal)});
   await assistant.load();
+  const coding=new CodingService(vault,directory,owner=>owner==='local'||(server.managementAllowed(owner)&&server.status().peers.some(p=>p.fingerprint===owner&&p.shells.some(s=>server.status().allowedShells?.includes(s)))));
+  await coding.load();
+  const ide=new IdeService(vault,directory,owner=>owner==='local'||server.managementAllowed(owner));await ide.load();
+  const browserNetwork=new AgentBrowserNetwork(owner=>owner==='local'||server.browserAllowed(owner));
   const hosting = new HostingService(join(directory, 'hosting'));
   await hosting.load();
   let relay = new AgentRelayService({ vault, identity: await vault.identity() });
@@ -181,6 +190,18 @@ export async function createAgentRuntime(
     if (closed) throw new Error('Agent 已关闭');
     if(method.startsWith('update.')){if(!local)throw new Error('更新只允许在本机执行');if(method==='update.check')return updater.check();if(method==='update.download')return updater.start();if(method==='update.status')return updater.status();throw new Error('未知更新操作');}
     const admin=local || (owner!=='local' && server.managementAllowed(owner));
+    if(method.startsWith('browser.')){if(!local&&owner==='local')throw Error('未授权');return browserNetwork.call(method,params,owner);}
+    if(method.startsWith('ide.')){if(!admin)throw Error('未授权');return ide.call(method,params,owner);}
+    if(method.startsWith('coding.')){if(!admin)throw Error('未授权');return ['coding.start','coding.configure','coding.profile.save','coding.profile.remove','coding.install'].includes(method)?serialized(()=>coding.call(method,params,owner)):coding.call(method,params,owner);}
+    if(method.startsWith('visual.')){
+      if(!admin)throw new Error('未授权远程管理');
+      if(method==='visual.status')return visual.status(owner);
+      if(method==='visual.launch')return visual.launch(owner,params);
+      if(method==='visual.frame')return visual.frame(owner);
+      if(method==='visual.input')return visual.input(owner,params);
+      if(method==='visual.close')return visual.close(owner);
+      throw new Error('未知可视化操作');
+    }
     if(method.startsWith('files.')){if(!admin)throw new Error('未授权远程管理');return files.call(method,params,owner,signal);}
     if(method==='connection.autostart'){if(!admin)throw new Error('未授权远程管理');return setStartup(z.object({enabled:z.boolean()}).strict().parse(params).enabled);}
     if(method==='connection.settings') {
@@ -481,7 +502,11 @@ export async function createAgentRuntime(
   async function close() {
     if (closed) return;
     closed = true;
+    await visual.dispose();
     await files.close();
+    browserNetwork.close();
+    await coding.close();
+    ide.close();
     await assistant.close();
     await control?.close();
     await mutation;

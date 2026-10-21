@@ -1,3 +1,4 @@
+import {LinuxWorkspace} from './components/LinuxWorkspace';
 import {SavedAgentConnection} from './components/SavedAgentConnection';
 import { MonitorViews } from './components/MonitorViews';
 import { WorkbenchHome } from './components/WorkbenchHome';
@@ -240,6 +241,10 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
     [transfers, setTransfers] = useState<Transfer[]>([]),
     [confirmDelete, setConfirmDelete] = useState<Profile | null>(null),
     [confirmClose, setConfirmClose] = useState<Tab | null>(null);
+  const [linuxWorkspaces,setLinuxWorkspaces]=useState<string[]>([]);
+  const [linuxModes,setLinuxModes]=useState<Record<string,boolean>>({});
+  const linuxRestored=useRef(new Set<string>());
+  useEffect(()=>{for(const tab of tabs){if(tab.local||tab.client||linuxRestored.current.has(tab.id))continue;linuxRestored.current.add(tab.id);if(localStorage.getItem('cshell-linux-workspace:'+tab.profile.id)==='cagent'){setLinuxWorkspaces(v=>v.includes(tab.id)?v:[...v,tab.id]);setLinuxModes(v=>({...v,[tab.id]:true}));}}},[tabs]);
   const [machineSessionIds,setMachineSessionIds]=useState<Record<string,string[]>>({});
   const [machineSessionCounts,setMachineSessionCounts]=useState<Record<string,number>>({});
   const [machines,setMachines]=useState<{device:ClientDevice;target:AgentTarget}[]>([]),[machineId,setMachineId]=useState('');
@@ -440,7 +445,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
       }),
     [],
   );
-  const showTools = surface === 'terminal' && right && !!current && !current.closed && !current.local && !current.client;
+  const showTools = surface === 'terminal' && !linuxModes[active] && right && !!current && !current.closed && !current.local && !current.client;
   const saveProfile = async (p: Profile) => {
     await window.cshell.saveProfile(p);
     setTabs((items) =>
@@ -716,11 +721,11 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
           </div>
         )}
         <main
-          className="main-area"
+          className={'main-area' + (surface === 'machine' || surface === 'terminal' && linuxModes[active] ? ' visual-desktop-workspace' : '')}
           data-panel="terminal"
           style={{ order: layout.order.indexOf('terminal') }}
         >
-          <div className="tabbar">
+          <div className="tabbar" title="连接标签栏 · 移到顶部显示">
             {minimal && (
               <button
                 className="icon minimal-pin"
@@ -787,7 +792,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
                   <SessionTab
                     key={tab.id}
                     {...tab}
-                    active={surface === 'terminal' && active === tab.id}
+                    active={surface === 'terminal' && active === tab.id && !linuxModes[tab.id]}
                     onSelect={() => {
                       setActive(tab.id);
                       setSurface('terminal');
@@ -1232,14 +1237,16 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
               </button>
             </div>
           )}
+          {surface==='terminal'&&current&&!current.local&&!current.client&&!linuxModes[current.id]&&<div className="linux-mode-bar"><button aria-pressed={!linuxModes[current.id]} onClick={()=>{localStorage.setItem('cshell-linux-workspace:'+current.profile.id,'ssh');setLinuxModes(v=>({...v,[current.id]:false}));}}>SSH 终端</button><button disabled={current.closed} aria-pressed={!!linuxModes[current.id]} onClick={()=>{localStorage.setItem('cshell-linux-workspace:'+current.profile.id,'cagent');setLinuxWorkspaces(v=>v.includes(current.id)?v:[...v,current.id]);setLinuxModes(v=>({...v,[current.id]:true}));}}>CAgent 工作区</button><span>{current.profile.name}</span></div>}
+          {tabs.filter(tab=>linuxWorkspaces.includes(tab.id)).map(tab=><LinuxWorkspace key={tab.id} session={tab.id} profileId={tab.profile.id} preferences={preferences} name={tab.profile.name} active={surface==='terminal'&&active===tab.id&&!!linuxModes[tab.id]} closed={!!tab.closed} onTerminal={()=>setLinuxModes(v=>({...v,[tab.id]:false}))}/>)}
           <AiExecution enabled={preferences.showAiExecution && !minimal} sessionId={current?.id} />
           {tabs.length ? (
-            <div className="terminals" hidden={surface !== 'terminal'}>
+            <div className="terminals" hidden={surface !== 'terminal'||!!linuxModes[active]}>
               {tabs.map((tab) => (
                 <TerminalPane
                   key={tab.id}
                   id={tab.id}
-                  active={surface === 'terminal' && active === tab.id}
+                  active={surface === 'terminal' && active === tab.id && !linuxModes[tab.id]}
                   pythonInterpreter={tab.python}
                   textEditingSupported={!tab.local && !tab.client}
                   plugins={tab.local || tab.client ? [] : config.plugins}

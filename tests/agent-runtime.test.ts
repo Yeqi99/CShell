@@ -337,9 +337,9 @@ test(
         .resolve(session)
         .terminal!.input("printf '\\nCSHELL_AGENT_WSL_%s\\n' OK; uname -s; id -u\r");
       const result = /(?:^|\n|\x1b\[\d+(?:;\d+)?[Hf])CSHELL_AGENT_WSL_OK(?=\r|\n|\x1b|$)/;
-      while (!result.test(output) && Date.now() < end)
+      while (!result.test(stripVTControlCharacters(output)) && Date.now() < end)
         await new Promise((resolve) => setTimeout(resolve, 50));
-      assert.match(output, result);
+      assert.match(stripVTControlCharacters(output), result);
       const tool = client
         .resolve(session)
         .tools.find((tool) => tool.capability === 'commands.execute');

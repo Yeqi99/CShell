@@ -346,6 +346,13 @@ export class ClientProvider implements ManagedProvider {
       channel.socket.destroy();
     }
   }
+  async browserTransport(deviceId:string){
+    const device=this.devices.find(d=>d.deviceId===deviceId);if(!device)throw Error('Agent 身份不可用');
+    const channel=await dial(device,await(this.identity??=this.vault.identity()),()=>{},new AbortController().signal);
+    try{const auth=this.verifyAuth(await channel.request('auth',{name:hostname()}),deviceId);if(!auth.capabilities.includes('http.send'))throw Error('未授权浏览器网络访问');}
+    catch(e){channel.socket.destroy();throw e;}
+    return {call:async(method:string,params?:unknown)=>{if(!method.startsWith('browser.'))throw Error('浏览器通道操作无效');if(channel.socket.destroyed)throw Error('浏览器通道已断开');return channel.request('manage',agentCallSchema.parse({method,params}),30000);},validate:()=>{if(channel.socket.destroyed)throw Error('浏览器通道已断开');},close:()=>channel.socket.destroy()};
+  }
   /** Dedicated TLS channel, same pinned device and optional end-to-end management relay. */
   async openDesktopStream(deviceId:string,signal:AbortSignal=new AbortController().signal){
     const device=this.devices.find(d=>d.deviceId===deviceId);if(!device)throw new Error('Agent identity not configured');

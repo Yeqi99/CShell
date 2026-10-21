@@ -16,3 +16,5 @@ await build({
   format: 'cjs',
   external: ['electron'],
 });
+
+await build({entryPoints:["src/agent/cli.ts"],outfile:"dist/agent/agent.cjs",bundle:true,platform:"node",format:"cjs",target:"node22",external:["node-pty"]});

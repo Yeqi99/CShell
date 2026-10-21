@@ -64,3 +64,11 @@ Agent 连接编辑页的「设备身份」提供「重新核对设备身份」�
 Android 10+ 从「扩展」启用 CAgent，设置密码、监听端口、对外地址及映射端口。系统录屏授权启动前台共享服务，无障碍服务提供可选输入；无需另装 CAgent APK。配置、输入映射及网络边界见 [Android CAgent](../docs/ANDROID-CAGENT.md)。
 
 隔离模拟器安装 debug 与 androidTest APK 后，可以用同一 runner 的 `-e hostMode true` 验证受控端 TLS、配对、视频分片、重连和撤权。该测试会修改测试应用的配对记录，不能在用户手机上执行。必须检查输出中的 `OK (Android host`，不能只依据 adb 退出码。
+
+## 0.8.0 机器浏览器与开发应用
+
+AndroidX WebKit 1.14.0（Apache-2.0）提供代理覆盖与独立 Profile。新版 WebView 支持时，机器应用页显示浏览器；网站内容在本机渲染，网络请求经所选 cagent。当前仅同时打开一台机器的浏览器，切换时销毁旧通道；Cookie、站点存储和加密的浏览器书签/历史按机器分开。
+
+Codex/Claude Code 通过同一机器 RPC 使用桌面端的会话组件，在窄屏采用抽屉导航。代码工作室使用 code-server；手机提供额外编辑快捷操作。Android 是远程开发控制端，不在手机系统内安装未经验证的官方 CLI。
+
+开发检查增加 scripts/mobile-apps-smoke.ts；Android 仪器 browserMode 覆盖 SOCKS 目标 DNS、双向数据、清理以及支持的 WebView 通过代理加载隔离 fixture。不会访问真实第三方账户。

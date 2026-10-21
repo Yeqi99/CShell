@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 export const agentAppId = z.enum([
+  'browser',
   'git',
   'nodejs',
   'python',

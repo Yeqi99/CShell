@@ -122,6 +122,7 @@ export class ClientServer {
       audit: [...this.audit].reverse(),
     };
   }
+  browserAllowed(owner:string){return !!this.access?.allowHttp&&this.peers.some(p=>p.fingerprint===owner&&p.allowHttp);}
   managementAllowed(owner: string) {
     return !!this.access?.allowManage && this.peers.some((p) => p.fingerprint === owner && p.allowManage);
   }
@@ -445,14 +446,14 @@ export class ClientServer {
               c.peer!.shells.includes(clientShellSchema.parse(s.shell)),
             )
           : c.peer.shells.map((shell) => ({ shell, label: shell }));
-      const permission = call.method.startsWith('hosting.')
+      const permission = call.method.startsWith('browser.') ? 'allowHttp' : call.method.startsWith('hosting.')
         ? 'allowHosting'
         : call.method.startsWith('relay.')
           ? 'allowRelay'
           : 'allowManage';
       if (!c.peer[permission] || !this.access?.[permission] || !this.options.manage)
         throw new Error('Management permission denied');
-      await this.record(call.method, fp);
+      if(!['browser.read','browser.write','browser.close'].includes(call.method))await this.record(call.method, fp);
       const abort = new AbortController(),
         closed = () => abort.abort();
       c.socket.once('close', closed);

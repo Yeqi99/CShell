@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import {startSshBridge} from './ssh-bridge';
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout, stderr } from 'node:process';
 import { createAgentRuntime } from './runtime';
@@ -54,6 +55,7 @@ async function secret(prompt: string) {
 const print = (value: unknown) => stdout.write(JSON.stringify(value, null, 2) + '\n');
 async function main() {
   const [command = 'help', method] = process.argv.slice(2);
+  if(command==='bridge'){startSshBridge();return;}
   if(command==='app'&&process.platform==='win32'&&existsSync(join(dirname(process.argv[1]),'Cagent.exe'))){
     const child=spawn(join(dirname(process.argv[1]),'Cagent.exe'),[],{detached:true,stdio:'ignore',windowsHide:false});
     await new Promise<void>((resolve,reject)=>{child.once('spawn',resolve);child.once('error',reject);});child.unref();return;

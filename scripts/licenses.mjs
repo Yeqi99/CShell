@@ -69,7 +69,7 @@ await fs.writeFile(
 );
 await fs.writeFile(
   'THIRD_PARTY_NOTICES.txt',
-  'CanpShell third-party dependency notices\nGenerated from locked installed package versions. The application source license is not yet selected.\nElectron also ships its separate LICENSE and LICENSES.chromium.html files.\n\n' +
+  'CanpShell third-party dependency notices\nGenerated from locked installed package versions. The application source is licensed under MIT.\nElectron also ships its separate LICENSE and LICENSES.chromium.html files.\n\n' +
     packages
       .map(
         (p) =>

@@ -1,5 +1,11 @@
+import {ideMethods} from './ide';
+import {codingMethods} from './coding';
 import { z } from 'zod';
 export const agentMethods = [
+  ...codingMethods,
+  ...ideMethods,
+  'browser.status','browser.open','browser.read','browser.write','browser.close',
+  'visual.status','visual.launch','visual.frame','visual.input','visual.close',
   'wechat.status','wechat.configure','wechat.stop',
   'files.roots','files.list','files.action','files.read','files.uploadStart','files.uploadChunk','files.uploadFinish','files.uploadCancel',
   'connection.autostart',
@@ -96,7 +102,7 @@ export interface AgentBridge {
   clientShells(deviceId: string): Promise<AgentShellOption[]>;
 }
 export const agentCapability = (method: string) =>
-  method.startsWith('hosting.')
+  method.startsWith('browser.') ? 'http.send' : method.startsWith('hosting.')
     ? 'agent.hosting'
     : method.startsWith('relay.')
       ? 'agent.relay'

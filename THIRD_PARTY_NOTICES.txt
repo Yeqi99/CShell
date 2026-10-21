@@ -1,5 +1,5 @@
 CanpShell third-party dependency notices
-Generated from locked installed package versions. The application source license is not yet selected.
+Generated from locked installed package versions. The application source is licensed under MIT.
 Electron also ships its separate LICENSE and LICENSES.chromium.html files.
 
 @codemirror/autocomplete@6.20.3

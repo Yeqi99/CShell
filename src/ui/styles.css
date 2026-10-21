@@ -5956,3 +5956,8 @@ input[type='radio']:focus-visible {
   .extension-main:has(.opencode-extension) { padding: 16px; }
   .extension-heading { gap: 12px; flex-wrap: wrap; }
 }
+
+.main-area.visual-desktop-workspace {position:relative;padding-top:6px;overflow:hidden;}
+.visual-desktop-workspace > .tabbar {position:absolute;left:0;right:0;top:0;z-index:100;transform:translateY(calc(-100% + 6px));transition:transform .16s ease;box-shadow:0 3px 12px #12243b18;}
+.visual-desktop-workspace > .tabbar:hover,.visual-desktop-workspace > .tabbar:focus-within {transform:translateY(0);}
+@media (prefers-reduced-motion:reduce){.visual-desktop-workspace > .tabbar{transition:none;}}

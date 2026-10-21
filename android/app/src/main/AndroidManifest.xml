@@ -6,7 +6,7 @@
   <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
   <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-  <application android:label="CShell" android:icon="@drawable/icon" android:allowBackup="false" android:usesCleartextTraffic="false" android:enableOnBackInvokedCallback="true" android:theme="@android:style/Theme.Material.Light.NoActionBar" android:supportsRtl="true">
+  <application android:label="CShell" android:icon="@drawable/icon" android:allowBackup="false" android:usesCleartextTraffic="false" android:networkSecurityConfig="@xml/network_security" android:enableOnBackInvokedCallback="true" android:theme="@android:style/Theme.Material.Light.NoActionBar" android:supportsRtl="true">
     <service android:name=".AndroidAgentService" android:exported="false" android:foregroundServiceType="connectedDevice|mediaProjection" />
     <service android:name=".AndroidControlService" android:label="CAgent 手机控制" android:exported="false" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
       <intent-filter><action android:name="android.accessibilityservice.AccessibilityService" /></intent-filter>

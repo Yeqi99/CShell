@@ -1,0 +1,169 @@
+.agent-applications {
+  font-size: 13px;
+  max-width: 1100px;
+  margin: 0 auto;
+  color: var(--text);
+}
+.agent-applications > header {
+  margin-bottom: 16px !important;
+}
+.agent-applications > header p {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0;
+}
+.agent-applications .agent-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 10px;
+  margin: 16px 0;
+  padding: 3px 0;
+}
+.agent-applications .agent-toolbar > input {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+}
+.agent-applications input:not([type='checkbox']),
+.agent-applications textarea {
+  font: inherit;
+  color: inherit;
+  background: var(--field, var(--panel));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 11px;
+  box-sizing: border-box;
+}
+.agent-applications textarea {
+  resize: vertical;
+  min-height: 84px;
+  max-height: 180px;
+  width: 100%;
+  display: block;
+}
+.agent-applications button {
+  font: inherit;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  min-height: 34px;
+  padding: 7px 12px;
+  background: var(--panel);
+  color: inherit;
+  cursor: pointer;
+}
+.agent-applications button:hover {
+  background: var(--hover);
+}
+.agent-applications button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.agent-applications :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.agent-applications .machine-app-permissions {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  padding: 12px 14px;
+}
+.agent-applications summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--muted);
+}
+.agent-applications .machine-app-permissions label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0;
+  font-size: 12px;
+}
+.agent-applications .machine-app-permissions label:has(textarea) {
+  display: grid;
+  gap: 8px;
+  max-width: 640px;
+}
+.agent-applications .machine-app-permissions input[type='checkbox'] {
+  margin: 0;
+  accent-color: var(--accent);
+}
+.agent-applications .agent-app-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(145px, 180px));
+  gap: 12px;
+  justify-content: start;
+  margin: 16px 0;
+}
+.agent-applications .agent-app-grid > button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 7px;
+  height: 136px;
+  padding: 16px;
+  text-align: left;
+  border-radius: 12px;
+  white-space: normal;
+  overflow: hidden;
+}
+.agent-applications .agent-app-grid strong {
+  font-size: 13px;
+}
+.agent-applications .agent-app-grid small {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.machine-app-icon {
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--accent-soft, var(--bg));
+  margin-bottom: 3px;
+}
+.agent-applications .machine-app-catalog > section {
+  border-top: 1px solid var(--border);
+  margin-top: 22px;
+  padding-top: 16px;
+}
+.agent-applications code {
+  overflow-wrap: anywhere;
+}
+.agent-applications pre {
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--field, var(--bg));
+}
+.desktop-window-content .agent-settings label:not(.agent-check) {
+  display: grid;
+  gap: 7px;
+  margin-bottom: 14px;
+}
+.desktop-window-content .agent-settings input,
+.desktop-window-content .agent-settings select,
+.desktop-window-content .agent-settings textarea {
+  font: inherit;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: inherit;
+  border-radius: 8px;
+}
+
+.agent-applications [hidden] {display:none!important;}
+.agent-applications > header {display:flex;align-items:baseline;gap:16px;padding:6px 0 14px;border-bottom:1px solid var(--border);}
+.agent-applications h2 {font-size:21px;letter-spacing:-.5px;margin:0;}
+.market-navigation {display:flex;align-items:center;gap:12px;margin:12px 0;font-size:12px;color:var(--muted);}
+.agent-applications .agent-app-grid > button {height:126px;transition:border-color .12s,background .12s;}
+.agent-applications .agent-app-grid > button:hover {border-color:var(--accent);}
+
+.ide-market-card{display:flex;align-items:center;gap:16px;padding:20px!important;border:1px solid var(--border);border-radius:14px;background:var(--panel);text-align:left}.ide-market-card span{display:grid;gap:6px}.ide-market-card small{color:var(--muted)}

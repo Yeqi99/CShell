@@ -1,3 +1,5 @@
+import {LinuxWorkspaceService} from '../core/linux-workspace';
+import {MachineBrowser} from './machine-browser';
 import {localViewProfiles} from '../shared/monitor-views';
 import { Diagnostics } from '../core/diagnostics';
 import { openRdpProfile, rdpProfileSchema } from '../core/rdp';
@@ -67,6 +69,7 @@ let window: BrowserWindow;
 let ssh: SshService;
 let transfers: Transfers;
 const idSchema = z.string().uuid();
+app.commandLine.appendSwitch('disable-quic');
 const pathSchema = z
   .string()
   .min(1)
@@ -502,13 +505,20 @@ else
       handle('http:send', (id, request, runId) => http.send(id, request, runId, 'user'));
       handle('http:history', id => http.histories(id));
       handle('http:cancel', id => http.cancel(id));
+      const linuxWorkspace=new LinuxWorkspaceService(ssh,join(app.getAppPath(),'dist/agent/agent.cjs'));
+      const machineBrowser=new MachineBrowser(window,ssh);
+      handle('machine-browser:action',(id,action,value)=>machineBrowser.action(id,action,value));
+      handle('linux:plan',(id,directory)=>linuxWorkspace.plan(idSchema.parse(id),directory));
+      handle('linux:install',(id,plan)=>linuxWorkspace.install(idSchema.parse(id),idSchema.parse(plan)));
+      handle('linux:job',(id,job,cancel)=>linuxWorkspace.job(idSchema.parse(id),idSchema.parse(job),cancel===true));
       const agent = await registerAgent(handle, store, clientProvider, connections.tools, event => {
         if (event.type === 'error') diagnostics.record('desktop.error', event.message);
         if (event.type === 'closed' && event.reason) diagnostics.record('desktop.closed', event.reason);
         if (event.type === 'state' && event.reason) diagnostics.record('desktop.' + event.state, event.reason);
         if (!window.isDestroyed()) window.webContents.send('desktop:view-event', event);
         monitorWindows.publish('desktop:view-event', event);
-      });
+      }, linuxWorkspace);
+      machineBrowser.setAgentTransport(agent.browserTarget);
       const disposeAi = await registerAiHandlers(
         handle,
         app.getPath('userData'),
@@ -994,6 +1004,7 @@ else
           event.preventDefault();
           flushing ??= wechat.subscriptions.stopAll().catch(error => console.error('WeChat listener shutdown unconfirmed',error)).then(() => disposeAi())
             .catch((error) => console.error('AI shutdown failed', error))
+            .then(() => machineBrowser.flush())
             .then(() => activity.flush())
             .catch((error) => console.error('Could not finish saving before exit', error))
             .finally(() => {

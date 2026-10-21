@@ -1,0 +1,274 @@
+.machine-browser {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--panel);
+  color: var(--text);
+}
+.machine-browser-tabs {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  flex: none;
+  overflow-x: auto;
+  padding: 6px 10px 0;
+  background: var(--bg);
+  min-height: 38px;
+}
+.machine-browser-tab {
+  display: flex;
+  align-items: center;
+  max-width: 220px;
+  min-width: 100px;
+  border-radius: 8px 8px 0 0;
+  border: 1px solid transparent;
+}
+.machine-browser-tab[data-selected='true'] {
+  background: var(--panel);
+  border-color: var(--border);
+  border-bottom-color: var(--panel);
+}
+.machine-browser-tab > button:first-child {
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-start;
+}
+.machine-browser-tab span {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+.machine-browser button {
+  border: 0 !important;
+  border-radius: 6px !important;
+  background: transparent !important;
+  min-height: 28px !important;
+  padding: 5px 7px !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: inherit;
+}
+.machine-browser button:hover {
+  background: var(--hover) !important;
+}
+.machine-browser button:disabled {
+  opacity: 0.35;
+}
+.machine-browser-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  flex: none;
+}
+.machine-browser-toolbar input {
+  min-width: 80px;
+  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  height: 32px;
+  padding: 0 12px;
+  background: var(--field, var(--bg));
+  color: inherit;
+  font-size: 13px;
+  font-family: inherit;
+}
+.machine-browser-route {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 150px;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 6px;
+}
+.machine-browser-surface {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  background: white;
+}
+.machine-browser-start {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--muted);
+  background: var(--panel);
+  padding: 24px;
+  text-align: center;
+}
+.machine-browser-start h2,
+.machine-browser-start p {
+  margin: 0;
+}
+.machine-browser-start h2 {
+  font-size: 22px;
+  color: var(--text);
+}
+.machine-browser-start p {
+  overflow-wrap: anywhere;
+}
+.machine-browser-start small {
+  font-size: 12px;
+}
+.machine-browser-error {
+  padding: 8px 12px;
+  background: var(--panel);
+  color: var(--red);
+  font-size: 12px;
+}
+.machine-browser :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.machine-browser-toolbar select {
+  height: 28px;
+  width: 66px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: inherit;
+  font: inherit;
+}
+.machine-browser-toolbar {
+  padding: 5px 8px;
+}
+
+.machine-browser-surface[hidden] {
+  display: none;
+}
+.machine-browser-toolbar button[aria-pressed='true'] {
+  color: var(--accent, #3478f6);
+  background: var(--hover) !important;
+}
+.machine-browser-library {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 20px 28px;
+}
+.machine-browser-library header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+.machine-browser-library h2 {
+  font-size: 18px;
+  margin: 0;
+}
+.machine-browser-library > p {
+  color: var(--muted);
+  font-size: 12px;
+}
+.machine-browser-entry {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--border);
+  padding: 8px 0;
+}
+.machine-browser-entry > button:first-child {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+.machine-browser-entry strong,
+.machine-browser-entry small {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.machine-browser-entry small,
+.machine-browser-entry time {
+  font-size: 11px;
+  color: var(--muted);
+}
+.machine-browser-suggestions {
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  max-height: 340px;
+  overflow: auto;
+}
+.machine-browser-suggestions > button {
+  display: flex;
+  width: 100%;
+  text-align: left;
+  gap: 10px !important;
+  padding: 9px 12px !important;
+}
+.machine-browser-suggestions > button[aria-selected='true'] {
+  background: var(--hover) !important;
+}
+.machine-browser-suggestions span {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.machine-browser-suggestions strong,
+.machine-browser-suggestions small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.machine-browser-suggestions small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.machine-browser-confirm {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+.machine-browser-confirm h3 {
+  margin: 0 0 9px;
+  font-size: 15px;
+}
+.machine-browser-confirm p {
+  font-size: 12px;
+  color: var(--muted);
+  max-width: 620px;
+  line-height: 1.7;
+}
+.machine-browser[data-fullscreen='true'] {
+  position: fixed;
+  inset: 0;
+  z-index: 1000000;
+}
+.machine-browser[data-fullscreen='true'] > .machine-browser-tabs,
+.machine-browser[data-fullscreen='true'] > .machine-browser-toolbar {
+  display: none;
+}
+.machine-browser-fullscreen-bar {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  background: var(--panel);
+  font-size: 12px;
+}
+.machine-browser-fullscreen-bar > span {
+  max-width: 70%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

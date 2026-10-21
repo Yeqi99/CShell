@@ -1,3 +1,5 @@
+import {MobileCoding} from './coding';
+import {MobileIde} from './ide';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
@@ -7,6 +9,9 @@ import {MobileDesktop} from './desktop';
 declare global {
   interface Window {
     CShellNative: {
+      browserSupported?(): boolean;
+      browserOpen?(id:string,name:string,url:string):void;
+      machineRequest?(json:string):void;
       cagentStatus?(): string;
       cagentConfigure?(data: string): string;
       cagentStart?(): void;
@@ -44,6 +49,9 @@ declare global {
 }
 const $ = (id: string) => document.getElementById(id)!;
 const desktop=new MobileDesktop(window.CShellNative);
+const mobileIde=new MobileIde(window.CShellNative);
+const mobileCoding=new MobileCoding(window.CShellNative);
+const machineApps=new Map<string,{browser?:boolean;ide?:boolean;coding?:boolean}>();
 const desktopStatus=new Map<string,{packageReady?:boolean;viewAllowed?:boolean;controlAllowed?:boolean;inputFeatures?:string[];qualityModes?:string[]}>();
 const icons: Record<string, string> = {
   extensions: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 17.5h7m-3.5-3.5v7"/>',
@@ -466,6 +474,8 @@ $('auth-key').onclick = () => setAuth('key');
 for (const id of ['new', 'empty-new', 'session-new', 'home-new']) $(id).onclick = () => openForm();
 $('back').onclick = () => navigate(page === 'cagent' ? 'extensions' : 'home');
 window.mobileBack = () => {
+  if(mobileCoding.visible){mobileCoding.close();return true;}
+  if(mobileIde.visible){mobileIde.close();return true;}
   if(desktop.visible){desktop.close();return true;}
   if (document.body.classList.contains('minimal')) {
     document.body.classList.remove('minimal');
@@ -586,6 +596,14 @@ form.onsubmit = (e) => {
   select(id);
   window.CShellNative.connect(JSON.stringify({ ...p, ...credentials, id, port: Number(p.port) }));
 };
+function updateMachineApps(id:string){
+ const s=sessions.get(id),picker=s?.element.querySelector('.agent-environments'),cap=machineApps.get(id);if(!s||!picker||!cap)return;
+ picker.querySelector('.machine-apps')?.remove();const apps=document.createElement('div');apps.className='machine-apps';
+ if(cap.browser&&window.CShellNative.browserSupported?.()){const b=document.createElement('button');b.className='machine-app-browser';b.textContent='浏览器';b.onclick=()=>window.CShellNative.browserOpen?.(id,s.profile.name,'');apps.append(b);}
+ if(cap.ide){const b=document.createElement('button');b.className='machine-app-ide';b.textContent='代码工作室';b.onclick=()=>void mobileIde.open(id,s.profile.name);apps.append(b);}
+ if(cap.coding)for(const engine of ['codex','claude'] as const){const b=document.createElement('button');b.textContent=engine==='codex'?'Codex':'Claude Code';b.onclick=()=>mobileCoding.open(id,s.profile.name,engine);apps.append(b);}
+ picker.insertBefore(apps,picker.children[2]||null);
+}
 function updateAgentDesktopEntry(id: string) {
   const session=sessions.get(id),status=desktopStatus.get(id);
   const picker=session?.element.querySelector('.agent-environments');
@@ -602,6 +620,8 @@ function updateAgentDesktopEntry(id: string) {
   picker.insertBefore(entry,picker.children[2]||null);
 }
 window.receive = (id, type, value) => {
+  if(type==='machine-result'){mobileIde.receive(id,value);mobileCoding.receive(id,value);return;}
+  if(type==='machine-apps'){try{machineApps.set(id,JSON.parse(value));updateMachineApps(id);}catch{}return;}
   if (type === 'cagent-status') { receiveCAgent(value); return; }
   if(type.startsWith('desktop-')){
     if(type==='desktop-status')try{desktopStatus.set(id,JSON.parse(value));updateAgentDesktopEntry(id);}catch{}
@@ -653,6 +673,7 @@ window.receive = (id, type, value) => {
       s.element.append(picker);
       if (!choices.length) { const note=document.createElement('p');note.className='muted caption';note.textContent='此设备未提供终端，可使用已开放的远程桌面。';picker.append(note); }
       updateAgentDesktopEntry(id);
+      updateMachineApps(id);
       s.state = '已连接 CAgent';
     } catch {
       s.state = '环境列表无效';

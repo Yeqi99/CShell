@@ -21,6 +21,7 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider;
 /** Local-only UI bridge. No remote page or remote script can access this interface. */
 public class MainActivity extends Activity {
   private WebView web;
+  private MachineBrowser browser;
   private AppUpdates updates;
   private LocalFiles localFiles;
   private final ExecutorService workers = Executors.newCachedThreadPool();
@@ -73,6 +74,7 @@ public class MainActivity extends Activity {
     content.addView(web, new android.widget.FrameLayout.LayoutParams(-1, -1));
     androidx.core.view.WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
     setContentView(content);
+    browser=new MachineBrowser(this,content,workers);
     androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(content, (view, insets) -> {
       androidx.core.graphics.Insets safe = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars() | androidx.core.view.WindowInsetsCompat.Type.displayCutout() | androidx.core.view.WindowInsetsCompat.Type.ime());
       view.setPadding(safe.left, safe.top, safe.right, safe.bottom);
@@ -162,6 +164,9 @@ public class MainActivity extends Activity {
         }
       });
     }
+    @JavascriptInterface public boolean browserSupported(){return MachineBrowser.supported();}
+    @JavascriptInterface public void browserOpen(String id,String name,String url){Connection c=connections.get(id);if(c==null||c.agent==null)return;runOnUiThread(()->{if(connections.get(id)==c)browser.open(id,name,c.agent,url);});}
+    @JavascriptInterface public void machineRequest(String json){if(destroyed||json.length()>131072)return;workers.execute(()->{String request="",id="";try{JSONObject p=new JSONObject(json);request=p.getString("request");UUID.fromString(request);id=p.getString("session");String method=p.getString("method");if(!method.matches("^(ide|coding)\\.[a-zA-Z.]+$"))throw new IOException("不支持的机器应用操作");Connection c=connections.get(id);if(c==null||c.agent==null)throw new IOException("机器连接已断开");Object result=c.agent.manage(method,p.opt("params"));event(id,"machine-result",new JSONObject().put("request",request).put("result",result).toString());}catch(Exception e){try{event(id,"machine-result",new JSONObject().put("request",request).put("error",e.getMessage()).toString());}catch(Exception ignored){}}});}
     @JavascriptInterface public boolean agentSupported() { return android.os.Build.VERSION.SDK_INT >= 29; }
     @JavascriptInterface public String version() { return updates.current(); }
     @JavascriptInterface public void checkUpdate() { updates.check(); }
@@ -274,7 +279,7 @@ public class MainActivity extends Activity {
       d.queueDesktopCommand(command);
     }
     @JavascriptInterface public void desktopClose(String id) {Connection c=connections.get(id);if(c==null)return;synchronized(c){AgentConnection d=c.desktop;c.desktop=null;if(d!=null)d.close();}}
-    @JavascriptInterface public void disconnect(String id) { Connection c = connections.remove(id); if (c != null) workers.execute(c::close); }
+    @JavascriptInterface public void disconnect(String id) { runOnUiThread(()->browser.disconnected(id)); Connection c = connections.remove(id); if (c != null) workers.execute(c::close); }
   }
   private void connectAgent(String json) {
     workers.execute(() -> {
@@ -288,7 +293,7 @@ public class MainActivity extends Activity {
         c.agentEndpoint=endpoint;
         c.agentHost=host;c.agentPort=port;
         c.agent = new AgentConnection((type,value)->{
-          if(type.equals("closed")) { connections.remove(sessionId,c); if(c.desktop!=null)c.desktop.close(); c.files.shutdownNow(); c.writer.shutdownNow(); }
+          if(type.equals("closed")) { runOnUiThread(()->browser.disconnected(sessionId)); connections.remove(sessionId,c); if(c.desktop!=null)c.desktop.close(); c.files.shutdownNow(); c.writer.shutdownNow(); }
           event(sessionId,type,value);
         });
         if(connections.putIfAbsent(id,c)!=null)throw new IOException("连接已存在");
@@ -316,6 +321,7 @@ public class MainActivity extends Activity {
   }
   @Override protected void onActivityResult(int code,int result,Intent data) {
     super.onActivityResult(code,result,data);
+    if(code==7140){browser.fileResult(result,data);return;}
     if(localFiles.onActivityResult(code,result,data))return;
     if(code==7107){
       if(result!=RESULT_OK||data==null){AndroidAgentService.starting(this,false,"未开始共享：屏幕录制未获授权");return;}
@@ -383,6 +389,7 @@ public class MainActivity extends Activity {
   }
   @Override public void onDestroy() {
     localFiles.close();
+    browser.close();
     destroyed = true; for (Connection c : connections.values()) c.close(); connections.clear(); workers.shutdownNow();
     unregisterReceiver(cagentEvents);
     web.removeJavascriptInterface("CShellNative"); web.destroy(); super.onDestroy();
@@ -390,6 +397,7 @@ public class MainActivity extends Activity {
   @Override protected void onResume(){super.onResume();if(web!=null)event("","cagent-status",AndroidAgentService.status(this).toString());}
   @Override protected void onPause(){super.onPause();for(Connection c:connections.values()){synchronized(c){if(c.desktop!=null)c.desktop.close();c.desktop=null;}}}
   private void navigateBack() {
+    if(browser!=null&&browser.back())return;
     web.evaluateJavascript("window.mobileBack()", result -> {
       if (!"true".equals(result)) moveTaskToBack(true);
     });

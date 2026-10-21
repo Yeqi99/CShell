@@ -1,0 +1,392 @@
+.linux-workspace {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg, #f7f8fa);
+  color: var(--text, #202938);
+}
+.linux-workspace[hidden],
+.linux-content[hidden] {
+  display: none !important;
+}
+.linux-workspace button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--border, #dfe4ec);
+  border-radius: 9px;
+  min-height: 34px;
+  padding: 7px 11px;
+  background: var(--panel, #fff);
+  color: inherit;
+  cursor: pointer;
+}
+.linux-workspace button:hover {
+  border-color: #99afcd;
+  background: var(--hover, #edf3fa);
+}
+.linux-workspace button:focus-visible,
+.linux-workspace input:focus-visible,
+.linux-browser img:focus-visible {
+  outline: 2px solid #3b78c8;
+  outline-offset: 2px;
+}
+.linux-workspace button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.linux-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--border, #e0e5ed);
+  flex: none;
+}
+.linux-topbar > div:not(.linux-topbar-spacer) {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.linux-topbar small {
+  font-size: 11px;
+  opacity: 0.6;
+}
+.linux-topbar-spacer {
+  flex: 1;
+}
+.linux-state {
+  font-size: 11px;
+  padding: 5px 9px;
+  border-radius: 20px;
+  background: var(--panel, #fff);
+  border: 1px solid var(--border, #ddd);
+}
+.linux-state.online:before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #33a484;
+  margin-right: 6px;
+}
+.linux-home,
+.linux-setup {
+  padding: clamp(24px, 5vw, 64px);
+  overflow: auto;
+  flex: 1;
+}
+.linux-eyebrow {
+  font-size: 10px;
+  letter-spacing: 2.3px;
+  color: #6f8198;
+  font-weight: 600;
+}
+.linux-home h1,
+.linux-setup h1 {
+  font-size: clamp(24px, 2.5vw, 34px);
+  font-weight: 600;
+  letter-spacing: -0.8px;
+  margin: 16px 0 9px;
+}
+.linux-home p,
+.linux-setup > p {
+  opacity: 0.6;
+  font-size: 13px;
+}
+.linux-apps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  max-width: 940px;
+  margin-top: 38px;
+}
+.linux-workspace .linux-app {
+  min-height: 174px;
+  max-width: 270px;
+  align-items: flex-start;
+  justify-content: flex-start;
+  flex-direction: column;
+  text-align: left;
+  padding: 22px;
+  position: relative;
+  box-shadow: 0 3px 12px #1c335008;
+  border-radius: 16px;
+}
+.linux-app strong {
+  font-size: 15px;
+  margin-top: 8px;
+}
+.linux-app small {
+  font-size: 11px;
+  opacity: 0.6;
+}
+.linux-app > svg {
+  position: absolute;
+  right: 18px;
+  top: 24px;
+  opacity: 0.35;
+}
+.linux-app-icon {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+}
+.linux-app-icon.violet {
+  background: #ece8fc;
+  color: #7564ad;
+}
+.linux-app-icon.amber {
+  background: #fbefd7;
+  color: #b68c39;
+}
+.linux-app-icon.blue {
+  background: #e2eefc;
+  color: #4c83bd;
+}
+.linux-app-icon.green {
+  background: #e2f1e9;
+  color: #4a9172;
+}
+.linux-machine-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 22px;
+  margin-top: 32px;
+  opacity: 0.5;
+  font-size: 11px;
+}
+.linux-app-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+}
+.linux-app-heading nav {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+.linux-app-heading button[aria-pressed='true'] {
+  background: #e5eef9;
+  color: #315e98;
+}
+.linux-content {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  padding: 0 20px 20px;
+}
+.linux-plan {
+  max-width: 660px;
+  padding: 24px;
+  margin-top: 25px;
+  border: 1px solid var(--border, #ddd);
+  background: var(--panel, #fff);
+  border-radius: 14px;
+}
+.linux-plan h3 {
+  margin-top: 0;
+}
+.linux-plan li {
+  margin: 12px 0;
+  line-height: 1.6;
+}
+.linux-setup pre {
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-size: 11px;
+}
+.linux-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 50px 20px;
+  flex: 1;
+  text-align: center;
+}
+.linux-empty > svg {
+  color: #6d8fb8;
+}
+.linux-empty h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.linux-empty p {
+  opacity: 0.6;
+  font-size: 13px;
+  max-width: 440px;
+}
+.linux-browser {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--panel, #fff);
+}
+.linux-browser-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px;
+  border-bottom: 1px solid var(--border, #ddd);
+}
+.linux-browser-toolbar form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  padding-left: 12px;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 9px;
+}
+.linux-browser-toolbar input {
+  min-width: 0;
+  flex: 1;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  outline: none;
+  font-size: 12px;
+}
+.linux-browser-viewport {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: #e7eaf0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.linux-browser-viewport img {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  flex: none;
+  touch-action: none;
+  display: block;
+  object-fit: contain;
+}
+.linux-browser-tools{position:absolute;right:10px;bottom:10px;z-index:4;display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.linux-browser-tools>button{width:32px;height:32px;min-height:0;border:1px solid var(--border);border-radius:8px;background:var(--panel);color:var(--text);opacity:.65;display:grid;place-items:center;padding:0;box-shadow:0 2px 12px #20355425}
+.linux-browser-tools:hover>button,.linux-browser-tools:focus-within>button{opacity:1}
+.linux-browser-tools-menu{position:absolute;bottom:40px;right:0;min-width:180px;padding:6px;display:flex;flex-direction:column;gap:4px;background:var(--panel);border:1px solid var(--border);border-radius:9px;box-shadow:0 8px 25px #20355430}
+.linux-browser-tools-menu button{white-space:nowrap;justify-content:flex-start;border:0;padding:9px}
+.linux-browser-confirm{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:5;background:var(--panel);border:1px solid var(--border);border-radius:9px;box-shadow:0 4px 20px #20355425;display:flex;align-items:center;gap:10px;padding:12px;max-width:95%;font-size:12px}
+.linux-browser-compose{position:absolute;bottom:12px;left:12px;right:54px;z-index:4;background:var(--panel);border:1px solid var(--border);border-radius:9px;box-shadow:0 4px 20px #20355430;padding:4px}
+.linux-browser-compose {
+  display: flex;
+  gap: 8px;
+  padding: 9px;
+  border-top: 1px solid var(--border, #ddd);
+}
+.linux-browser-compose input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  padding: 8px;
+  font-size: 12px;
+}
+.linux-mode-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border, #ddd);
+}
+.linux-mode-bar button {
+  border-radius: 7px;
+  padding: 5px 12px;
+  border: 1px solid var(--border, #ddd);
+  background: var(--panel, #fff);
+  color: inherit;
+}
+.linux-mode-bar button[aria-pressed='true'] {
+  background: #e5eef9;
+  color: #315e98;
+}
+.linux-mode-bar span {
+  margin-left: auto;
+  font-size: 11px;
+  opacity: 0.6;
+}
+@media (max-width: 700px) {
+  .linux-topbar {
+    padding: 10px;
+    gap: 7px;
+  }
+  .linux-state {
+    display: none;
+  }
+  .linux-apps {
+    grid-template-columns: repeat(2, minmax(130px, 1fr));
+    gap: 10px;
+  }
+  .linux-workspace .linux-app {
+    min-height: 150px;
+    padding: 16px;
+  }
+  .linux-content {
+    padding: 0 10px 10px;
+  }
+}
+
+.linux-browser-tabs {
+  display: flex;
+  gap: 5px;
+  padding: 8px 10px 0;
+  overflow-x: auto;
+  flex: none;
+}
+.linux-browser-tabs button {
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+  font-size: 11px;
+  min-height: 28px;
+}
+.linux-browser-tabs button[aria-pressed='true'] {
+  background: #e5eef9;
+  color: #315e98;
+}
+
+.linux-setup > label {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  max-width: 660px;
+  margin: 20px 0;
+  font-size: 13px;
+}
+.linux-setup > label input {
+  flex: 1;
+  min-width: 200px;
+  min-height: 36px;
+  padding: 7px 11px;
+  border: 1px solid var(--border, #dfe4ec);
+  border-radius: 9px;
+  background: var(--panel, #fff);
+  color: inherit;
+  font: inherit;
+}
+.linux-plan pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.linux-workspace .linux-setup{width:min(100% - 40px,680px);margin:32px auto;padding:26px 30px;border:1px solid var(--border);border-radius:16px;background:var(--panel);box-shadow:0 12px 36px #102e4f0c}.linux-workspace .linux-setup h1{font-size:24px;margin:0 0 10px}.linux-workspace .linux-setup>p{font-size:13px;line-height:1.7;color:var(--muted);margin-bottom:22px}.linux-workspace .linux-plan{padding:18px;margin-top:18px;border-radius:10px}.linux-workspace .linux-plan h3{font-size:14px}.linux-workspace .linux-plan li{font-size:12px;line-height:1.8}.linux-workspace .linux-plan pre{font-size:11px;white-space:pre-wrap;overflow-wrap:anywhere}

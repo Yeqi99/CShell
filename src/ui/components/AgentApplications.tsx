@@ -4,19 +4,24 @@ import type { AgentCall, AgentTarget } from '../../shared/agent';
 import type { z } from 'zod';
 import { AgentCapabilityMarket } from './AgentCapabilityMarket';
 import { AgentWsl } from './AgentWsl';
+import { RefreshCw, Package, Terminal, Globe, Code, Search } from 'lucide-react';
+import './agent-applications.css';
 
 export function AgentApplications({
   target,
   call,
+  onIde,
 }: {
   target: AgentTarget;
+  onIde?:()=>void;
   call: (method: AgentCall['method'], params?: unknown) => Promise<unknown>;
 }) {
   const [catalog, setCatalog] = useState<z.infer<typeof appCatalogSchema>>(),
     [task, setTask] = useState<z.infer<typeof appTaskSchema>>();
   const [policy, setPolicy] = useState<z.infer<typeof appPolicySchema>>(),
     [controllers, setControllers] = useState('');
-  const [wslOpen,setWslOpen]=useState(false);
+  const [detail, setDetail] = useState(false);
+  const [wslOpen, setWslOpen] = useState(false);
   const [query, setQuery] = useState(''),
     [busy, setBusy] = useState(false),
     [error, setError] = useState('');
@@ -67,20 +72,30 @@ export function AgentApplications({
   }, [task?.id, task?.state, target.id]);
   return (
     <section className="agent-applications">
-      <header>
-        <h2>应用市场</h2>
+      {onIde&&<button className="ide-market-card" onClick={onIde}><Code size={26}/><span><strong>代码工作室</strong><small>code-server · 远程项目与扩展 · 手机 / 电脑</small></span></button>}
+      <header><h2>应用市场</h2>
         <p>
-          {target.name} · {catalog?.platform ?? '检查中'} · {catalog?.manager ?? '未检测到包管理器'}
+          {target.name} · {catalog?.platform ?? '检查中'}
         </p>
       </header>
-      <AgentCapabilityMarket key={target.id} target={target} call={call} />
-      {catalog?.platform==='win32'&&<details className="agent-system-apps" onToggle={e=>setWslOpen(e.currentTarget.open)}><summary>Linux 虚拟机 · WSL</summary>{wslOpen&&<AgentWsl target={target.id} call={call}/>}</details>}
-      {error && <p role="alert" className="form-error">{error}</p>}
+      {!target.id.startsWith('ssh:') && (
+        <AgentCapabilityMarket key={target.id} target={target} call={call} />
+      )}
+      {catalog?.platform === 'win32' && (
+        <details className="agent-system-apps" onToggle={(e) => setWslOpen(e.currentTarget.open)}>
+          <summary>Linux 虚拟机 · WSL</summary>
+          {wslOpen && <AgentWsl target={target.id} call={call} />}
+        </details>
+      )}
+      {error && (
+        <p role="alert" className="form-error">
+          {error}
+        </p>
+      )}
       {busy && <p role="status">正在处理应用操作…</p>}
-      <details>
-        <summary>系统应用</summary>
+      <div className="machine-app-catalog">
         {policy && (
-          <details>
+          <details className="machine-app-permissions">
             <summary>应用安装权限</summary>
             <label>
               <input
@@ -116,18 +131,25 @@ export function AgentApplications({
         {catalog && !catalog.enabled && (
           <p>应用安装未授权。请在目标 CAgent 本机的应用安装权限中启用；远程控制端还需指纹授权。</p>
         )}
-        <div className="agent-toolbar">
+        {task && <div className="market-navigation"><button onClick={()=>setDetail(!detail)}>{detail ? "← 返回应用目录" : "查看安装任务"}</button><span>{task.app} · {task.state}</span></div>}
+        <div className="agent-toolbar" hidden={detail}>
+          <Search size={16} aria-hidden="true" />
           <input
             aria-label="搜索应用"
             placeholder="搜索应用"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-          <button disabled={busy} onClick={() => void run(refresh)}>
-            刷新
+          <button
+            title="刷新应用"
+            aria-label="刷新应用"
+            disabled={busy}
+            onClick={() => void run(refresh)}
+          >
+            <RefreshCw size={16} />
           </button>
         </div>
-        <div className="agent-app-grid">
+        <div className="agent-app-grid" hidden={detail}>
           {catalog?.applications
             .filter((a) => (a.id + ' ' + a.package).toLowerCase().includes(query.toLowerCase()))
             .map((a) => (
@@ -135,23 +157,38 @@ export function AgentApplications({
                 key={a.id}
                 disabled={busy || !catalog.enabled || task?.state === 'running'}
                 onClick={() =>
-                  void run(async () =>
-                    setTask(appTaskSchema.parse(await call('applications.plan', { app: a.id }))),
-                  )
+                  void run(async () => {
+                    setTask(appTaskSchema.parse(await call('applications.plan', { app: a.id }))); setDetail(true);
+                  })
                 }
               >
-                <strong>{a.id}</strong>
-                <small>{a.package}</small>
+                <span className="machine-app-icon">
+                  {a.id === 'browser' ? (
+                    <Globe size={24} />
+                  ) : ['python', 'nodejs'].includes(a.id) ? (
+                    <Code size={24} />
+                  ) : a.id === 'git' ? (
+                    <Terminal size={24} />
+                  ) : (
+                    <Package size={24} />
+                  )}
+                </span>
+                <strong>{a.id === 'browser' ? 'Linux 图形环境' : a.id}</strong>
+                <small>{a.id === 'browser' ? '原生应用兼容 · 含 Chrome' : a.package}</small>
               </button>
             ))}
         </div>
-        {task && (
+        {task && detail && (
           <section>
             <h3>
               {task.app} · {task.state}
             </h3>
             <p>安装目标：{target.name}</p>
-            <code>{[task.executable, ...task.args].join(' ')}</code>
+            <code>
+              {task.app === 'browser'
+                ? 'Google Chrome · 官方签名软件源'
+                : [task.executable, ...task.args].join(' ')}
+            </code>
             <p>{task.warning}</p>
             <pre style={{ whiteSpace: 'pre-wrap', maxHeight: 260, overflow: 'auto' }}>
               {task.logs}
@@ -188,7 +225,7 @@ export function AgentApplications({
             )}
           </section>
         )}
-      </details>
+      </div>
     </section>
   );
 }

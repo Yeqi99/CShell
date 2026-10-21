@@ -1,3 +1,4 @@
+import type {LinuxWorkspaceService} from '../core/linux-workspace';
 import { app,dialog } from 'electron';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
@@ -29,6 +30,7 @@ export async function registerAgent(
   provider: ClientProvider,
   registry: ConnectionRegistry,
   publish: (event: DesktopViewEvent) => void,
+  linuxWorkspace?: LinuxWorkspaceService,
 ) {
   const directory = process.env.CSHELL_AGENT_DATA;
   const bundledAvailable = false;
@@ -187,15 +189,20 @@ export async function registerAgent(
     machines.set(target,{resourceId:id,fingerprint:device.fingerprint,label:device.name});
     return {id:target,name:device.name,local:false,available:true};
   });
+  const remoteCall=(key:string,call:import('../shared/agent').AgentCall,signal?:AbortSignal)=>{
+    if(key.startsWith('ssh:')&&linuxWorkspace)return linuxWorkspace.call(z.string().uuid().parse(key.slice(4)),call,signal);
+    const current=activeTarget(key);if(!current)throw new Error('机器连接已关闭');return provider.call(current.resourceId,call,signal);
+  };
+  const checkTarget=(key:string)=>{if(key.startsWith('ssh:')&&linuxWorkspace){linuxWorkspace.validate(z.string().uuid().parse(key.slice(4)));return;}if(!activeTarget(key))throw new Error('机器连接已关闭');};
   const downloads=new Map<string,AbortController>();
   handle('agent:file-cancel',(id:unknown)=>{downloads.get(z.string().uuid().parse(id))?.abort();});
   handle('agent:file-paste',async(target:unknown,input:unknown)=>{
     const key=z.string().parse(target),p=z.object({id:z.string().uuid(),root:z.string().uuid(),path:z.string().max(4096)}).strict().parse(input);
-    const device=()=>{const current=activeTarget(key);if(!current)throw new Error('机器连接已关闭');return current.resourceId;};device();
+    checkTarget(key);
     if(process.platform!=='win32')throw new Error('此系统请使用拖放或上传文件');
     if(downloads.size>=4||downloads.has(p.id))throw new Error('传输任务已满');
     const controller=new AbortController();downloads.set(p.id,controller);const completed:string[]=[];let uploadId='';
-    const call=(method:string,params:unknown)=>provider.call(device(),{method,params} as any,controller.signal);
+    const call=(method:string,params:unknown)=>remoteCall(key,{method,params} as any,controller.signal);
     try{
       const {stdout}=await promisify(execFile)('powershell.exe',['-NoProfile','-NonInteractive','-STA','-Command',"[Console]::OutputEncoding=[Text.UTF8Encoding]::new(); Add-Type -AssemblyName System.Windows.Forms; $items=@([Windows.Forms.Clipboard]::GetFileDropList()); ConvertTo-Json -InputObject $items -Compress"],{windowsHide:true,timeout:10000,maxBuffer:1024*1024,signal:controller.signal});
       const paths=z.array(z.string().min(1).max(32768)).max(100).parse(JSON.parse(stdout.trim()));
@@ -213,16 +220,16 @@ export async function registerAgent(
       }
       return {completed};
     }catch(error){throw new Error((completed.length?'已完成 '+completed.length+' 个文件；':'')+(error as Error).message);}
-    finally{if(uploadId){const current=activeTarget(key);if(current)await provider.call(current.resourceId,{method:'files.uploadCancel',params:{id:uploadId}}).catch(()=>{});}downloads.delete(p.id);}
+    finally{if(uploadId){await remoteCall(key,{method:'files.uploadCancel',params:{id:uploadId}}).catch(()=>{});}downloads.delete(p.id);}
   });
   handle('agent:file-download',async(target:unknown,input:unknown)=>{
     const key=z.string().parse(target),p=z.object({id:z.string().uuid(),root:z.string().uuid(),path:z.string().min(1).max(4096),name:z.string().min(1).max(255)}).strict().parse(input);safeName(p.name);
-    const resolveDevice=()=>{const current=activeTarget(key);if(!current)throw new Error('机器连接已关闭');return current.resourceId;};resolveDevice();
+    checkTarget(key);
     if(downloads.size>=4||downloads.has(p.id))throw new Error('下载任务已满');const controller=new AbortController();downloads.set(p.id,controller);let temporary='';
     try{const save=await dialog.showSaveDialog({defaultPath:p.name,title:'下载远端文件'});if(save.canceled||!save.filePath)return {cancelled:true};controller.signal.throwIfAborted();
       temporary=save.filePath+'.cagent-'+p.id+'.part';const h=await open(temporary,'wx',0o600);
-      try{let offset=0,version:string|undefined;for(;;){controller.signal.throwIfAborted();const raw=await provider.call(resolveDevice(),{method:'files.read',params:{root:p.root,path:p.path,offset,version}},controller.signal);const r=z.object({data:z.string().max(349528),size:z.number().int().nonnegative(),version:z.string(),next:z.number().int().nonnegative(),done:z.boolean()}).parse(raw);const buffer=Buffer.from(r.data,'base64');if(r.next!==offset+buffer.length||(!r.done&&!buffer.length))throw new Error('远端文件分块无效');await h.writeFile(buffer);offset=r.next;version=r.version;if(r.done){if(offset!==r.size)throw new Error('远端文件长度不一致');break;}}await h.sync();}finally{await h.close();}
-      controller.signal.throwIfAborted();resolveDevice();await link(temporary,save.filePath);return {};
+      try{let offset=0,version:string|undefined;for(;;){controller.signal.throwIfAborted();const raw=await remoteCall(key,{method:'files.read',params:{root:p.root,path:p.path,offset,version}},controller.signal);const r=z.object({data:z.string().max(349528),size:z.number().int().nonnegative(),version:z.string(),next:z.number().int().nonnegative(),done:z.boolean()}).parse(raw);const buffer=Buffer.from(r.data,'base64');if(r.next!==offset+buffer.length||(!r.done&&!buffer.length))throw new Error('远端文件分块无效');await h.writeFile(buffer);offset=r.next;version=r.version;if(r.done){if(offset!==r.size)throw new Error('远端文件长度不一致');break;}}await h.sync();}finally{await h.close();}
+      controller.signal.throwIfAborted();checkTarget(key);await link(temporary,save.filePath);return {};
     }finally{downloads.delete(p.id);if(temporary)await unlink(temporary).catch(()=>{});}
   });
   handle('agent:machine-close',async(target)=>{await stopTarget(z.string().parse(target));machines.delete(target);});
@@ -231,6 +238,7 @@ export async function registerAgent(
     const call = agentCallSchema.parse(raw);
     if (call.method === 'desktop.open') throw new Error('请从远程桌面入口连接');
     if (target === 'local') return callAgent(call.method, call.params, directory);
+    if(typeof target==='string'&&target.startsWith('ssh:')&&linuxWorkspace)return remoteCall(target,call);
     const active = activeTarget(target);
     if (!active) throw new Error('请选择仍在连接的 Agent');
     return provider.call(active.resourceId, call);
@@ -258,6 +266,13 @@ export async function registerAgent(
     });
   return {
     stopTarget,
+    browserTarget: async(key:string)=>{
+      if(key==='local'){guard();const s=await callAgent('client.status',undefined,directory) as {deviceId:string};return {key:'agent:'+s.deviceId,call:(method:string,params?:unknown)=>{guard();return callAgent(method,params,directory);},validate:guard};}
+      checkTarget(key);const target=activeTarget(key);if(!target)throw new Error('机器连接已关闭');
+      const device=provider.list().find(d=>d.deviceId===target.resourceId);if(!device)throw new Error('设备身份不可用');
+      const tunnel=await provider.browserTransport(device.deviceId);
+      return {key:'agent:'+device.deviceId+':'+device.fingerprint,call:(method:string,params?:unknown)=>{checkTarget(key);return tunnel.call(method,params);},validate:()=>{checkTarget(key);tunnel.validate();},close:tunnel.close};
+    },
     dispose: () => {
       offDisconnect();
       return views.dispose();

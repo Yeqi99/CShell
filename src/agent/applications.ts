@@ -1,3 +1,4 @@
+import {linuxBrowserInstall} from './linux-browser-install';
 import { execFile, spawn, type ChildProcess } from 'node:child_process';
 import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
@@ -42,6 +43,7 @@ const recipes: Record<Manager, Partial<Record<App, string>>> = {
     ffmpeg: 'ffmpeg',
   },
   'apt-get': {
+    ...(process.arch==='x64'?{browser:'google-chrome-stable'}:{}),
     git: 'git',
     nodejs: 'nodejs',
     python: 'python3',
@@ -212,7 +214,7 @@ export class AgentApplicationService {
         : detected.manager === 'brew'
           ? ['info', ...(app === 'vscode' ? ['--cask'] : []), pkg]
           : [detected.manager === 'apt-get' ? 'show' : 'info', pkg];
-    const metadata = await exec(probe, probeArgs, {
+    const metadata = app==='browser' ? {stdout:'安装 Google 官方 apt 软件源（独立签名密钥）、Chrome 稳定版、中文字体和无登录权限的 cagent-browser 用户。浏览器沙箱保持开启，资料保存在 /var/lib/cagent-browser；不开放网络端口。'} : await exec(probe, probeArgs, {
       windowsHide: true,
       timeout: 45000,
       maxBuffer: 65536,
@@ -229,11 +231,11 @@ export class AgentApplicationService {
       app,
       platform: process.platform,
       ...detected,
-      args: installArgs(detected.manager, app),
+      ...(app==='browser'?{executable:'/bin/sh',args:['-c',linuxBrowserInstall]}:{args:installArgs(detected.manager,app)}),
       expires: Date.now() + 15 * 60_000,
       state: 'planned',
       logs: metadata.stdout.slice(-8192),
-      warning:
+      warning: app==='browser' ? '将添加 Google 官方签名软件源，安装 Chrome、中文字体和浏览器专用用户。不会关闭沙箱或开放端口。取消后已安装的软件和资料保留。' :
         '执行会接受所列软件包和软件源协议，可能安装依赖或更新已有系统包。可能需要系统管理员批准；不会自动提权、重启或新增软件源。断线后任务继续；撤权会停止受管进程，但已安装部分及安装器子进程可能保留。',
     };
     this.tasks.set(task.id, { owner, task });

@@ -110,6 +110,7 @@ jobs:
         run: |
           node scripts/build-android.mjs
           pnpm exec tsx scripts/mobile-smoke.ts
+          pnpm exec tsx scripts/mobile-apps-smoke.ts
       - run: pnpm exec electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
