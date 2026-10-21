@@ -28,6 +28,7 @@ import type { ManagedProvider } from '../connections/manager';
 import type { ProviderConnection } from '../connections/contracts';
 import { ClientVault, fingerprint, type ClientIdentity } from './identity';
 import { frames, send, textChunks } from './wire';
+import { ManagementQueue } from './management-queue';
 const deviceSchema = clientInvitationSchema
   .omit({ token: true, expires: true })
   .extend({ relay: agentRelayConnectionSchema.optional() });
@@ -325,6 +326,10 @@ export class ClientProvider implements ManagedProvider {
     input: AgentCall,
     signal: AbortSignal = new AbortController().signal,
   ) {
+    return this.managementQueue.run(deviceId,signal,()=>this.managementCall(deviceId,input,signal));
+  }
+  private managementQueue = new ManagementQueue();
+  private async managementCall(deviceId:string,input:AgentCall,signal:AbortSignal) {
     const device = this.devices.find((d) => d.deviceId === deviceId);
     if (!device) throw new Error('Agent 尚未连接并核对身份');
     const call = agentCallSchema.parse(input);

@@ -7,6 +7,7 @@ import type { AgentCall, AgentTarget } from '../../shared/agent';
 import { desktopConfigSchema, type DesktopConfig } from '../../shared/agent-desktop';
 import { AgentDesktopView } from './AgentDesktopView';
 import './agent-capability-market.css';
+import {agentRead} from '../agent-read';
 
 const stateSchema = z.enum([
   'not-installed',
@@ -80,8 +81,8 @@ export function AgentCapabilityMarket({ target, call }: { target: AgentTarget; c
   const [remove, setRemove] = useState(false);
   const refresh = async () => {
     const [nextCatalog, nextInstalled] = await Promise.all([
-      call('packages.catalog'),
-      call('packages.list'),
+      agentRead(()=>call('packages.catalog')),
+      agentRead(()=>call('packages.list')),
     ]);
     setCatalog(catalogSchema.parse(nextCatalog));
     setInstalled(installedSchema.parse(nextInstalled));

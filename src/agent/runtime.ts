@@ -192,7 +192,7 @@ export async function createAgentRuntime(
     const admin=local || (owner!=='local' && server.managementAllowed(owner));
     if(method.startsWith('browser.')){if(!local&&owner==='local')throw Error('未授权');return browserNetwork.call(method,params,owner);}
     if(method.startsWith('ide.')){if(!admin)throw Error('未授权');return ide.call(method,params,owner);}
-    if(method.startsWith('coding.')){if(!admin)throw Error('未授权');return ['coding.start','coding.configure','coding.profile.save','coding.profile.remove','coding.install'].includes(method)?serialized(()=>coding.call(method,params,owner)):coding.call(method,params,owner);}
+    if(method.startsWith('coding.')){if(!admin)throw Error('未授权');return ['coding.permission','coding.start','coding.configure','coding.profile.save','coding.profile.remove','coding.install'].includes(method)?serialized(()=>coding.call(method,params,owner)):coding.call(method,params,owner);}
     if(method.startsWith('visual.')){
       if(!admin)throw new Error('未授权远程管理');
       if(method==='visual.status')return visual.status(owner);

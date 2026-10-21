@@ -6,14 +6,18 @@ import { AgentCapabilityMarket } from './AgentCapabilityMarket';
 import { AgentWsl } from './AgentWsl';
 import { RefreshCw, Package, Terminal, Globe, Code, Search } from 'lucide-react';
 import './agent-applications.css';
+import {DevelopmentMarket} from './DevelopmentMarket';
+import {agentRead} from '../agent-read';
 
 export function AgentApplications({
   target,
   call,
-  onIde,
+  onDevelopmentOpen,onDevelopmentChanged,
 }: {
   target: AgentTarget;
   onIde?:()=>void;
+  onDevelopmentOpen?:(id:string)=>void;
+  onDevelopmentChanged?:()=>void;
   call: (method: AgentCall['method'], params?: unknown) => Promise<unknown>;
 }) {
   const [catalog, setCatalog] = useState<z.infer<typeof appCatalogSchema>>(),
@@ -37,9 +41,9 @@ export function AgentApplications({
     }
   };
   const refresh = async () => {
-    setCatalog(appCatalogSchema.parse(await call('applications.list')));
+    setCatalog(appCatalogSchema.parse(await agentRead(()=>call('applications.list'))));
     {
-      const p = appPolicySchema.parse(await call('applications.policy'));
+      const p = appPolicySchema.parse(await agentRead(()=>call('applications.policy')));
       setPolicy(p);
       setControllers(p.controllers.join('\n'));
     }
@@ -72,12 +76,12 @@ export function AgentApplications({
   }, [task?.id, task?.state, target.id]);
   return (
     <section className="agent-applications">
-      {onIde&&<button className="ide-market-card" onClick={onIde}><Code size={26}/><span><strong>代码工作室</strong><small>code-server · 远程项目与扩展 · 手机 / 电脑</small></span></button>}
       <header><h2>应用市场</h2>
         <p>
           {target.name} · {catalog?.platform ?? '检查中'}
         </p>
       </header>
+      <DevelopmentMarket call={call} onOpen={onDevelopmentOpen} onChanged={onDevelopmentChanged}/>
       {!target.id.startsWith('ssh:') && (
         <AgentCapabilityMarket key={target.id} target={target} call={call} />
       )}

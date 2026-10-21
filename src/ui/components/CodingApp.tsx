@@ -22,6 +22,7 @@ import type { CodingEngine, CodingProfile, CodingTask } from '../../shared/codin
 import './coding-app.css';
 type Profile = Omit<CodingProfile, 'key'> & { hasKey: boolean };
 type Status = {
+  permissions?: Record<string,string>;
   directory: string;
   engines: {
     engine: CodingEngine;
@@ -48,14 +49,18 @@ export function CodingApp({
   call,
   openBrowser,
   active,
+  onManage,
 }: {
   engine: CodingEngine;
   name: string;
   call: (method: AgentCall['method'], params?: unknown) => Promise<unknown>;
   openBrowser: (url: string) => Promise<void>;
   active: boolean;
+  onManage?: () => void;
 }) {
   const [sideOpen, setSideOpen] = useState(false);
+  const [checking, setChecking] = useState(true);
+  const [statusError, setStatusError] = useState('');
   const [status, setStatus] = useState<Status>(),
     [tasks, setTasks] = useState<CodingTask[]>([]),
     [selected, setSelected] = useState(''),
@@ -64,45 +69,64 @@ export function CodingApp({
     [cwd, setCwd] = useState(''),
     [mode, setMode] = useState('read'),
     [drafts, setDrafts] = useState<Record<string, string>>({}),
-    [panel, setPanel] = useState<'' | 'profiles' | 'runtime'>(''),
+    [panel, setPanel] = useState<'' | 'profiles'>(''),
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false),
     [edit, setEdit] = useState<CodingProfile>(),
-    [runtime, setRuntime] = useState({ directory: '', codex: '', claude: '' }),
-    [plan, setPlan] = useState<any>(),
     [login, setLogin] = useState<any>(),
     [code, setCode] = useState('');
   const scroll = useRef<HTMLDivElement>(null);
+  const openedLogin = useRef('');
+  useEffect(() => {
+    if (!login?.url || login.state !== 'running' || openedLogin.current === login.id) return;
+    openedLogin.current = login.id;
+    void openBrowser(login.url).catch((e) => setError('无法打开机器浏览器：' + String(e)));
+  }, [login?.id, login?.url, login?.state, openBrowser]);
   const title = engine === 'codex' ? 'Codex' : 'Claude Code';
   const selectedRef = useRef(selected);
   selectedRef.current = selected;
   const refresh = async () => {
-    const s = (await call('coding.status')) as Status;
-    setStatus(s);
-    setProfile((p) => p || s.profiles.find((p) => p.engine === engine)?.id || '');
-    return s;
+    setChecking(true);
+    try {
+      let s: Status | undefined;
+      for (let attempt = 0; ; attempt++) {
+        try {
+          s = (await call('coding.status')) as Status;
+          break;
+        } catch (e) {
+          // Reopening a machine can race its TLS connection. Retry reads only,
+          // never installation, authentication, or task execution.
+          if (
+            attempt >= 2 ||
+            !/socket|network|ECONN|TLS|disconnected|timeout|尚未连接|断开/i.test(String(e))
+          )
+            throw e;
+          await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+        }
+      }
+      setStatus(s);
+      setMode(m=>['read','edit','execute'].indexOf(m)>['read','edit','execute'].indexOf(s.permissions?.[engine]??'execute')?'read':m);
+      setStatusError('');
+      setProfile((p) => p || s.profiles.find((p) => p.engine === engine)?.id || '');
+      return s;
+    } catch (e) {
+      setStatus(undefined);
+      setStatusError(
+        '无法读取这台机器的编程服务。请确认远端 cagent 已更新至 0.8.0 或更高版本，并已开放管理权限，然后刷新重试。',
+      );
+      throw e;
+    } finally {
+      setChecking(false);
+    }
   };
   useEffect(() => {
-    let live = true;
-    void refresh()
-      .then((s) => {
-        if (live)
-          setRuntime({
-            directory: s.directory,
-            codex: s.engines.find((e) => e.engine === 'codex')?.path || '',
-            claude: s.engines.find((e) => e.engine === 'claude')?.path || '',
-          });
-      })
-      .catch((e) => setError(String(e)));
-    return () => {
-      live = false;
-    };
+    void refresh().catch(() => {});
   }, [call, engine]);
   useEffect(() => {
     let live = true,
       inflight = false;
     const poll = async () => {
-      if (inflight) return;
+      if (inflight || !status || statusError) return;
       inflight = true;
       try {
         const ts = (await call('coding.tasks')) as CodingTask[];
@@ -125,15 +149,23 @@ export function CodingApp({
     };
     void poll();
     const timer = setInterval(() => {
-      if (active) void poll();
+      if (active || login?.state === 'running') void poll();
     }, 1200);
     return () => {
       live = false;
       clearInterval(timer);
     };
-  }, [call, engine, active, login?.id, status?.installs.some((i) => i.state === 'running')]);
+  }, [
+    call,
+    engine,
+    active,
+    login?.id,
+    !!status,
+    statusError,
+    status?.installs.some((i) => i.state === 'running'),
+  ]);
   useEffect(() => {
-    if (scroll.current) scroll.current.scrollTop = scroll.current.scrollHeight;
+    if (task && scroll.current) scroll.current.scrollTop = scroll.current.scrollHeight;
   }, [task?.messages.at(-1)?.text]);
   const act = async (fn: () => Promise<unknown>) => {
     setBusy(true);
@@ -213,15 +245,12 @@ export function CodingApp({
           <Settings size={16} />
           账号与基座
         </button>
-        <button
-          onClick={() => {
-            setPanel('runtime');
-            setSideOpen(false);
-          }}
-        >
-          <Download size={16} />
-          客户端安装
-        </button>
+        {onManage && (
+          <button onClick={onManage}>
+            <Download size={16} />
+            在应用市场管理
+          </button>
+        )}
       </aside>
       <main className="coding-main">
         <header>
@@ -234,13 +263,7 @@ export function CodingApp({
             <Menu size={20} />
           </button>
           <div>
-            <strong>
-              {panel === 'profiles'
-                ? '账号与基座'
-                : panel === 'runtime'
-                  ? '客户端安装'
-                  : task?.title || '新会话'}
-            </strong>
+            <strong>{panel === 'profiles' ? '账号与基座' : task?.title || '新会话'}</strong>
             <small>
               {name}
               {task ? ' · ' + task.profileName : ''}
@@ -256,109 +279,73 @@ export function CodingApp({
             <RefreshCw size={16} />
           </button>
         </header>
-        {error && (
+        {(statusError || error) && (
           <div role="alert" className="coding-error">
-            {error}
+            {statusError ||
+              error.replace(/^Error: (?:Error invoking remote method '[^']+': Error: )?/, '')}
           </div>
         )}
-        {panel === 'runtime' ? (
+        {panel === 'profiles' || (ready?.ready && !profile) ? (
           <div className="coding-settings">
-            <h2>在 {name} 上运行</h2>
-            <p>独立安装目录，不修改系统软件源或全局环境。</p>
-            <div className="coding-engine-status">
-              <Code2 />
+            <div className="coding-account-intro">
+              <span>
+                <Code2 size={28} />
+              </span>
               <div>
-                <strong>{title}</strong>
-                <small>{ready?.ready ? ready.version : ready?.reason || '正在检查'}</small>
+                <h2>连接 {title}</h2>
+                <p>选择官方账号或自己的模型服务，在 {name} 上开始工作。</p>
               </div>
-              <span>{ready?.ready ? '已就绪' : '待配置'}</span>
             </div>
-            <label>
-              数据与账号目录
-              <input
-                value={runtime.directory}
-                onChange={(e) => setRuntime({ ...runtime, directory: e.target.value })}
-              />
-            </label>
-            <label>
-              已有 {title} 可执行文件
-              <input
-                value={runtime[engine]}
-                onChange={(e) => setRuntime({ ...runtime, [engine]: e.target.value })}
-                placeholder="绝对路径，支持官方 CLI 或 JS 入口"
-              />
-            </label>
-            <div className="coding-actions">
+            <div className="coding-auth-choices">
               <button
-                disabled={busy}
+                disabled={busy || !ready?.ready || login?.state === 'running'}
                 onClick={() =>
                   void act(async () => {
-                    await call('coding.configure', runtime);
-                    await refresh();
+                    let p = status?.profiles.find(
+                      (p) => p.engine === engine && p.auth === 'official',
+                    );
+                    if (!p) {
+                      const value = {
+                        id: crypto.randomUUID(),
+                        engine,
+                        name: engine === 'codex' ? 'ChatGPT 账号' : 'Claude 账号',
+                        auth: 'official' as const,
+                        endpoint: '',
+                        model: '',
+                      };
+                      await call('coding.profile.save', value);
+                      await refresh();
+                      p = { ...value, hasKey: false };
+                    }
+                    setProfile(p.id);
+                    setPanel('profiles');
+                    setLogin(await call('coding.login', { id: p.id }));
                   })
                 }
               >
-                保存路径并检查
+                <Globe size={22} />
+                <strong>{engine === 'codex' ? '使用 ChatGPT 登录' : '使用 Claude 登录'}</strong>
+                <small>在这台机器的浏览器完成官方授权</small>
               </button>
               <button
-                disabled={busy}
-                onClick={() =>
-                  void act(async () =>
-                    setPlan(
-                      await call('coding.install.plan', { engine, directory: runtime.directory }),
-                    ),
-                  )
-                }
+                onClick={() => {
+                  freshProfile();
+                  setEdit({
+                    id: crypto.randomUUID(),
+                    engine,
+                    name: '',
+                    auth: 'api',
+                    endpoint: '',
+                    model: '',
+                  });
+                  setPanel('profiles');
+                }}
               >
-                检查安装计划
+                <Settings size={22} />
+                <strong>使用 API 基座</strong>
+                <small>保存多个服务，按会话切换</small>
               </button>
             </div>
-            {plan && (
-              <div className="coding-plan">
-                <strong>
-                  {title} · {plan.version}
-                </strong>
-                <p>{plan.directory}</p>
-                {plan.steps.map((s: string) => (
-                  <p key={s}>• {s}</p>
-                ))}
-                <button
-                  className="primary"
-                  disabled={busy}
-                  onClick={() =>
-                    void act(async () => {
-                      await call('coding.install', { id: plan.id });
-                      setPlan(undefined);
-                      await refresh();
-                    })
-                  }
-                >
-                  安装到此目录
-                </button>
-              </div>
-            )}
-            {status?.installs.map((i) => (
-              <details key={i.id} open={i.state === 'running'}>
-                <summary>安装 · {states[i.state] || i.state}</summary>
-                <pre>{i.output}</pre>
-                {i.state === 'running' && (
-                  <button
-                    disabled={busy}
-                    onClick={() =>
-                      void act(async () => {
-                        await call('coding.install.cancel', { id: i.id });
-                        await refresh();
-                      })
-                    }
-                  >
-                    取消安装
-                  </button>
-                )}
-              </details>
-            ))}
-          </div>
-        ) : panel === 'profiles' ? (
-          <div className="coding-settings">
             <div className="coding-section-title">
               <h2>选择模型服务</h2>
               <button onClick={freshProfile}>
@@ -555,7 +542,15 @@ export function CodingApp({
                 readOnly={!!selected}
                 onChange={(e) => setCwd(e.target.value)}
               />
-              <span className="coding-ready">{ready?.ready ? '引擎就绪' : '需要安装客户端'}</span>
+              <span className="coding-ready">
+                {checking
+                  ? '正在检查'
+                  : statusError
+                    ? '状态不可用'
+                    : ready?.ready
+                      ? '引擎就绪'
+                      : '未配置客户端'}
+              </span>
             </div>
             <div className="coding-conversation" ref={scroll}>
               {!task ? (
@@ -563,17 +558,23 @@ export function CodingApp({
                   <div>
                     <Code2 size={34} />
                   </div>
-                  <h2>在 {name} 开始编程</h2>
-                  <p>选择项目与基座，描述要完成的工作。</p>
-                  {!ready?.ready ? (
-                    <button onClick={() => setPanel('runtime')}>安装或连接 {title}</button>
-                  ) : !profile ? (
+                  <h2>{title}</h2>
+                  <p>
+                    {checking
+                      ? '正在检查编程环境…'
+                      : statusError
+                        ? '连接恢复后，可继续配置项目与基座。'
+                        : !ready?.ready
+                          ? '请到应用市场安装并验证客户端。'
+                          : '选择项目与基座，描述要完成的工作。'}
+                  </p>
+                  {ready?.ready && !profile ? (
                     <button onClick={() => setPanel('profiles')}>添加官方账号或 API 基座</button>
-                  ) : (
+                  ) : ready?.ready ? (
                     <small>
                       {title} · {status?.profiles.find((p) => p.id === profile)?.name}
                     </small>
-                  )}
+                  ) : null}
                 </div>
               ) : (
                 <>
@@ -647,6 +648,9 @@ export function CodingApp({
                     !e.nativeEvent.isComposing &&
                     !running &&
                     !busy &&
+                    ready?.ready &&
+                    profile &&
+                    cwd &&
                     draft.trim()
                   ) {
                     e.preventDefault();
@@ -681,8 +685,8 @@ export function CodingApp({
                   onChange={(e) => setMode(e.target.value)}
                 >
                   <option value="read">只读分析</option>
-                  <option value="edit">修改项目文件</option>
-                  <option value="execute">修改并执行命令</option>
+                  {status?.permissions?.[engine]!=='read'&&<option value="edit">修改项目文件</option>}
+                  {(!status?.permissions?.[engine]||status.permissions[engine]==='execute')&&<option value="execute">修改并执行命令</option>}
                 </select>
                 <span />
                 {running ? (

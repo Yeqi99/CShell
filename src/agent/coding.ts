@@ -3,6 +3,7 @@ import { mkdir, stat, readFile, writeFile } from 'node:fs/promises';
 import { join, dirname, isAbsolute, resolve } from 'node:path';
 import { randomUUID, createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
+import { privateNpm } from './private-npm';
 import { z } from 'zod';
 import type { ClientVault } from '../core/client/identity';
 import {
@@ -117,6 +118,7 @@ type Login = {
   timer?: NodeJS.Timeout;
 };
 export class CodingService {
+  private permissions: Record<string, 'read' | 'edit' | 'execute'> = {};
   private saveTimer?: NodeJS.Timeout;
   private scheduleSave() {
     if (!this.saveTimer)
@@ -150,6 +152,7 @@ export class CodingService {
       owner: string;
       state: string;
       output: string;
+      abort: AbortController;
       child?: ChildProcessWithoutNullStreams;
     }
   >();
@@ -161,6 +164,11 @@ export class CodingService {
     this.config = { codex: '', claude: '', directory: join(directory, 'coding') };
   }
   async load() {
+    this.permissions =
+      (await this.vault.read(
+        'coding-permissions',
+        z.record(z.string(), z.enum(['read', 'edit', 'execute'])),
+      )) ?? {};
     this.config = (await this.vault.read('coding-config', configSchema)) ?? this.config;
     const saved = await this.vault.read('coding-state', savedSchema);
     if (saved) {
@@ -243,9 +251,9 @@ export class CodingService {
       detached: process.platform !== 'win32',
     });
   }
-  private async probe(engine: CodingEngine) {
+  private async probe(engine: CodingEngine, candidate?: string) {
     try {
-      const exe = this.executable(engine);
+      const exe = candidate ?? this.executable(engine);
       await stat(exe);
       const js = /\.[cm]?js$/i.test(exe);
       return await new Promise<{ ready: boolean; version?: string; reason?: string }>((done) => {
@@ -328,9 +336,15 @@ export class CodingService {
   }
   async call(method: string, raw: unknown, owner: string): Promise<any> {
     this.authorize(owner);
-    if (method === 'coding.status')
+    if (method === 'coding.status') {
+      const installs = [...this.installJobs.values()]
+        .filter((j) => j.owner === owner)
+        .map(({ child, owner, abort, ...j }) => ({ ...j }));
       return {
         platform: process.platform,
+        supported:
+          ['linux', 'win32', 'darwin'].includes(process.platform) &&
+          ['x64', 'arm64'].includes(process.arch),
         directory: this.config.directory,
         engines: await Promise.all(
           (['codex', 'claude'] as const).map(async (engine) => ({
@@ -342,10 +356,27 @@ export class CodingService {
         profiles: this.profiles
           .filter((p) => p.owner === owner)
           .map(({ key, owner, ...p }) => ({ ...p, hasKey: !!key })),
-        installs: [...this.installJobs.values()]
-          .filter((j) => j.owner === owner)
-          .map(({ child, owner, ...j }) => j),
+        permissions: Object.fromEntries(
+          ['codex', 'claude'].map((engine) => [
+            engine,
+            this.permissions[owner + ':' + engine] ?? 'execute',
+          ]),
+        ),
+        installs,
       };
+    }
+    if (method === 'coding.permission') {
+      const p = z
+        .object({ engine: codingEngine, mode: z.enum(['read', 'edit', 'execute']) })
+        .strict()
+        .parse(raw);
+      if ([...this.running.values()].some((r) => r.profile.engine === p.engine))
+        throw Error('请先停止此应用的运行任务，再修改权限');
+      const permissions={...this.permissions,[owner + ':' + p.engine]:p.mode};
+      await this.vault.write('coding-permissions', permissions);
+      this.permissions=permissions;
+      return { saved: true };
+    }
     if (method === 'coding.configure') {
       const c = configSchema.parse(raw);
       if (!isAbsolute(c.directory) || [c.codex, c.claude].some((p) => p && !isAbsolute(p)))
@@ -390,9 +421,14 @@ export class CodingService {
       return { removed: true };
     }
     if (method === 'coding.install.plan') {
+      if (
+        !['linux', 'win32', 'darwin'].includes(process.platform) ||
+        !['x64', 'arm64'].includes(process.arch)
+      )
+        throw Error('此系统不支持编程客户端');
       const p = z.object({ engine: codingEngine, directory: z.string() }).strict().parse(raw);
       if (!isAbsolute(p.directory)) throw Error('安装目录须为绝对路径');
-      const npm = await this.npmPath();
+      const npm = await this.npmPath().catch(() => '');
       const response = await fetch('https://registry.npmjs.org/' + pkg[p.engine] + '/latest', {
         signal: AbortSignal.timeout(15000),
       });
@@ -415,7 +451,7 @@ export class CodingService {
         version: plan.version,
         directory: join(plan.directory, 'engines', p.engine),
         steps: [
-          '在专用目录安装官方 npm 软件包及依赖',
+          '在专用目录准备私有安装工具并安装官方最新版客户端',
           '禁用安装脚本，不修改全局 PATH 或系统软件源',
           '安装后验证实际客户端版本',
         ],
@@ -425,10 +461,12 @@ export class CodingService {
       const { id } = object.parse(raw),
         job = this.installJobs.get(id);
       if (!job || job.owner !== owner) throw Error('安装任务不存在');
+      job.abort.abort();
       if (job.state === 'running' && job.child) {
         job.state = 'cancelled';
         this.kill(job.child);
       }
+      if (job.state === 'running') job.state = 'cancelled';
       return { state: job.state };
     }
     if (method === 'coding.install') {
@@ -438,80 +476,114 @@ export class CodingService {
       if ([...this.installJobs.values()].some((j) => j.state === 'running'))
         throw Error('已有安装任务');
       this.plans.delete(id);
-      const prefix = join(plan.directory, 'engines', plan.engine);
+      const prefix = join(
+        plan.directory,
+        'engines',
+        plan.engine,
+        plan.version + '-' + randomUUID(),
+      );
       await mkdir(prefix, { recursive: true });
       const job = {
         id: randomUUID(),
         owner,
         state: 'running',
         output: '',
+        abort: new AbortController(),
         child: undefined as ChildProcessWithoutNullStreams | undefined,
       };
       this.installJobs.set(job.id, job);
-      const npmConfig = join(plan.directory, 'npm-isolated.conf');
-      await writeFile(npmConfig, '', { mode: 0o600 });
-      await writeFile(npmConfig+'.global', '', { mode: 0o600 });
-      const npmEnv = Object.fromEntries(
-        Object.entries(process.env).filter(([key]) => !/^npm_/i.test(key)),
-      );
-      const child = spawn(
-        process.execPath,
-        [
-          plan.npm,
-          'install',
-          '--prefix',
-          prefix,
-          '--no-audit',
-          '--no-fund',
-          '--ignore-scripts',
-          '--registry=https://registry.npmjs.org',
-          pkg[plan.engine] + '@' + plan.version,
-        ],
-        {
-          windowsHide: true,
-          detached: process.platform !== 'win32',
-          env: {
-            ...npmEnv,
-            npm_config_cache: join(plan.directory, 'cache'),
-            npm_config_userconfig: npmConfig,
-            npm_config_globalconfig: npmConfig+'.global',
-          },
-          stdio: 'pipe',
-        },
-      );
-      job.child = child;
-      const timer = setTimeout(() => this.kill(child), 10 * 60000);
-      child.stdout.on('data', (b) => (job.output = (job.output + b).slice(-12000)));
-      child.stderr.on('data', (b) => (job.output = (job.output + b).slice(-12000)));
-      child.on('error', (e) => {
-        job.state = 'failed';
-        job.output = e.message;
-        clearTimeout(timer);
-      });
-      child.on('close', async (code) => {
-        clearTimeout(timer);
+      void (async () => {
+        if (!plan.npm) job.output = '正在准备私有安装工具…\n';
+        const npm =
+          plan.npm ||
+          (await privateNpm(
+            plan.directory,
+            AbortSignal.any([job.abort.signal, AbortSignal.timeout(180000)]),
+          ));
         if (job.state === 'cancelled') return;
-        if(code!==0)job.state = 'failed';
-        if (code === 0) {
-          let executable = join(
+        this.authorize(owner);
+        const npmConfig = join(plan.directory, 'npm-isolated.conf');
+        await writeFile(npmConfig, '', { mode: 0o600 });
+        await writeFile(npmConfig + '.global', '', { mode: 0o600 });
+        if (job.abort.signal.aborted) return;
+        const npmEnv = Object.fromEntries(
+          Object.entries(process.env).filter(([key]) => !/^npm_/i.test(key)),
+        );
+        const child = spawn(
+          process.execPath,
+          [
+            npm,
+            'install',
+            '--prefix',
             prefix,
-            'node_modules',
-            pkg[plan.engine],
-            entry[plan.engine],
-          );
-          try {
-            // New Claude packages ship a native optional dependency and an
-            // official launcher expressly supporting --ignore-scripts.
-            if(plan.engine==='claude'){
-              try{await stat(executable);}catch{executable=join(prefix,'node_modules',pkg.claude,'cli-wrapper.cjs');}
+            '--no-audit',
+            '--no-fund',
+            '--ignore-scripts',
+            '--registry=https://registry.npmjs.org',
+            pkg[plan.engine] + '@' + plan.version,
+          ],
+          {
+            windowsHide: true,
+            detached: process.platform !== 'win32',
+            env: {
+              ...npmEnv,
+              npm_config_cache: join(plan.directory, 'cache'),
+              npm_config_userconfig: npmConfig,
+              npm_config_globalconfig: npmConfig + '.global',
+            },
+            stdio: 'pipe',
+          },
+        );
+        job.child = child;
+        const timer = setTimeout(() => this.kill(child), 10 * 60000);
+        child.stdout.on('data', (b) => (job.output = (job.output + b).slice(-12000)));
+        child.stderr.on('data', (b) => (job.output = (job.output + b).slice(-12000)));
+        child.on('error', (e) => {
+          if (job.state !== 'cancelled') job.state = 'failed';
+          job.output = e.message;
+          clearTimeout(timer);
+        });
+        child.on('close', async (code) => {
+          clearTimeout(timer);
+          if (job.state === 'cancelled') return;
+          if (code !== 0) job.state = 'failed';
+          if (code === 0) {
+            let executable = join(prefix, 'node_modules', pkg[plan.engine], entry[plan.engine]);
+            try {
+              // New Claude packages ship a native optional dependency and an
+              // official launcher expressly supporting --ignore-scripts.
+              if (plan.engine === 'claude') {
+                try {
+                  await stat(executable);
+                } catch {
+                  executable = join(prefix, 'node_modules', pkg.claude, 'cli-wrapper.cjs');
+                }
+              }
+              await stat(executable);
+              const result = await this.probe(plan.engine, executable);
+              if (job.abort.signal.aborted) return;
+              if (
+                result.ready &&
+                result.version?.split(/\s+/).some((v) => v.replace(/^v/, '') === plan.version)
+              ) {
+                this.authorize(owner);
+                const config={...this.config,[plan.engine]:executable};
+                await this.vault.write('coding-config', config);
+                this.config=config;
+                job.state = 'completed';
+              } else job.state = 'failed';
+              if (!result.ready) job.output += '\n' + result.reason;
+              else if (job.state === 'failed') job.output += '\n客户端版本与安装计划不一致';
+            } catch (e) {
+              job.state = 'failed';
+              job.output += '\n' + String(e);
             }
-            await stat(executable);
-            this.config[plan.engine]=executable;
-            await this.vault.write('coding-config', this.config);
-            const result = await this.probe(plan.engine);
-            job.state = result.ready && result.version?.includes(plan.version) ? 'completed' : 'failed';
-            if (!result.ready) job.output += '\n' + result.reason;
-          } catch(e) {job.state='failed';job.output+='\n'+String(e);}
+          }
+        });
+      })().catch((e) => {
+        if (job.state !== 'cancelled') {
+          job.state = 'failed';
+          job.output += '\n' + String(e);
         }
       });
       return { id: job.id };
@@ -604,6 +676,11 @@ export class CodingService {
         .strict()
         .parse(raw),
       p = { ...this.profile(owner, i.profileId) };
+    if (
+      ['read', 'edit', 'execute'].indexOf(i.mode) >
+      ['read', 'edit', 'execute'].indexOf(this.permissions[owner + ':' + p.engine] ?? 'execute')
+    )
+      throw Error('此操作超出应用权限，请在应用市场调整权限');
     if (this.running.size >= 4) throw Error('最多同时运行 4 项任务');
     if (!isAbsolute(i.cwd) || !(await stat(i.cwd)).isDirectory()) throw Error('项目目录不存在');
     const binding = createHash('sha256')
@@ -933,7 +1010,11 @@ export class CodingService {
       if (l.child) this.kill(l.child);
       if (l.timer) clearTimeout(l.timer);
     }
-    for (const j of this.installJobs.values()) if (j.child) this.kill(j.child);
+    for (const j of this.installJobs.values()) {
+      j.abort.abort();
+      if (j.state === 'running') j.state = 'cancelled';
+      if (j.child) this.kill(j.child);
+    }
     await this.persist();
   }
 }

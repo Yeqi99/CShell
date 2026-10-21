@@ -50,8 +50,8 @@ declare global {
 const $ = (id: string) => document.getElementById(id)!;
 const desktop=new MobileDesktop(window.CShellNative);
 const mobileIde=new MobileIde(window.CShellNative);
-const mobileCoding=new MobileCoding(window.CShellNative);
-const machineApps=new Map<string,{browser?:boolean;ide?:boolean;coding?:boolean}>();
+const mobileCoding=new MobileCoding(window.CShellNative,(id,apps)=>{machineApps.set(id,{...machineApps.get(id),...apps});updateMachineApps(id);});
+const machineApps=new Map<string,{browser?:boolean;ide?:boolean;codex?:boolean;claude?:boolean;market?:boolean}>();
 const desktopStatus=new Map<string,{packageReady?:boolean;viewAllowed?:boolean;controlAllowed?:boolean;inputFeatures?:string[];qualityModes?:string[]}>();
 const icons: Record<string, string> = {
   extensions: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 17.5h7m-3.5-3.5v7"/>',
@@ -600,8 +600,9 @@ function updateMachineApps(id:string){
  const s=sessions.get(id),picker=s?.element.querySelector('.agent-environments'),cap=machineApps.get(id);if(!s||!picker||!cap)return;
  picker.querySelector('.machine-apps')?.remove();const apps=document.createElement('div');apps.className='machine-apps';
  if(cap.browser&&window.CShellNative.browserSupported?.()){const b=document.createElement('button');b.className='machine-app-browser';b.textContent='浏览器';b.onclick=()=>window.CShellNative.browserOpen?.(id,s.profile.name,'');apps.append(b);}
- if(cap.ide){const b=document.createElement('button');b.className='machine-app-ide';b.textContent='代码工作室';b.onclick=()=>void mobileIde.open(id,s.profile.name);apps.append(b);}
- if(cap.coding)for(const engine of ['codex','claude'] as const){const b=document.createElement('button');b.textContent=engine==='codex'?'Codex':'Claude Code';b.onclick=()=>mobileCoding.open(id,s.profile.name,engine);apps.append(b);}
+ if(cap.ide){const b=document.createElement('button');b.className='machine-app-ide';b.textContent='代码编辑器';b.onclick=()=>void mobileIde.open(id,s.profile.name);apps.append(b);}
+ if(cap.market){const b=document.createElement('button');b.textContent='应用市场';b.onclick=()=>mobileCoding.open(id,s.profile.name,'market',()=>void mobileIde.open(id,s.profile.name));apps.append(b);}
+ for(const engine of ['codex','claude'] as const){if(!cap[engine])continue;const b=document.createElement('button');b.textContent=engine==='codex'?'Codex':'Claude Code';b.onclick=()=>mobileCoding.open(id,s.profile.name,engine);apps.append(b);}
  picker.insertBefore(apps,picker.children[2]||null);
 }
 function updateAgentDesktopEntry(id: string) {

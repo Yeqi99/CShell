@@ -425,6 +425,8 @@ test('Agent provider reassembles bounded large management results across protoco
       'tool path must preserve complete JSON across frames',
     );
     assert.ok(toolResult.every((s) => s.config.routes[0].body === '中文'.repeat(8000)));
+    const burst=await Promise.all(Array.from({length:16},()=>f.provider.call(device.deviceId,{method:'hosting.list'})));
+    assert.ok(burst.every(value=>Array.isArray(value)&&value.length===5),'parallel panels must not exceed the server channel limit');
   } finally {
     await f.close();
   }

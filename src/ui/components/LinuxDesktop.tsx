@@ -1,6 +1,7 @@
 import {IdeApp} from './IdeApp';
+import {agentRead} from '../agent-read';
 import {CodingApp} from './CodingApp';
-import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import {
   Monitor,
   Terminal,
@@ -30,7 +31,7 @@ import { TerminalPane } from './TerminalPane';
 import './linux-desktop.css';
 
 const apps = [
-  { id: 'ide', label: '代码工作室', icon: Terminal, color: 'blue' },
+  { id: 'ide', label: '代码编辑器', icon: Terminal, color: 'blue' },
   { id: 'codex', label: 'Codex', icon: Terminal, color: 'green' },
   { id: 'claude', label: 'Claude Code', icon: Terminal, color: 'amber' },
   { id: 'browser', label: '浏览器', icon: Globe, color: 'blue' },
@@ -114,8 +115,17 @@ export function LinuxDesktop({
   onTerminal?: () => void;
   terminal?: (active: boolean, theme: 'light' | 'dark') => ReactNode;
 }) {
+  const [installed,setInstalled]=useState<string[]>([]);
+  const refreshInstalled=useCallback(async()=>{
+    const [c,i]=await Promise.allSettled([agentRead(()=>call('coding.status')),agentRead(()=>call('ide.status'))]);
+    const ids:string[]=[];
+    if(c.status==='fulfilled')for(const engine of (c.value as any)?.engines??[])if(engine.ready)ids.push(engine.engine);
+    if(i.status==='fulfilled'&&(i.value as any)?.ready&&(i.value as any)?.supported)ids.push('ide');
+    setInstalled(ids);
+  },[call]);
+  useEffect(()=>{void refreshInstalled();},[refreshInstalled]);
   const catalog = [
-    ...apps.filter(app => machine.terminalOnly ? app.id === 'terminal' : machine.platform === 'android' ? app.id === 'settings' : app.id === 'browser' ? ['linux','win32','darwin'].includes(machine.platform) : app.id !== 'native' || machine.platform === 'linux'),
+    ...apps.filter(app => ['codex','claude','ide'].includes(app.id)?installed.includes(app.id):machine.terminalOnly ? app.id === 'terminal' : machine.platform === 'android' ? app.id === 'settings' : app.id === 'browser' ? ['linux','win32','darwin'].includes(machine.platform) : app.id !== 'native' || machine.platform === 'linux'),
     ...extraPanels.map((p) => ({ id: p.id, label: p.label, icon: p.icon ?? Settings, color: 'slate' })),
   ];
   const [context, setContext] = useState<{id:string;x:number;y:number}>();
@@ -139,7 +149,7 @@ export function LinuxDesktop({
       return initialLook;
     }
   });
-  const [windows, setWindows] = useState<WindowState[]>(()=>{try{const saved=JSON.parse(localStorage.getItem(key+':windows')||'[]');return Array.isArray(saved)?saved.filter(w=>catalog.some(a=>a.id===w.id)&&['x','y','w','h','z'].every(k=>Number.isFinite(w[k]))&&w.w>0&&w.h>0).slice(0,16).map((w,i)=>({...w,minimized:!!w.minimized,closed:!!w.closed,maximized:!!w.maximized,z:i+1})):[];}catch{return [];}}),
+  const [windows, setWindows] = useState<WindowState[]>(()=>{try{const saved=JSON.parse(localStorage.getItem(key+':windows')||'[]');return Array.isArray(saved)?saved.filter(w=>(apps.some(a=>a.id===w.id)||extraPanels.some(a=>a.id===w.id))&&['x','y','w','h','z'].every(k=>Number.isFinite(w[k]))&&w.w>0&&w.h>0).slice(0,16).map((w,i)=>({...w,minimized:!!w.minimized,closed:!!w.closed,maximized:!!w.maximized,z:i+1})):[];}catch{return [];}}),
     [menu, setMenu] = useState(false),
     [settingsTab, setSettingsTab] = useState('appearance'),
     [error, setError] = useState(''),
@@ -202,7 +212,7 @@ export function LinuxDesktop({
   };
   const patch = (id: string, change: Partial<WindowState>) =>
     setWindows((v) => v.map((w) => (w.id === id ? { ...w, ...change } : w)));
-  const front = windows.filter((w) => !w.minimized && !w.closed).sort((a, b) => b.z - a.z)[0]?.id;
+  const front = windows.filter((w) => !w.minimized && !w.closed && catalog.some(a=>a.id===w.id)).sort((a, b) => b.z - a.z)[0]?.id;
   const bounds = (w: WindowState) => {
     const margin = Math.min(16,size.w/4,size.h/4);
     const width = Math.min(w.w, Math.max(1,size.w-margin*2)),
@@ -364,7 +374,8 @@ export function LinuxDesktop({
           <small>{machine.platform === 'win32' ? 'Windows' : machine.platform === 'linux' ? 'Linux' : machine.platform === 'android' ? 'Android' : '设备'} · cagent</small>
         </div>
         {windows.map((w) => {
-          const app = catalog.find((a) => a.id === w.id)!;
+          const app = catalog.find((a) => a.id === w.id);
+          if(!app)return null;
           const visible = !w.minimized && !w.closed;
           return (
             <section
@@ -436,7 +447,7 @@ export function LinuxDesktop({
                 }
               >
                 {w.id==='ide'&&!closed&&<IdeApp call={call} openBrowser={async url=>{const session=target.startsWith('ssh:')?target.slice(4):target;await window.cshell.machineBrowser(session,'new');await window.cshell.machineBrowser(session,'navigate',url);open('browser');}}/>}
-                {['codex','claude'].includes(w.id)&&!closed&&<CodingApp engine={w.id as 'codex'|'claude'} name={name} call={call} active={active&&visible&&front===w.id} openBrowser={async url=>{const session=target.startsWith('ssh:')?target.slice(4):target;await window.cshell.machineBrowser(session,'new');await window.cshell.machineBrowser(session,'navigate',url);open('browser');}}/>}
+                {['codex','claude'].includes(w.id)&&!closed&&<CodingApp onManage={()=>open('applications')} engine={w.id as 'codex'|'claude'} name={name} call={call} active={active&&visible&&front===w.id} openBrowser={async url=>{const session=target.startsWith('ssh:')?target.slice(4):target;await window.cshell.machineBrowser(session,'new');await window.cshell.machineBrowser(session,'navigate',url);open('browser');}}/>}
                 {w.id === 'browser' && !closed && <MachineBrowser target={target} name={name} active={active && visible && front === w.id && !menu && !context} />}
                 {w.id === 'native' && !closed && (
                   <NativeApplications
@@ -452,7 +463,8 @@ export function LinuxDesktop({
                 {w.id === 'files' && <AgentMachineFiles target={target} call={call} />}
                 {w.id === 'applications' && (
                   <AgentApplications
-                    onIde={()=>open('ide')}
+                    onDevelopmentOpen={id=>{void refreshInstalled().then(()=>open(id))}}
+                    onDevelopmentChanged={()=>void refreshInstalled()}
                     target={{ id: target, name, local: false, available: !closed }}
                     call={call}
                   />
@@ -707,7 +719,8 @@ export function LinuxDesktop({
           {windows
             .filter((w) => !w.closed)
             .map((w) => {
-              const a = catalog.find((a) => a.id === w.id)!;
+              const a = catalog.find((a) => a.id === w.id);
+              if(!a)return null;
               return (
                 <button
                   key={w.id}
