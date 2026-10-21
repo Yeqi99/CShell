@@ -127,9 +127,22 @@ public final class AndroidControlService extends AccessibilityService {
     if(!accepted)gestureBusy=false;
   }
   private AccessibilityNodeInfo focused(){
-    // The active window can be the IME while input focus remains in the application.
-    AccessibilityNodeInfo node=findFocus(AccessibilityNodeInfo.FOCUS_INPUT);
-    if(node!=null&&!node.refresh()){node.recycle();return null;}return node;
+    // Android 10 can temporarily return no global input focus while the IME
+    // updates. Only fall back to a focused application window's actual input
+    // focus, never an arbitrary editable field or a remembered node.
+    for(int attempt=0;attempt<4;attempt++){
+      AccessibilityNodeInfo node=findFocus(AccessibilityNodeInfo.FOCUS_INPUT);
+      if(node!=null){if(node.refresh()&&node.isFocused())return node;node.recycle();}
+      for(android.view.accessibility.AccessibilityWindowInfo window:getWindows()){
+        try{
+          if(window.getType()!=android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION||!window.isFocused())continue;
+          AccessibilityNodeInfo root=window.getRoot();if(root==null)continue;
+          try{node=root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);if(node!=null){if(node.refresh()&&node.isFocused())return node;node.recycle();}}finally{root.recycle();}
+        }finally{window.recycle();}
+      }
+      android.os.SystemClock.sleep(24);
+    }
+    return null;
   }
   private void insert(String text){
     if(text.length()>4096)return;AccessibilityNodeInfo node=focused();if(node==null)return;
