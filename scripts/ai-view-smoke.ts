@@ -1,0 +1,31 @@
+import {build} from 'esbuild';
+import {chromium} from 'playwright';
+import {createServer} from 'node:http';
+import {mkdtemp,readFile,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import assert from 'node:assert/strict';
+const dir=await mkdtemp(join(tmpdir(),'ai-view-'));
+await build({stdin:{contents:`import React from 'react';import{createRoot}from'react-dom/client';import{AiView}from'./src/ui/components/AiView';
+const thread={id:'11111111-1111-4111-8111-111111111111',title:'服务器任务',location:'terminal',providerId:'p',sessionId:'machine-a',target:'服务器 A',mode:'review',messages:[],state:'idle'};
+window.calls=[];window.cshell={aiSnapshot:async()=>({providers:[{id:'p',name:'测试基座',model:'test-model'}],permissions:[],threads:window.deleted?[]:[thread],policy:{},extractionProviderId:null}),aiSend:async(id,text)=>{window.calls.push({id,text});thread.messages.push({role:'user',content:text});thread.state='running'},aiStop:async(id)=>{window.calls.push({stop:id});thread.state='idle'}};
+createRoot(document.getElementById('root')).render(<AiView threadId={thread.id}/>);`,resolveDir:process.cwd(),loader:'tsx'},bundle:true,outfile:join(dir,'app.js'),jsx:'automatic'});
+const server=createServer(async(req,res)=>{const file=req.url==='/app.js'?'app.js':req.url==='/app.css'?'app.css':'';res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file?'text/css':'text/html');res.end(file?await readFile(join(dir,file)):'<html><head><link rel="stylesheet" href="/app.css"><style>*{box-sizing:border-box}body{margin:0;font:13px system-ui;--terminal:white;--border:#ddd;--muted:#667;--accent:#1677ff}#root{height:100vh}button,select,textarea{font:inherit}[hidden]{display:none!important}</style></head><body><div id="root"></div><script src="/app.js"></script></body></html>');});
+await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
+const browser=await chromium.launch({channel:'msedge',headless:true});
+try {
+ const page=await browser.newPage({viewport:{width:320,height:460}}),errors:string[]=[];
+ page.on('pageerror',e=>errors.push(e.message));
+ await page.goto(`http://127.0.0.1:${(server.address() as any).port}`);
+ await page.getByText('服务器 A',{exact:true}).waitFor();
+ await page.getByLabel('发送给智能体').fill('检查当前机器');
+ await page.getByRole('button',{name:'发送',exact:true}).click();
+ await page.getByRole('button',{name:'停止 AI'}).click();
+ assert.deepEqual(await page.evaluate(()=>(window as any).calls),[{id:'11111111-1111-4111-8111-111111111111',text:'检查当前机器'},{stop:'11111111-1111-4111-8111-111111111111'}]);
+ assert.ok(await page.evaluate(()=>document.body.scrollWidth<=innerWidth));
+ await page.evaluate(()=>{(window as any).deleted=true;});
+ await page.getByText('该智能体会话已删除或不可用，请在视图设置中重新选择。',{exact:true}).waitFor();
+ assert.equal(await page.getByLabel('发送给智能体').count(),0);
+ assert.deepEqual(errors,[]);
+ console.log('AI pane: narrow layout, bound send/stop, deleted conversation recovery passed.');
+} finally {await browser.close();server.close();await rm(dir,{recursive:true,force:true});}

@@ -347,7 +347,7 @@ else
                     }
                   : {}),
               });
-            return result;
+            return viewSender ? monitorWindows.result(event.sender.id, name, result) : result;
           } catch (error) {
             diagnostics.record('ipc.' + name, error);
             if (viewSender) monitorWindows.failed(event.sender.id, name);
@@ -541,6 +541,7 @@ else
         },
         (channel, value) => {
           if (!window.isDestroyed()) window.webContents.send(channel, value);
+          monitorWindows.publish(channel, value);
         },
         http,
         wechat,

@@ -1,4 +1,5 @@
 export type TextAssistTarget = {
+  sessionId?: string;
   mode: 'translate' | 'compose';
   text: string;
   label: string;
@@ -21,12 +22,14 @@ export function analysisDraft(text: string, locale: string) {
     '\n'
   );
 }
-export function analyzeSelection(text: string) {
+export type AnalysisRequest = { text: string; sessionId?: string; recipient: 'main' | 'monitor' };
+export function analyzeSelection(text: string, sessionId?: string) {
   if (!text.trim()) return;
   window.dispatchEvent(new Event('cshell:open-ai'));
   window.dispatchEvent(
     new CustomEvent('cshell:analyze-selection', {
-      detail: analysisDraft(text, document.documentElement.lang),
+      detail: { text: analysisDraft(text, document.documentElement.lang), sessionId,
+        recipient: new URLSearchParams(location.search).has('monitorView') ? 'monitor' : 'main' } satisfies AnalysisRequest,
     }),
   );
 }

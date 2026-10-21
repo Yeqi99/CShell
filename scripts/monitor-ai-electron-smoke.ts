@@ -1,0 +1,34 @@
+import {_electron as electron} from 'playwright';
+import {createServer} from 'node:http';
+import {mkdtemp,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import assert from 'node:assert/strict';
+import {fixture} from '../tests/fixture';
+const ssh=await fixture(),data=await mkdtemp(join(tmpdir(),'monitor-ai-electron-'));
+let requests=0;
+const api=createServer(async(req,res)=>{for await(const _chunk of req){}requests++;res.setHeader('content-type','text/event-stream');res.end('data: '+JSON.stringify({choices:[{index:0,delta:{content:'本地模拟翻译'},finish_reason:'stop'}]})+'\n\ndata: [DONE]\n\n');});
+await new Promise<void>(r=>api.listen(0,'127.0.0.1',r));
+const env={...process.env,CSHELL_TEST_DATA:data};delete env.ELECTRON_RUN_AS_NODE;
+const app=await electron.launch({args:['.'],env});
+try{
+ await app.evaluate(({dialog})=>{dialog.showMessageBox=(async()=>({response:1,checkboxChecked:false})) as typeof dialog.showMessageBox;});
+ const page=await app.firstWindow();page.setDefaultTimeout(15000);
+ await page.evaluate(async({port,url})=>{const id=crypto.randomUUID();await window.cshell.saveProfile({id,protocol:'ssh',name:'AI test server',host:'127.0.0.1',port,username:'tester',auth:'password',group:'',favorite:false});await window.cshell.aiProviderSave({id:crypto.randomUUID(),name:'Local fixture',model:'fixture',url});const display=(await window.cshell.viewDisplays())[0];const viewId=crypto.randomUUID();await window.cshell.saveMonitorView({id:viewId,name:'Context AI test',tiles:[{id:crypto.randomUUID(),profileId:id,label:'Terminal',kind:'ssh',displayId:display.id,column:0,row:0,width:12,height:12,directory:'',command:'',screen:''}]});await window.cshell.openMonitorView(viewId);},{port:ssh.port,url:`http://127.0.0.1:${(api.address() as any).port}/v1`});
+ const view=app.windows().find(w=>w!==page)??await app.waitForEvent('window');view.setDefaultTimeout(15000);const errors:string[]=[];view.on('pageerror',e=>errors.push(e.message));
+ await view.getByLabel('密码',{exact:true}).fill(ssh.password);await view.getByRole('button',{name:/连接/}).last().click();await view.locator('.xterm').waitFor();await view.waitForTimeout(500);
+ const terminal=view.locator('.view-terminal');await terminal.click({button:'right'});await view.getByRole('menuitem',{name:'AI 分析最近输出…',exact:true}).click();
+ await view.getByLabel('发送给智能体').waitFor();assert.ok((await view.getByLabel('发送给智能体').inputValue()).trim());assert.equal(requests,0,'Opening analysis must not send model requests');
+ const permitted=await view.evaluate(()=>window.cshell.aiSnapshot());assert.equal(permitted.threads.length,1);assert.ok(permitted.threads[0].sessionId);
+ const hiddenThread=await page.evaluate(async()=>{const snapshot=await window.cshell.aiSnapshot();return window.cshell.aiThreadCreate('terminal',snapshot.providers[0].id,'review');});
+ assert.equal((await view.evaluate(()=>window.cshell.aiSnapshot())).threads.length,1,'Unrelated main-window history leaked');
+ assert.ok(await view.evaluate(async id=>{try{await window.cshell.aiStop(id);return false;}catch{return true;}},hiddenThread.id),'View accessed unrelated thread');
+ await view.getByRole('button',{name:'收起分析',exact:true}).click();
+ const box=await terminal.boundingBox();assert.ok(box);await view.mouse.move(box.x+8,box.y+8);await view.mouse.down();await view.mouse.move(box.x+300,box.y+35,{steps:12});await view.mouse.up();await terminal.click({button:'right',position:{x:300,y:35}});
+ await view.getByRole('menuitem',{name:'复制选中文字',exact:true}).click();
+ assert.ok((await app.evaluate(({clipboard})=>clipboard.readText())).length,'Clipboard write from view failed');
+ await terminal.click({button:'right',position:{x:300,y:35}});await view.getByRole('menuitem',{name:'AI 翻译选中文字',exact:true}).click();
+ await view.locator('.text-assist').waitFor();
+ await view.getByText('本地模拟翻译',{exact:true}).waitFor();assert.equal(requests,1,'Translation must use only the loopback fixture');
+ assert.deepEqual(errors,[]);console.log('Electron view AI: context draft, correct session, snapshot/operation isolation, clipboard and loopback translation passed.');
+}finally{await app.close();await ssh.close();api.close();await rm(data,{recursive:true,force:true});}

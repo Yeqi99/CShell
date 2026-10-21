@@ -722,7 +722,7 @@ export function TerminalPane({
             <>
               <button
                 disabled={!term.current?.hasSelection()}
-                onClick={() => analyzeSelection(term.current?.getSelection() || '')}
+                onClick={() => analyzeSelection(term.current?.getSelection() || '', id)}
               >
                 AI 分析
               </button>

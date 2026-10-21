@@ -21,6 +21,24 @@ test('saved views reject overlap, duplicate ids and credential payloads', () => 
   assert.equal(monitorViewSchema.safeParse({ ...base, tiles: [t, { ...t, displayId: 'other' }] }).success, false);
   assert.equal(monitorViewSchema.safeParse({ ...base, password: 'secret' }).success, false);
 });
+
+test('AI view sources preserve a real conversation reference without machine or credential data', async () => {
+  const threadId = randomUUID();
+  const ai = { ...tile(), kind: 'ai' as const, profileId: '', threadId, label: '运维助手' };
+  const view = { id: randomUUID(), name: 'AI 与机器', tiles: [ai] };
+  assert.equal(monitorViewSchema.safeParse(view).success, true);
+  assert.equal(monitorViewSchema.safeParse({...view, tiles:[{...ai, threadId:undefined}]}).success, false);
+  assert.equal(monitorViewSchema.safeParse({...view, tiles:[{...ai, profileId:randomUUID()}]}).success, false);
+  assert.equal(monitorViewSchema.safeParse({...view, tiles:[{...tile(), profileId:''}]}).success, false);
+  assert.equal(monitorViewSchema.safeParse({...view, tiles:[{...tile(), threadId}]}).success, false);
+  const dir = await mkdtemp(join(tmpdir(), 'cshell-ai-view-'));
+  const codec = { encrypt: async (s: string) => s, decrypt: async (s: string) => s };
+  try {
+    const store = new Store(dir, codec); await store.load(); await store.saveMonitorView(view);
+    const restored = new Store(dir, codec); await restored.load();
+    assert.deepEqual(restored.monitorViews(), [view]);
+  } finally { await rm(dir, {recursive:true, force:true}); }
+});
 test('directory and screen identifiers are literal shell arguments, screen never detaches other clients', () => {
   assert.equal(viewShellCommand({ ...tile(), directory: "/srv/it's a world", command: 'tail -F latest.log' }),
     "cd -- '/srv/it'\\''s a world' && tail -F latest.log");

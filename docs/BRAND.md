@@ -1,10 +1,10 @@
-# 品牌标识 · 0.6.36
+# 品牌标识 · 0.7.6
 
-CShell 与 CAgent 共用开口 C 轮廓。CShell 的蓝色终端提示符代表工作台；CAgent 的薄荷绿星芒代表本地智能体。Pro 使用香槟金轮廓及细边框，保留产品识别，不依赖微小的 Pro 字样。
+CShell 与 CAgent 共用开口 C 轮廓及深色圆角底，分别以终端提示符和像素节点区分用途。基础版保持蓝色与绿色，Pro 增加金色标签。
 
-本次使用内置 imagegen 生成四个概念图，保存在 `assets/brand/generated/`。正式应用采用依据这些概念整理的 SVG，避免生成图的杂点及缩小时的模糊；PNG 和多尺寸 ICO 由 `scripts/render-icon.cjs` 渲染。基础版本已应用，Pro 仅提供设计资产，未冒充已开发的商业产品。
+0.7.6 按用户提供的品牌参考图更新：CShell 为蓝青渐变 C 与白色终端符号，CAgent 为薄荷绿渐变 C 与像素节点，均使用深色圆角底。Pro 共用基础图形并增加金色标识。正式资源为可编辑 SVG，PNG 与多尺寸 ICO 从同一源文件渲染。Pro 仅提供设计资源，不代表商业版本已经发布。`assets/brand/generated/` 保留旧版概念图，不参与当前应用构建。
 
-## 生成提示词概要
+## 历史概念图提示词（不用于当前资源）
 
 - CShell：production app icon; bold geometric white C shell enclosing terminal >_; deep ink navy tile, electric blue accent; flat vector-like geometry, transparent surround, no text.
 - CAgent：same family C silhouette; replace terminal with mint four-point spark; dark teal tile; clean, small-size readable, no robot face.
@@ -17,6 +17,7 @@ CShell 与 CAgent 共用开口 C 轮廓。CShell 的蓝色终端提示符代表�
 - 品牌目录：`assets/brand/cshell.svg`、`cagent.svg`、`cshell-pro.svg`、`cagent-pro.svg`。
 - Windows CAgent 的窗口品牌和托盘从可执行文件内嵌图标读取，同安装图标一致。
 - Android 构建复制同一 CShell 图标；macOS / Linux 包装使用共享 PNG。
+- `node scripts/build-brand-vectors.mjs` 从当前设计参数重建 SVG。
 - 运行 `electron scripts/render-icon.cjs icon`、`cagent-icon`、`brand/cshell-pro` 或 `brand/cagent-pro` 更新输出。
 
 当前发布为开源版，Pro 素材不改变授权、功能或现有应用名称。

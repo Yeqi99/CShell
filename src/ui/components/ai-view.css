@@ -1,0 +1,16 @@
+.view-ai { height: 100%; min-width: 0; overflow: hidden; container-type: inline-size; }
+.view-ai .agent-context { padding: 5px 9px; flex-shrink: 0; }
+.view-ai .agent-messages { padding: 10px; }
+.view-ai .agent-message { margin-bottom: 14px; }
+.view-ai .agent-composer { margin: 6px; padding: 8px; flex-shrink: 0; }
+.view-ai .agent-composer textarea { min-height: 48px; max-height: 100px; }
+.view-ai .agent-composer-tools { flex-wrap: wrap; gap: 5px; }
+.view-ai .agent-model { min-width: 0; flex: 1; overflow: hidden; }
+.view-ai .agent-thread-model { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.view-ai > .form-error { margin: 4px 8px; max-height: 60px; overflow: auto; }
+@container (max-width: 360px) {
+  .view-ai .agent-messages { padding: 8px; font-size: 12px; }
+  .view-ai .agent-composer-tools { font-size: 11px; }
+  .view-ai .agent-policy select { max-width: 94px; }
+  .view-ai .agent-send { width: 30px; height: 30px; min-height: 30px; }
+}

@@ -53,7 +53,16 @@ try {
   await view.getByRole('button', { name: '放大 Server 1', exact: true }).click();
   assert.equal(await view.locator('.view-tile.view-focused').count(), 1);
   const full = await view.locator('.view-grid').boundingBox(), enlarged = await view.locator('.view-tile.view-focused').boundingBox();
-  assert.ok(full && enlarged && enlarged.width >= full.width - 2 && enlarged.height >= full.height - 2);
+  const inset = await view.locator('.view-grid').evaluate(e => {
+    const css = getComputedStyle(e);
+    return {left:parseFloat(css.paddingLeft),right:parseFloat(css.paddingRight),top:parseFloat(css.paddingTop),bottom:parseFloat(css.paddingBottom)};
+  });
+  assert.ok(full && enlarged);
+  // Focus fills the grid's content box, preserving the same outer gutter as the tiled view.
+  assert.ok(Math.abs(enlarged.x - full.x - inset.left) < 1);
+  assert.ok(Math.abs(enlarged.y - full.y - inset.top) < 1);
+  assert.ok(Math.abs(enlarged.width - (full.width - inset.left - inset.right)) < 1);
+  assert.ok(Math.abs(enlarged.height - (full.height - inset.top - inset.bottom)) < 1);
   assert.equal(server.shellRequests(), 2, 'Enlarging a preview must reuse its session');
   await view.getByRole('button', { name: '返回全部预览', exact: true }).click();
   assert.equal(await view.locator('.view-preview-open').count(), 2);
@@ -62,6 +71,13 @@ try {
   assert.equal(await page.evaluate(async () => (await window.cshell.monitorViews())[0].mode), 'overview');
   await mkdir('test-results', { recursive: true });
   await view.screenshot({ path: 'test-results/monitor-views-smoke.png' });
+  await view.locator('.view-pane-close').first().click();
+  await view.waitForTimeout(300);
+  assert.equal(await view.locator('.view-tile').count(), 1);
+  assert.equal(server.connectionsCount(), 1, 'Closing one owned pane must release only that session');
+  await view.getByRole('button', { name: '保存布局', exact: true }).click();
+  await view.getByText('布局已保存', { exact: true }).waitFor();
+  assert.equal(await page.evaluate(async () => (await window.cshell.monitorViews())[0].tiles.length), 1);
   await page.evaluate(id => window.cshell.closeMonitorView(id), viewId);
   await page.waitForTimeout(300);
   assert.equal(server.connectionsCount(), 0, 'View-owned sessions must close with their window');
@@ -70,7 +86,7 @@ try {
   assert.equal(server.shellInputs.filter(s => s.includes('echo explicit-start')).length, 1);
   await page.evaluate(id => window.cshell.closeMonitorView(id), viewId);
   await page.reload();
-  await page.locator('.home-connections button').first().click();
+  await page.locator('.home-connection-list button').first().click();
   const auth = page.locator('.saved-connection:visible');
   await auth.getByLabel('密码', { exact: true }).fill(server.password);
   await auth.getByRole('button', { name: /连接/ }).last().click();
@@ -85,6 +101,9 @@ try {
   assert.equal(server.shellRequests(), before, 'Current connection view must not create a second SSH session');
   await currentView.screenshot({ path: 'test-results/current-view-smoke.png' });
   await page.screenshot({ path: 'test-results/workbench-home-smoke.png' });
+  await currentView.locator('.view-pane-close').first().click();
+  await currentView.locator('.view-empty').waitFor();
+  assert.equal(server.connectionsCount(), 1, 'Closing the borrowed pane must preserve the original session');
   await currentView.evaluate(() => window.close());
   await page.waitForTimeout(200);
   assert.equal(server.connectionsCount(), 1, 'Closing a borrowed view must preserve the original connection');

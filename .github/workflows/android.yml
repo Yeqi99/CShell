@@ -29,6 +29,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: node scripts/build-android.mjs
       - run: pnpm exec tsc -p android/web/tsconfig.json
+      - name: Verify bounded local file streams
+        run: |
+          mkdir -p "$RUNNER_TEMP/cshell-local-files"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/cshell-local-files" android/app/src/main/java/org/canpshell/mobile/LocalFileStreams.java android/app/src/test/java/org/canpshell/mobile/LocalFileStreamsTest.java
+          java -cp "$RUNNER_TEMP/cshell-local-files" org.canpshell.mobile.LocalFileStreamsTest
       - run: gradle -p android assembleDebug lint
       - uses: actions/upload-artifact@v4
         with:

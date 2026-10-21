@@ -53,7 +53,7 @@ export function TextAssist() {
     const requested = (e: Event) => open((e as CustomEvent<TextAssistTarget>).detail);
     const context = (e: MouseEvent) => {
       const element = e.target as HTMLElement;
-      if (element.closest('.terminal-pane, .text-assist, .text-assist-menu')) return;
+      if (element.closest('.terminal-pane, .view-terminal, .text-assist, .text-assist-menu')) return;
       const input = element.closest('input,textarea') as
         HTMLInputElement | HTMLTextAreaElement | null;
       let next: TextAssistTarget | null = null;
@@ -229,7 +229,7 @@ export function TextAssist() {
           {!!(menu.target.copy ?? menu.target.text) && (
             <button
               role="menuitem"
-              onClick={() => analyzeSelection(menu.target.copy ?? menu.target.text)}
+              onClick={() => analyzeSelection(menu.target.copy ?? menu.target.text, menu.target.sessionId)}
             >
               <Sparkles size={15} />
               AI 分析

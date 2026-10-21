@@ -1,13 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
-import { Save, SlidersHorizontal, RotateCcw, ArrowLeft, Grid2X2 } from 'lucide-react';
+import { Save, SlidersHorizontal, RotateCcw, ArrowLeft, Grid2X2, X } from 'lucide-react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import type { Config, Profile } from '../../shared/contracts';
 import { type MonitorView, type ViewTile, type BorrowedViewTerminal, viewShellCommand, arrangeViewTiles, localViewProfiles } from '../../shared/monitor-views';
 import { LocaleContext } from '../i18n';
+import { mergeMonitorDisplay } from '../../shared/monitor-view-layout';
+import { AiView } from './AiView';
+import { MonitorAiAssist } from './MonitorAiAssist';
 import { SavedConnection } from './SavedConnection';
 import { AgentDesktopView } from './AgentDesktopView';
 import { terminalEvent, subscribeTerminal } from '../terminalBus';
+import { ViewTerminalMenu } from './ViewTerminalMenu';
 import '@xterm/xterm/css/xterm.css';
 import './monitor-views.css';
 
@@ -17,8 +21,10 @@ function SshView({ tile, profile, config, borrowed }: { tile: ViewTile; profile:
   const [connecting, setConnecting] = useState(false);
   const attempted = useRef(false);
   const host = useRef<HTMLDivElement>(null);
+  const terminal = useRef<Terminal | null>(null);
+  const ownedSession = useRef(id); ownedSession.current=id;
   const live = useRef(true);
-  useEffect(() => () => { live.current = false; }, []);
+  useEffect(() => {live.current=true;return () => { live.current = false;if(!borrowed&&ownedSession.current)void window.cshell.disconnect(ownedSession.current).catch(()=>{}); };}, []);
   const connectTerminal = async () => {
     setConnecting(true); setError('');
     try {
@@ -41,6 +47,7 @@ function SshView({ tile, profile, config, borrowed }: { tile: ViewTile; profile:
     const term = new Terminal({ scrollback: 3000, fontSize: 13, cursorBlink: true,
       theme: config.preferences.theme === 'dark' ? { background: '#101820', foreground: '#e6edf3' } : { background: '#ffffff', foreground: '#24354b' } });
     const fit = new FitAddon(); term.loadAddon(fit); term.open(host.current);
+    terminal.current=term;
     if (borrowed) term.write(borrowed.snapshot.data);
     const stop = subscribeTerminal(id, data => term.write(data, () => { void window.cshell.acknowledge(id, data.length).catch(() => {}); }));
     const input = term.onData(data => { void window.cshell.input(id, data).catch(e => setError(String(e))); });
@@ -48,7 +55,7 @@ function SshView({ tile, profile, config, borrowed }: { tile: ViewTile; profile:
     const observer = new ResizeObserver(resize); observer.observe(host.current); resize();
     window.addEventListener('focus', resize);
     const off = window.cshell.events(e => { if (e.type === 'closed' && e.sessionId === id) { setClosed(true); setError(e.error || '连接已断开'); } });
-    return () => { off(); window.removeEventListener('focus', resize); observer.disconnect(); input.dispose(); stop(); term.dispose(); };
+    return () => { off(); window.removeEventListener('focus', resize); observer.disconnect(); input.dispose(); stop(); terminal.current=null;term.dispose(); };
   }, [id, config.preferences.theme]);
   return <div className="view-ssh">
     {!id && tile.kind!=='ssh' ? <button disabled={connecting} onClick={()=>void connectTerminal()}>{connecting?'正在连接…':'连接 '+(tile.shell??'PowerShell')}</button> : !id ? <SavedConnection profile={profile} saved={config.savedCredentials.includes(profile.id)} onDone={() => {}} onConnect={async (p, credentials) => {
@@ -63,6 +70,7 @@ function SshView({ tile, profile, config, borrowed }: { tile: ViewTile; profile:
       {borrowed ? <span className="view-session-note muted">复用工作台会话</span> : <button className="view-session-reconnect" title="重新连接" aria-label="重新连接" onClick={() => { void window.cshell.disconnect(id).catch(() => {}); setId(''); setError(''); }}><RotateCcw size={13}/></button>}
     </div><div className="view-terminal" ref={host}/></>}
     {error && <p role="alert" className="form-error">{error}</p>}
+    <ViewTerminalMenu host={host} terminal={terminal} sessionId={id} closed={closed} onError={setError}/>
   </div>;
 }
 function DesktopTile({ tile }: { tile: ViewTile }) {
@@ -83,6 +91,7 @@ export function MonitorViewWindow() {
   const [config, setConfig] = useState<Config>(), [editing, setEditing] = useState(false);
   const [message, setMessage] = useState(''), [selected, setSelected] = useState('');
   const [focused, setFocused] = useState('');
+  const ownedIds = useRef(new Set<string>());
   useEffect(() => {
     const escape = (e: KeyboardEvent) => { if (e.key === 'Escape' && focused) setFocused(''); };
     window.addEventListener('keydown', escape);
@@ -102,6 +111,7 @@ export function MonitorViewWindow() {
     void Promise.all([window.cshell.monitorViewInit(), window.cshell.config()]).then(([s, c]) => {
       for (const value of Object.values(s.borrowed ?? {})) cutoffs.set(value.sessionId, value.snapshot.sequence);
       queued.forEach(forward); queued.length = 0; ready = true;
+      ownedIds.current = new Set(s.view.tiles.map(tile => tile.id));
       setState(s); setConfig({ ...c, profiles: [...c.profiles, ...(s.profiles ?? []).filter(p => !c.profiles.some(existing => existing.id === p.id))] }); document.documentElement.dataset.theme = c.preferences.theme;
     }).catch(e => setMessage(String(e)));
     return off;
@@ -109,6 +119,13 @@ export function MonitorViewWindow() {
   if (!state || !config) return <p>{message || '正在恢复视图…'}</p>;
   const update = (id: string, patch: Partial<ViewTile>) => setState(s => s && ({ ...s, view: { ...s.view, tiles: s.view.tiles.map(t => t.id === id ? { ...t, ...patch } : t) } }));
   const current = state.view.tiles.find(t => t.id === selected);
+  const closePane = (id: string) => {
+    setFocused(value => value === id ? '' : value);
+    setSelected(value => value === id ? '' : value);
+    setState(value => value && ({ ...value, view: { ...value.view,
+      tiles: arrangeViewTiles(value.view.tiles.filter(tile => tile.id !== id), value.view.mode === 'focus' ? 'focus' : 'grid') } }));
+    setMessage('区域已关闭；保存布局可保留下次打开的内容');
+  };
   return <LocaleContext.Provider value={config.preferences.locale}><main className="monitor-screen">
     <header className="view-screen-bar"><strong>{state.view.name}</strong>
       <select aria-label="视图模式" value={state.view.mode ?? 'tile'} onChange={e => {
@@ -122,8 +139,7 @@ export function MonitorViewWindow() {
       <span className="view-edit-hint">拖动标题交换位置</span></>}
       <button title="保存布局" aria-label="保存布局" onClick={() => void (async () => {
         const saved = (await window.cshell.monitorViews()).find(v => v.id === state.view.id) ?? state.view;
-        const changes = new Map(state.view.tiles.map(t => [t.id, t]));
-        await window.cshell.saveMonitorView({ ...saved, mode: state.view.mode, tiles: saved.tiles.map(t => changes.get(t.id) ?? t) });
+        await window.cshell.saveMonitorView(mergeMonitorDisplay(saved, state.view, ownedIds.current));
         setMessage('布局已保存');
       })().catch(e => setMessage(String(e)))}><Save size={15}/></button><span role="status">{message}</span>
     </header>
@@ -142,15 +158,16 @@ export function MonitorViewWindow() {
           const box = (t: ViewTile) => ({ column: t.column, row: t.row, width: t.width, height: t.height });
           setState({ ...state, view: { ...state.view, tiles: state.view.tiles.map(t => t.id === source.id ? { ...t, ...box(tile) } : t.id === tile.id ? { ...t, ...box(source) } : t) } });
         }}>
-        <button className="view-tile-title" draggable={editing} title={state.view.mode === 'focus' ? '点击设为主视图' : tile.label} onClick={() => {
+        <div className="view-tile-header"><button className="view-tile-title" draggable={editing} title={state.view.mode === 'focus' ? '点击设为主视图' : tile.label} onClick={() => {
           setSelected(tile.id);
           if (!editing && state.view.mode === 'overview') setFocused(tile.id);
           if (!editing && state.view.mode === 'focus') setState({ ...state, view: { ...state.view, tiles: arrangeViewTiles([tile, ...state.view.tiles.filter(t => t.id !== tile.id)], 'focus') } });
         }}
-          onDragStart={e => { e.dataTransfer.setData('application/x-cshell-view-tile', tile.id); e.dataTransfer.effectAllowed = 'move'; }}>{tile.label}<small>{profile?.host || '连接已删除'}</small></button>
-        <div className="view-tile-content" inert={state.view.mode === 'overview' && focused !== tile.id && !editing}>{!profile ? <p role="alert">请重新配置该区域的连接。</p> : tile.kind !== 'desktop' ? <SshView tile={tile} profile={profile} config={config} borrowed={state.borrowed?.[tile.id]}/> : <DesktopTile tile={tile}/>}</div>
+          onDragStart={e => { e.dataTransfer.setData('application/x-cshell-view-tile', tile.id); e.dataTransfer.effectAllowed = 'move'; }}>{tile.label}<small>{tile.kind === 'ai' ? '智能体' : profile?.host || '连接已删除'}</small></button>
+        <button className="view-pane-close" title={'关闭区域：'+tile.label} aria-label={'关闭区域：'+tile.label} onClick={() => closePane(tile.id)}><X size={13}/></button></div>
+        <div className="view-tile-content" inert={state.view.mode === 'overview' && focused !== tile.id && !editing}>{tile.kind === 'ai' ? <AiView threadId={tile.threadId!}/> : tile.kind === 'local' && window.cshell.platform !== 'win32' ? <p role="status">此区域使用 Windows 本机终端。请在视图设置中选择当前系统可用的 SSH 或 CAgent 连接。</p> : !profile ? <p role="alert">请重新配置该区域的连接。</p> : tile.kind !== 'desktop' ? <SshView tile={tile} profile={profile} config={config} borrowed={state.borrowed?.[tile.id]}/> : <DesktopTile tile={tile}/>}</div>
         {state.view.mode === 'overview' && !editing && !focused && <button className="view-preview-open" aria-label={'放大 '+tile.label} title={'点击放大并操作 '+tile.label} onClick={() => setFocused(tile.id)}><span>点击放大</span></button>}
       </section>;
-    })}</div>
-  </main></LocaleContext.Provider>;
+    })}{!state.view.tiles.length && <p className="view-empty">当前窗口没有区域。可保存布局，或关闭窗口后从工作台重新配置视图。</p>}</div>
+  <MonitorAiAssist/></main></LocaleContext.Provider>;
 }

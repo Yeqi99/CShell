@@ -25,8 +25,12 @@ import {
   type AiProvider,
 } from '../../shared/ai';
 import { AiConversation } from './AiConversation';
+import {openAiViewWindow} from '../ai-view-window';
+import {useI18n} from '../i18n';
+import {PanelsTopLeft} from 'lucide-react';
 import './ai-panel.css';
 import type { Profile } from '../../shared/contracts';
+import type { AnalysisRequest } from '../text-assist';
 const locations = { workspace: '工作台', terminal: '终端', files: '文件', python: 'Python' };
 export function AiPanel({
   visible,
@@ -52,6 +56,7 @@ export function AiPanel({
     extractionProviderId: null,
     threads: [],
   });
+  const {locale}=useI18n();
   const [page, setPage] = useState<'chat' | 'settings' | 'history' | 'goals' | 'events'>('chat');
   const [events, setEvents] = useState<
     AiEventSnapshot & { subscriptions: { id: string; name: string; source: string }[] }
@@ -161,23 +166,31 @@ export function AiPanel({
   currentConversation.current = { threadId, providerId, mode, sessionId };
   useEffect(() => {
     const handler = (event: Event) => {
-      const text = (event as CustomEvent<string>).detail;
+      const detail = (event as CustomEvent<string | AnalysisRequest>).detail;
+      if (typeof detail !== 'string' && detail.recipient !== 'main') return;
+      const text = typeof detail === 'string' ? detail : detail.text;
+      const requestedSession = typeof detail === 'string' ? undefined : detail.sessionId;
       setPage('chat');
       insertQueue.current = insertQueue.current
         .catch(() => {})
         .then(async () => {
           const current = currentConversation.current;
           let targetId = current.threadId;
+          if (requestedSession) {
+            const existing = (await window.cshell.aiSnapshot()).threads.find(t => t.id === targetId);
+            if (existing?.sessionId !== requestedSession) targetId = '';
+          }
           if (!targetId) {
             const next = await window.cshell.aiSnapshot();
             const provider =
               next.providers.find((p) => p.id === current.providerId) ?? next.providers[0];
+            if (!provider) throw new Error('请先配置模型基座，再分析终端内容');
             if (provider) {
               const created = await window.cshell.aiThreadCreate(
                 'terminal',
                 provider.id,
                 current.mode,
-                current.sessionId,
+                requestedSession ?? current.sessionId,
               );
               targetId = created.id;
               currentConversation.current.threadId = targetId;
@@ -205,6 +218,9 @@ export function AiPanel({
           智能体
         </strong>
         <div className="ai-toolbar">
+          <button className="icon" disabled={busy || (!thread && !providerId)}
+            title={locale==='en-US'?'Open conversation in a view':'在独立视图打开会话'} aria-label={locale==='en-US'?'Open conversation in a view':'在独立视图打开会话'}
+            onClick={()=>void run(async()=>{const current=thread ?? await create();await openAiViewWindow(current);})}><PanelsTopLeft size={16}/></button>
           <button
             className="icon"
             title="新建会话"

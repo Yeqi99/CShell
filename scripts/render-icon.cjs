@@ -22,7 +22,12 @@ app.whenReady().then(async () => {
           `<style>html,body{margin:0;background:transparent;width:512px;height:512px}svg{display:block;width:512px;height:512px}</style>${svg}`,
         ),
     );
+    await window.webContents.executeJavaScript('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
     const capture = await window.webContents.capturePage();
+    const pixels = capture.toBitmap();
+    let visible = 0;
+    for (let i=3;i<pixels.length;i+=4) if(pixels[i]>128) visible++;
+    if(visible < 512*512*.5) throw Error('Brand render is blank or incomplete');
     const source = nativeImage
       .createFromBuffer(capture.toPNG())
       .resize({ width: 512, height: 512, quality: 'best' });

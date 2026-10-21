@@ -53,6 +53,9 @@ jobs:
           pnpm exec tsx scripts/monitor-layout-smoke.ts
           pnpm exec tsx scripts/opencode-pane-smoke.ts
           pnpm exec tsx scripts/desktop-compact-ui-smoke.ts
+          pnpm exec tsx scripts/monitor-views-smoke.ts
+          pnpm exec tsx scripts/monitor-ai-electron-smoke.ts
+          pnpm exec tsx scripts/ai-view-smoke.ts
       - run: pnpm run licenses
       - if: matrix.platform == 'win'
         name: Prepare checksum-pinned desktop compiler

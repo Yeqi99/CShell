@@ -3,9 +3,10 @@ import type { TerminalSnapshot } from './floating';
 
 export const viewTileSchema = z.object({
   id: z.string().uuid(),
-  profileId: z.string().uuid(),
+  profileId: z.union([z.string().uuid(), z.literal('')]),
   label: z.string().trim().min(1).max(80),
-  kind: z.enum(['ssh', 'desktop', 'client-terminal', 'local']),
+  kind: z.enum(['ssh', 'desktop', 'client-terminal', 'local', 'ai']),
+  threadId: z.string().uuid().optional(),
   shell: z.enum(['cmd','powershell','sh']).optional(),
   displayId: z.string().max(100),
   column: z.number().int().min(0).max(11),
@@ -15,7 +16,8 @@ export const viewTileSchema = z.object({
   directory: z.string().max(4096).default(''),
   command: z.string().max(8192).default(''),
   screen: z.string().max(128).default(''),
-}).strict().refine(t => t.column + t.width <= 12 && t.row + t.height <= 12, '区域超出布局');
+}).strict().refine(t => t.column + t.width <= 12 && t.row + t.height <= 12, '区域超出布局')
+  .refine(t => t.kind === 'ai' ? !!t.threadId && t.profileId === '' : !!t.profileId && !t.threadId, '请选择真实的会话或机器来源');
 export const monitorViewSchema = z.object({
   id: z.string().uuid(),
   name: z.string().trim().min(1).max(80),

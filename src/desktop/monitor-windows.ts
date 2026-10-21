@@ -4,11 +4,22 @@ import { randomUUID } from 'node:crypto';
 import type { Profile } from '../shared/contracts';
 import type { Store } from '../core/store';
 import { arrangeViewTiles, localViewProfiles, monitorViewSchema, type MonitorView, type BorrowedViewTerminal } from '../shared/monitor-views';
+import { mergeMonitorDisplay } from '../shared/monitor-view-layout';
 import { installWindowPermissions } from './window-permissions';
+import { assertMonitorAiRequest, monitorOwnsAi } from '../shared/monitor-ai-access';
 
 type OpenView = { window: BrowserWindow; url: string; view: MonitorView; displayId: string; cleanup: Map<string, () => Promise<unknown>>; targets: Set<string>; desktopIds: Set<string>; pending: number; early: Map<string, string>; borrowed: Record<string, BorrowedViewTerminal>; profiles: Profile[] };
 export class MonitorWindows {
   private windows = new Map<number, OpenView>();
+  private aiThreads = new Map<number, Set<string>>();
+  private allowedAi(view: OpenView, sender: number, id: string) {
+    return monitorOwnsAi(view.view.tiles, this.aiThreads.get(sender), id);
+  }
+  result(sender: number, channel: string, result: any) {
+    const view = this.windows.get(sender);
+    if (view && channel === 'ai:snapshot') return { ...result, threads: result.threads.filter((t: {id: string}) => this.allowedAi(view, sender, t.id)) };
+    return result;
+  }
   private temporary = new Map<string, { view: MonitorView; borrowed: Record<string, BorrowedViewTerminal>; profiles: Profile[] }>();
   constructor(private store: Store, private entry: string, private preload: string,
     private tail: (id: string, sequence: number) => { data: string; sequence: number }[] = () => []) {
@@ -32,8 +43,11 @@ export class MonitorWindows {
     const allowed = ['config', 'client:connect', 'local-terminal:open', 'connect', 'connect:cancel', 'disconnect', 'input', 'resize', 'acknowledge',
       'clipboard:write', 'key:pick', 'agent:machine-open', 'agent:call',
       'desktop:view-start', 'desktop:view-stop', 'desktop:view-input', 'desktop:view-release',
-      'desktop:view-ack', 'desktop:view-quality', 'views:save', 'views:list'];
+      'desktop:view-ack', 'desktop:view-quality', 'views:save', 'views:list',
+      'ai:snapshot', 'ai:create', 'ai:send', 'ai:stop', 'ai:approve', 'ai:mode', 'ai:text'];
     if (!allowed.includes(channel)) throw new Error('此操作不属于监控视图');
+    assertMonitorAiRequest(channel, args, view.view.tiles, this.aiThreads.get(event.sender.id), view.cleanup);
+    if (channel === 'ai:create' && view.desktopIds.has(args[3])) throw new Error('请从终端输出发起 AI 分析');
     if (channel === 'local-terminal:open' && !view.view.tiles.some(t=>t.kind==='local'&&(t.shell??'powershell')===args[0])) throw Error('终端不属于此视图');
     if (channel === 'client:connect' && !view.view.tiles.some(t=>t.kind==='client-terminal'&&t.profileId===args[0]&&(t.shell??'powershell')===args[1])) throw Error('终端不属于此视图');
     if (['connect','client:connect','agent:machine-open'].includes(channel)) {
@@ -55,14 +69,10 @@ export class MonitorWindows {
       if (input.id !== view.view.id) throw new Error('视图不匹配');
       const saved = this.store.monitorViews().find(v => v.id === input.id) ?? this.temporary.get(input.id)?.view;
       if (!saved) throw new Error('视图已删除');
-      if (saved.tiles.some(t => t.kind!=='local' && !this.store.snapshot().profiles.some(p => p.id === t.profileId)))
+      if (saved.tiles.some(t => t.kind!=='local' && t.kind!=='ai' && !this.store.snapshot().profiles.some(p => p.id === t.profileId)))
         throw new Error('请先在服务器列表保存临时连接，再保存此视图');
       const own = new Set(view.view.tiles.map(t => t.id));
-      args[0] = { ...saved, mode: input.mode, tiles: saved.tiles.map(tile => {
-        const changed = own.has(tile.id) && input.tiles.find(t => t.id === tile.id);
-        return changed ? { ...tile, column: changed.column, row: changed.row, width: changed.width,
-          height: changed.height, displayId: view.displayId } : tile;
-      }) };
+      args[0] = mergeMonitorDisplay(saved, input, own, view.displayId);
     }
   }
   skip(event: Electron.IpcMainInvokeEvent, channel: string, args: any[]) {
@@ -88,6 +98,13 @@ export class MonitorWindows {
   }
   track(sender: number, channel: string, args: any[], result: any, cleanup: (name: string, id: string) => Promise<unknown>) {
     const owner = this.windows.get(sender);
+    if (owner && channel === 'views:save') {
+      const own = new Set(owner.view.tiles.map(t => t.id));
+      owner.view = { ...owner.view, mode: args[0].mode, tiles: args[0].tiles.filter((t: {id: string}) => own.has(t.id)) };
+    }
+    if (owner && channel === 'ai:create' && result?.id) {
+      const ids = this.aiThreads.get(sender) ?? new Set<string>(); ids.add(result.id); this.aiThreads.set(sender, ids);
+    }
     if (['connect','client:connect','local-terminal:open'].includes(channel) && owner) {
       owner.pending = Math.max(0, owner.pending - 1);
       const data = owner.early.get(result?.sessionId);
@@ -111,6 +128,7 @@ export class MonitorWindows {
   publish(channel: string, event: any) {
     for (const owner of this.windows.values()) {
       if (owner.window.isDestroyed()) continue;
+      if (channel === 'ai:thread' && !this.allowedAi(owner, owner.window.webContents.id, event?.id)) continue;
       if (channel === 'desktop:view-event' && !owner.desktopIds.has(event.id)) continue;
       if (channel === 'session:event' && !owner.cleanup.has(event.sessionId)) {
         if (owner.pending && event.type === 'data') {
@@ -172,6 +190,7 @@ export class MonitorWindows {
         window.once('closed', () => {
           screen.removeListener('display-removed', removed);
           this.windows.delete(sender);
+          this.aiThreads.delete(sender);
           if (![...this.windows.values()].some(w => w.view.id === id)) this.temporary.delete(id);
           for (const stop of owner.cleanup.values()) void stop().catch(() => {});
         });
