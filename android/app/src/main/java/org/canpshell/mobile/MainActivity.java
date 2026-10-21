@@ -24,6 +24,8 @@ public class MainActivity extends Activity {
   private MachineBrowser browser;
   private AppUpdates updates;
   private LocalFiles localFiles;
+  private CloudSync cloud;
+  private final java.util.concurrent.atomic.AtomicBoolean cloudBusy=new java.util.concurrent.atomic.AtomicBoolean();
   private final ExecutorService workers = Executors.newCachedThreadPool();
   private final Map<String, Connection> connections = new ConcurrentHashMap<>();
   private volatile boolean destroyed;
@@ -40,6 +42,7 @@ public class MainActivity extends Activity {
   }
   @Override public void onCreate(Bundle state) {
     super.onCreate(state);
+    cloud=new CloudSync(this);
     androidx.core.content.ContextCompat.registerReceiver(this,cagentEvents,new android.content.IntentFilter(AndroidAgentService.CHANGED),androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED);
     Security.removeProvider("BC"); Security.addProvider(new BouncyCastleProvider());
     web = new WebView(this);
@@ -112,6 +115,15 @@ public class MainActivity extends Activity {
     } catch (Exception e) { return false; }
   }
   public class Bridge {
+    @JavascriptInterface public void cloudRequest(String json){
+      if(destroyed||json.length()>2*1024*1024)return;
+      if(!cloudBusy.compareAndSet(false,true))return;
+      workers.execute(()->{String request="";try{
+        JSONObject input=new JSONObject(json);request=input.getString("request");UUID.fromString(request);
+        JSONObject result=cloud.call(input);event("","cloud-result",new JSONObject().put("request",request).put("result",result).toString());
+      }catch(Exception error){try{event("","cloud-result",new JSONObject().put("request",request).put("error",error instanceof javax.crypto.AEADBadTagException?"恢复密钥错误或密文校验失败":error.getMessage()).toString());}catch(Exception ignored){}}
+      finally{cloudBusy.set(false);}});
+    }
     @JavascriptInterface public String localFilesStatus(){return localFiles.status().toString();}
     @JavascriptInterface public void localFilesChoose(){runOnUiThread(()->{if(pendingTransfer==null)localFiles.choose();});}
     @JavascriptInterface public String cagentStatus(){return AndroidAgentService.status(MainActivity.this).toString();}
@@ -183,7 +195,7 @@ public class MainActivity extends Activity {
       workers.execute(() -> {
         String id = ""; Connection c = new Connection();
         try {
-          JSONObject p = new JSONObject(json); id = p.getString("id"); UUID.fromString(id);
+          JSONObject p = new JSONObject(json); cloud.fillCredentials(p); id = p.getString("id"); UUID.fromString(id);
           String host = p.getString("host").trim(), user = p.getString("username").trim(); int port = p.getInt("port");
           if (host.isEmpty() || user.isEmpty() || host.length() > 255 || user.length() > 255 || host.matches(".*[\\s\\p{Cntrl}].*") || port < 1 || port > 65535 || connections.size() >= 12) throw new IOException("连接参数无效或连接数已满");
           if (connections.putIfAbsent(id, c) != null) throw new IOException("连接已存在");

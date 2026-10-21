@@ -214,6 +214,21 @@ export class ClientProvider implements ManagedProvider {
   async load() {
     this.devices = (await this.vault.read('devices', z.array(deviceSchema).max(100))) ?? [];
   }
+  cloudExport() { return structuredClone(this.devices); }
+  cloudValidate(value: unknown) {
+    const devices = z.array(deviceSchema).max(100).parse(value);
+    for (const device of devices) {
+      const existing = this.devices.find(d=>d.deviceId===device.deviceId);
+      if (existing && fingerprint(existing.certificate)!==fingerprint(device.certificate)) throw new Error('云端 cagent 身份与本机不一致');
+    }
+    return devices;
+  }
+  async cloudImport(value: unknown) {
+    const devices = this.cloudValidate(value);
+    await this.vault.write('devices', devices);
+    this.devices = devices;
+    // Controller identity stays local: new installations still authenticate to the target.
+  }
   list(): ClientDevice[] {
     return this.devices.map(({ certificate, relay: _relay, ...d }) => ({
       ...d,

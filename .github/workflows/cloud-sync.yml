@@ -1,0 +1,32 @@
+name: Cloud sync protocol
+on:
+  push:
+    paths: ['src/core/cloud-*.ts', 'src/desktop/cloud-sync.ts', 'src/shared/cloud-sync.ts', 'services/cloud-sync/**', 'tests/cloud-*.test.ts', 'android/**/Cloud*.java', 'scripts/cloud-java-interop.ts', '.github/workflows/cloud-sync.yml']
+  pull_request:
+    paths: ['src/core/cloud-*.ts', 'src/desktop/cloud-sync.ts', 'src/shared/cloud-sync.ts', 'services/cloud-sync/**', 'tests/cloud-*.test.ts', 'android/**/Cloud*.java', 'scripts/cloud-java-interop.ts', '.github/workflows/cloud-sync.yml']
+permissions:
+  contents: read
+jobs:
+  protocol:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec tsx --test tests/cloud-*.test.ts
+      - run: pnpm exec tsx scripts/cloud-java-interop.ts
+      - run: python -m unittest -v test_server.py
+        working-directory: services/cloud-sync

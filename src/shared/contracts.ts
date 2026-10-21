@@ -1,4 +1,5 @@
 import type {LinuxWorkspaceBridge} from './linux-workspace';
+import type { CloudBridge } from './cloud-sync';
 import type {MachineBrowserBridge} from './machine-browser';
 import type { HttpBridge } from './http';
 import type { WechatBridge } from './wechat';
@@ -322,7 +323,7 @@ export type SessionEvent =
   | { type: 'closed'; sessionId: string; error?: string }
   | { type: 'transfer'; transfer: Transfer };
 export interface Bridge
-  extends LinuxWorkspaceBridge, MachineBrowserBridge,
+  extends CloudBridge, LinuxWorkspaceBridge, MachineBrowserBridge,
     AgentBridge,
     DesktopViewBridge,
     HttpBridge,

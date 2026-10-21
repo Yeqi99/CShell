@@ -1,4 +1,5 @@
 import { LocalEnvironmentSettings } from './LocalEnvironmentSettings';
+import { CloudSettings } from './CloudSettings';
 import { Palette, Terminal, PanelsTopLeft, Blocks, ShieldCheck, Download } from 'lucide-react';
 import { UpdateSettings } from './UpdateSettings';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -25,6 +26,7 @@ export function Settings({
   const { t, locale } = useI18n();
   const cn = locale === 'zh-CN';
   const categories = [
+    ['cloud', ShieldCheck, cn ? '账号与云同步' : 'Account & sync'],
     ['appearance', Palette, cn ? '外观' : 'Appearance'],
     ['terminal', Terminal, cn ? '终端' : 'Terminal'],
     ...(navigator.platform.startsWith('Win')
@@ -116,6 +118,7 @@ export function Settings({
         <div hidden={category !== 'updates'}>
           <UpdateSettings english={!cn} />
         </div>
+        <div hidden={category !== 'cloud'}><CloudSettings /></div>
         <div hidden={category !== 'workspace'}>
           <PresetControls draft={draft} onSelect={setDraft} onError={setError} />
         </div>
@@ -367,7 +370,7 @@ export function Settings({
           {t('cancel')}
         </button>
         <button
-          hidden={category === 'local'}
+          hidden={category === 'local' || category === 'cloud'}
           className="primary"
           form="workspace-preferences-form"
           disabled={busy || mcp.busy || (category === 'security' && !mcp.draft)}

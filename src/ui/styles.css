@@ -5961,3 +5961,5 @@ input[type='radio']:focus-visible {
 .visual-desktop-workspace > .tabbar {position:absolute;left:0;right:0;top:0;z-index:100;transform:translateY(calc(-100% + 6px));transition:transform .16s ease;box-shadow:0 3px 12px #12243b18;}
 .visual-desktop-workspace > .tabbar:hover,.visual-desktop-workspace > .tabbar:focus-within {transform:translateY(0);}
 @media (prefers-reduced-motion:reduce){.visual-desktop-workspace > .tabbar{transition:none;}}
+/* Cloud controls live inside the existing settings workspace, preserving drafts. */
+.cloud-settings{max-width:760px}.cloud-settings fieldset{border:0;padding:0;display:grid;gap:12px;max-width:460px}.cloud-settings label{display:grid;gap:6px}.cloud-actions{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0}.cloud-recovery,.cloud-confirm{padding:16px;border:1px solid var(--border);border-radius:8px;margin:16px 0}.cloud-recovery textarea{width:100%;min-height:64px;resize:vertical}.cloud-recovery label{display:flex;align-items:center}.cloud-confirm button{margin-right:8px}

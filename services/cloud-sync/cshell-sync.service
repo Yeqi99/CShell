@@ -1,0 +1,32 @@
+[Unit]
+Description=CShell encrypted configuration sync
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=cshell-sync
+Group=cshell-sync
+WorkingDirectory=/opt/cshell-sync
+EnvironmentFile=/etc/cshell-sync.env
+ExecStart=/usr/bin/python3 /opt/cshell-sync/server.py
+Restart=on-failure
+RestartSec=5
+StateDirectory=cshell-sync
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+MemoryMax=256M
+CPUQuota=50%
+TasksMax=32
+LimitNOFILE=256
+
+[Install]
+WantedBy=multi-user.target

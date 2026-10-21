@@ -1,4 +1,5 @@
 import {MobileCoding} from './coding';
+import {MobileCloud} from './cloud';
 import {MobileIde} from './ide';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
@@ -9,6 +10,7 @@ import {MobileDesktop} from './desktop';
 declare global {
   interface Window {
     CShellNative: {
+      cloudRequest?(json:string):void;
       browserSupported?(): boolean;
       browserOpen?(id:string,name:string,url:string):void;
       machineRequest?(json:string):void;
@@ -594,7 +596,7 @@ form.onsubmit = (e) => {
   protocolDrafts.delete(editing + ':ssh');
   page = '';
   select(id);
-  window.CShellNative.connect(JSON.stringify({ ...p, ...credentials, id, port: Number(p.port) }));
+  window.CShellNative.connect(JSON.stringify({ ...p, ...credentials, cloudProfileId:p.id, id, port: Number(p.port) }));
 };
 function updateMachineApps(id:string){
  const s=sessions.get(id),picker=s?.element.querySelector('.agent-environments'),cap=machineApps.get(id);if(!s||!picker||!cap)return;
@@ -620,6 +622,7 @@ function updateAgentDesktopEntry(id: string) {
   picker.insertBefore(entry,picker.children[2]||null);
 }
 window.receive = (id, type, value) => {
+  if(type==='cloud-result'){mobileCloud.receive(value);return;}
   if(type==='machine-result'){mobileIde.receive(id,value);mobileCoding.receive(id,value);return;}
   if(type==='machine-apps'){try{machineApps.set(id,JSON.parse(value));updateMachineApps(id);}catch{}return;}
   if (type === 'cagent-status') { receiveCAgent(value); return; }
@@ -734,6 +737,11 @@ window.updateEvent = (json) => {
   ($('update-progress') as HTMLProgressElement).value = state.progress || 0;
 };
 render();
+const mobileCloud=new MobileCloud(window.CShellNative,()=>({profiles,theme:dark?'dark':'light'}),data=>{
+  localStorage.setItem('profiles-before-cloud',JSON.stringify(profiles));
+  profiles=data.profiles;localStorage.setItem('profiles',JSON.stringify(profiles));
+  dark=data.theme==='dark';localStorage.setItem('theme',dark?'dark':'light');applyTheme();render();
+});
 
 // File requests are bound to an explicit live session; stale responses never replace another machine.
 const filePaths = new Map<string, string>();

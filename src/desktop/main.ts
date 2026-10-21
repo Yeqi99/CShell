@@ -14,6 +14,7 @@ import { wslAccountStatus, initializeWslAccount } from './wsl-account';
 import { startClientApplication, clientCodec } from './client-app';
 import { ClientProvider } from '../core/client/provider';
 import { ClientVault } from '../core/client/identity';
+import { registerCloudHandlers } from './cloud-sync';
 import { clientShellSchema } from '../shared/client';
 import { LocalTerminalProvider } from '../core/connections/local-terminal-provider';
 import { WslSetup } from './wsl-setup';
@@ -555,6 +556,12 @@ else
         },
         http,
         wechat,
+        ai => registerCloudHandlers(handle, store, ai, clientProvider, http, () => {
+          if (!window.isDestroyed()) {
+            window.webContents.send('cloud:changed');
+            window.webContents.send('ai:providers-changed');
+          }
+        }),
       );
       registerPresetHandlers(handle, window, app.getPath('userData'), store, text);
       window.once('closed', () => {

@@ -23,6 +23,12 @@ import { ApiError } from './api/errors';
 
 const id = z.string().uuid();
 export class HttpWorkspaces {
+  cloudExport() { return structuredClone(this.workspaces); }
+  cloudValidate(value: unknown) {
+    if(this.runs.size)throw new Error('请等待 HTTP 请求结束后恢复配置');
+    return z.array(httpWorkspaceSchema).max(200).parse(value);
+  }
+  async cloudImport(value:unknown){this.workspaces=this.cloudValidate(value);await this.persist();}
   private workspaces: HttpWorkspace[] = [];
   private history: HttpHistory[] = [];
   private runs = new Map<string, { abort: AbortController; workspaceId: string }>();

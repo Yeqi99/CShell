@@ -56,6 +56,32 @@ export interface SecretCodec {
   decrypt(value: string): Promise<string>;
 }
 export class Store {
+  /** Explicit portable allowlist. Never include MCP grants, local identity or plugin grants. */
+  async cloudExport() {
+    const secrets: Record<string, unknown> = {};
+    const snapshot = structuredClone(this.data);
+    for (const profile of snapshot.profiles) {
+      if (snapshot.secrets[profile.id]) secrets[profile.id] = JSON.parse(await this.codec.decrypt(snapshot.secrets[profile.id]));
+    }
+    return { profiles: snapshot.profiles, groups: snapshot.groups, preferences: snapshot.preferences,
+      presets: snapshot.presets, monitorViews: snapshot.monitorViews, hosts: snapshot.hosts, secrets };
+  }
+  cloudValidate(value: unknown) {
+    const result = schema.pick({profiles:true, groups:true, preferences:true, presets:true, monitorViews:true, hosts:true}).extend({
+      secrets: z.record(z.string().uuid(), z.object({password:z.string().max(65536).optional(), privateKey:z.string().max(262144).optional(), passphrase:z.string().max(65536).optional()}).strict()),
+    }).strict().parse(value);
+    if (new Set(result.profiles.map(p=>p.id)).size !== result.profiles.length) throw new Error('云端存在重复连接');
+    for (const [endpoint, fingerprint] of Object.entries(result.hosts)) {
+      if (this.data.hosts[endpoint] && this.data.hosts[endpoint] !== fingerprint) throw new Error('云端主机身份与本机不一致，请手动核对');
+    }
+    return result;
+  }
+  async cloudImport(value: unknown) {
+    const next = this.cloudValidate(value), secrets: Record<string,string> = {};
+    for (const profile of next.profiles) if (next.secrets[profile.id]) secrets[profile.id] = await this.codec.encrypt(JSON.stringify(next.secrets[profile.id]));
+    this.data = {...this.data, ...next, secrets, hosts:{...this.data.hosts,...next.hosts}};
+    await this.persist();
+  }
   monitorViews(): MonitorView[] { return structuredClone(this.data.monitorViews); }
   async saveMonitorView(value: MonitorView) {
     const view = monitorViewSchema.parse(value);

@@ -2,6 +2,14 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { Bridge, SessionEvent } from '../shared/contracts';
 const bridge: Bridge = {
   platform: process.platform,
+  cloudStatus:()=>ipcRenderer.invoke('cloud:status'),
+  onCloudChanged:listener=>{const fn=()=>listener();ipcRenderer.on('cloud:changed',fn);return()=>ipcRenderer.removeListener('cloud:changed',fn);},
+  cloudRequestCode:email=>ipcRenderer.invoke('cloud:code',email),
+  cloudLogin:(email,code)=>ipcRenderer.invoke('cloud:login',email,code),
+  cloudUnlock:key=>ipcRenderer.invoke('cloud:unlock',key),
+  cloudCreateVault:()=>ipcRenderer.invoke('cloud:create'),
+  cloudSync:direction=>ipcRenderer.invoke('cloud:sync',direction),
+  cloudLogout:()=>ipcRenderer.invoke('cloud:logout'),
   machineBrowser:(id,action,value)=>ipcRenderer.invoke('machine-browser:action',id,action,value),
   onMachineBrowserFocus:listener=>{const fn=(_e:unknown,id:string)=>listener(id);ipcRenderer.on('machine-browser:focus',fn);return()=>{ipcRenderer.removeListener('machine-browser:focus',fn);};},
   linuxWorkspacePlan:(id,directory)=>ipcRenderer.invoke('linux:plan',id,directory),

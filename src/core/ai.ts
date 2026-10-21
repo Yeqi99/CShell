@@ -52,6 +52,22 @@ const eventToolDenied = (name:string) => eventDeniedTools.has(name) || (name.sta
 const idSchema = z.string().uuid();
 export const modeSchema = z.enum(['review', 'restricted', 'allow']);
 export class AiService {
+  cloudExport() {
+    return structuredClone({providers:this.providers, extractionProviderId:this.extractionProviderId, textProviderIds:this.textProviderIds});
+  }
+  cloudValidate(value: unknown) {
+    if (this.runs.size) throw new Error('请等待智能体任务结束后恢复云端基座');
+    return z.object({providers:z.array(providerRecord).max(200), extractionProviderId:z.string().uuid().nullable(),
+      textProviderIds:z.object({translate:z.string().uuid().nullable(),compose:z.string().uuid().nullable()}).strict()}).strict().parse(value);
+  }
+  async cloudImport(value: unknown) {
+    const next = this.cloudValidate(value);
+    // Permissions, active threads and device-bound extension installation remain local.
+    this.providers = next.providers;
+    this.extractionProviderId = next.extractionProviderId;
+    this.textProviderIds = next.textProviderIds;
+    await this.persist();
+  }
   private jobs=new AgentJobs();
   readonly providerExtensions=new AiExtensionRegistry();
   private async resolveProvider(p:Provider,session:string){

@@ -103,6 +103,7 @@ export function App() {
     preferences: defaults,
     savedCredentials: [],
   });
+  useEffect(()=>window.cshell.onCloudChanged(()=>{void window.cshell.config().then(setConfig).catch(()=>{});}),[]);
   return (
     <LocaleContext.Provider value={config.preferences.locale}>
       <Workbench config={config} setConfig={setConfig} />
