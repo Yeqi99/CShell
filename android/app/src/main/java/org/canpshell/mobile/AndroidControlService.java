@@ -21,9 +21,11 @@ public final class AndroidControlService extends AccessibilityService {
   private final java.util.ArrayDeque<JSONObject> queue=new java.util.ArrayDeque<>();
   private boolean pending;
   private boolean gestureBusy;
+  private volatile boolean editBusy;
   private boolean shiftLeft,shiftRight,control,alt,caps;
   private static volatile String lastEditState="none";
   static String editState(){return lastEditState;}
+  static boolean isEditing(){AndroidControlService s=instance;return s!=null&&s.editBusy;}
   @Override protected void onServiceConnected(){instance=this;AndroidAgentService.changed(this);}
   @Override public void onAccessibilityEvent(AccessibilityEvent event){}
   @Override public void onInterrupt(){reset();}
@@ -44,7 +46,8 @@ public final class AndroidControlService extends AccessibilityService {
     service.main.post(service::drainInputs);return true;
   }
   private void drainInputs(){
-    for(int n=0;n<16;n++){JSONObject event;synchronized(this){event=queue.pollFirst();if(event==null){pending=false;return;}}apply(event);}
+    if(editBusy){main.postDelayed(this::drainInputs,16);return;}
+    for(int n=0;n<16;n++){JSONObject event;synchronized(this){event=queue.pollFirst();if(event==null){pending=false;return;}}apply(event);if(editBusy){main.postDelayed(this::drainInputs,16);return;}}
     main.post(this::drainInputs);
   }
   static void releaseAll(){AndroidControlService s=instance;if(s!=null){synchronized(s){s.queue.clear();}s.main.post(s::reset);}}
@@ -130,7 +133,7 @@ public final class AndroidControlService extends AccessibilityService {
     try{if(!node.isEditable()||node.isPassword())return;String old=node.isShowingHintText()||node.getText()==null?"":node.getText().toString();if(old.length()>1_000_000)return;
       int start=node.getTextSelectionStart(),end=node.getTextSelectionEnd();if(start<0||end<0){start=old.length();end=start;}int lo=Math.min(start,end),hi=Math.max(start,end);if(hi>old.length())return;
       Bundle args=new Bundle();args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,old.substring(0,lo)+text+old.substring(hi));
-      if(node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT,args)){Bundle selection=new Bundle();selection.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT,lo+text.length());selection.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT,lo+text.length());node.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION,selection);}
+      if(node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT,args))settleEdit(node,old.substring(0,lo)+text+old.substring(hi),lo+text.length());
     }finally{node.recycle();}
   }
   private void backspace(){AccessibilityNodeInfo node=focused();if(node==null){lastEditState="backspace:no-input-focus";return;}
@@ -145,9 +148,30 @@ public final class AndroidControlService extends AccessibilityService {
       if(lo==hi)lo=old.offsetByCodePoints(lo,-1);
       Bundle args=new Bundle();args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,old.substring(0,lo)+old.substring(hi));
       if(!node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT,args)){lastEditState="backspace:text-rejected";return;}
-      Bundle selection=new Bundle();selection.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT,lo);selection.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT,lo);
-      lastEditState=node.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION,selection)?"backspace:applied":"backspace:selection-rejected";
+      settleEdit(node,old.substring(0,lo)+old.substring(hi),lo);
     }finally{node.recycle();}}
+  // Accessibility text and selection snapshots can lag independently on older
+  // Android releases. Do not consume the next input until this edit's caret is
+  // confirmed on the same node; never move focus or overwrite a newer edit.
+  private void settleEdit(AccessibilityNodeInfo original,String expected,int caret){
+    editBusy=true;AccessibilityNodeInfo node=AccessibilityNodeInfo.obtain(original);
+    main.post(new Runnable(){int attempts;
+      public void run(){
+        boolean retry=false;
+        try{
+          if(instance!=AndroidControlService.this||!node.refresh()||!node.isFocused())return;
+          String actual=node.getText()==null?"":node.getText().toString();
+          if(actual.equals(expected)){
+            if(node.getTextSelectionStart()==caret&&node.getTextSelectionEnd()==caret){lastEditState="edit:applied";return;}
+            Bundle selection=new Bundle();selection.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT,caret);selection.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT,caret);
+            node.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION,selection);
+          }
+          retry=++attempts<8;
+          if(!retry)lastEditState="edit:caret-unconfirmed";
+        }finally{if(retry)main.postDelayed(this,32);else{node.recycle();editBusy=false;}}
+      }
+    });
+  }
 }
 
 
