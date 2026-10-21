@@ -14,22 +14,24 @@ import org.json.JSONObject;
 public final class AndroidControlService extends AccessibilityService {
   private static volatile AndroidControlService instance;
   private final Handler main=new Handler(Looper.getMainLooper());
+  private android.os.HandlerThread inputThread;
+  private Handler inputHandler;
   private float x=.5f,y=.5f;
   private Path drag;
   private long downAt;
   private int points;
   private final java.util.ArrayDeque<JSONObject> queue=new java.util.ArrayDeque<>();
   private boolean pending;
-  private boolean gestureBusy;
+  private volatile boolean gestureBusy;
   private volatile boolean editBusy;
   private boolean shiftLeft,shiftRight,control,alt,caps;
   private static volatile String lastEditState="none";
   static String editState(){return lastEditState;}
   static boolean isEditing(){AndroidControlService s=instance;return s!=null&&s.editBusy;}
-  @Override protected void onServiceConnected(){instance=this;AndroidAgentService.changed(this);}
+  @Override protected void onServiceConnected(){inputThread=new android.os.HandlerThread("cagent-accessibility-input");inputThread.start();inputHandler=new Handler(inputThread.getLooper());instance=this;AndroidAgentService.changed(this);}
   @Override public void onAccessibilityEvent(AccessibilityEvent event){}
-  @Override public void onInterrupt(){reset();}
-  @Override public void onDestroy(){if(instance==this)instance=null;synchronized(this){queue.clear();}reset();AndroidAgentService.changed(this);super.onDestroy();}
+  @Override public void onInterrupt(){releaseAll();}
+  @Override public void onDestroy(){if(instance==this)instance=null;synchronized(this){queue.clear();}if(inputThread!=null)inputThread.quitSafely();AndroidAgentService.changed(this);super.onDestroy();}
   static boolean isAvailable(){return instance!=null;}
   /** Returns queued, not proof that a target application accepted the action. */
   static boolean dispatch(JSONObject event){
@@ -43,14 +45,15 @@ public final class AndroidControlService extends AccessibilityService {
       if(service.pending)return true;
       service.pending=true;
     }
-    service.main.post(service::drainInputs);return true;
+    service.inputHandler.post(service::drainInputs);return true;
   }
   private void drainInputs(){
-    if(editBusy){main.postDelayed(this::drainInputs,16);return;}
-    for(int n=0;n<16;n++){JSONObject event;synchronized(this){event=queue.pollFirst();if(event==null){pending=false;return;}}apply(event);if(editBusy){main.postDelayed(this::drainInputs,16);return;}}
-    main.post(this::drainInputs);
+    if(instance!=this)return;
+    if(editBusy){inputHandler.postDelayed(this::drainInputs,16);return;}
+    for(int n=0;n<16;n++){JSONObject event;synchronized(this){event=queue.pollFirst();if(event==null){pending=false;return;}}apply(event);if(editBusy){inputHandler.postDelayed(this::drainInputs,16);return;}}
+    inputHandler.post(this::drainInputs);
   }
-  static void releaseAll(){AndroidControlService s=instance;if(s!=null){synchronized(s){s.queue.clear();}s.main.post(s::reset);}}
+  static void releaseAll(){AndroidControlService s=instance;if(s!=null){synchronized(s){s.queue.clear();}s.inputHandler.post(s::reset);}}
   private void reset(){drag=null;points=0;downAt=0;shiftLeft=false;shiftRight=false;control=false;alt=false;}
   private float px(float value,boolean horizontal){
     android.util.DisplayMetrics dm=new android.util.DisplayMetrics();
@@ -155,7 +158,7 @@ public final class AndroidControlService extends AccessibilityService {
   // confirmed on the same node; never move focus or overwrite a newer edit.
   private void settleEdit(AccessibilityNodeInfo original,String expected,int caret){
     editBusy=true;AccessibilityNodeInfo node=AccessibilityNodeInfo.obtain(original);
-    main.post(new Runnable(){int attempts;
+    inputHandler.post(new Runnable(){int attempts;
       public void run(){
         boolean retry=false;
         try{
@@ -168,7 +171,7 @@ public final class AndroidControlService extends AccessibilityService {
           }
           retry=++attempts<8;
           if(!retry)lastEditState="edit:caret-unconfirmed";
-        }finally{if(retry)main.postDelayed(this,32);else{node.recycle();editBusy=false;}}
+        }finally{if(retry)inputHandler.postDelayed(this,32);else{node.recycle();editBusy=false;}}
       }
     });
   }

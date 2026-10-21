@@ -42,7 +42,7 @@ final class AndroidHostProtocolTest {
       try(FileOutputStream out=new FileOutputStream(config)){out.write(info.toString().getBytes(StandardCharsets.UTF_8));}
       android.os.Bundle status=new android.os.Bundle();status.putString("stream","HOST_FIXTURE_READY");runner.sendStatus(0,status);
       long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(180);
-      while(!stop.exists()&&System.nanoTime()<deadline){JSONObject result=new JSONObject().put("inputs",capture.inputs.get()).put("releases",capture.releases.get()).put("running",host.status().getBoolean("running"));try(FileOutputStream out=new FileOutputStream(receipt)){out.write(result.toString().getBytes(StandardCharsets.UTF_8));}Thread.sleep(200);}
+      while(!stop.exists()&&System.nanoTime()<deadline){JSONObject result=new JSONObject().put("inputs",capture.inputs.get()).put("releases",capture.releases.get()).put("running",host.status().getBoolean("running")).put("error",host.status().optString("error"));try(FileOutputStream out=new FileOutputStream(receipt)){out.write(result.toString().getBytes(StandardCharsets.UTF_8));}Thread.sleep(200);}
       return "OK (Android host external interoperability fixture closed)";
     }finally{host.close();capture.close();config.delete();stop.delete();}
   }

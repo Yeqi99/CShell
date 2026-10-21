@@ -137,12 +137,12 @@ final class AndroidAgentHost implements AutoCloseable {
         synchronized(AndroidAgentHost.this){JSONObject t=pending.get(response.getString("id"));if(t==null||t.getLong("expiresAt")<=System.currentTimeMillis()||!owner.equals(t.getString("owner"))||desktop!=null||hostEpoch!=epoch.get())throw new IOException("Invalid desktop ticket");byte[] key=DesktopTransport.hex(t.getJSONObject("keys").getString("bootstrap"));if(!MessageDigest.isEqual(hmac(key,"client:"+nonce+":"+t.getString("id")),DesktopTransport.hex(response.getString("proof"))))throw new IOException("Desktop proof invalid");pending.remove(t.getString("id"));ticket=t;desktop=this;writeLine(output,new JSONObject().put("proof",hex(hmac(key,"server:"+nonce+":"+t.getString("id")))));}
         JSONObject keys=ticket.getJSONObject("keys");session=DesktopTransport.hex(ticket.getString("session"));txKey=DesktopTransport.hex(keys.getString("hostControl"));rxKey=DesktopTransport.hex(keys.getString("viewerControl"));mediaKey=DesktopTransport.hex(keys.getString("hostMedia"));
         send(new JSONObject().put("op","hello").put("identity",identity.id).put("generation",ticket.getString("generation")).put("port",0).put("transport","tcp"));
-        watchdog=timer.scheduleAtFixedRate(()->{long now=System.nanoTime();if(hostEpoch!=epoch.get()||(writeStarted!=0&&now-writeStarted>TimeUnit.SECONDS.toNanos(5))||(awaiting>=0&&now-lastAck>TimeUnit.SECONDS.toNanos(15)))close();},1,1,TimeUnit.SECONDS);
+        watchdog=timer.scheduleAtFixedRate(()->{long now=System.nanoTime();if(hostEpoch!=epoch.get()||(writeStarted!=0&&now-writeStarted>TimeUnit.SECONDS.toNanos(5))||(awaiting>=0&&now-lastAck>TimeUnit.SECONDS.toNanos(15))){failure="DESKTOP_WATCHDOG";close();}},1,1,TimeUnit.SECONDS);
         DataInputStream in=new DataInputStream(input);
         while(!closed.get()){
           int length=in.readInt();if(length<25||length>8216)throw new IOException("Invalid desktop control length");byte[] bytes=new byte[length];in.readFully(bytes);byte[] seq=Arrays.copyOf(bytes,8);if(ByteBuffer.wrap(seq).getLong()!=rx)throw new IOException("Desktop control replay");JSONObject message=new JSONObject(new String(crypt(false,rxKey,seq,ByteBuffer.allocate(16).put(session).put(seq).array(),Arrays.copyOfRange(bytes,8,length)),StandardCharsets.UTF_8));rx++;handle(message);
         }
-      }finally{close();}
+      }catch(Exception e){failure="DESKTOP_CONTROL_"+e.getClass().getSimpleName();throw e;}finally{close();}
     }
     void handle(JSONObject m)throws Exception {
       String op=m.getString("op");if(op.equals("hello")){if(ready||!owner.equals(m.getString("identity"))||!ticket.getString("generation").equals(m.getString("generation"))||m.getInt("port")!=0||!"tcp".equals(m.getString("transport")))throw new IOException("Desktop binding mismatch");ready=true;socket.setSoTimeout(15000);synchronized(AndroidAgentHost.this){if(closed.get()||desktop!=this||hostEpoch!=epoch.get())return;backend.start(ticket.getJSONObject("quality"),this);}return;}
@@ -161,12 +161,12 @@ final class AndroidAgentHost implements AutoCloseable {
       }
     }
     private synchronized void send(JSONObject value)throws Exception {if(closed.get())return;byte[] body=value.toString().getBytes(StandardCharsets.UTF_8);if(body.length>8192||tx==Long.MAX_VALUE)throw new IOException("Control budget");byte[] seq=ByteBuffer.allocate(8).putLong(tx++).array();byte[] encrypted=crypt(true,txKey,seq,ByteBuffer.allocate(16).put(session).put(seq).array(),body);writeStarted=System.nanoTime();try{output.writeInt(8+encrypted.length);output.write(seq);output.write(encrypted);output.flush();}finally{writeStarted=0;}}
-    public void video(JSONObject info){try{JSONObject snapshot=new JSONObject(info.toString());writer.execute(()->{try{send(new JSONObject().put("op","video").put("value",snapshot));hasVideo=true;}catch(Exception e){close();}});}catch(Exception e){close();}}
+    public void video(JSONObject info){try{JSONObject snapshot=new JSONObject(info.toString());writer.execute(()->{try{send(new JSONObject().put("op","video").put("value",snapshot));hasVideo=true;}catch(Exception e){failure="DESKTOP_WRITE_"+e.getClass().getSimpleName();close();}});}catch(Exception e){close();}}
     public void frame(byte[] data,long time,boolean key){
       if(closed.get()||!ready||!hasVideo)return;if(data.length==0||data.length>32*1024*1024){error("CAPTURE_FRAME_BUDGET");return;}
       if(awaiting>=0||!frameQueued.compareAndSet(false,true)){needKey=true;return;}
       if(needKey&&!key){frameQueued.set(false);backend.requestKeyFrame();return;}
-      needKey=false;byte[] copy=data.clone();try{writer.execute(()->{try{sendFrame(copy,time,key);}catch(Exception e){close();}finally{frameQueued.set(false);}});}catch(RejectedExecutionException e){frameQueued.set(false);close();}
+      needKey=false;byte[] copy=data.clone();try{writer.execute(()->{try{sendFrame(copy,time,key);}catch(Exception e){failure="DESKTOP_FRAME_"+e.getClass().getSimpleName();close();}finally{frameQueued.set(false);}});}catch(RejectedExecutionException e){frameQueued.set(false);close();}
     }
     private void sendFrame(byte[] data,long timestamp,boolean key)throws Exception {
       long id=frameId++;if(id>0xffffffffL)throw new IOException("Frame identity exhausted");int payload=16384-48,count=(data.length+payload-1)/payload;awaiting=id;lastAck=System.nanoTime();

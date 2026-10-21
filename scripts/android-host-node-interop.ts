@@ -50,6 +50,9 @@ try {
   const receipt=JSON.parse(await adbCall('shell','run-as','org.canpshell.mobile','cat','files/host-fixture-result.json'));assert(receipt.inputs>=4);assert(receipt.releases>=2);
   const result={passed:true,transport:'actual ClientProvider + DesktopClient + DesktopSession TLS 1.3 / AEAD TCP',frames:total,inputs:receipt.inputs,releases:receipt.releases,checks:['pinned identity before password','wrong password rejected','honest Android capabilities','fragmented frames','ACK backpressure','input forwarding','fresh desktop reconnect','desktop UDP preference falls back to TCP','unsupported input preserves video']};
   await mkdir('test-results',{recursive:true});await writeFile('test-results/android-host-node-interop.json',JSON.stringify(result,null,2));console.log(JSON.stringify(result,null,2));
+} catch(error) {
+  try{console.error('Android host receipt:',await adbCall('shell','run-as','org.canpshell.mobile','cat','files/host-fixture-result.json'));}catch{}
+  throw error;
 } finally {
   await desktop?.close();
   try{await adbCall('shell','run-as','org.canpshell.mobile','touch','files/host-fixture-stop');}catch{}
