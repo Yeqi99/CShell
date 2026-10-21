@@ -491,19 +491,27 @@ export class CodingService {
       child.on('close', async (code) => {
         clearTimeout(timer);
         if (job.state === 'cancelled') return;
-        job.state = 'failed';
+        if(code!==0)job.state = 'failed';
         if (code === 0) {
-          this.config[plan.engine] = join(
+          let executable = join(
             prefix,
             'node_modules',
             pkg[plan.engine],
             entry[plan.engine],
           );
-          await this.vault.write('coding-config', this.config);
-          const result = await this.probe(plan.engine);
-          job.state =
-            result.ready && result.version?.includes(plan.version) ? 'completed' : 'failed';
-          if (!result.ready) job.output += '\n' + result.reason;
+          try {
+            // New Claude packages ship a native optional dependency and an
+            // official launcher expressly supporting --ignore-scripts.
+            if(plan.engine==='claude'){
+              try{await stat(executable);}catch{executable=join(prefix,'node_modules',pkg.claude,'cli-wrapper.cjs');}
+            }
+            await stat(executable);
+            this.config[plan.engine]=executable;
+            await this.vault.write('coding-config', this.config);
+            const result = await this.probe(plan.engine);
+            job.state = result.ready && result.version?.includes(plan.version) ? 'completed' : 'failed';
+            if (!result.ready) job.output += '\n' + result.reason;
+          } catch(e) {job.state='failed';job.output+='\n'+String(e);}
         }
       });
       return { id: job.id };

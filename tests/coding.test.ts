@@ -129,3 +129,18 @@ test('model profiles reject credentials in endpoint and external plaintext HTTP'
     true,
   );
 });
+
+test('Claude native-package wrapper installs privately with lifecycle scripts disabled', async () => {
+  const f=await fixture(),npm=join(f.d,'npm.cjs'),id=randomUUID();
+  await writeFile(npm,`const fs=require('fs'),path=require('path');if(!process.argv.includes('--ignore-scripts'))process.exit(2);if(process.env.npm_config_userconfig===process.env.npm_config_globalconfig)process.exit(3);const prefix=process.argv[process.argv.indexOf('--prefix')+1];const d=path.join(prefix,'node_modules','@anthropic-ai','claude-code');fs.mkdirSync(d,{recursive:true});fs.writeFileSync(path.join(d,'cli-wrapper.cjs'),"console.log('2.1.306 (Claude Code)')");`);
+  // The fixture supplies only the upstream plan and npm process; the real
+  // installer, isolated config, launcher discovery and version probe execute.
+  (f.service as any).plans.set(id,{owner:'owner',engine:'claude',directory:join(f.d,'private'),version:'2.1.306',npm});
+  try{
+    const job=await f.service.call('coding.install',{id},'owner');
+    const status=await until(()=>f.service.call('coding.status',{},'owner'),s=>s.installs.find((j:any)=>j.id===job.id)?.state!=='running');
+    assert.equal(status.installs.find((j:any)=>j.id===job.id).state,'completed');
+    assert.equal(status.engines.find((e:any)=>e.engine==='claude').ready,true);
+    assert.match(status.engines.find((e:any)=>e.engine==='claude').path,/cli-wrapper\.cjs$/);
+  }finally{await f.service.close();}
+});
