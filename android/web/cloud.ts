@@ -16,7 +16,11 @@ export class MobileCloud {
     const $ = (id: string) => document.getElementById(id)!;
     const input = (name: string) =>
       (document.querySelector(`#cloud-login [name="${name}"]`) as HTMLInputElement).value;
+    let busy = false;
+    const digest = async () => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(this.snapshot()))))).map(b=>b.toString(16).padStart(2,'0')).join('');
     const run = async (action: string, args: any = {}) => {
+      if(busy)return; busy=true;
+      const before = await digest();
       root.querySelectorAll('button').forEach((b) => (b.disabled = true));
       $('cloud-message').textContent = '正在处理…';
       try {
@@ -26,12 +30,15 @@ export class MobileCloud {
         if (result.profiles) {
           this.restore(result);
           this.showModels(result.models);
+          localStorage.setItem('cloud-snapshot-hash', await digest());
         }
+        if(action === 'upload')localStorage.setItem('cloud-snapshot-hash',before);
         $('cloud-message').textContent =
           action === 'code' ? '验证码已发送，10 分钟内有效。' : '操作完成';
       } catch (e) {
         $('cloud-message').textContent = (e as Error).message;
       } finally {
+        busy=false;
         root.querySelectorAll('button').forEach((b) => (b.disabled = false));
       }
     };
@@ -65,7 +72,9 @@ export class MobileCloud {
       void run(direction, direction === 'upload' ? this.snapshot() : {});
     };
     $('cloud-logout').onclick = () => void run('logout');
-    void run('status');
+    const autoSync=async()=>{if(busy||!this.state?.unlocked)return;const previous=localStorage.getItem('cloud-snapshot-hash');await run(previous && previous !== await digest() ? 'upload' : previous ? 'refresh' : 'download',this.snapshot());};
+    void run('status').then(autoSync);
+    setInterval(()=>void autoSync(),30000);
   }
   private request(action: string, args: any): Promise<any> {
     if (!this.native.cloudRequest)

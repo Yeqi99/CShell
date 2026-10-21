@@ -2,7 +2,7 @@ import { mkdir, readFile, rename, writeFile, readdir, unlink } from 'node:fs/pro
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { SecretCodec } from './store';
-import { decryptVault, encryptVault, newRecoveryKey, vaultDigest } from './cloud-crypto';
+import { decryptVault, encryptVault, newRecoveryKey, vaultDigest, unwrapRecoveryKey } from './cloud-crypto';
 import type { CloudEnvelope, CloudSession, CloudStatus, CloudRevision } from '../shared/cloud-sync';
 
 interface LocalState {
@@ -118,17 +118,23 @@ export class CloudSync {
     await this.api('/v1/auth/code', { email });
   }
   async login(email: string, code: string, password = false) {
-    return this.exclusive(async () => {
-      const session: CloudSession = await this.api(password ? '/v1/auth/password-login' : '/v1/auth/login', password ? { email, password: code } : { email, code });
+    await this.exclusive(async () => {
+      const session: CloudSession & {keybox?:any} = await this.api(password ? '/v1/auth/password-login' : '/v1/auth/login', password ? { email, password: code } : { email, code });
       if (!/^[a-f0-9]{32}$/.test(session.accountId) || !/^[A-Za-z0-9_-]{43}$/.test(session.token))
         throw new Error('登录响应不正确');
       const same = this.data.session?.accountId === session.accountId;
       this.data = same ? { ...this.data, session } : { session, revision: 0 };
+      if(password && session.keybox) this.data.key = unwrapRecoveryKey(session.keybox, code, session.accountId);
       this.state = this.data.key ? 'ready' : 'locked';
       this.error = undefined;
       await this.persist();
       return this.status();
     });
+    if (this.data.key) {
+      const first = !this.data.digest && (await this.remote()).envelope;
+      await this.sync(first ? 'download' : undefined);
+    }
+    return this.status();
   }
   private async remote(): Promise<CloudRevision> {
     if (!this.data.session) throw new Error('请先登录');

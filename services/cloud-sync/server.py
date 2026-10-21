@@ -37,6 +37,7 @@ class Service:
             PRAGMA max_page_count=32768;
             CREATE TABLE IF NOT EXISTS accounts(id TEXT PRIMARY KEY,email TEXT UNIQUE NOT NULL);
             CREATE TABLE IF NOT EXISTS passwords(account TEXT PRIMARY KEY,salt TEXT NOT NULL,digest TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS keyboxes(account TEXT PRIMARY KEY,box TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS codes(email TEXT PRIMARY KEY,digest TEXT,expires REAL,attempts INTEGER);
             CREATE TABLE IF NOT EXISTS sessions(digest TEXT PRIMARY KEY,account TEXT,expires REAL);
             CREATE TABLE IF NOT EXISTS vaults(account TEXT PRIMARY KEY,revision INTEGER,envelope TEXT,mutation TEXT);
@@ -138,7 +139,8 @@ class Service:
         token = secrets.token_urlsafe(32)
         with self.db() as db:
             db.execute('INSERT INTO sessions VALUES(?,?,?)', (self.digest(token), row[0], time.time() + 30 * 86400))
-        return {'accountId': row[0], 'email': email, 'token': token}
+            box = db.execute('SELECT box FROM keyboxes WHERE account=?', (row[0],)).fetchone()
+        return {'accountId': row[0], 'email': email, 'token': token, 'keybox': json.loads(box[0]) if box else None}
 
     def authenticate(self, token):
         if not isinstance(token, str) or len(token) != 43:
@@ -257,7 +259,16 @@ def handler(service):
                 else:
                     token = self.headers.get('Authorization', '').removeprefix('Bearer ')
                     account = service.authenticate(token)
-                    if self.path == '/v1/auth/password' and self.command == 'POST':
+                    if self.path == '/v1/auth/keybox' and self.command == 'POST':
+                        encoded = json.dumps(body)
+                        if len(encoded) > 2048 or set(body) != {'salt', 'envelope'}:
+                            raise Failure(400, '密钥包装格式不正确')
+                        with service.db() as db:
+                            if db.execute('SELECT 1 FROM keyboxes WHERE account=?', (account,)).fetchone():
+                                raise Failure(409, '已配置自动解锁')
+                            db.execute('INSERT INTO keyboxes VALUES(?,?)', (account, encoded))
+                        value = {'ok': True}
+                    elif self.path == '/v1/auth/password' and self.command == 'POST':
                         value = service.set_password(account, body.get('password'))
                     elif self.path == '/v1/vault' and self.command == 'GET':
                         value = service.read(account)

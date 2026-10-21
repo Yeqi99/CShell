@@ -3,8 +3,18 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { encryptVault, decryptVault, newRecoveryKey } from '../src/core/cloud-crypto';
+import { encryptVault, decryptVault, newRecoveryKey, unwrapRecoveryKey } from '../src/core/cloud-crypto';
+import { pbkdf2Sync, randomBytes } from 'node:crypto';
 import { CloudSync } from '../src/core/cloud-sync';
+
+test('password unlock authenticates the wrapped recovery key and account', () => {
+  const salt=randomBytes(32), password='test-password-only', key=newRecoveryKey();
+  const derived=pbkdf2Sync(password,salt,210000,32,'sha256').toString('base64url');
+  const box={salt:salt.toString('base64'),envelope:encryptVault({key},derived,'test-account')};
+  assert.equal(unwrapRecoveryKey(box,password,'test-account'),key);
+  assert.throws(()=>unwrapRecoveryKey(box,'wrong-password','test-account'));
+  assert.throws(()=>unwrapRecoveryKey(box,password,'another-account'));
+});
 
 test('vault binds ciphertext to account, detects tampering and uses unique nonces', () => {
   const key = newRecoveryKey(),

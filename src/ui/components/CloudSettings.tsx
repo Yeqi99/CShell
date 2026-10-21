@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { CloudStatus } from '../../shared/cloud-sync';
 
 export function CloudSettings() {
-  const [passwordMode, setPasswordMode] = useState(false);
+  const [passwordMode, setPasswordMode] = useState(true);
   const [status, setStatus] = useState<CloudStatus>();
   const [email, setEmail] = useState(''),
     [code, setCode] = useState(''),

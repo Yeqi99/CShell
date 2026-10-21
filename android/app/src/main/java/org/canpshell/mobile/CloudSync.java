@@ -92,12 +92,23 @@ final class CloudSync {
     else if((action.equals("login") || action.equals("password-login"))){
       JSONObject session=api("auth/"+action,new JSONObject().put("email",request.getString("email")).put(action.equals("password-login")?"password":"code",request.getString("code")));
       if(!state.has("session")||!state.getJSONObject("session").getString("accountId").equals(session.getString("accountId")))state=new JSONObject();
-      state.put("session",session);save();
+      state.put("session",session);
+      if(action.equals("password-login") && !session.isNull("keybox")){
+        JSONObject box=session.getJSONObject("keybox"), envelope=box.getJSONObject("envelope");
+        byte[] salt=android.util.Base64.decode(box.getString("salt"),android.util.Base64.DEFAULT);
+        if(salt.length!=32)throw new IOException("自动解锁数据不正确");
+        javax.crypto.spec.PBEKeySpec spec=new javax.crypto.spec.PBEKeySpec(request.getString("code").toCharArray(),salt,210000,256);
+        byte[] derived=javax.crypto.SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).getEncoded();spec.clearPassword();
+        byte[] clear=CloudCipher.transform(false,derived,android.util.Base64.decode(envelope.getString("nonce"),android.util.Base64.DEFAULT),android.util.Base64.decode(envelope.getString("ciphertext"),android.util.Base64.DEFAULT),session.getString("accountId"));
+        state.put("key",new JSONObject(new String(clear,java.nio.charset.StandardCharsets.UTF_8)).getString("key"));
+      }
+      save();
+      if(state.has("key"))return call(new JSONObject().put("action","download"));
     }else if(action.equals("unlock")){
       JSONObject remote=api("vault",null);JSONObject data=decrypt(remote.getJSONObject("envelope"),request.getString("key"));
       state.put("key",request.getString("key"));save();
-    }else if(action.equals("download")){
-      JSONObject remote=api("vault",null);if(remote.getLong("revision")<state.optLong("revision",0))throw new IOException("云端版本回退");
+    }else if((action.equals("download")||action.equals("refresh"))){
+      JSONObject remote=api("vault",null);if(action.equals("refresh") && remote.getLong("revision")==state.optLong("revision",0))return result.put("status",status());if(remote.getLong("revision")<state.optLong("revision",0))throw new IOException("云端版本回退");
       JSONObject data=decrypt(remote.getJSONObject("envelope"),state.getString("key"));
       if(state.has("bundle"))state.put("backup",state.getJSONObject("bundle"));
       state.put("bundle",data).put("revision",remote.getLong("revision"));state.remove("pending");save();result=publicData(data);

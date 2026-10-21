@@ -1,8 +1,16 @@
-import { createCipheriv, createDecipheriv, randomBytes, createHash } from 'node:crypto';
+import { createCipheriv, createDecipheriv, randomBytes, createHash, pbkdf2Sync } from 'node:crypto';
 import type { CloudEnvelope } from '../shared/cloud-sync';
 
 export function newRecoveryKey() {
   return randomBytes(32).toString('base64url');
+}
+export function unwrapRecoveryKey(box: {salt:string;envelope:CloudEnvelope}, password:string, account:string): string {
+  const salt = Buffer.from(box.salt, 'base64');
+  if(salt.length !== 32) throw new Error('自动解锁数据不正确');
+  const derived = pbkdf2Sync(password, salt, 210000, 32, 'sha256').toString('base64url');
+  const value = decryptVault(box.envelope, derived, account) as {key:string};
+  keyBytes(value.key);
+  return value.key;
 }
 function keyBytes(key: string) {
   if (!/^[A-Za-z0-9_-]{43}$/.test(key)) throw new Error('恢复密钥格式不正确');
