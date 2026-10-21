@@ -22,6 +22,8 @@ public final class AndroidControlService extends AccessibilityService {
   private boolean pending;
   private boolean gestureBusy;
   private boolean shiftLeft,shiftRight,control,alt,caps;
+  private static volatile String lastEditState="none";
+  static String editState(){return lastEditState;}
   @Override protected void onServiceConnected(){instance=this;AndroidAgentService.changed(this);}
   @Override public void onAccessibilityEvent(AccessibilityEvent event){}
   @Override public void onInterrupt(){reset();}
@@ -82,7 +84,7 @@ public final class AndroidControlService extends AccessibilityService {
           else if(action.equals("recents"))performGlobalAction(GLOBAL_ACTION_RECENTS);
           break;
       }
-    }catch(Exception ignored){reset();}
+    }catch(Exception error){lastEditState="input-error:"+error.getClass().getSimpleName();reset();}
   }
   private void key(int code,boolean down){
     if(code==42){shiftLeft=down;return;}if(code==54){shiftRight=down;return;}
@@ -118,7 +120,11 @@ public final class AndroidControlService extends AccessibilityService {
     },main);
     if(!accepted)gestureBusy=false;
   }
-  private AccessibilityNodeInfo focused(){AccessibilityNodeInfo root=getRootInActiveWindow();if(root==null)return null;try{AccessibilityNodeInfo node=root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);if(node!=null&&!node.refresh()){node.recycle();return null;}return node;}finally{root.recycle();}}
+  private AccessibilityNodeInfo focused(){
+    // The active window can be the IME while input focus remains in the application.
+    AccessibilityNodeInfo node=findFocus(AccessibilityNodeInfo.FOCUS_INPUT);
+    if(node!=null&&!node.refresh()){node.recycle();return null;}return node;
+  }
   private void insert(String text){
     if(text.length()>4096)return;AccessibilityNodeInfo node=focused();if(node==null)return;
     try{if(!node.isEditable()||node.isPassword())return;String old=node.isShowingHintText()||node.getText()==null?"":node.getText().toString();if(old.length()>1_000_000)return;
@@ -127,8 +133,21 @@ public final class AndroidControlService extends AccessibilityService {
       if(node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT,args)){Bundle selection=new Bundle();selection.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT,lo+text.length());selection.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT,lo+text.length());node.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION,selection);}
     }finally{node.recycle();}
   }
-  private void backspace(){AccessibilityNodeInfo node=focused();if(node==null)return;
-    try{if(!node.isEditable()||node.isPassword())return;String old=node.isShowingHintText()||node.getText()==null?"":node.getText().toString();int a=node.getTextSelectionStart(),b=node.getTextSelectionEnd();if(a<0||b<0||a>old.length()||b>old.length())return;int lo=Math.min(a,b),hi=Math.max(a,b);if(lo==hi&&lo>0)lo=old.offsetByCodePoints(lo,-1);Bundle args=new Bundle();args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,old.substring(0,lo)+old.substring(hi));node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT,args);}finally{node.recycle();}}
+  private void backspace(){AccessibilityNodeInfo node=focused();if(node==null){lastEditState="backspace:no-input-focus";return;}
+    try{
+      if(!node.isEditable()||node.isPassword()){lastEditState="backspace:not-editable";return;}
+      String old=node.isShowingHintText()||node.getText()==null?"":node.getText().toString();
+      int a=node.getTextSelectionStart(),b=node.getTextSelectionEnd();
+      // Missing selection is not permission to guess a deletion position.
+      if(a<0||b<0||a>old.length()||b>old.length()){lastEditState="backspace:invalid-selection:"+a+":"+b+":"+old.length();return;}
+      int lo=Math.min(a,b),hi=Math.max(a,b);
+      if(lo==hi&&lo==0){lastEditState="backspace:at-start";return;}
+      if(lo==hi)lo=old.offsetByCodePoints(lo,-1);
+      Bundle args=new Bundle();args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,old.substring(0,lo)+old.substring(hi));
+      if(!node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT,args)){lastEditState="backspace:text-rejected";return;}
+      Bundle selection=new Bundle();selection.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT,lo);selection.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT,lo);
+      lastEditState=node.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION,selection)?"backspace:applied":"backspace:selection-rejected";
+    }finally{node.recycle();}}
 }
 
 

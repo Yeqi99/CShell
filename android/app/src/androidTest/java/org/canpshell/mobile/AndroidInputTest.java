@@ -51,9 +51,23 @@ final class AndroidInputTest implements AutoCloseable {
     input(connection,new JSONObject().put("kind","key").put("code",14).put("down",true));
     input(connection,new JSONObject().put("kind","key").put("code",14).put("down",false));
     awaitText("CAgent input check");
-    return "PASS encrypted remote input → real Accessibility tap, editable text, scan-code letter and backspace\n";
+    // A second delete catches cursor reset after ACTION_SET_TEXT; a surrogate pair
+    // must be removed as one code point rather than leaving invalid UTF-16 behind.
+    input(connection,new JSONObject().put("kind","text").put("text","\ud83d\ude00x"));
+    awaitText("CAgent input check\ud83d\ude00x");
+    pressBackspace(connection);awaitText("CAgent input check\ud83d\ude00");
+    pressBackspace(connection);awaitText("CAgent input check");
+    test.runOnMainSync(()->editor.setSelection(7,12));
+    pressBackspace(connection);awaitText("CAgent  check");
+    input(connection,new JSONObject().put("kind","text").put("text","input"));
+    awaitText("CAgent input check");
+    return "PASS encrypted remote input → real Accessibility tap, editable text, scan-code letter, repeated/Unicode/selection backspace\n";
   }
-  private void awaitText(String expected)throws Exception {AtomicReference<String> actual=new AtomicReference<>("");long end=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);while(!expected.equals(actual.get())&&System.nanoTime()<end){test.runOnMainSync(()->actual.set(editor.getText().toString()));Thread.sleep(50);}check(expected.equals(actual.get()),"Remote edit mismatch: "+actual.get());}
+  private static void pressBackspace(AgentConnection connection)throws Exception {
+    input(connection,new JSONObject().put("kind","key").put("code",14).put("down",true));
+    input(connection,new JSONObject().put("kind","key").put("code",14).put("down",false));
+  }
+  private void awaitText(String expected)throws Exception {AtomicReference<String> actual=new AtomicReference<>("");AtomicReference<String> selection=new AtomicReference<>("");long end=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);while(!expected.equals(actual.get())&&System.nanoTime()<end){test.runOnMainSync(()->{actual.set(editor.getText().toString());selection.set(editor.getSelectionStart()+":"+editor.getSelectionEnd()+", focused="+editor.hasFocus());});Thread.sleep(50);}check(expected.equals(actual.get()),"Remote edit mismatch: "+actual.get()+", expected="+expected+", selection="+selection.get()+", service="+AndroidControlService.editState());}
   private void tap(AgentConnection connection,View target)throws Exception {
     AtomicReference<double[]> point=new AtomicReference<>();test.runOnMainSync(()->{int[] at=new int[2];target.getLocationOnScreen(at);android.util.DisplayMetrics metrics=new android.util.DisplayMetrics();app.getSystemService(WindowManager.class).getDefaultDisplay().getRealMetrics(metrics);point.set(new double[]{(at[0]+target.getWidth()/2.0)/metrics.widthPixels,(at[1]+target.getHeight()/2.0)/metrics.heightPixels});});
     input(connection,new JSONObject().put("kind","move").put("x",point.get()[0]).put("y",point.get()[1]));

@@ -89,6 +89,7 @@ try {
     throw new Error(safeReport);
   console.log(safeReport);
   for (const [mode, expected] of [
+    ['filesMode', 'OK (Agent file roots'],
     ['hostMode', 'OK (Android host'],
     ['captureMode', 'PASS real Android system screen-sharing'],
   ]) {

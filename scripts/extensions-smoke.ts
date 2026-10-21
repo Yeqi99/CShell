@@ -126,6 +126,13 @@ export async function extensionsSmoke(
   await output('\r\n$ ');
   await page.locator('.terminal-pane.active .xterm-screen').click();
   await page.keyboard.type('/usr/bin/python3');
+  // Enter-time context recognition intentionally requires a fully echoed command.
+  // Keyboard dispatch completes before the SSH echo and xterm parsing on busy runners.
+  await page.waitForFunction(() => {
+    const rows = [...document.querySelectorAll('.terminal-pane.active .xterm-rows > div')]
+      .map(row => row.textContent?.trimEnd() ?? '').filter(Boolean);
+    return rows.at(-1)?.endsWith('$ /usr/bin/python3');
+  });
   await page.keyboard.press('Enter');
   await output('\r\n>>> ');
   await page.getByLabel('终端 Python 环境', { exact: true }).waitFor();
