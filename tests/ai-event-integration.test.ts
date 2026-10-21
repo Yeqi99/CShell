@@ -42,7 +42,7 @@ test('plugin event reaches configured AI without prior history; duplicate and re
   let dispose = await register();
   const wait = async (condition: () => boolean) => {
     for (let i = 0; i < 250; i++) { if (condition()) return; await new Promise(r => setTimeout(r, 20)); }
-    throw new Error('Integration timed out: ' + JSON.stringify(call('ai:events-snapshot')));
+    throw new Error('Integration timed out: ' + JSON.stringify({events:call('ai:events-snapshot'),threadErrors:call('ai:snapshot').threads.map((thread:any)=>({id:thread.id,state:thread.state,error:thread.error}))}));
   };
   const emit = (id: string) => wechat.subscriptions.onMessage({ id: 'subscription-fixture', accountId: 'wxid_fixture', event: {
     kind: 'message', messageId: id, senderId: 'filehelper', recipientId: 'wxid_fixture', conversationId: 'filehelper', conversationType: 'private',
@@ -64,6 +64,15 @@ test('plugin event reaches configured AI without prior history; duplicate and re
     const callsPerRun = definitions.length ? 2 : 1;
     assert.equal(requests.length, callsPerRun);
     assert.equal(requests[0].max_tokens, 512);
+    for(const tool of requests[0].tools??[]){
+      assert(!Object.hasOwn(tool.function.parameters,'$schema'),'tool schemas omit redundant dialect metadata');
+      assert.equal(tool.function.parameters.type,'object');
+    }
+    const parseTool=requests[0].tools?.find((tool:any)=>tool.function.name==='wechat_payment_parse');
+    if(definitions.some(tool=>tool.name==='wechat_payment_parse')){
+      assert(parseTool,'newly authorized payment read tool remains available');
+      assert.equal(parseTool.function.parameters.properties.xml.maxLength,65536);
+    }
     const body = JSON.stringify(requests[0]);
     assert.match(body, /Event fixture message/);
     assert.doesNotMatch(body, /Prior private conversation|must-not-leak/);

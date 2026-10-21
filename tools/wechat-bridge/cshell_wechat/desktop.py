@@ -7,6 +7,9 @@ from .state import SendJournal,exclusive,state_dir
 
 def execute(request):
     method=request['method'];params=request.get('params',{})
+    if method in ('payment_parse','transfer_receive','red_packet_receive','payment_result'):
+        from .atomic_payment import execute as atomic_payment
+        return atomic_payment(request)
     if method=='discover':
         raw=subprocess.check_output(['tasklist.exe','/FI','IMAGENAME eq Weixin.exe','/FO','CSV','/NH'],creationflags=0x08000000,timeout=10)
         processes=[]

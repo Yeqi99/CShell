@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cshell-wechat-bridge"
-version = "0.1.5"
+version = "0.1.6"
 description = "Version-pinned local WeChat adapter for CShell Agent"
 requires-python = ">=3.11"
 license = "MIT"

@@ -141,6 +141,7 @@ export function AiPermissionTree({
               ['ai.providers.manage', '查询、添加与测试 AI 基座'],
               ['wechat.read', '读取本机微信状态、联系人与授权消息'],
               ['wechat.send', '向授权联系人发送微信文本'],
+              ['wechat.payments.receive', '领取本机微信转账或红包（另需对应领取开关）'],
               ['wechat.contacts.manage', '修改授权微信联系人的备注'],
             ] as const
           ).map(([id, label]) => (

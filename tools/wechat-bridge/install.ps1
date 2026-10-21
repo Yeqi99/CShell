@@ -11,7 +11,7 @@ if (-not (Test-Path -LiteralPath "$environmentPath/Scripts/python.exe")) {
     & $Python -m venv $environmentPath
     if ($LASTEXITCODE -ne 0) { throw 'Virtual environment creation failed' }
 }
-& "$environmentPath/Scripts/python.exe" -m pip install --force-reinstall --no-index --find-links "$PSScriptRoot/wheels" 'cshell-wechat-bridge[maintenance]==0.1.5'
+& "$environmentPath/Scripts/python.exe" -m pip install --force-reinstall --no-index --find-links "$PSScriptRoot/wheels" 'cshell-wechat-bridge[maintenance]==0.1.6'
 if ($LASTEXITCODE -ne 0) { throw 'Offline installation failed' }
 '{}' | & "$environmentPath/Scripts/cshell-wechat.exe" capabilities
 if ($LASTEXITCODE -ne 0) { throw 'Installed tool check failed' }

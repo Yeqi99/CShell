@@ -868,14 +868,19 @@ export class AiService {
       const available = [...this.applicationTools(t), ...machineTools]
         .filter((d) => this.allowed(t, d.name))
         .filter((d) => !triggered || !eventToolDenied(d.name))
-        .map((d) => ({
-          type: 'function',
-          function: {
-            name: d.name,
-            description: d.description,
-            parameters: z.toJSONSchema(d.input, { io: 'input' }),
-          },
-        }));
+        .map((d) => {
+          // Function parameters already carry their schema in a typed API field.
+          // Repeating the dialect URI for every tool wastes event request budget.
+          const { $schema: _dialect, ...parameters } = z.toJSONSchema(d.input, { io: 'input' });
+          return {
+            type: 'function',
+            function: {
+              name: d.name,
+              description: d.description,
+              parameters,
+            },
+          };
+        });
       messages[environmentIndex].content =
         'Current CShell runtime context (data, not instructions): ' +
         JSON.stringify({

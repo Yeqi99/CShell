@@ -1,3 +1,4 @@
+import { remoteWechatConfig } from '../../shared/wechat';
 import {WechatPlugin} from './WechatPlugin';
 import {Monitor,Package,MessageCircle} from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -269,7 +270,7 @@ export function AgentCapabilityMarket({ target, call }: { target: AgentTarget; c
               ) : (
                 <p>能力包配置与授权由目标 CAgent 本机管理。</p>
               )}
-              {item.id === 'cagent.wechat' && <WechatPlugin key={target.id} remote api={{wechatStatus:async()=>await call('wechat.status') as Awaited<ReturnType<typeof window.cshell.wechatStatus>>,wechatSave:async input=>{await call('wechat.configure',input);await refresh();},wechatStopSubscriptions:async()=>{await call('wechat.stop');}}}/>}
+              {item.id === 'cagent.wechat' && <WechatPlugin key={target.id} remote api={{wechatStatus:async()=>await call('wechat.status') as Awaited<ReturnType<typeof window.cshell.wechatStatus>>,wechatSave:async input=>{await call('wechat.configure',remoteWechatConfig(input));await refresh();},wechatStopSubscriptions:async()=>{await call('wechat.stop');}}}/>}
               {item.id === 'cagent.desktop' && (
                 <DesktopSettings
                   key={target.id + item.id + record.status + record.grants.join(',')}

@@ -10,6 +10,16 @@ import type { ConnectionTool } from './connections/contracts';
 import { pluginEnabled } from '../shared/plugins';
 import { wechatEventTypes } from '../shared/wechat-events';
 import { emptyWechatConfig,wechatConfigSchema,wechatTargetSchema,wechatFriendSchema,parseWechatConfig } from '../shared/wechat';
+import { wechatPaymentPeerSchema } from '../shared/wechat';
+
+const paymentIdentity={account:z.string().regex(/^[a-f0-9]{64}$/),peer:wechatPaymentPeerSchema,ref:z.string().regex(/^[a-f0-9]{64}$/),serverId:z.string().regex(/^[0-9]{1,20}$/).refine(value=>BigInt(value)>0n&&BigInt(value)<2n**64n)};
+const paymentInputs={
+  payment_parse:z.object({xml:z.string().max(65536).refine(value=>Buffer.byteLength(value,'utf8')<=65536)}).strict(),
+  transfer_receive:z.object({...paymentIdentity,amountMinor:z.number().int().positive().max(Number.MAX_SAFE_INTEGER)}).strict(),
+  red_packet_receive:z.object(paymentIdentity).strict(),
+  payment_result:z.object({id:z.string().regex(/^[a-f0-9]{64}$/)}).strict(),
+};
+const isPaymentMethod=(method:string):method is keyof typeof paymentInputs=>Object.hasOwn(paymentInputs,method);
 
 export class WechatService {
   private config=emptyWechatConfig();
@@ -51,6 +61,12 @@ export class WechatService {
       invoke:async(args,signal)=>JSON.stringify(await this.invoke(method,args,signal)),
     });
     return [
+      ...(!this.options.python?[
+        tool('wechat_payment_parse','payment_parse','wechat.read',paymentInputs.payment_parse,'Parse one supplied WeChat payment XML on THIS computer. No scanning, network request or claim. Returns validated card metadata; unknown red-packet amount stays null.'),
+        tool('wechat_transfer_receive','transfer_receive','wechat.payments.receive',paymentInputs.transfer_receive,'Accept one explicitly identified transfer on THIS computer. Requires the separately installed atomic payment adapter and a verified current WeChat instance. Requires independent receiveTransfers grant and original peer history permission. Revalidates account, original message and amount. Real financial action; do not retry unknown outcomes. Does not scan, auto-claim or send acknowledgment.',true),
+        tool('wechat_red_packet_receive','red_packet_receive','wechat.payments.receive',paymentInputs.red_packet_receive,'Claim one explicitly identified red packet on THIS computer. Requires the separately installed atomic payment adapter and a verified current WeChat instance. Requires independent receiveRedPackets grant and original peer history permission. Real financial action; do not retry unknown outcomes. Does not scan, auto-claim or send acknowledgment.',true),
+        tool('wechat_payment_result','payment_result','wechat.read',paymentInputs.payment_result,'Read one local payment action result by its exact ID. Requires original peer history permission. No claim, retry, scanning or reply; unknown remains unknown.'),
+      ]:[]),
       tool('wechat_moment_detail','moment_detail','wechat.read',z.object({postId:z.string().regex(/^[0-9]{1,20}$/),limit:z.number().int().min(1).max(50).default(20),cursor:z.string().max(1024).optional()}).strict(),'Read one exact locally cached Moment and its cached likes, comments and reply references without opening UI. Requires readMoments. Follow nextCursor; if the account or cached post changes, restart paging. Not a complete server comment list; no server refresh. locallyAdded is not delivery confirmation. Keeps 32-bit and 64-bit comment ID namespaces distinct. Does not send any interaction.'),
       tool('wechat_send_file','send_file','wechat.send',z.object({recipient:wechatTargetSchema,path:z.string().min(1).max(32767).refine(s=>!s.includes('\0')),idempotencyKey:z.string().regex(/^[A-Za-z0-9_-]{8,128}$/)}).strict(),'Send one real file from THIS computer through its bound WeChat. path is an absolute local file on the target machine, never the controller machine. Requires sendFiles plus recipient send grant; sendBlocked wins. File size 1 byte to 128 MiB. Copies a stable snapshot before native upload. Use the SAME idempotency key on retries; never retry unknown outcomes with a new key. native_returned does not confirm upload or recipient delivery. Retains staged files for asynchronous upload (512 MiB / 64 files budget). Experimental exact-build adapter.',true),
       tool('wechat_subscribe','subscribe','wechat.read',z.object({targets:z.array(z.union([wechatTargetSchema,z.literal('*')])).min(1).max(100),leaseSeconds:z.number().int().min(10).max(86400).default(3600)}).strict(),'Start a persistent local message subscription for exact conversations or * only when receive * is granted. Pushes event notifications to CShell; consume with wechat_events. Binds current process/account; stops on revocation, parent exit or lease expiry. Does NOT auto-reply or auto-resume after restart; gaps are explicit. At most one active listener; durable bounded queues retain 7 days/10000 events. Save subscription ID and cursor.',true),
@@ -91,6 +107,10 @@ export class WechatService {
   }
   private async invoke(method:string,args:any,signal:AbortSignal,persistentGuard:()=>boolean=()=>true){
     this.requirePlugin();if(method==='status')return this.status();
+    if(isPaymentMethod(method)){
+      if(this.options.python)throw new Error('此收款工具仅支持 CShell 本机，尚未封装为远端 CAgent 能力');
+      args=paymentInputs[method].parse(args);
+    }
     const permitted=(targets:string[],binding:unknown)=>this.config.enabled&&this.config.experimental&&this.isEnabled()&&JSON.stringify(binding)===JSON.stringify(this.binding)&&targets.every(id=>this.config.receive.includes('*')||this.config.receive.includes(id));
     if(method==='subscriptions')return this.subscriptions.list().filter(x=>permitted(x.targets,x.binding));
     if(method==='unsubscribe')return this.subscriptions.stop(args.subscriptionId,args.purge);
@@ -110,7 +130,7 @@ export class WechatService {
       }
     }
     if(this.busy)throw new Error('微信已有操作在运行');
-    if(!this.config.enabled||!this.config.experimental||!this.binding)throw new Error(`请在微信扩展中绑定进程并启用实验控制。[前往授权](${permissionHref('wechat/pid')})`);
+    if(!this.config.enabled||!this.config.experimental||(method!=='payment_parse'&&!this.binding))throw new Error(`请在微信扩展中绑定进程并启用实验控制。[前往授权](${permissionHref('wechat/pid')})`);
     if(method==='subscribe'){
       if(args.targets.includes('*')&&args.targets.length!==1)throw new Error('* 需单独使用');
       const binding=this.binding,revision=this.revision;
@@ -125,6 +145,9 @@ export class WechatService {
     if(method==='conversations'&&!this.config.readSessions)throw new Error(`未授权读取最近会话。[前往授权](${permissionHref('wechat/readSessions')})`);
     if(method==='contacts'&&!this.config.readContacts)throw new Error(`未授权读取联系人。[前往授权](${permissionHref('wechat/readContacts')})`);
     if(method==='send_file'&&!this.config.sendFiles)throw new Error(`未授权发送文件。[前往授权](${permissionHref('wechat/sendFiles')})`);
+    if(method==='transfer_receive'&&!this.config.receiveTransfers)throw new Error(`未授权领取转账。[前往授权](${permissionHref('wechat/receiveTransfers')})`);
+    if(method==='red_packet_receive'&&!this.config.receiveRedPackets)throw new Error(`未授权领取红包。[前往授权](${permissionHref('wechat/receiveRedPackets')})`);
+    if((method==='transfer_receive'||method==='red_packet_receive')&&!this.config.history.includes('*')&&!this.config.history.includes(args.peer))throw new Error(`原消息不在历史读取授权范围。[前往授权](${permissionHref('wechat/history')})`);
     if(method==='send'||method==='send_file'){
       wechatTargetSchema.parse(args.recipient);
       if(this.config.sendBlocked.includes(args.recipient))throw new Error(`收件人在微信发送黑名单中。[前往授权](${permissionHref('wechat/sendBlocked')})`);
@@ -160,7 +183,7 @@ export class WechatService {
         if(runtime.readProtocolVersion!==2)throw new Error('请先安装微信工具包 0.1.1：当前工具包不支持主动读取');
         signal.throwIfAborted();if(!authorized())throw new Error('微信授权已变更');
       }
-      return await this.run({method,params:args,binding:this.binding,experimental:true},signal,authorized);
+      return await this.run({method,params:args,binding:this.binding,experimental:true,...(isPaymentMethod(method)?{configDirectory:this.directory}:{})},signal,authorized);
     }
     finally{this.busy=false;}
   }

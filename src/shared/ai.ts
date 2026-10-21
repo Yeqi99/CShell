@@ -58,6 +58,7 @@ export const aiPolicySchema = z
         'ai.providers.manage',
         'wechat.read',
         'wechat.send',
+        'wechat.payments.receive',
         'wechat.contacts.manage',
       ]),
     ),
