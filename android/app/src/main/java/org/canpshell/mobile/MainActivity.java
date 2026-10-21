@@ -22,6 +22,7 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider;
 public class MainActivity extends Activity {
   private WebView web;
   private AppUpdates updates;
+  private LocalFiles localFiles;
   private final ExecutorService workers = Executors.newCachedThreadPool();
   private final Map<String, Connection> connections = new ConcurrentHashMap<>();
   private volatile boolean destroyed;
@@ -41,6 +42,9 @@ public class MainActivity extends Activity {
     androidx.core.content.ContextCompat.registerReceiver(this,cagentEvents,new android.content.IntentFilter(AndroidAgentService.CHANGED),androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED);
     Security.removeProvider("BC"); Security.addProvider(new BouncyCastleProvider());
     web = new WebView(this);
+    localFiles = new LocalFiles(this,
+      value -> { if(!destroyed)web.evaluateJavascript("window.localFilesChanged("+JSONObject.quote(value.toString())+")",null); },
+      value -> { if(!destroyed)web.evaluateJavascript("window.fileEvent("+JSONObject.quote(value.toString())+")",null); });
     updates = new AppUpdates(this, workers, value -> runOnUiThread(() -> {
       if (!destroyed) web.evaluateJavascript("window.updateEvent(" + JSONObject.quote(value) + ")", null);
     }));
@@ -56,19 +60,25 @@ public class MainActivity extends Activity {
       @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
         Uri uri = request.getUrl();
         String path = uri.getPath();
-        if (!"https".equals(uri.getScheme()) || !"cshell.local".equals(uri.getHost()) || path == null || !Arrays.asList("/index.html", "/app.js", "/app.css").contains(path))
+        if (!"https".equals(uri.getScheme()) || !"cshell.local".equals(uri.getHost()) || path == null || !Arrays.asList("/index.html", "/app.js", "/app.css", "/icon.png").contains(path))
           return new WebResourceResponse("text/plain", "UTF-8", 403, "Forbidden", Collections.emptyMap(), new ByteArrayInputStream(new byte[0]));
         try {
-          String mime = path.endsWith(".js") ? "application/javascript" : path.endsWith(".css") ? "text/css" : "text/html";
-          return new WebResourceResponse(mime, "UTF-8", getAssets().open(path.substring(1)));
+          String mime = path.endsWith(".js") ? "application/javascript" : path.endsWith(".css") ? "text/css" : path.endsWith(".png") ? "image/png" : "text/html";
+          return new WebResourceResponse(mime, path.endsWith(".png") ? null : "UTF-8", getAssets().open(path.substring(1)));
         } catch (IOException e) { return new WebResourceResponse("text/plain", "UTF-8", new ByteArrayInputStream(new byte[0])); }
       }
     });
-    setContentView(web);
-    web.setOnApplyWindowInsetsListener((view, insets) -> {
-      view.setPadding(insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetTop(), insets.getSystemWindowInsetRight(), insets.getSystemWindowInsetBottom());
-      return insets.consumeSystemWindowInsets();
+    // Inset the WebView's layout bounds: WebView padding does not reliably inset its HTML viewport.
+    android.widget.FrameLayout content = new android.widget.FrameLayout(this);
+    content.addView(web, new android.widget.FrameLayout.LayoutParams(-1, -1));
+    androidx.core.view.WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+    setContentView(content);
+    androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(content, (view, insets) -> {
+      androidx.core.graphics.Insets safe = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars() | androidx.core.view.WindowInsetsCompat.Type.displayCutout() | androidx.core.view.WindowInsetsCompat.Type.ime());
+      view.setPadding(safe.left, safe.top, safe.right, safe.bottom);
+      return androidx.core.view.WindowInsetsCompat.CONSUMED;
     });
+    androidx.core.view.ViewCompat.requestApplyInsets(content);
     web.loadUrl("https://cshell.local/index.html");
     if (android.os.Build.VERSION.SDK_INT >= 33) {
       getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
@@ -100,6 +110,8 @@ public class MainActivity extends Activity {
     } catch (Exception e) { return false; }
   }
   public class Bridge {
+    @JavascriptInterface public String localFilesStatus(){return localFiles.status().toString();}
+    @JavascriptInterface public void localFilesChoose(){runOnUiThread(()->{if(pendingTransfer==null)localFiles.choose();});}
     @JavascriptInterface public String cagentStatus(){return AndroidAgentService.status(MainActivity.this).toString();}
     @JavascriptInterface public String cagentConfigure(String json){return AndroidAgentService.configure(MainActivity.this,json).toString();}
     @JavascriptInterface public void cagentStop(){
@@ -108,6 +120,12 @@ public class MainActivity extends Activity {
     }
     @JavascriptInterface public void cagentAccessibility(){
       runOnUiThread(()->{try{startActivity(new Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS));}catch(Exception e){AndroidAgentService.starting(MainActivity.this,false,"无法打开无障碍设置");}});
+    }
+    @JavascriptInterface public void cagentBackgroundSettings(){
+      runOnUiThread(()->{
+        try{startActivity(new Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));}
+        catch(Exception unavailable){try{startActivity(new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+getPackageName())));}catch(Exception e){AndroidAgentService.starting(MainActivity.this,false,"无法打开系统后台运行设置");}}
+      });
     }
     @JavascriptInterface public void cagentCopyConnection(){
       try{
@@ -120,7 +138,7 @@ public class MainActivity extends Activity {
       try{
         if(android.os.Build.VERSION.SDK_INT<29)throw new IllegalStateException("CAgent 受控端需要 Android 10 或更新版本");
         JSONObject status=AndroidAgentService.status(MainActivity.this);
-        if(status.optBoolean("running")||status.optBoolean("starting"))return;
+        if(status.optBoolean("sharing")||status.optBoolean("starting"))return;
         JSONObject settings=AndroidAgentSettings.read(MainActivity.this);
         if(!settings.getBoolean("enabled")||settings.getString("password").isEmpty())throw new IllegalStateException("请先启用 CAgent 并保存连接密码");
         android.media.projection.MediaProjectionManager manager=getSystemService(android.media.projection.MediaProjectionManager.class);
@@ -199,9 +217,10 @@ public class MainActivity extends Activity {
       try {
         JSONObject request=new JSONObject(json);UUID.fromString(request.getString("request"));
         String id=request.getString("session"), path=request.getString("path"), operation=request.getString("operation");
+        if(id.equals("local")){if(pendingTransfer!=null)throw new IOException("请先完成当前文件选择");localFiles.request(request);return;}
         UUID.fromString(id);
         if(path.isEmpty() || path.length()>4096 || path.indexOf(0)>=0 || path.indexOf(10)>=0 || path.indexOf(13)>=0)throw new IOException("路径无效");
-        Connection c=connections.get(id);if(c==null || c.session==null || !c.session.isConnected())throw new IOException("连接已断开");
+        Connection c=connections.get(id);if(c==null || (c.agent==null && (c.session==null || !c.session.isConnected())))throw new IOException("连接已断开");
         if(operation.equals("upload")||operation.equals("download")) runOnUiThread(()->pickTransfer(request));
         else if(operation.equals("list")||operation.equals("preview")) c.files.execute(()->fileOperation(request,null));
         else throw new IOException("不支持的文件操作");
@@ -283,6 +302,7 @@ public class MainActivity extends Activity {
     try{value.put("request",request.getString("request"));String json=value.toString();runOnUiThread(()->{if(!destroyed)web.evaluateJavascript("window.fileEvent("+JSONObject.quote(json)+")",null);});}catch(Exception ignored){}
   }
   private void pickTransfer(JSONObject request) {
+    if(localFiles.hasPendingPicker()){try{fileResult(request,new JSONObject().put("error","请先完成当前文件选择"));}catch(Exception ignored){}return;}
     try {
       if(pendingTransfer!=null)throw new IOException("请先完成当前文件选择");
       pendingTransfer=request;
@@ -296,6 +316,7 @@ public class MainActivity extends Activity {
   }
   @Override protected void onActivityResult(int code,int result,Intent data) {
     super.onActivityResult(code,result,data);
+    if(localFiles.onActivityResult(code,result,data))return;
     if(code==7107){
       if(result!=RESULT_OK||data==null){AndroidAgentService.starting(this,false,"未开始共享：屏幕录制未获授权");return;}
       try{
@@ -316,7 +337,9 @@ public class MainActivity extends Activity {
   private void fileOperation(JSONObject request,Uri uri) {
     ChannelSftp channel=null;
     try {
-      Connection c=connections.get(request.getString("session"));if(c==null || c.session==null || !c.session.isConnected())throw new IOException("连接已断开");
+      Connection c=connections.get(request.getString("session"));if(c==null)throw new IOException("连接已断开");
+      if(c.agent!=null){fileResult(request,AgentFiles.operation(getContentResolver(),c.agent,request,uri,()->destroyed||Thread.currentThread().isInterrupted()));return;}
+      if(c.session==null || !c.session.isConnected())throw new IOException("连接已断开");
       channel=(ChannelSftp)c.session.openChannel("sftp");channel.connect(15000);
       String path=request.getString("path"),op=request.getString("operation");JSONObject result=new JSONObject();
       if(op.equals("list")){
@@ -359,6 +382,7 @@ public class MainActivity extends Activity {
     byte[] bytes=new byte[65536];int n;while((n=in.read(bytes))!=-1){if(destroyed||Thread.currentThread().isInterrupted())throw new IOException("传输已停止");out.write(bytes,0,n);}
   }
   @Override public void onDestroy() {
+    localFiles.close();
     destroyed = true; for (Connection c : connections.values()) c.close(); connections.clear(); workers.shutdownNow();
     unregisterReceiver(cagentEvents);
     web.removeJavascriptInterface("CShellNative"); web.destroy(); super.onDestroy();

@@ -23,6 +23,7 @@ final class AndroidAgentHost implements AutoCloseable {
   interface Events { void video(JSONObject info); void frame(byte[] annexB,long timestampUs,boolean key); void error(String reason); }
   interface Backend {
     boolean available(); boolean controlAvailable();
+    default String unavailableReason(){return "请在手机上开始屏幕共享并确认系统授权";}
     void start(JSONObject quality,Events events)throws Exception;
     void stop(); void input(JSONObject event)throws Exception; void releaseInput();
     void requestKeyFrame(); void quality(JSONObject quality)throws Exception;
@@ -96,11 +97,11 @@ final class AndroidAgentHost implements AutoCloseable {
     switch(method){
       case "agent.shells":case "agent.environments":case "packages.tools":case "applications.list":case "agent.logs":return new JSONArray();
       case "client.status":return new JSONObject().put("running",listener!=null&&!listener.isClosed()).put("deviceId",identity.id).put("fingerprint",AndroidHostIdentity.fingerprint(identity.certificate.getEncoded())).put("port",listener==null?0:listener.getLocalPort()).put("bind","0.0.0.0").put("platform","android").put("passwordConfigured",true).put("allowedShells",new JSONArray()).put("allowManage",true).put("allowHttp",false).put("allowHosting",false).put("allowRelay",false).put("peers",new JSONArray()).put("audit",new JSONArray());
-      case "packages.list":return new JSONArray().put(new JSONObject().put("id","cagent.desktop").put("name","Android 屏幕共享").put("version","0.1.0").put("registered",backend.available()).put("status",backend.available()?"ready":"not-configured").put("reason",backend.available()?"":"请在手机上开始屏幕共享并确认系统授权").put("grants",new JSONArray().put("desktop.view").put("desktop.control")));
+      case "packages.list":return new JSONArray().put(new JSONObject().put("id","cagent.desktop").put("name","Android 屏幕共享").put("version","0.1.0").put("registered",true).put("status",backend.available()?"ready":"not-configured").put("reason",backend.available()?"":backend.unavailableReason()).put("grants",new JSONArray().put("desktop.view").put("desktop.control")));
       case "packages.catalog":return new JSONArray();
-      case "desktop.status":return new JSONObject().put("enabled",true).put("listening",listener!=null).put("viewAllowed",backend.available()).put("controlAllowed",backend.available()&&backend.controlAvailable()).put("busy",desktop!=null).put("qualityModes",new JSONArray().put("bounded")).put("packageReady",true).put("nativeAvailable",true).put("inputFeatures",new JSONArray().put("unicode-text")).put("implementation","android-mediaprojection-mediacodec").put("relay",false).put("config",new JSONObject().put("enabled",true).put("authenticatedPeers",true).put("directListener",false));
+      case "desktop.status":return new JSONObject().put("enabled",true).put("listening",listener!=null).put("viewAllowed",backend.available()).put("controlAllowed",backend.available()&&backend.controlAvailable()).put("busy",desktop!=null).put("reason",backend.available()?"":backend.unavailableReason()).put("recoverable",!backend.available()).put("qualityModes",new JSONArray().put("bounded")).put("packageReady",true).put("nativeAvailable",true).put("inputFeatures",new JSONArray().put("unicode-text")).put("implementation","android-mediaprojection-mediacodec").put("relay",false).put("config",new JSONObject().put("enabled",true).put("authenticatedPeers",true).put("directListener",false));
       case "desktop.open":{
-        if(!backend.available())throw new IOException("请先在手机上开始屏幕共享并确认系统授权");
+        if(!backend.available())throw new IOException(backend.unavailableReason());
         if(!"management".equals(params.optString("transport")))throw new IOException("Android desktop requires the authenticated management transport");
         if("udp".equals(params.optString("mediaTransport")))throw new IOException("Unsupported mediaTransport: udp; Android desktop requires TCP");
         JSONObject quality=params.getJSONObject("quality");validateQuality(quality);
@@ -175,7 +176,7 @@ final class AndroidAgentHost implements AutoCloseable {
         synchronized(this){writeStarted=System.nanoTime();try{output.writeInt(0x80000000|32+encrypted.length);output.write(header);output.write(encrypted);output.flush();}finally{writeStarted=0;}}
       }
     }
-    public void error(String reason){failure=reason==null?"Screen capture stopped":reason;try{send(new JSONObject().put("op","close").put("reason","CAPTURE_CLOSED"));}catch(Exception ignored){}close();}
+    public void error(String reason){failure=reason==null?"Screen capture stopped":reason;String message=failure.startsWith("SCREEN_LOCKED")?"手机已锁屏或息屏，请在手机上解锁后重新连接；管理连接仍可使用":"手机屏幕共享已结束，请在手机上重新授权共享后连接；管理连接仍可使用";try{send(new JSONObject().put("op","close").put("reason",message).put("code",failure.startsWith("SCREEN_LOCKED")?"SCREEN_LOCKED":"PROJECTION_STOPPED").put("recoverable",true));}catch(Exception ignored){}close();}
     public void close(){if(!closed.compareAndSet(false,true))return;try{socket.close();}catch(Exception ignored){}if(watchdog!=null)watchdog.cancel(false);writer.shutdownNow();synchronized(AndroidAgentHost.this){if(desktop==this){desktop=null;backend.releaseInput();backend.stop();}}}
   }
   static byte[] hmac(byte[] key,String value)throws Exception{Mac mac=Mac.getInstance("HmacSHA256");mac.init(new SecretKeySpec(key,"HmacSHA256"));return mac.doFinal(value.getBytes(StandardCharsets.UTF_8));}

@@ -69,3 +69,18 @@ test('output limits and filtering are interruptions rather than successful compl
     /过滤/,
   );
 });
+
+test('malformed provider JSON identifies its phase without leaking response payloads', async () => {
+  for (const [body, type, code] of [
+    ['{"private-prompt":"SECRET', 'application/json', 'AI_RESPONSE_JSON_INVALID'],
+    ['data: {"private-prompt":"SECRET\n\n', 'text/event-stream', 'AI_SSE_JSON_INVALID'],
+  ]) {
+    await assert.rejects(readAiResponse(new Response(body, {headers:{'content-type':type}}),()=>{}), error => {
+      assert.match(String(error),new RegExp(code));assert.doesNotMatch(String(error),/SECRET|private-prompt/);return true;
+    });
+  }
+  await assert.rejects(readAiResponse(new Response('null'),()=>{}),/AI_RESPONSE_SCHEMA_INVALID/);
+  await assert.rejects(readAiResponse(new Response('{"choices":[{"message":{"tool_calls":42}}]}'),()=>{}),/AI_RESPONSE_SCHEMA_INVALID/);
+  const parsed=await readAiResponse(new Response('{"choices":[{"message":{"content":"OK","tool_calls":null}}]}'),()=>{});
+  assert.equal(parsed.content,'OK');assert.equal(parsed.tool_calls,null);
+});

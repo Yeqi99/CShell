@@ -22,6 +22,12 @@ body {
   flex-direction: column;
   overflow: hidden;
 }
+.brand-mark img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.files-empty { padding: 36px 16px; text-align: center; }
+.files-empty > [data-icon] { color: var(--accent); margin-bottom: 12px; }
+.files-empty p { line-height: 1.6; margin: 12px auto 20px; max-width: 30em; }
+.file-sources { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 16px; }
+.file-sources [aria-pressed=true] { background: var(--soft); color: var(--accent); border-color: transparent; }
 body.dark {
   --bg: #141b24;
   --surface: #1c2531;

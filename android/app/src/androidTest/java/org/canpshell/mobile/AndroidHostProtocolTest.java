@@ -19,8 +19,9 @@ final class AndroidHostProtocolTest {
     final ScheduledExecutorService frames=Executors.newSingleThreadScheduledExecutor();
     volatile ScheduledFuture<?> delivery;volatile AndroidAgentHost.Events events;
     final AtomicInteger inputs=new AtomicInteger(),releases=new AtomicInteger();
-    volatile boolean accessible=true;
-    public boolean available(){return true;} public boolean controlAvailable(){return accessible;}
+    volatile boolean accessible=true,projecting=true;
+    public boolean available(){return projecting;} public boolean controlAvailable(){return projecting&&accessible;}
+    public String unavailableReason(){return "PROJECTION_STOPPED: 请在手机上重新授权屏幕共享";}
     public void start(JSONObject quality,AndroidAgentHost.Events e)throws Exception{
       events=e;e.video(new JSONObject().put("width",320).put("height",240).put("sourceWidth",320).put("sourceHeight",240).put("fps",30).put("codec","avc1.42001e").put("encoder","fixture").put("hardware",false));
       byte[] frame=new byte[100000];Arrays.fill(frame,(byte)73);
@@ -71,6 +72,21 @@ final class AndroidHostProtocolTest {
         long until=System.nanoTime()+TimeUnit.SECONDS.toNanos(3);while(capture.delivery!=null&&System.nanoTime()<until)Thread.sleep(20);
       }
       check(capture.inputs.get()>0,"Control did not reach backend");check(capture.releases.get()>0,"Disconnect did not release input");
+      // Losing projection must not invalidate pairing, the listener, or management access.
+      capture.projecting=false;
+      AgentConnection management=new AgentConnection((t,v)->{});
+      try{
+        management.connect("127.0.0.1",port,"",cert->certificateMatches(cert,invitation.optString("certificate")));
+        check(((JSONObject)management.manage("client.status",new JSONObject())).getBoolean("running"),"Projection loss stopped management");
+        JSONObject paused=(JSONObject)management.manage("desktop.status",new JSONObject());
+        check(!paused.getBoolean("viewAllowed")&&!paused.getBoolean("controlAllowed"),"Stopped projection still advertised control");
+        JSONObject installed=((JSONArray)management.manage("packages.list",new JSONObject())).getJSONObject(0);
+        check(installed.getBoolean("registered")&&"not-configured".equals(installed.getString("status")),"Projection loss was reported as uninstalled");
+        boolean rejected=false;try{management.manage("desktop.open",new JSONObject().put("quality",QUALITY).put("control",true).put("transport","management"));}catch(Exception expected){rejected=expected.getMessage().contains("PROJECTION_STOPPED");}
+        check(rejected,"Stopped projection did not provide a recoverable error");
+        capture.projecting=true;
+        check(((JSONObject)management.manage("desktop.status",new JSONObject())).getBoolean("viewAllowed"),"Fresh projection did not restore availability");
+      }finally{management.close();capture.projecting=true;}
       JSONObject stale;
       try(SSLSocket socket=connect(port)){InputStream in=socket.getInputStream();OutputStream out=socket.getOutputStream();rpc(in,out,"auth",new JSONObject().put("name","fixture"));stale=(JSONObject)rpc(in,out,"manage",new JSONObject().put("method","desktop.open").put("params",new JSONObject().put("quality",QUALITY).put("control",false).put("transport","management").put("mediaTransport","tcp")));}
       host.stop();host.start(port,password);

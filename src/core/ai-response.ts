@@ -1,4 +1,16 @@
 import { z } from 'zod';
+/** Do not echo provider payloads: they may contain prompts or credentials. */
+export function parseAiJson(text: string, phase: 'json'|'sse'): any {
+  try { return JSON.parse(text); }
+  catch { throw new Error(phase === 'sse'
+    ? '模型服务返回了不完整或无效的流式数据（AI_SSE_JSON_INVALID）；本轮未完成，未执行未完成的工具调用。'
+    : '模型服务返回了不完整或无效的 JSON（AI_RESPONSE_JSON_INVALID）；本轮未完成，请检查服务或稍后重试。'); }
+}
+function validateReply(value: unknown) {
+  const result = replySchema.safeParse(value);
+  if (!result.success) throw new Error('模型响应或工具调用的结构不符合接口约定（AI_RESPONSE_SCHEMA_INVALID）；未执行本轮工具调用。');
+  return result.data;
+}
 const callSchema = z.object({
   id: z.string().max(200),
   type: z.literal('function'),
@@ -42,7 +54,8 @@ export async function readAiResponse(response: Response, onContent: (content: st
       finished = true;
       return;
     }
-    const value = JSON.parse(data);
+    const value = parseAiJson(data, 'sse');
+    if (!value || typeof value !== 'object') throw new Error('模型流式响应结构无效（AI_RESPONSE_SCHEMA_INVALID）。');
     if (value.error) throw new Error('AI 流式响应出错，请重试');
     const choice = value.choices?.find((c: any) => c.index === 0) ?? value.choices?.[0];
     if (!choice) return;
@@ -92,16 +105,13 @@ export async function readAiResponse(response: Response, onContent: (content: st
       if (chunk.done || (streaming && finished)) break;
     }
     if (!streaming) {
-      const value = JSON.parse(raw);
-      checkFinish(value.choices?.[0]?.finish_reason);
-      const parsed = z
-        .object({ choices: z.array(z.object({ message: replySchema })).min(1) })
-        .parse(value);
-      return parsed.choices[0].message;
+      const value = parseAiJson(raw, 'json');
+      checkFinish(value?.choices?.[0]?.finish_reason);
+      return validateReply(value?.choices?.[0]?.message);
     }
     if (pending.trim()) event(pending.replace(/\r\n/g, '\n'));
     if (!finished) throw new Error('AI 响应中断，请重试；未执行未完成的工具调用。');
-    return replySchema.parse({
+    return validateReply({
       content,
       tool_calls: [...calls.entries()].sort((a, b) => a[0] - b[0]).map(([, c]) => c),
     });

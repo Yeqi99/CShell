@@ -84,6 +84,13 @@
             data-icon="refresh"
           ></button>
         </div>
+        <div class="file-sources" role="group" aria-label="文件来源"><button id="files-remote" aria-pressed="true">远端</button><button id="files-local" aria-pressed="false">此手机</button><button id="files-choose" hidden>选择文件夹</button></div>
+        <div id="files-empty" class="files-empty" hidden>
+          <span data-icon="folder" aria-hidden="true"></span>
+          <h2>连接后管理文件</h2>
+          <p id="files-empty-description" class="muted">选择一台服务器，浏览目录、预览和传输文件。</p>
+          <button data-page="connections">选择连接</button>
+        </div>
         <select id="files-session" aria-label="文件所属会话"></select>
         <form id="files-path-form" class="file-path">
           <button
@@ -278,6 +285,7 @@
         <div class="cagent-permissions">
           <div class="setting-row"><div><strong>屏幕共享</strong><p id="cagent-screen-state" class="muted caption">未开始</p></div><button id="cagent-start">开始共享</button><button id="cagent-stop" hidden>停止共享</button></div>
           <div class="setting-row"><div><strong>触摸与键盘控制</strong><p id="cagent-access-state" class="muted caption">需要开启系统无障碍服务</p></div><button id="cagent-access">去设置</button></div>
+          <div class="setting-row"><div><strong>后台运行</strong><p id="cagent-background-state" class="muted caption">检查系统省电限制</p></div><button id="cagent-background">系统设置</button></div>
           <p class="muted caption">屏幕共享由 Android 确认授权；可随时在这里停止。</p>
         </div>
         <p id="cagent-feedback" role="status" aria-live="polite"></p>

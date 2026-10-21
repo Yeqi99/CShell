@@ -1,3 +1,4 @@
+import { parseAiJson } from '../../core/ai-response';
 // OpenCode protocol adapters. The CShell host continues to use its generic chat contract.
 export type Family='chat'|'responses'|'anthropic'|'google';
 export function family(model:string):Family|null {
@@ -75,8 +76,8 @@ export function normalizeResponse(response:Response,kind:Family,stream:boolean):
   return new Response(new ReadableStream({async start(controller){try{
     const emit=(v:any)=>{for(const chunk of consume(v))if(stream)controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));};
     for(;;){const next=await reader.read();if(next.value){bytes+=next.value.length;if(bytes>2_000_000)throw Error('模型响应过大');pending+=decoder.decode(next.value,{stream:true});if(stream)controller.enqueue(encoder.encode(': activity\n\n'));}
-      if(sse){let m;while((m=/\r?\n\r?\n/.exec(pending))){const block=pending.slice(0,m.index);pending=pending.slice(m.index+m[0].length);const data=block.split(/\r?\n/).filter(l=>l.startsWith('data:')).map(l=>l.slice(5).trim()).join('\n');if(data&&data!=='[DONE]')emit(JSON.parse(data));}}
-      if(next.done){pending+=decoder.decode();if(!sse)emit(JSON.parse(pending));break;}if(done)break;
+      if(sse){let m;while((m=/\r?\n\r?\n/.exec(pending))){const block=pending.slice(0,m.index);pending=pending.slice(m.index+m[0].length);const data=block.split(/\r?\n/).filter(l=>l.startsWith('data:')).map(l=>l.slice(5).trim()).join('\n');if(data&&data!=='[DONE]')emit(parseAiJson(data,'sse'));}}
+      if(next.done){pending+=decoder.decode();if(!sse)emit(parseAiJson(pending,'json'));break;}if(done)break;
     }
     if(!done)throw Error('模型响应中断，未重试');
     if(stream)controller.enqueue(encoder.encode('data: [DONE]\n\n'));else controller.enqueue(encoder.encode(JSON.stringify({choices:[{message:{content,tool_calls:[...calls.values()]},finish_reason:finishReason}]})));

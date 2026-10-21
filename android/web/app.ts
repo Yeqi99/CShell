@@ -12,8 +12,11 @@ declare global {
       cagentStart?(): void;
       cagentStop?(): void;
       cagentAccessibility?(): void;
+      cagentBackgroundSettings?(): void;
       cagentCopyConnection?(): void;
       fileRequest(data: string): void;
+      localFilesStatus?(): string;
+      localFilesChoose?(): void;
       connect(data: string): void;
       openAgent(id: string, index: number): void;
       desktopOpen(id:string,options:string):void;
@@ -33,6 +36,7 @@ declare global {
     };
     agentTrustReset(host: string, port: number): void;
     fileEvent(json: string): void;
+    localFilesChanged(json: string): void;
     receive(id: string, type: string, value: string): void;
     updateEvent(json: string): void;
     mobileBack(): boolean;
@@ -712,17 +716,25 @@ render();
 
 // File requests are bound to an explicit live session; stale responses never replace another machine.
 const filePaths = new Map<string, string>();
+let localFileParent: string | null = null;
+let fileSource: 'remote' | 'local' = localStorage.getItem('fileSource') === 'local' ? 'local' : 'remote';
+let localFileState: {available?: boolean; name?: string; path?: string; error?: string} = {};
+try { localFileState = JSON.parse(window.CShellNative?.localFilesStatus?.() || '{}'); } catch { /* Choosing a folder offers recovery. */ }
+function remoteFileSessionReady(id: string) { return ['已连接', '已连接 CAgent'].includes(sessions.get(id)?.state || ''); }
+function fileSessionReady() { return fileSession === 'local' ? !!localFileState.available : remoteFileSessionReady(fileSession); }
 let fileSession = '',
   listingRequest = '',
   fileBusy = false;
-const pendingFiles = new Map<string, { session: string; operation: string }>();
+const pendingFiles = new Map<string, { session: string; operation: string; timer: ReturnType<typeof setTimeout> }>();
 function syncFileSessions() {
+  for (const source of ['remote', 'local']) $('files-' + source).setAttribute('aria-pressed', String(fileSource === source));
   const select = $('files-session') as HTMLSelectElement;
   const live = [...sessions].filter(
-    ([, s]) => s.state === '已连接' && s.profile.protocol !== 'agent',
+    ([id]) => remoteFileSessionReady(id),
   );
   const previous = fileSession;
-  if (!live.some(([id]) => id === fileSession))
+  if (fileSource === 'local') fileSession = localFileState.available ? 'local' : '';
+  else if (!live.some(([id]) => id === fileSession))
     fileSession = live.some(([id]) => id === active) ? active : live[0]?.[0] || '';
   select.replaceChildren();
   for (const [id, s] of live) {
@@ -733,20 +745,36 @@ function syncFileSessions() {
   }
   select.value = fileSession;
   select.disabled = !fileSession;
+  $('files-empty').hidden = !!fileSession;
+  select.hidden = !fileSession || fileSource === 'local';
+  $('files-choose').hidden = fileSource !== 'local';
+  ($('files-path') as HTMLInputElement).readOnly = fileSource === 'local';
+  $('files-empty').querySelector('h2')!.textContent = fileSource === 'local' ? '选择手机文件夹' : '连接后管理文件';
+  ($('files-empty').querySelector('button') as HTMLButtonElement).hidden = fileSource === 'local';
+  $('files-upload').setAttribute('aria-label', fileSource === 'local' ? '导入到当前文件夹' : '上传到当前目录');
+  $('files-path-form').hidden = !fileSession;
+  $('files-upload').hidden = !fileSession;
+  $('files-refresh').hidden = !fileSession;
+  $('files-status').hidden = !fileSession;
   for (const id of ['files-upload', 'files-refresh', 'files-up'])
     ($(id) as HTMLButtonElement).disabled = !fileSession;
   if (!fileSession) {
-    $('files-status').textContent =
-      sessions.get(active)?.profile.protocol === 'agent'
-        ? '此 Agent 连接尚未提供文件能力'
-        : '连接服务器后浏览文件';
+    $('files-empty-description').textContent =
+      fileSource === 'local' ? localFileState.error || '选择一个文件夹后，仅浏览和管理你授权的目录。' : '连接服务器后，可以浏览目录、预览和传输文件。';
+    ($('files-path') as HTMLInputElement).value = '.';
+    fileBusy = false;
+    listingRequest = '';
+    for (const [id, pending] of pendingFiles) {
+      clearTimeout(pending.timer);
+      pendingFiles.delete(id);
+    }
     $('files-list').replaceChildren();
     $('file-preview').hidden = true;
   } else if (previous !== fileSession || !$('files-list').childElementCount)
     requestFiles('list', filePaths.get(fileSession) || '.');
 }
 function requestFiles(operation: string, path: string) {
-  if (!fileSession || sessions.get(fileSession)?.state !== '已连接') return;
+  if (!fileSession || !fileSessionReady()) return;
   if (!window.CShellNative?.fileRequest) {
     $('files-status').textContent = '请更新 Android 客户端以使用文件功能';
     return;
@@ -756,15 +784,20 @@ function requestFiles(operation: string, path: string) {
     return;
   }
   const request = crypto.randomUUID();
-  pendingFiles.set(request, { session: fileSession, operation });
+  const timer = setTimeout(() => window.fileEvent(JSON.stringify({ request, error: '文件操作超时，请重试；传输可在设备文件选择器中重新发起。' })), operation === 'upload' || operation === 'download' ? 300000 : 30000);
+  pendingFiles.set(request, { session: fileSession, operation, timer });
   if (operation === 'list') {
     listingRequest = request;
     fileBusy = true;
+    $('files-list').replaceChildren();
+    $('file-preview').hidden = true;
   }
   $('files-status').textContent = operation === 'list' ? '正在读取…' : '正在处理…';
-  window.CShellNative.fileRequest(
+  try { window.CShellNative.fileRequest(
     JSON.stringify({ request, session: fileSession, operation, path }),
-  );
+  ); } catch (error) {
+    window.fileEvent(JSON.stringify({ request, error: error instanceof Error ? error.message : '无法读取文件，请重试' }));
+  }
 }
 $('files-session').onchange = () => {
   fileSession = ($('files-session') as HTMLSelectElement).value;
@@ -772,14 +805,31 @@ $('files-session').onchange = () => {
   $('file-preview').hidden = true;
   requestFiles('list', filePaths.get(fileSession) || '.');
 };
+for (const source of ['remote', 'local'] as const) $('files-' + source).onclick = () => {
+  fileSource = source;
+  localStorage.setItem('fileSource', source);
+  for (const option of ['remote', 'local']) $('files-' + option).setAttribute('aria-pressed', String(source === option));
+  if (source === 'local') {
+    try { localFileState = JSON.parse(window.CShellNative?.localFilesStatus?.() || '{"error":"请更新 Android 客户端以使用手机文件"}'); } catch { localFileState = {error: '无法读取目录授权，请重新选择文件夹'}; }
+  }
+  $('files-list').replaceChildren();
+  syncFileSessions();
+};
+$('files-choose').onclick = () => window.CShellNative?.localFilesChoose?.();
+window.localFilesChanged = (json) => {
+  try { localFileState = JSON.parse(json); } catch { return; }
+  filePaths.delete('local');
+  if (fileSource === 'local') { $('files-list').replaceChildren(); syncFileSessions(); }
+};
 $('files-path-form').onsubmit = (e) => {
   e.preventDefault();
-  requestFiles('list', ($('files-path') as HTMLInputElement).value);
+  requestFiles('list', fileSession === 'local' ? filePaths.get('local') || '.' : ($('files-path') as HTMLInputElement).value);
 };
 $('files-refresh').onclick = () => {
   if (!fileBusy) requestFiles('list', filePaths.get(fileSession) || '.');
 };
 $('files-up').onclick = () => {
+  if (fileSession === 'local') { if (localFileParent) requestFiles('list', localFileParent); return; }
   const path = filePaths.get(fileSession) || '/';
   requestFiles('list', path.replace(/\/[^/]+\/?$/, '') || '/');
 };
@@ -788,12 +838,16 @@ $('preview-close').onclick = () => {
   $('file-preview').hidden = true;
 };
 window.fileEvent = (json) => {
-  const result = JSON.parse(json),
+  let result;
+  try { result = JSON.parse(json); } catch { return; }
+  if (!result || typeof result !== 'object') return;
+  const
     pending = pendingFiles.get(result.request);
   if (!pending) return;
+  clearTimeout(pending.timer);
   pendingFiles.delete(result.request);
   if (pending.operation === 'list' && result.request === listingRequest) fileBusy = false;
-  if (pending.session !== fileSession || sessions.get(fileSession)?.state !== '已连接') return;
+  if (pending.session !== fileSession || !fileSessionReady()) return;
   if (pending.operation === 'list' && result.request !== listingRequest) return;
   if (result.error) {
     $('files-status').textContent = result.error;
@@ -801,7 +855,9 @@ window.fileEvent = (json) => {
   }
   if (pending.operation === 'list') {
     filePaths.set(fileSession, result.path);
-    ($('files-path') as HTMLInputElement).value = result.path;
+    if (fileSession === 'local') localFileParent = result.parent || null;
+    ($('files-up') as HTMLButtonElement).disabled = fileSession === 'local' && !localFileParent;
+    ($('files-path') as HTMLInputElement).value = fileSession === 'local' ? result.name || localFileState.name || '所选文件夹' : result.path;
     $('files-list').replaceChildren();
     $('file-preview').hidden = true;
     for (const entry of result.entries) {
@@ -814,7 +870,7 @@ window.fileEvent = (json) => {
       if (!entry.directory) {
         const b = document.createElement('button');
         b.className = 'icon';
-        b.setAttribute('aria-label', '下载 ' + entry.name);
+        b.setAttribute('aria-label', (fileSession === 'local' ? '导出 ' : '下载 ') + entry.name);
         icon(b, 'download');
         b.onclick = () => requestFiles('download', entry.path);
         r.append(b);
@@ -834,7 +890,7 @@ window.fileEvent = (json) => {
   }
 };
 
-type CAgentState = { supported?: boolean; enabled?: boolean; running?: boolean; sharing?: boolean; starting?: boolean; accessibilityEnabled?: boolean; port?: number; advertisedHost?: string; advertisedPort?: number; password?: string; error?: string };
+type CAgentState = { supported?: boolean; enabled?: boolean; running?: boolean; sharing?: boolean; starting?: boolean; needsProjectionConsent?: boolean; screenLocked?: boolean; ignoringBatteryOptimizations?: boolean; accessibilityEnabled?: boolean; port?: number; advertisedHost?: string; advertisedPort?: number; password?: string; error?: string };
 let cagentState: CAgentState = {};
 let cagentDraftDirty = false;
 const cagentInput = (id: string) => $(id) as HTMLInputElement;
@@ -851,8 +907,11 @@ function renderCAgent(fill = false) {
   $('cagent-card-state').textContent = !available ? '不可用' : cagentState.sharing ? '共享中' : enabled ? '已启用' : '未启用';
   $('cagent-status').textContent = !available ? '手机受控端需要 Android 10 或更新版本。' : cagentState.error || (cagentState.running ? '已监听 · ' + (cagentState.port || 24443) : enabled ? '已启用 · 等待启动' : '启用后可设置连接地址，按需共享此手机屏幕。');
   $('cagent-status').classList.toggle('error', !!cagentState.error);
-  $('cagent-screen-state').textContent = cagentState.sharing ? '正在共享此手机屏幕' : cagentState.starting ? '等待 Android 屏幕共享授权' : '未共享';
+  $('cagent-screen-state').textContent = cagentState.sharing ? '正在共享此手机屏幕' : cagentState.starting ? '等待 Android 屏幕共享授权' : cagentState.screenLocked ? '手机已锁屏 · 解锁后可重新共享' : cagentState.needsProjectionConsent ? '屏幕共享已结束 · 请重新授权共享' : '未共享';
+  $('cagent-start').textContent = cagentState.needsProjectionConsent ? '重新授权共享屏幕' : '共享手机屏幕';
   $('cagent-access-state').textContent = cagentState.accessibilityEnabled ? '已开启 · 可接收远程操作' : '未开启 · 仅能观看画面';
+  $('cagent-background-state').textContent = cagentState.ignoringBatteryOptimizations ? '已允许后台运行 · 屏幕共享仍受系统授权限制' : '省电限制可能中断后台连接，可在系统设置中调整。';
+  ($('cagent-background') as HTMLButtonElement).disabled = !window.CShellNative?.cagentBackgroundSettings;
   $('cagent-start').hidden = !!cagentState.sharing;
   ($('cagent-start') as HTMLButtonElement).disabled = !enabled || !!cagentState.starting || cagentDraftDirty;
   $('cagent-stop').hidden = !cagentState.sharing && !cagentState.starting;
@@ -917,6 +976,7 @@ for (const [id, action] of [
   ['cagent-start', () => window.CShellNative.cagentStart?.()],
   ['cagent-stop', () => window.CShellNative.cagentStop?.()],
   ['cagent-access', () => window.CShellNative.cagentAccessibility?.()],
+  ['cagent-background', () => window.CShellNative.cagentBackgroundSettings?.()],
   ['cagent-copy', () => window.CShellNative.cagentCopyConnection?.()],
 ] as const) $(id).onclick = () => {
   try { action(); refreshCAgent(); if (!cagentState.error) cagentFeedback(id === 'cagent-copy' ? '已复制连接信息，不包含密码' : ''); }

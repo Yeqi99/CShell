@@ -4,7 +4,7 @@ import { readFile, mkdir } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 const server = createServer(async (req, res) => {
   const path = req.url === '/' ? 'index.html' : req.url!.slice(1);
-  if (!['index.html', 'app.js', 'app.css'].includes(path)) {
+  if (!['index.html', 'app.js', 'app.css', 'icon.png'].includes(path)) {
     res.writeHead(404).end();
     return;
   }
@@ -14,7 +14,7 @@ const server = createServer(async (req, res) => {
       ? 'application/javascript'
       : path.endsWith('.css')
         ? 'text/css'
-        : 'text/html',
+        : path.endsWith('.png') ? 'image/png' : 'text/html',
   );
   res.end(await readFile('android/app/src/main/assets/' + path));
 });
@@ -81,23 +81,28 @@ try {
       },
       fileRequest: (data: string) => {
         const r = JSON.parse(data);
+        calls.push({ fileRequest: r });
+        if (r.path === '/denied') { setTimeout(() => (window as any).fileEvent(JSON.stringify({request:r.request,error:'没有读取此目录的权限'})), 10); return; }
         setTimeout(
           () =>
             (window as any).fileEvent(
               JSON.stringify({
                 request: r.request,
                 path: '/home/test',
+                parent: null,
                 entries: [
                   { name: 'src', path: '/home/test/src', directory: true, size: 0 },
                   { name: 'README.md', path: '/home/test/README.md', directory: false, size: 120 },
                 ],
-                name: 'README.md',
+                name: r.session === 'local' && r.operation === 'list' ? '手机文档' : 'README.md',
                 text: 'hello file',
               }),
             ),
           30,
         );
       },
+      localFilesStatus: () => JSON.stringify({available:false}),
+      localFilesChoose: () => (window as any).localFilesChanged(JSON.stringify({available:true,name:'手机文档',path:'content://fixture/tree/docs'})),
       input: (...args: any[]) => calls.push(args),
       resize: () => {},
       acknowledge: () => {},
@@ -116,6 +121,27 @@ try {
     };
   });
   await page.goto('http://127.0.0.1:' + (server.address() as any).port);
+  await page.waitForFunction(() => (document.querySelector('.brand-mark img') as HTMLImageElement)?.naturalWidth > 0);
+  await page.locator('#navigation [data-page=files]').click();
+  assert.equal(await page.locator('#files-empty').isVisible(), true);
+  assert.equal(await page.locator('#files-session').isVisible(), false);
+  assert.equal(await page.locator('#files-path-form').isVisible(), false);
+  await page.locator('#files-local').click();
+  assert.equal(await page.locator('#files-empty h2').innerText(), '选择手机文件夹');
+  await page.locator('#files-choose').click();
+  await page.locator('#files-list .server-open').first().waitFor();
+  assert.equal(await page.locator('#files-path').inputValue(), '手机文档');
+  assert.equal(await page.locator('#files-up').isDisabled(), true);
+  assert.equal(await page.locator('#files-path').getAttribute('readonly'), '');
+  assert.ok(await page.evaluate(() => (window as any).nativeCalls.some((c:any) => c.fileRequest?.session === 'local')));
+  assert.equal(await page.evaluate(() => localStorage.getItem('fileSource')), 'local');
+  await page.reload();
+  await page.locator('#navigation [data-page=files]').click();
+  assert.equal(await page.locator('#files-local').getAttribute('aria-pressed'), 'true');
+  assert.equal(await page.locator('#files-empty h2').innerText(), '选择手机文件夹');
+  await page.locator('#files-remote').click();
+  await page.locator('#files-empty [data-page=connections]').click();
+  await page.locator('#navigation [data-page=home]').click();
   await mkdir('test-results', { recursive: true });
   assert.equal(await page.locator('#connect').isVisible(), false);
   await page.screenshot({ path: 'test-results/android-home.png' });
@@ -173,6 +199,11 @@ try {
   await page.locator('#files-list .server-open').last().click();
   await page.locator('#file-preview').waitFor();
   assert.equal(await page.locator('#preview-text').innerText(), 'hello file');
+  await page.locator('#files-path').fill('/denied');
+  await page.locator('#files-path-form').evaluate((form:HTMLFormElement) => form.requestSubmit());
+  await page.getByText('没有读取此目录的权限', {exact:true}).waitFor();
+  assert.equal(await page.locator('#files-list .server-open').count(), 0);
+  assert.equal(await page.locator('#file-preview').isVisible(), false);
   await page.locator('#navigation [data-page=session-page]').click();
   await page.setViewportSize({ width: 320, height: 480 });
   assert.equal(await page.evaluate(() => document.body.scrollWidth <= window.innerWidth), true);
@@ -214,8 +245,9 @@ try {
     ),
   );
   await page.locator('#navigation [data-page=files]').click();
-  assert.equal(await page.locator('#files-status').innerText(), '此 Agent 连接尚未提供文件能力');
-  assert.equal(await page.locator('#files-upload').isDisabled(), true);
+  await page.locator('#files-list .server-open').first().waitFor();
+  assert.equal(await page.locator('#files-empty').isVisible(), false);
+  assert.equal(await page.locator('#files-upload').isDisabled(), false);
   assert.ok(
     !(await page.evaluate(() => localStorage.getItem('profiles')))?.includes(
       'agent-secret-not-persisted',
