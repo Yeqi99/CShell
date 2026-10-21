@@ -12,7 +12,7 @@ export class MobileCloud {
   ) {
     const root = document.getElementById('cloud-sync')!;
     root.innerHTML =
-      '<h2>账号与云同步 · Pro</h2><p class="muted">与桌面端共享加密保险库。桌面专属模型、视图等数据会保留。</p><p id="cloud-account"></p><form id="cloud-login"><label>邮箱<input name="email" type="email" autocomplete="email" required></label><button type="button" id="cloud-code">发送验证码</button><label>验证码<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"></label><button>注册 / 登录</button></form><div id="cloud-unlock" hidden><label>恢复密钥<input id="cloud-key" type="password" autocomplete="off"></label><button id="cloud-unlock-button">解锁</button><p class="muted">首次请在 Windows 端创建保险库并保存恢复密钥。</p></div><div id="cloud-operations" hidden><button id="cloud-download">恢复云端到本机</button><button id="cloud-upload">同步本机更改</button><p class="muted">同步当前支持的连接及明暗设置，保留其他平台配置。冲突时请先核对原设备。</p></div><div id="cloud-confirm" hidden><p id="cloud-confirm-text"></p><button id="cloud-confirm-yes">确认</button><button id="cloud-confirm-no">取消</button></div><button id="cloud-logout" hidden>退出账号</button><p id="cloud-message" role="status"></p><div id="cloud-models"></div>';
+      '<h2>账号与云同步 · Pro</h2><p class="muted">与桌面端共享加密保险库。桌面专属模型、视图等数据会保留。</p><p id="cloud-account"></p><form id="cloud-login"><label>邮箱<input name="email" type="email" autocomplete="email" required></label><button type="button" id="cloud-code">发送验证码</button><label>验证码<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"></label><label>密码<input name="password" type="password" autocomplete="current-password" maxlength="128"></label><button type="button" id="cloud-password-login">密码登录</button><button>验证码注册 / 登录</button></form><div id="cloud-unlock" hidden><label>恢复密钥<input id="cloud-key" type="password" autocomplete="off"></label><button id="cloud-unlock-button">解锁</button><p class="muted">首次请在 Windows 端创建保险库并保存恢复密钥。</p></div><div id="cloud-operations" hidden><button id="cloud-download">恢复云端到本机</button><button id="cloud-upload">同步本机更改</button><p class="muted">同步当前支持的连接及明暗设置，保留其他平台配置。冲突时请先核对原设备。</p></div><div id="cloud-confirm" hidden><p id="cloud-confirm-text"></p><button id="cloud-confirm-yes">确认</button><button id="cloud-confirm-no">取消</button></div><button id="cloud-logout" hidden>退出账号</button><p id="cloud-message" role="status"></p><div id="cloud-models"></div>';
     const $ = (id: string) => document.getElementById(id)!;
     const input = (name: string) =>
       (document.querySelector(`#cloud-login [name="${name}"]`) as HTMLInputElement).value;
@@ -35,6 +35,7 @@ export class MobileCloud {
         root.querySelectorAll('button').forEach((b) => (b.disabled = false));
       }
     };
+    $('cloud-password-login').onclick = () => { void run('password-login', {email: input('email'), code: input('password')}); (document.querySelector('#cloud-login [name="password"]') as HTMLInputElement).value = ''; };
     $('cloud-code').onclick = () => void run('code', { email: input('email') });
     $('cloud-login').onsubmit = (e) => {
       e.preventDefault();

@@ -44,5 +44,17 @@ class ServiceTest(unittest.TestCase):
         with self.assertRaises(Failure): self.service.request_code('one@example.com','1')
         with self.service.db() as db: self.assertEqual(db.execute('SELECT COUNT(*) FROM codes').fetchone()[0],0)
 
+    def test_password_login_and_no_overwrite(self):
+        session = self.login('password@example.com', 'password-test')
+        account = self.service.authenticate(session['token'])
+        self.service.set_password(account, 'test-password-123')
+        with self.assertRaises(Failure): self.service.set_password(account, 'another-password')
+        with self.assertRaises(Failure): self.service.password_login('password@example.com', 'wrong-password', 'test')
+        signed = self.service.password_login('password@example.com', 'test-password-123', 'test')
+        self.assertEqual(self.service.authenticate(signed['token']), account)
+        with self.service.db() as db:
+            stored = db.execute('SELECT digest FROM passwords WHERE account=?', (account,)).fetchone()[0]
+        self.assertNotEqual(stored, 'test-password-123')
+
 
 if __name__ == '__main__': unittest.main()

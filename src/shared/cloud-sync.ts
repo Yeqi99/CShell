@@ -25,7 +25,7 @@ export interface CloudBridge {
   onCloudChanged(listener: () => void): () => void;
   cloudStatus(): Promise<CloudStatus>;
   cloudRequestCode(email: string): Promise<void>;
-  cloudLogin(email: string, code: string): Promise<CloudStatus>;
+  cloudLogin(email: string, code: string, password?: boolean): Promise<CloudStatus>;
   cloudUnlock(recoveryKey: string): Promise<CloudStatus>;
   cloudCreateVault(): Promise<{ recoveryKey: string }>;
   cloudSync(direction?: 'upload' | 'download'): Promise<CloudStatus>;

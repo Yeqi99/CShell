@@ -89,8 +89,8 @@ final class CloudSync {
   synchronized JSONObject call(JSONObject request)throws Exception{
     load();String action=request.getString("action");JSONObject result=new JSONObject();
     if(action.equals("code")){api("auth/code",new JSONObject().put("email",request.getString("email")));}
-    else if(action.equals("login")){
-      JSONObject session=api("auth/login",new JSONObject().put("email",request.getString("email")).put("code",request.getString("code")));
+    else if((action.equals("login") || action.equals("password-login"))){
+      JSONObject session=api("auth/"+action,new JSONObject().put("email",request.getString("email")).put(action.equals("password-login")?"password":"code",request.getString("code")));
       if(!state.has("session")||!state.getJSONObject("session").getString("accountId").equals(session.getString("accountId")))state=new JSONObject();
       state.put("session",session);save();
     }else if(action.equals("unlock")){

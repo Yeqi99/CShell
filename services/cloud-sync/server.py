@@ -9,6 +9,9 @@ import json
 import os
 import re
 import secrets
+import smtplib
+import ssl
+from email.message import EmailMessage
 import sqlite3
 import threading
 import time
@@ -33,6 +36,7 @@ class Service:
             PRAGMA journal_mode=WAL;
             PRAGMA max_page_count=32768;
             CREATE TABLE IF NOT EXISTS accounts(id TEXT PRIMARY KEY,email TEXT UNIQUE NOT NULL);
+            CREATE TABLE IF NOT EXISTS passwords(account TEXT PRIMARY KEY,salt TEXT NOT NULL,digest TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS codes(email TEXT PRIMARY KEY,digest TEXT,expires REAL,attempts INTEGER);
             CREATE TABLE IF NOT EXISTS sessions(digest TEXT PRIMARY KEY,account TEXT,expires REAL);
             CREATE TABLE IF NOT EXISTS vaults(account TEXT PRIMARY KEY,revision INTEGER,envelope TEXT,mutation TEXT);
@@ -108,6 +112,34 @@ class Service:
             raise Failure(401, '验证码无效、过期或尝试次数已用尽')
         return {'accountId': account, 'email': email, 'token': token}
 
+    def set_password(self, account, password):
+        if not isinstance(password, str) or not 8 <= len(password) <= 128:
+            raise Failure(400, '密码须为 8 至 128 个字符')
+        salt = secrets.token_hex(16)
+        digest = hashlib.scrypt(password.encode(), salt=bytes.fromhex(salt), n=16384, r=8, p=1).hex()
+        with self.db() as db:
+            if db.execute('SELECT 1 FROM passwords WHERE account=?', (account,)).fetchone():
+                raise Failure(409, '账号已设置密码')
+            db.execute('INSERT INTO passwords VALUES(?,?,?)', (account, salt, digest))
+        return {'ok': True}
+
+    def password_login(self, value, password, ip):
+        email = self.email(value)
+        self.limit('password-ip:' + self.digest(ip), 20, 600)
+        self.limit('password-email:' + self.digest(email), 10, 600)
+        if not isinstance(password, str) or not 8 <= len(password) <= 128:
+            raise Failure(401, '邮箱或密码不正确')
+        with self.db() as db:
+            row = db.execute('SELECT a.id,p.salt,p.digest FROM accounts a JOIN passwords p ON a.id=p.account WHERE a.email=?', (email,)).fetchone()
+        salt = bytes.fromhex(row[1]) if row else bytes(16)
+        digest = hashlib.scrypt(password.encode(), salt=salt, n=16384, r=8, p=1).hex()
+        if not row or not hmac.compare_digest(row[2], digest):
+            raise Failure(401, '邮箱或密码不正确')
+        token = secrets.token_urlsafe(32)
+        with self.db() as db:
+            db.execute('INSERT INTO sessions VALUES(?,?,?)', (self.digest(token), row[0], time.time() + 30 * 86400))
+        return {'accountId': row[0], 'email': email, 'token': token}
+
     def authenticate(self, token):
         if not isinstance(token, str) or len(token) != 43:
             raise Failure(401, '请重新登录')
@@ -165,6 +197,32 @@ def cloudflare_mail(email, code):
             raise RuntimeError('Mail rejected')
 
 
+def smtp_mail(email, code):
+    message = EmailMessage()
+    message['From'] = os.environ['SMTP_USER']
+    message['To'] = email
+    message['Subject'] = 'CShell 登录验证码'
+    message.set_content(f'您的 CShell 验证码为 {code}，10 分钟内有效。请勿向他人透露。如非本人操作，请忽略此邮件。')
+    with smtplib.SMTP_SSL(os.environ.get('SMTP_HOST', 'smtp.163.com'),
+                          int(os.environ.get('SMTP_PORT', '465')),
+                          timeout=20, context=ssl.create_default_context()) as client:
+        client.login(os.environ['SMTP_USER'], os.environ['SMTP_PASSWORD'])
+        if client.send_message(message):
+            raise RuntimeError('Mail rejected')
+
+
+def send_mail(email, code):
+    if os.environ.get('MAIL_PROVIDER', 'cloudflare') == 'smtp':
+        return smtp_mail(email, code)
+    return cloudflare_mail(email, code)
+
+
+def mail_configured():
+    if os.environ.get('MAIL_PROVIDER', 'cloudflare') == 'smtp':
+        return bool(os.environ.get('SMTP_USER') and os.environ.get('SMTP_PASSWORD'))
+    return bool(os.environ.get('CF_EMAIL_TOKEN'))
+
+
 def handler(service):
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *_):
@@ -189,15 +247,19 @@ def handler(service):
                     if not isinstance(body, dict):
                         raise Failure(400, '请求格式不正确')
                 if self.command == 'GET' and self.path == '/v1/health':
-                    value = {'ok': True, 'protocol': 1, 'mailConfigured': bool(os.environ.get('CF_EMAIL_TOKEN'))}
+                    value = {'ok': True, 'protocol': 1, 'mailConfigured': mail_configured()}
                 elif self.command == 'POST' and self.path == '/v1/auth/code':
                     value = service.request_code(body.get('email'), ip)
                 elif self.command == 'POST' and self.path == '/v1/auth/login':
                     value = service.login(body.get('email'), body.get('code'), ip)
+                elif self.command == 'POST' and self.path == '/v1/auth/password-login':
+                    value = service.password_login(body.get('email'), body.get('password'), ip)
                 else:
                     token = self.headers.get('Authorization', '').removeprefix('Bearer ')
                     account = service.authenticate(token)
-                    if self.path == '/v1/vault' and self.command == 'GET':
+                    if self.path == '/v1/auth/password' and self.command == 'POST':
+                        value = service.set_password(account, body.get('password'))
+                    elif self.path == '/v1/vault' and self.command == 'GET':
                         value = service.read(account)
                     elif self.path == '/v1/vault' and self.command == 'POST':
                         value = service.write(account, body)
@@ -254,5 +316,5 @@ if __name__ == '__main__':
     pepper = bytes.fromhex(os.environ['AUTH_PEPPER'])
     if len(pepper) != 32:
         raise RuntimeError('AUTH_PEPPER must contain 32 random bytes')
-    service = Service(os.environ.get('SYNC_DB', '/var/lib/cshell-sync/sync.sqlite'), pepper, cloudflare_mail)
+    service = Service(os.environ.get('SYNC_DB', '/var/lib/cshell-sync/sync.sqlite'), pepper, send_mail)
     BoundedServer(('127.0.0.1', int(os.environ.get('SYNC_PORT', '8789'))), handler(service)).serve_forever()

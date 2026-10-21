@@ -96,13 +96,11 @@ export async function registerCloudHandlers(
   await cloud.load();
   handle('cloud:status', () => cloud.status());
   handle('cloud:code', (email) => cloud.requestCode(z.email().max(254).parse(email)));
-  handle('cloud:login', (email, code) =>
+  handle('cloud:login', (email, code, password = false) =>
     cloud.login(
       z.email().max(254).parse(email),
-      z
-        .string()
-        .regex(/^\d{6}$/)
-        .parse(code),
+      (password === true ? z.string().min(8).max(128) : z.string().regex(/^\d{6}$/)).parse(code),
+      password === true,
     ),
   );
   handle('cloud:unlock', (key) => cloud.unlock(z.string().max(100).parse(key)));

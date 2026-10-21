@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { CloudStatus } from '../../shared/cloud-sync';
 
 export function CloudSettings() {
+  const [passwordMode, setPasswordMode] = useState(false);
   const [status, setStatus] = useState<CloudStatus>();
   const [email, setEmail] = useState(''),
     [code, setCode] = useState(''),
@@ -42,7 +43,7 @@ export function CloudSettings() {
           onSubmit={(e) => {
             e.preventDefault();
             void run(async () => {
-              await window.cshell.cloudLogin(email, code);
+              await window.cshell.cloudLogin(email, code, passwordMode);
               setCode('');
             });
           }}
@@ -58,7 +59,8 @@ export function CloudSettings() {
                 onChange={(e) => setEmail(e.target.value)}
               />
             </label>
-            <button
+            <button type="button" className="secondary" onClick={() => {setPasswordMode(!passwordMode);setCode('');}}>{passwordMode ? '使用邮箱验证码' : '使用密码登录'}</button>
+            {!passwordMode && <button
               type="button"
               className="secondary"
               onClick={() =>
@@ -69,14 +71,15 @@ export function CloudSettings() {
               }
             >
               发送验证码
-            </button>
+            </button>}
             <label>
-              验证码
+              {passwordMode ? '密码' : '验证码'}
               <input
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                pattern="[0-9]{6}"
-                maxLength={6}
+                type={passwordMode ? 'password' : 'text'}
+                inputMode={passwordMode ? undefined : 'numeric'}
+                autoComplete={passwordMode ? 'current-password' : 'one-time-code'}
+                pattern={passwordMode ? undefined : '[0-9]{6}'}
+                maxLength={passwordMode ? 128 : 6}
                 required
                 value={code}
                 onChange={(e) => setCode(e.target.value)}

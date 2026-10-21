@@ -117,9 +117,9 @@ export class CloudSync {
   async requestCode(email: string) {
     await this.api('/v1/auth/code', { email });
   }
-  async login(email: string, code: string) {
+  async login(email: string, code: string, password = false) {
     return this.exclusive(async () => {
-      const session: CloudSession = await this.api('/v1/auth/login', { email, code });
+      const session: CloudSession = await this.api(password ? '/v1/auth/password-login' : '/v1/auth/login', password ? { email, password: code } : { email, code });
       if (!/^[a-f0-9]{32}$/.test(session.accountId) || !/^[A-Za-z0-9_-]{43}$/.test(session.token))
         throw new Error('登录响应不正确');
       const same = this.data.session?.accountId === session.accountId;
