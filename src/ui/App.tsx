@@ -360,7 +360,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
     const style = document.documentElement.style;
     style.setProperty('--ui-font-size', `${preferences.uiFontSize ?? 15}px`);
     style.setProperty('--sidebar-font-size', `${preferences.sidebarFontSize ?? 15}px`);
-    style.setProperty('--sidebar-group-size', `${preferences.sidebarGroupSize ?? 14}px`);
+    style.setProperty('--sidebar-group-size', `${preferences.sidebarGroupSize ?? 16}px`);
     style.setProperty('--sidebar-detail-size', `${preferences.sidebarDetailSize ?? 13}px`);
     style.setProperty('--sidebar-row-padding', `${({ compact: 7, comfortable: 11, spacious: 15 })[preferences.sidebarDensity ?? 'comfortable']}px`);
   }, [preferences]);
@@ -718,6 +718,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
               onOpen={(p) => openConnection(p || 'new')}
               onConnect={openSaved}
               onSave={saveProfile}
+              onMove={async (id, group, before) => { await window.cshell.moveProfile!(id, group, before); await refresh(); }}
               onManageGroup={async (action) => {
                 await window.cshell.manageGroup(action);
                 await refresh();
@@ -1456,3 +1457,4 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
     </div>
   );
 }
+

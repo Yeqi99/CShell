@@ -226,6 +226,7 @@ const bridge: Bridge = {
   importAppearance: (kind, token) => ipcRenderer.invoke('appearance:import', kind, token),
   appearanceData: (id) => ipcRenderer.invoke('appearance:data', id),
   saveProfile: (profile) => ipcRenderer.invoke('profile:save', profile),
+  moveProfile: (id, group, before) => ipcRenderer.invoke('profile:move', { id, group, before }),
   deleteProfile: (id) => ipcRenderer.invoke('profile:delete', id),
   manageGroup: (action) => ipcRenderer.invoke('group:manage', action),
   preferences: (value) => ipcRenderer.invoke('preferences', value),

@@ -235,12 +235,25 @@ export class Store {
         old.auth !== profile.auth)
     )
       delete this.data.secrets[profile.id];
-    this.data.profiles = [...this.data.profiles.filter((p) => p.id !== profile.id), profile];
+    this.data.profiles = old ? this.data.profiles.map(p => p.id === profile.id ? profile : p) : [...this.data.profiles, profile];
     if (profile.group && !this.data.groups.includes(profile.group))
       this.data.groups = this.groups();
     await this.persist();
   }
   /** Append a confirmed import in one durable write; never changes existing credentials or trust. */
+  async moveProfile(id: string, group: string, before?: string) {
+    const source = this.profile(id);
+    if (group && !this.groups().includes(group)) throw new Error('GROUP_MISSING');
+    if (before === id) return;
+    if (before && this.profile(before).group !== group) throw new Error('目标分组已变更');
+    const remaining = this.data.profiles.filter(p => p.id !== id);
+    const targetIndex = before ? remaining.findIndex(p => p.id === before) : remaining.reduce((last, p, i) => p.group === group ? i + 1 : last, remaining.length);
+    remaining.splice(targetIndex, 0, { ...source, group });
+    if (JSON.stringify(remaining) === JSON.stringify(this.data.profiles)) return;
+    this.data.profiles = remaining;
+    await this.persist();
+  }
+
   async importProfiles(values: { profile: Profile; password?: string }[], duplicates: 'skip' | 'keep') {
     if (!values.length || values.length > 5000) throw new Error('请选择 1 至 5000 条连接');
     if (!['skip', 'keep'].includes(duplicates)) throw new Error('重复项策略无效');

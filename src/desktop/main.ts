@@ -800,6 +800,7 @@ else
         await store.deleteProfile(id);
       });
       handle('group:manage', (action) => store.manageGroup(groupActionSchema.parse(action)));
+      handle('profile:move', raw => { const input = z.object({ id: z.string().uuid(), group: z.string().max(80), before: z.string().uuid().optional() }).strict().parse(raw); return store.moveProfile(input.id, input.group, input.before); });
       handle('preferences', async (value) => {
         const preferences = preferencesSchema.parse(value);
         await store.preferences(preferences);

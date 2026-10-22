@@ -33,6 +33,7 @@ export function ServerSidebar({
   onOpen,
   onConnect,
   onSave,
+  onMove,
   onDelete,
   onManageGroup,
 }: {
@@ -45,6 +46,7 @@ export function ServerSidebar({
   onOpen: (p?: Profile) => void;
   onConnect: (p: Profile) => void;
   onSave: (p: Profile) => Promise<void>;
+  onMove?: (id: string, group: string, before?: string) => Promise<void>;
   onDelete: (p: Profile) => void;
   onManageGroup: (action: GroupAction) => Promise<void>;
 }) {
@@ -56,6 +58,15 @@ export function ServerSidebar({
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [working, setWorking] = useState(false);
+  const [dragging, setDragging] = useState('');
+  const [drop, setDrop] = useState<{ group: string; before?: string } | null>(null);
+  const finishDrop = () => {
+    const id = dragging, destination = drop;
+    setDragging(''); setDrop(null);
+    if (!id || !destination || !onMove || destination.before === id) return;
+    setWorking(true);
+    void onMove(id, destination.group, destination.before).catch(report).finally(() => setWorking(false));
+  };
   const popup = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLElement | null>(null);
   const report = (e: unknown) => {
@@ -277,6 +288,7 @@ export function ServerSidebar({
         </p>
       )}
       <div className="server-list">
+        {dragging && <div className="sidebar-drag-hint" role="status">{profiles.find(p => p.id === dragging)?.name} → {drop ? `${drop.group || t('ungrouped')}${drop.before ? ' · 插入此机器之前' : ' · 移到分组末尾'}` : '拖到机器之间或分组标题'}</div>}
         {!!targets.length && (
           <section className="server-group">
             <div className="group-heading">
@@ -310,8 +322,10 @@ export function ServerSidebar({
         {sections.map((section) => (
           <section
             key={`${section.favorite ? 'favorite' : 'group'}:${section.id}`}
-            className="server-group"
+            className={`server-group ${dragging && drop?.group === section.id && !drop.before ? 'group-drop-target' : ''}`}
             data-group={section.favorite ? undefined : section.id}
+            onDragOver={e => { if (!dragging || section.favorite || working) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDrop({ group: section.id }); }}
+            onDrop={e => { if (!dragging || section.favorite) return; e.preventDefault(); finishDrop(); }}
           >
             <div className="group-heading">
               <button
@@ -354,6 +368,13 @@ export function ServerSidebar({
                 <div
                   key={profile.id}
                   className={`server-item ${activeProfile === profile.id ? 'active' : ''}`}
+                  draggable={!!onMove && !working}
+                  data-dragging={dragging === profile.id || undefined}
+                  data-drop-before={!!dragging && !section.favorite && drop?.before === profile.id || undefined}
+                  onDragStart={e => { closeMenu(); setDragging(profile.id); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('application/x-cshell-profile', profile.id); }}
+                  onDragEnd={() => { setDragging(''); setDrop(null); }}
+                  onDragOver={e => { if (!dragging || section.favorite || working) return; e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'move'; setDrop({ group: section.id, before: profile.id }); }}
+                  onDrop={e => { if (!dragging || section.favorite) return; e.preventDefault(); e.stopPropagation(); finishDrop(); }}
                   onContextMenu={(e) => {
                     e.preventDefault();
                     openMenu(

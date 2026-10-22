@@ -5963,7 +5963,7 @@ input[type='radio']:focus-visible {
 @media (prefers-reduced-motion:reduce){.visual-desktop-workspace > .tabbar{transition:none;}}
 
 /* Sidebar typography follows the user appearance scheme, independently of terminal text. */
-.sidebar .group-title, .sidebar .group-name { font-size:var(--sidebar-group-size,14px); font-weight:600; letter-spacing:0; line-height:1.5; }
+.sidebar .group-title, .sidebar .group-name { font-size:var(--sidebar-group-size,16px); font-weight:600; letter-spacing:0; line-height:1.5; }
 .sidebar .server-open strong, .sidebar .local-target-row strong { font-size:var(--sidebar-font-size,15px); font-weight:500; line-height:1.45; margin-bottom:3px; }
 .sidebar .server-open small, .sidebar .local-target-row small { font-size:var(--sidebar-detail-size,13px); line-height:1.5; }
 .sidebar .server-open, .sidebar .local-target-row { padding-top:var(--sidebar-row-padding,11px); padding-bottom:var(--sidebar-row-padding,11px); }
@@ -5971,3 +5971,8 @@ input[type='radio']:focus-visible {
 .sidebar .server-item { border-radius:8px; transition:background-color .12s; }
 .sidebar .server-item:hover { background:var(--accent-soft); }
 .sidebar .server-open:focus-visible, .sidebar .group-title:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; border-radius:6px; }
+
+.sidebar .server-item[data-dragging] { opacity:.45; }
+.sidebar .server-item[data-drop-before] { box-shadow:0 -3px 0 var(--accent); }
+.sidebar .group-drop-target { background:var(--accent-soft); outline:1px dashed var(--accent); outline-offset:-3px; border-radius:8px; }
+.sidebar-drag-hint { padding:8px 14px; font-size:var(--sidebar-detail-size,13px); color:var(--accent); line-height:1.5; }

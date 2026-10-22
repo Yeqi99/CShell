@@ -208,7 +208,7 @@ export const preferencesSchema = z
     uiFont: z.string().max(200),
     uiFontSize: z.number().min(12).max(20).default(15),
     sidebarFontSize: z.number().min(12).max(22).default(15),
-    sidebarGroupSize: z.number().min(12).max(22).default(14),
+    sidebarGroupSize: z.number().min(12).max(22).default(16),
     sidebarDetailSize: z.number().min(11).max(20).default(13),
     sidebarDensity: z.enum(['compact', 'comfortable', 'spacious']).default('comfortable'),
     terminalFont: z.string().max(200),
@@ -238,7 +238,7 @@ export const defaults: Preferences = {
   uiFont: '"Segoe UI Variable", "Segoe UI", "Microsoft YaHei UI", "PingFang SC", "Noto Sans CJK SC", sans-serif',
   uiFontSize: 15,
   sidebarFontSize: 15,
-  sidebarGroupSize: 14,
+  sidebarGroupSize: 16,
   sidebarDetailSize: 13,
   sidebarDensity: 'comfortable',
   terminalFont: 'Cascadia Code, Consolas, Microsoft YaHei UI, monospace',
@@ -380,6 +380,7 @@ export interface Bridge
   importAppearance(kind: 'font' | 'background', token?: string): Promise<AppearanceAsset | null>;
   appearanceData(id: string): Promise<string>;
   saveProfile(profile: Profile): Promise<void>;
+  moveProfile?(id: string, group: string, before?: string): Promise<void>;
   aiDrafts?(): Promise<Record<string, string>>;
   aiDraftSave?(id: string, text: string): Promise<void>;
   deleteProfile(id: string): Promise<void>;
@@ -433,3 +434,4 @@ declare global {
     cshell: Bridge;
   }
 }
+
