@@ -22,7 +22,7 @@ try {
     ipcMain.removeHandler('local-terminal:environment');
     ipcMain.handle('local-terminal:environment', () => new Promise(() => {}));
   });
-  await page.getByRole('button', { name: '新建连接', exact: true }).click();
+  await page.locator('.new-connection').click();
   await page
     .getByRole('button', { name: 'Windows 远程桌面', exact: true })
     .waitFor({ timeout: 1000 });

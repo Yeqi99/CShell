@@ -151,7 +151,7 @@ CShell 在本机渲染浏览器，通过所选机器的网络出口请求网页�
 
 ## 安装
 
-[官网下载 Pro](/#download)，开源版前往 [GitHub Releases](https://github.com/Yeqi99/CShell/releases)。当前 Pro 提供 Windows x64 测试安装程序，可与开源版独立安装。升级前保存重要编辑内容。
+[官网下载 Pro](/#download)，开源版前往 [香港下载中心](/downloads.html)。当前 Pro 提供 Windows x64 测试安装程序，可与开源版独立安装。升级前保存重要编辑内容。
 
 ## 本机与远端
 
@@ -169,9 +169,9 @@ Windows 锁屏、UAC、无显示器与多显示器行为依赖原生能力和环
 
 ## 获取对应架构
 
-在 [GitHub Releases](https://github.com/Yeqi99/CShell/releases) 查找开源版 macOS 附件：Apple Silicon 选择 arm64，Intel 选择 x64。以该次发行实际附件为准；不要下载 Windows 安装程序。
+在 [香港下载中心](/downloads.html) 查找开源版 macOS 附件：Apple Silicon 选择 arm64，Intel 选择 x64。以该次发行实际附件为准；不要下载 Windows 安装程序。
 
-Pro 0.8.2 提供 Apple Silicon / Intel 实验版 DMG，可在官网下载区选择架构。CI 构建与协议测试已通过，但未完成实体设备验收，也未做 Apple 公证。
+Pro 0.8.3 提供 Apple Silicon / Intel 实验版 DMG，可在官网下载区选择架构。CI 构建与协议测试已通过，但未完成实体设备验收，也未做 Apple 公证。
 
 ## 功能范围
 
@@ -187,7 +187,7 @@ Pro 0.8.2 提供 Apple Silicon / Intel 实验版 DMG，可在官网下载区选�
 
 ## 下载
 
-从 [GitHub Releases](https://github.com/Yeqi99/CShell/releases) 选择开源版 Linux x64 或 ARM64 附件。格式以实际发行列表为准。Pro 0.8.2 提供 x64 / ARM64 实验版 AppImage 和 DEB，在官网下载区选择架构与格式。CI 构建和协议测试已通过；尚未完成发行版及实体设备验收。
+从 [香港下载中心](/downloads.html) 选择开源版 Linux x64 或 ARM64 附件。格式以实际发行列表为准。Pro 0.8.3 提供 x64 / ARM64 实验版 AppImage 和 DEB，在官网下载区选择架构与格式。CI 构建和协议测试已通过；尚未完成发行版及实体设备验收。
 
 ## 桌面客户端与 CAgent
 
@@ -205,7 +205,7 @@ Linux 的机器工作区、浏览器网络出口和原生图形应用是不同�
 
 ## 安装与升级
 
-从[官网下载](/#download)获取 Pro 签名 APK；开源版从 GitHub 下载。最低系统为 Android 10。允许本次下载来源安装后按系统提示完成；升级使用相同签名的同一产品安装包。Pro 与开源版的数据独立。
+从[官网下载](/#download)获取 Pro 签名 APK；开源版从[香港下载中心](/downloads.html)下载。最低系统为 Android 10。允许本次下载来源安装后按系统提示完成；升级使用相同签名的同一产品安装包。Pro 与开源版的数据独立。
 
 ## 手机工作区
 
@@ -352,9 +352,9 @@ adapterId 必须对应主程序已实现的适配器；只写一个清单不能�
 
 ## Pro 当前下载
 
-官网目前提供 0.8.2 测试版 Windows x64 安装程序与签名 Android APK。下载包包含基础账号与云同步体验；不能将正在开发的新权益视为当前包已经交付。
+官网目前提供 0.8.3 测试版 Windows x64 安装程序与签名 Android APK。下载包包含基础账号与云同步体验；不能将正在开发的新权益视为当前包已经交付。
 
-macOS、Linux 的 Pro 0.8.2 实验包已通过 CI 构建与协议测试，提供 ARM64 / x64 下载；尚未完成实体设备验收，macOS 未公证。开源版各平台通过 [GitHub Releases](https://github.com/Yeqi99/CShell/releases) 获取实际已上传附件。构建通过、附件上传、签名/公证和真机验证是不同状态。
+macOS、Linux 的 Pro 0.8.3 实验包已通过 CI 构建与协议测试，提供 ARM64 / x64 下载；尚未完成实体设备验收，macOS 未公证。开源版各平台通过 [香港下载中心](/downloads.html) 获取实际已上传附件。构建通过、附件上传、签名/公证和真机验证是不同状态。
 
 ## 新版开发中
 
@@ -362,7 +362,7 @@ macOS、Linux 的 Pro 0.8.2 实验包已通过 CI 构建与协议测试，提供
 
 ## 校验下载
 
-官网下载的 Pro 包可使用 [SHA-256 清单](/downloads/SHA256SUMS.txt) 核验。Windows 可运行 Get-FileHash；Linux 使用 sha256sum；macOS 使用 shasum -a 256。摘要确认文件一致性，不等同于发行者数字签名。
+官网下载的 Pro 包可使用 [SHA-256 清单](/downloads/pro/v0.8.3/SHA256SUMS.txt) 核验。Windows 可运行 Get-FileHash；Linux 使用 sha256sum；macOS 使用 shasum -a 256。摘要确认文件一致性，不等同于发行者数字签名。
 
 ## 反馈问题
 
@@ -441,7 +441,7 @@ CAgent（Canp Agent）是独立运行的机器智能体，同时作为 CShell �
 
 ## 获取与安装
 
-从 [GitHub Releases](https://github.com/Yeqi99/CShell/releases) 选择目标系统和架构对应的 CAgent 附件，按附件安装说明操作。程序、私有运行时和缓存放入选定专用目录；升级时保留身份、加密凭据和既有授权。
+从 [香港下载中心](/downloads.html) 选择目标系统和架构对应的 CAgent 附件，按附件安装说明操作。程序、私有运行时和缓存放入选定专用目录；升级时保留身份、加密凭据和既有授权。
 
 Windows 使用原生配置窗口，macOS/Linux 使用系统浏览器配置界面。Android 被控能力在 CShell 扩展内按需启用，不需要假设存在另一个独立桌面版 CAgent 安装器。
 
@@ -473,8 +473,8 @@ await fs.writeFile(path.join(root,'index.html'),shell('机器、终端与智能�
 <section class="hero product-hero"><div class="hero-copy"><span class="eyebrow">CSHELL · A WORKSPACE FOR EVERY MACHINE</span><h1>连接机器，也连接完整的工作环境。</h1><p>Windows 远程控制、Linux 可视化操作、终端与智能体。<br>把远方的机器，放进触手可及的工作台。</p><div class="actions"><a class="primary" href="#download">下载 CShell ↓</a><a class="secondary" href="#visual-workspace">探索可视化工作区 →</a></div></div><div class="product-stage"><div class="stage-label"><span>CShell / 机器工作区</span><span>桌面 · 文件 · 应用 · 智能体</span></div><a href="/media/windows-workspace.png" aria-label="查看完整机器工作区截图"><img class="hero-capture" src="/media/windows-workspace.png" width="1280" height="800" alt="CShell 机器桌面与独立智能体窗口，左侧提供浏览器、文件、终端、应用市场和远程控制入口"></a><div class="stage-caption"><span>当前产品组件截图 · 示例机器与任务</span><span>窗口可最小化、恢复，在同一机器上下文切换</span></div></div></section>
 <section id="visual-workspace" class="section visual-story"><div class="section-head"><div><span class="eyebrow">MORE THAN A TERMINAL</span><h2>远程工作，不止一行命令。</h2></div><p>看得见的机器桌面、可操作的应用窗口，以及始终属于当前机器的终端和文件。</p></div><div class="connection-stories"><article><span class="story-number">01 / WINDOWS</span><h3>远程桌面，也有完整的机器上下文。</h3><p>选择 Windows 远程桌面连接，或使用 CAgent 提供的原生桌面采集与键鼠控制。远控作为独立应用窗口打开，与文件、终端和智能体并行工作。</p><ul><li>观看与控制权限分别检查</li><li>画质选择与网络自适应</li><li>窗口最小化后，可从任务栏恢复</li></ul><a href="/docs/desktop.html">了解远程控制 →</a></article><article class="protocol-story"><span class="story-number">02 / CAGENT PROTOCOL</span><h3>一种连接，通向整台机器。</h3><p>自研 CAgent 协议将身份认证、终端、文件、HTTP 和机器管理统一到同一设备上下文。支持的能力由目标机器实际提供，权限在后端执行。</p><div class="protocol-flow"><span>CShell</span><b>身份核对 · 加密通道</b><span>CAgent</span></div><p class="story-note">无需以 SSH 终端作为所有功能的前置入口。同账号免公网 IP 接入属于 Pro 会员新版联调能力。</p><a href="/docs/cagent.html">认识 CAgent →</a></article></div><div class="feature-showcase"><div><span class="eyebrow">03 / LINUX WORKSPACE</span><h2>让 Linux，成为可视化工作环境。</h2><p>从机器桌面打开文件、终端、浏览器和应用市场。窗口保留各自状态，切换任务也不必反复进入不同工具。</p><p>浏览器在 CShell 本地渲染，通过所选 Linux 机器访问网络；原生图形应用通过独立兼容入口使用。</p><a href="/docs/linux.html">查看 Linux 使用说明 →</a><small>原生图形应用按实际适配范围开放。</small></div><a href="/media/linux-workspace.png" aria-label="查看完整 Linux 工作区截图"><img src="/media/linux-workspace.png" width="1280" height="800" loading="lazy" alt="Linux 机器桌面中的文件窗口，支持目录浏览、上传、下载和文件操作"><span class="image-caption">当前产品组件截图 · 示例文件</span></a></div></section>
 <section class="section ecosystem"><div class="section-head"><div><span class="eyebrow">EXTEND YOUR WORKSPACE</span><h2>扩展工作台，装备每台机器。</h2></div><p>扩展与应用各有归属。<br>需要什么，再加入什么。</p></div><a class="market-capture" href="/media/extensions.png" aria-label="查看完整扩展市场界面"><img src="/media/extensions.png" width="2160" height="1380" loading="lazy" alt="CShell 插件市场：HTTP、WSL、Docker、Python、Conda、Vim、Nano 与模型服务扩展"></a><div class="market-descriptions"><article><span class="story-number">EXTENSIONS</span><h3>扩展市场 · 增强你的工作方式</h3><p>从 Shell 联想到 Docker、Python、Conda、HTTP 与模型服务，按需安装、启用和设置。插件专属功能从自己的入口进入，日常工作区保持简洁。</p><a href="/docs/extensions.html">浏览扩展使用指南 →</a></article><article><span class="story-number">APPLICATIONS</span><h3>应用市场 · 安装到正确的机器</h3><p>根据目标系统提供实际可用的软件和开发工具。先检查环境、查看安装计划，再执行安装；代码编辑器、终端和应用共享这台机器的上下文。</p><a href="/docs/app-authoring.html">了解应用与能力包 →</a></article><article><span class="story-number">BUILD YOUR OWN</span><h3>加入自己的功能</h3><p>从一份声明式命令扩展开始，或贡献应用配方与可信适配器。文档给出清单、打包命令、权限边界和提交步骤。</p><a href="/docs/plugin-authoring.html">制作第一份扩展 →</a></article></div></section>
-<section id="download" class="section"><div class="section-head"><div><span class="eyebrow">DOWNLOAD CENTER</span><h2>为你的设备，选择合适的版本。</h2></div><p>Pro 安装包在本站下载。<br>开源版与 CAgent 统一从 GitHub 获取。</p></div><div class="download-shell"><div class="device-tabs" role="tablist" aria-label="选择设备系统">${tabs}</div><div id="device-panel" class="device-panel" role="tabpanel" aria-labelledby="tab-windows"><div><span class="status" data-field="status">0.8.2 · 测试版</span><h3 data-field="name">Windows</h3><div class="device-meta"><span data-field="arch">x64 · Windows 10 / 11</span><span data-field="format">EXE 安装程序</span></div><p data-field="text">独立安装 CShell Pro，登录后同步连接、模型和设置。</p></div><div class="download-action"><label class="variant-label" hidden>架构与格式<select id="download-variant" aria-label="架构与安装格式"></select></label><a class="primary" data-field="download" href="/downloads/CShell-Pro-0.8.2-windows-x64.exe?build=20261022-pro082">下载 Windows Pro</a><a data-field="guide" href="/docs/windows.html">安装与平台说明 →</a></div></div></div><div class="download-foot"><a href="${github}/releases">所有系统的开源版与 CAgent · GitHub Releases ↗</a><a href="/downloads/SHA256SUMS.txt">Pro 文件校验值 ↗</a></div><noscript><p><a href="/downloads/CShell-Pro-0.8.2-android.apk?build=20261022-pro082">Android Pro 下载</a> · <a href="${github}/releases">macOS / Linux 开源版下载</a></p></noscript></section>
-<section id="editions" class="section"><div class="section-head"><div><span class="eyebrow">FIND YOUR EDITION</span><h2>同一个核心，三种选择。</h2></div><p>按功能选择适合你的版本。<br>✓ 已开放 · — 未开放。</p></div><div class="edition-cards"><article class="edition-card"><span class="eyebrow">OPEN SOURCE</span><h3>CShell 开源版</h3><p>本地使用，自行配置连接和基座。适合希望掌握源码、独立部署与开发扩展的用户。</p><a href="${github}/releases">前往 GitHub 下载 ↗</a></article><article class="edition-card"><span class="eyebrow">PRO / FREE</span><h3>Pro 免费版</h3><p>保留工作台核心，增加邮箱账号和云同步。在不同设备上恢复支持的连接与配置。</p><a href="#download">下载 Pro，免费开始 →</a></article><article class="edition-card premium"><span class="eyebrow">PRO / MEMBERSHIP</span><h3>Pro 会员版</h3><p>提供更大的云端配置空间，适合多设备与更多配置的同步需求。</p><a href="/docs/cloud.html">查看会员权益 →</a></article></div><div class="comparison-scroll" tabindex="0" aria-label="版本对比，可横向滚动"><table><thead><tr><th scope="col">功能与权益</th><th scope="col">开源版</th><th scope="col">Pro 免费版</th><th scope="col">Pro 会员版</th></tr></thead><tbody>${rows}</tbody></table></div><p class="fineprint">配置空间不是网盘容量；远端文件、Cookie、缓存和设备授权不属于通用配置同步。对比表按当前已开放能力展示，后续开放后更新。<a href="/docs/releases.html">查看版本状态 →</a></p></section>
+<section id="download" class="section"><div class="section-head"><div><span class="eyebrow">DOWNLOAD CENTER</span><h2>为你的设备，选择合适的版本。</h2></div><p>Pro 安装包在本站下载。<br>开源版、Pro 与 CAgent 均由香港下载源提供。</p></div><div class="download-shell"><div class="device-tabs" role="tablist" aria-label="选择设备系统">${tabs}</div><div id="device-panel" class="device-panel" role="tabpanel" aria-labelledby="tab-windows"><div><span class="status" data-field="status">0.8.3 · 测试版</span><h3 data-field="name">Windows</h3><div class="device-meta"><span data-field="arch">x64 · Windows 10 / 11</span><span data-field="format">EXE 安装程序</span></div><p data-field="text">独立安装 CShell Pro，登录后同步连接、模型和设置。</p></div><div class="download-action"><label class="variant-label" hidden>架构与格式<select id="download-variant" aria-label="架构与安装格式"></select></label><a class="primary" data-field="download" href="/downloads/pro/v0.8.3/CShell-Pro-0.8.3-win-x64.exe">下载 Windows Pro</a><a data-field="guide" href="/docs/windows.html">安装与平台说明 →</a></div></div></div><div class="download-foot"><a href="/downloads.html">开源版与 CAgent · 全平台下载 →</a><a href="/downloads/pro/v0.8.3/SHA256SUMS.txt">Pro 文件校验值 ↗</a></div><noscript><p><a href="/downloads/pro/v0.8.3/CShell-Pro-0.8.3-android.apk">Android Pro 下载</a> · <a href="/downloads.html">macOS / Linux 开源版下载</a></p></noscript></section>
+<section id="editions" class="section"><div class="section-head"><div><span class="eyebrow">FIND YOUR EDITION</span><h2>同一个核心，三种选择。</h2></div><p>按功能选择适合你的版本。<br>✓ 已开放 · — 未开放。</p></div><div class="edition-cards"><article class="edition-card"><span class="eyebrow">OPEN SOURCE</span><h3>CShell 开源版</h3><p>本地使用，自行配置连接和基座。适合希望掌握源码、独立部署与开发扩展的用户。</p><a href="/downloads.html">下载开源版 →</a></article><article class="edition-card"><span class="eyebrow">PRO / FREE</span><h3>Pro 免费版</h3><p>保留工作台核心，增加邮箱账号和云同步。在不同设备上恢复支持的连接与配置。</p><a href="#download">下载 Pro，免费开始 →</a></article><article class="edition-card premium"><span class="eyebrow">PRO / MEMBERSHIP</span><h3>Pro 会员版</h3><p>提供更大的云端配置空间，适合多设备与更多配置的同步需求。</p><a href="/docs/cloud.html">查看会员权益 →</a></article></div><div class="comparison-scroll" tabindex="0" aria-label="版本对比，可横向滚动"><table><thead><tr><th scope="col">功能与权益</th><th scope="col">开源版</th><th scope="col">Pro 免费版</th><th scope="col">Pro 会员版</th></tr></thead><tbody>${rows}</tbody></table></div><p class="fineprint">配置空间不是网盘容量；远端文件、Cookie、缓存和设备授权不属于通用配置同步。对比表按当前已开放能力展示，后续开放后更新。<a href="/docs/releases.html">查看版本状态 →</a></p></section>
 <section id="documentation" class="section"><div class="section-head"><div><span class="eyebrow">LEARN & BUILD</span><h2>从第一次连接，到自己的扩展。</h2></div><p>面向使用者和开发者的项目文档。<br>平台差异、功能边界与接入步骤都在这里。</p></div><div class="docs-cards">${[['01 / GET STARTED','开始使用','选择产品，安装客户端，连接第一台机器。','start'],['02 / WORKSPACE','功能指南','终端、文件、桌面、浏览器与智能体。','connections'],['03 / EXTENSIONS','扩展与应用','理解安装、配置、版本核验和权限。','extensions'],['04 / DEVELOPERS','加入你的功能','从 JSON 命令包到可信应用适配器。','developers']].map(([n,t,d,id])=>`<a class="docs-card" href="/docs/${id}.html"><span>${n}</span><h3>${t} ↗</h3><p>${d}</p></a>`).join('')}</div></section>
-<section class="cagent-section"><img src="/cagent.svg" alt="CAgent"><div><h3>认识 CAgent</h3><p>独立、精简的机器智能体。既可独立运行，也可作为 CShell 的连接端与被授权的子智能体。</p></div><a class="secondary" href="${github}/releases">获取 CAgent ↗</a></section></main>`,'CShell 官网：版本介绍、按设备下载、跨平台使用文档，以及扩展与 CAgent 应用开发指南。'));
+<section class="cagent-section"><img src="/cagent.svg" alt="CAgent"><div><h3>认识 CAgent</h3><p>独立、精简的机器智能体。既可独立运行，也可作为 CShell 的连接端与被授权的子智能体。</p></div><a class="secondary" href="/downloads.html">获取 CAgent ↗</a></section></main>`,'CShell 官网：版本介绍、按设备下载、跨平台使用文档，以及扩展与 CAgent 应用开发指南。'));
 console.log(`Built portal and ${pages.length} documentation pages`);
