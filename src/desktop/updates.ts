@@ -1,3 +1,4 @@
+import {agentDownloads,type AgentDownload} from '../shared/agent-downloads';
 import { isPro } from '../shared/edition';
 import { app, shell, dialog, net, type BrowserWindow } from 'electron';
 import { mkdir, open, rename, rm, readFile, writeFile } from 'node:fs/promises';
@@ -40,6 +41,17 @@ export function registerUpdateHandlers(
     state = { ...state, phase: 'error', retry, error: e instanceof Error ? e.message : String(e) };
     return state;
   };
+  let agentPackages:AgentDownload[]=[];
+  handle('agent:download-list',async()=>{
+    const catalogs=await Promise.all(['pro','opensource'].map(async channel=>(await request('https://shell.canp.ai/downloads/'+channel+'/releases.json')).json()));
+    agentPackages=agentDownloads(catalogs);
+    return agentPackages.map(({url,...item})=>item);
+  });
+  handle('agent:download-open',async(id:unknown)=>{
+    if(typeof id!=='string')throw Error('请选择安装包');
+    const item=agentPackages.find(p=>p.id===id);if(!item)throw Error('安装包列表已失效，请重新打开下载入口');
+    await shell.openExternal(item.url);
+  });
   handle('update:state', () => state);
   handle('update:open-page', () => shell.openExternal(releasesPage));
   const check = async () => {

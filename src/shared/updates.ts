@@ -18,6 +18,8 @@ export interface UpdateState {
   automatic?: boolean;
 }
 export interface UpdateBridge {
+  agentDownloadList():Promise<Omit<import('./agent-downloads').AgentDownload,'url'>[]>;
+  agentDownloadOpen(id:string):Promise<void>;
   updateState(): Promise<UpdateState>;
   checkUpdate(): Promise<UpdateState>;
   downloadUpdate(): Promise<UpdateState>;

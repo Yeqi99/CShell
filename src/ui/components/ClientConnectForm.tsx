@@ -1,3 +1,4 @@
+import {AgentDownloadEntry} from './AgentDownloadEntry';
 import { ConnectionExtractor } from './ConnectionExtractor';
 import type { Profile } from '../../shared/contracts';
 import { useState } from 'react';
@@ -145,6 +146,7 @@ export function ClientConnectForm({
           if (fields.group) setGroup(fields.group);
         }}
       />
+      {!profile&&<AgentDownloadEntry/>}
       <fieldset disabled={busy}>
         <div className="client-fields">
           <label>
