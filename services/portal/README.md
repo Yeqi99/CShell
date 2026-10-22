@@ -13,4 +13,4 @@
 
 先备份现有 portal，在独立暂存目录解包并核对，再切换静态目录。不要覆盖管理员目录、API 服务、安装包或 CanpAI。发布后验证文档页面、下载 HEAD 与 API 健康状态。
 
-2026-10-22：Windows / Android Pro 0.8.1 account3 附件可下载；macOS / Linux 提供 GitHub 开源发行入口，Pro 包尚未发布。会员中继、应用网络代理和扩展同步等新版能力仍在联调，官网明确标记，不将服务进程启动等同于功能发布。
+2026-10-22：Pro 0.8.2 已发布 Windows x64、Android 签名 APK，以及 macOS ARM64/x64、Linux ARM64/x64 AppImage/DEB 实验包。官网提供架构和格式选择，开源版继续从 GitHub 下载。Mac 未公证，Mac/Linux 尚未实机验收。会员中继、应用网络代理和扩展同步等新版能力仍在联调，不将服务进程启动等同于功能发布。
