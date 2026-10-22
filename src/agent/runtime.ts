@@ -197,7 +197,7 @@ export async function createAgentRuntime(
     signal.throwIfAborted();
     if (closed) throw new Error('Agent 已关闭');
     if(method.startsWith('account.')){if(!local)throw Error('账号操作仅允许本机执行');return account.call(method,params);}
-    if(method.startsWith('update.')){if(!local)throw new Error('更新只允许在本机执行');if(method==='update.check')return updater.check();if(method==='update.download')return updater.start();if(method==='update.status')return updater.status();throw new Error('未知更新操作');}
+    if(method.startsWith('update.')){if(!local)throw new Error('更新只允许在本机执行');if(method==='update.settings')return updater.settings(z.object({automatic:z.boolean().optional()}).parse(params??{}).automatic);if(method==='update.check')return updater.check();if(method==='update.download')return updater.start();if(method==='update.status')return updater.status();if(method==='update.verify')return updater.verify();throw new Error('未知更新操作');}
     const admin=local || (owner!=='local' && server.managementAllowed(owner));
     if(method==='network.status')return accountNetwork.status();
     if(method==='network.configure')return accountNetwork.configure(params);
@@ -221,11 +221,11 @@ export async function createAgentRuntime(
     }
     if(method==='connection.save') {
       if(!admin)throw new Error('未授权远程管理');
-      const input=z.object({bind:z.string(),port:z.number().int().min(1024).max(65535),password:z.string().min(1).max(128),shells:z.array(clientShellSchema).min(1).max(6).optional(),allowManage:z.boolean().optional(),allowHttp:z.boolean().optional(),allowHosting:z.boolean().optional(),allowRelay:z.boolean().optional(),advertisedHost:z.string().optional(),advertisedPort:clientEndpointSchema.shape.port.optional()}).strict().parse(params);
+      const input=z.object({bind:z.string(),port:z.number().int().min(1024).max(65535),password:z.string().max(128).optional(),shells:z.array(clientShellSchema).min(1).max(6).optional(),allowManage:z.boolean().optional(),allowHttp:z.boolean().optional(),allowHosting:z.boolean().optional(),allowRelay:z.boolean().optional(),advertisedHost:z.string().optional(),advertisedPort:clientEndpointSchema.shape.port.optional()}).strict().parse(params);
       if(!['0.0.0.0', '127.0.0.1','::1',...Object.values(networkInterfaces()).flatMap(v=>v?.map(i=>i.address)??[])].includes(input.bind))throw new Error('请选择当前设备的网络地址');
-      if(input.advertisedHost)clientEndpointSchema.shape.host.parse(input.advertisedHost);
+      if(input.advertisedHost)clientEndpointSchema.shape.host.parse(input.advertisedHost); if(['0.0.0.0','::'].includes(input.advertisedHost??''))throw Error('连接地址不能是 0.0.0.0，请填写其他设备能够访问的 IP 或域名');const connectionPassword=input.password||await server.revealPassword();if(!connectionPassword)throw Error('首次开启连接请设置连接密码');
       const apply=async()=>{
-        await server.stop();await server.setAccess({password:input.password,shells:input.shells??(server.status().passwordConfigured?server.status().allowedShells:[...new Set([...(await shells()).map(s=>s.shell),...(process.platform==='win32'?['wsl' as const]:[])])]),allowManage:input.allowManage??(server.status().passwordConfigured?server.status().allowManage:true),allowHttp:input.allowHttp??(server.status().passwordConfigured?server.status().allowHttp:true),allowHosting:input.allowHosting??(server.status().passwordConfigured?server.status().allowHosting:true),allowRelay:input.allowRelay??(server.status().passwordConfigured?server.status().allowRelay:true)});
+        await server.stop();await server.setAccess({password:connectionPassword,shells:input.shells??(server.status().passwordConfigured?server.status().allowedShells:[...new Set([...(await shells()).map(s=>s.shell),...(process.platform==='win32'?['wsl' as const]:[])])]),allowManage:input.allowManage??(server.status().passwordConfigured?server.status().allowManage:true),allowHttp:input.allowHttp??(server.status().passwordConfigured?server.status().allowHttp:true),allowHosting:input.allowHosting??(server.status().passwordConfigured?server.status().allowHosting:true),allowRelay:input.allowRelay??(server.status().passwordConfigured?server.status().allowRelay:true)});
         const current=await desktop.dispatch('desktop.status',{},'local',true) as {config:Record<string,unknown>};
         if(desktop.extraPackages.length)await desktop.dispatch('desktop.configure',{...current.config,directListener:false,bindAddress:input.bind,tcpPort:input.port,udpPort:input.port,publicTcpPort:input.advertisedPort,publicUdpPort:input.advertisedPort??input.port},'local',true);
         await server.start({bind:input.bind,port:input.port,advertisedHost:input.advertisedHost,advertisedPort:input.advertisedPort});
@@ -337,7 +337,7 @@ export async function createAgentRuntime(
     return serialized(async () => {
       signal.throwIfAborted();
       if (closed) throw new Error('Agent 已关闭');
-    if(method.startsWith('update.')){if(!local)throw new Error('更新只允许在本机执行');if(method==='update.check')return updater.check();if(method==='update.download')return updater.start();if(method==='update.status')return updater.status();throw new Error('未知更新操作');}
+    if(method.startsWith('update.')){if(!local)throw new Error('更新只允许在本机执行');if(method==='update.settings')return updater.settings(z.object({automatic:z.boolean().optional()}).parse(params??{}).automatic);if(method==='update.check')return updater.check();if(method==='update.download')return updater.start();if(method==='update.status')return updater.status();if(method==='update.verify')return updater.verify();throw new Error('未知更新操作');}
       if (method === 'applications.configure') {
         if (!admin) throw new Error('未授权管理应用安装');
         const result = await applications.configure(params);
@@ -512,7 +512,7 @@ export async function createAgentRuntime(
   }
   async function close() {
     if (closed) return;
-    closed = true;
+    closed = true; updater.close();
     await visual.dispose();
     await files.close();
     await accountNetwork.close();
@@ -542,7 +542,7 @@ export async function createAgentRuntime(
     dispatch,
     async startControl() {
       if (control) throw new Error('本机控制服务已运行');
-      control = await startAgentControl(directory, (m, p, s) => dispatch(m, p, s, true));
+      control = await startAgentControl(directory, (m, p, s) => dispatch(m, p, s, true)); await updater.initialize();
     },
     close,
     directory,

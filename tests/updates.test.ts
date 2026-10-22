@@ -11,13 +11,13 @@ const release = (version: string, suffix = 'win-x64.exe') => ({
   ].map((a) => ({
     ...a,
     browser_download_url:
-      'https://github.com/Yeqi99/CShell/releases/download/v' + version + '/' + a.name,
+      'https://shell.canp.ai/downloads/opensource/v' + version + '/' + a.name,
   })),
 });
 
 test('Pro and base applications select only their own release assets', () => {
   const base = release('0.8.2');
-  const pro = JSON.parse(JSON.stringify(base).replaceAll('CShell-0.8.2', 'CShell-Pro-0.8.2'));
+  const pro = JSON.parse(JSON.stringify(base).replaceAll('CShell-0.8.2', 'CShell-Pro-0.8.2').replaceAll('/opensource/', '/pro/'));
   assert.equal(selectRelease([base], 'win32', 'x64', true), undefined);
   assert.equal(selectRelease([pro], 'win32', 'x64'), undefined);
   assert.equal(selectRelease([pro], 'win32', 'x64', true)?.asset.name, 'CShell-Pro-0.8.2-win-x64.exe');

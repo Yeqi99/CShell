@@ -42,8 +42,8 @@ export function UpdateSettings({ english }: { english: boolean }) {
   const failure = error || state?.error || '';
   const failureHint = /HTTP (403|429)/.test(failure)
     ? t(
-        'GitHub 限制了当前网络的请求。请稍后重试，或打开下载页。',
-        'GitHub limited requests from this network. Retry later or open the downloads page.',
+        '香港下载服务 限制了当前网络的请求。请稍后重试，或打开下载页。',
+        'The Hong Kong download service limited requests from this network. Retry later or open the downloads page.',
       )
     : /timeout|aborted|timed out/i.test(failure)
       ? t(
@@ -52,12 +52,12 @@ export function UpdateSettings({ english }: { english: boolean }) {
         )
       : /fetch|net::|network/i.test(failure)
         ? t(
-            '无法连接 GitHub，请检查网络和系统代理。',
-            'Cannot reach GitHub. Check your network and system proxy.',
+            '无法连接香港下载服务，请检查网络和系统代理。',
+            'Cannot reach the Hong Kong download service. Check your network and system proxy.',
           )
         : failure;
   const labels = {
-    idle: t('从 GitHub Releases 检查更新', 'Check GitHub Releases for updates'),
+    idle: t('从香港更新服务检查更新', 'Check the Hong Kong service for updates'),
     checking: t('正在检查更新…', 'Checking…'),
     current: t('当前已是最新可用版本', 'You have the latest available version'),
     unavailable: t(
@@ -75,6 +75,7 @@ export function UpdateSettings({ english }: { english: boolean }) {
         {t('应用更新', 'App updates')}
         <span className="update-version">v{state?.current || '…'}</span>
       </h2>
+      {window.cshell.updateAutomatic && <label className="check"><input type="checkbox" checked={state?.automatic!==false} disabled={!state||pending} onChange={e=>void run(()=>window.cshell.updateAutomatic!(e.target.checked))}/>{t('自动检查并下载更新（安装前保留当前工作）','Automatically check and download updates')}</label>}
       <p className="muted">
         {t('当前版本', 'Current version')} {state?.current || '…'} ·{' '}
         {t('包含预览版', 'Includes previews')}
@@ -126,7 +127,7 @@ export function UpdateSettings({ english }: { english: boolean }) {
           type="button"
           onClick={() => void window.cshell.openUpdatePage().catch((e) => setError(e.message))}
         >
-          {t('打开 GitHub 下载页', 'Open GitHub downloads')}
+          {t('打开下载页', 'Open downloads')}
         </button>
       </div>
       <p className="muted">

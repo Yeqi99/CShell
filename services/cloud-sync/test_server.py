@@ -113,6 +113,32 @@ class ServiceTest(unittest.TestCase):
             self.assertNotIn('hello',str(usage))
         finally:upstream.shutdown();upstream.server_close();thread.join()
 
+    def test_model_stream_is_incremental_and_releases_slot(self):
+        import io, json
+        from unittest.mock import patch
+        account=self.login('stream@example.com','stream')['accountId']
+        models=self.service.models
+        models.entries={'fixture':{'id':'fixture','name':'Fixture','model':'private','key':'secret','url':'https://invalid.example'}}
+        emitted=[]
+        class Response(io.BytesIO):
+            headers={'Content-Type':'text/event-stream'}
+            def readline(self, limit=-1):
+                if self.tell() > 0 and self.getvalue()[self.tell():].startswith(b'data: [DONE]'):
+                    assert len(emitted)==1, 'first token must arrive before reading completion'
+                return super().readline(limit)
+        chunk={'model':'private','choices':[{'index':0,'delta':{'content':'你好'}}]}
+        data=('data: '+json.dumps(chunk)+'\n\ndata: [DONE]\n\n').encode()
+        with patch('models.urllib.request.urlopen',return_value=Response(data)) as request:
+            models.complete(account,{'model':'fixture','messages':[{'role':'user','content':'hi'}],'stream':True},emitted.append)
+            self.assertTrue(json.loads(request.call_args.args[0].data)['stream'])
+        self.assertEqual(json.loads(emitted[0])['model'],'fixture')
+        self.assertEqual(emitted[-1],'[DONE]')
+        self.assertNotIn(account,models.active)
+        with patch('models.urllib.request.urlopen',return_value=Response(b'data: {}\n\n')):
+            with self.assertRaises(Failure):
+                models.complete(account,{'model':'fixture','messages':[{}],'stream':True},lambda _:None)
+        self.assertNotIn(account,models.active)
+
     def tearDown(self):
         self.directory.cleanup()
 

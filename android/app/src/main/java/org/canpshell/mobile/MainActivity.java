@@ -186,7 +186,7 @@ public class MainActivity extends Activity {
     @JavascriptInterface public void installUpdate() { updates.install(); }
     @JavascriptInterface public void openUpdatePage() {
       runOnUiThread(() -> {
-        try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Yeqi99/CShell/releases"))); }
+        try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://shell.canp.ai/"))); }
         catch (android.content.ActivityNotFoundException e) { android.widget.Toast.makeText(MainActivity.this, "未找到可打开下载页的浏览器", android.widget.Toast.LENGTH_LONG).show(); }
       });
     }

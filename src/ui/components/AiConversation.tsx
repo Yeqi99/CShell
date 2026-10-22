@@ -13,6 +13,8 @@ import {
 } from 'lucide-react';
 import { CopyButton } from './AiCopyButton';
 import { AiMarkdown } from './AiMarkdown';
+import { AiStreamingMarkdown } from './AiStreamingMarkdown';
+import { ErrorNotice } from './ErrorNotice';
 import { type AiSnapshot, type AiLocation, type AiMode, type AiThread } from '../../shared/ai';
 export function AiConversation({
   openThread,
@@ -180,7 +182,11 @@ export function AiConversation({
                 </header>
                 <div className="agent-content">
                   {message.role === 'assistant' ? (
-                    <AiMarkdown text={message.content} />
+                    i === thread.messages.length - 1 && active ? (
+                      <AiStreamingMarkdown key={`${thread.id}:${i}`} text={message.content} streaming={thread.state === 'running'} onReveal={() => {
+                        if (follow.current && viewport.current) viewport.current.scrollTop = viewport.current.scrollHeight;
+                      }} />
+                    ) : <AiMarkdown text={message.content} />
                   ) : (
                     message.content
                   )}
@@ -230,9 +236,7 @@ export function AiConversation({
           )}
           {thread?.checkpoint && <details className="agent-checkpoint"><summary>任务检查点 · {thread.checkpoint.phase}</summary>{thread.checkpoint.memory&&<><p>{thread.checkpoint.memory.objective}</p><p>待完成：{thread.checkpoint.memory.remaining.join('；')||'未记录'}</p><p>验证：{thread.checkpoint.memory.verification.join('；')||'尚未记录验收证据'}</p></>}{thread.checkpoint.pending&&<p>结果待核查：{thread.checkpoint.pending.tool}。继续前检查实际状态，勿直接重跑。</p>}<small>{new Date(thread.checkpoint.updatedAt).toLocaleString()}</small></details>}
           {thread?.error && (
-            <p className="form-error" role="alert">
-              {thread.error}
-            </p>
+            <ErrorNotice title="这次回复未完成" error={thread.error} />
           )}
           {thread?.state === 'running' && (
             <div className="agent-running" role="status">
@@ -285,20 +289,28 @@ export function AiConversation({
         <div className="agent-composer-tools">
           <div className="agent-model">
             <Cpu size={13} />
-            {thread ? (
-              <span title={provider?.model}>{provider?.name ?? '基座已删除'}</span>
-            ) : (
+            {(
               <div
                 className="agent-model-picker"
-                title={snapshot.providers.find((p) => p.id === providerId)?.model}
+                title={thread ? '切换模型并开始新会话，保留当前会话' : provider?.model}
               >
                 <span>
-                  {snapshot.providers.find((p) => p.id === providerId)?.name || '选择基座'}
+                  {provider?.name || '选择基座'}
                 </span>
                 <select
                   aria-label="AI 基座"
-                  value={providerId}
-                  onChange={(e) => setProviderId(e.target.value)}
+                  value={thread?.providerId ?? providerId}
+                  disabled={active || busy}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    if (!thread) { setProviderId(next); return; }
+                    void run(async () => {
+                      const created = await window.cshell.aiThreadCreate(thread.location, next, thread.mode, thread.sessionId);
+                      setDrafts(previous => ({ ...previous, [created.id]: text }));
+                      setProviderId(next);
+                      openThread(created.id);
+                    });
+                  }}
                 >
                   <option value="" disabled>
                     选择基座

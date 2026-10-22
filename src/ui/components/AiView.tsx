@@ -1,3 +1,4 @@
+import { ErrorNotice } from './ErrorNotice';
 import { useEffect, useState } from 'react';
 import type { AiSnapshot } from '../../shared/ai';
 import { AiConversation } from './AiConversation';
@@ -40,7 +41,7 @@ export function AiView({ threadId }: { threadId: string }) {
         setProviderId={() => {}} setMode={() => {}}
         create={async () => { throw Error(text('此区域只使用已保存的会话','This pane uses its saved conversation only')); }} run={run}
         configure={() => setError(text('请在主工作台配置智能体基座。','Configure the AI provider in the main workbench.'))}/>
-      {error && <p role="alert" className="form-error">{error}</p>}
+      {error && <ErrorNotice title="智能体操作未完成" error={error} />}
     </>}
   </div>;
 }

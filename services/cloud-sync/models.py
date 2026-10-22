@@ -1,5 +1,22 @@
 """Authenticated, bounded model gateway. Upstream credentials never leave this process."""
-import json, os, threading, time, urllib.request
+import json, os, threading, time, urllib.request, urllib.error
+
+def inference_schema(value):
+    """Small-model grammar hints only. The caller still validates full tool arguments."""
+    if not isinstance(value, dict):
+        return value
+    omitted = {'pattern', 'format', 'minimum', 'maximum', 'exclusiveMinimum', 'exclusiveMaximum', 'minLength', 'maxLength', 'minItems', 'maxItems', 'default'}
+    result = {}
+    for key, item in value.items():
+        if key in omitted:
+            continue
+        if key in ('properties', '$defs', 'definitions') and isinstance(item, dict):
+            result[key] = {name: inference_schema(child) for name, child in item.items()}
+        elif isinstance(item, list):
+            result[key] = [inference_schema(child) for child in item]
+        else:
+            result[key] = inference_schema(item)
+    return result
 
 class Models:
     def __init__(self, service, failure):
@@ -21,7 +38,7 @@ class Models:
     def catalog(self):
         return {'models': [{'id': e['id'], 'name': e['name'], 'vision': bool(e.get('vision')), 'free': True} for e in self.entries.values()]}
 
-    def complete(self, account, body):
+    def complete(self, account, body, emit=None):
         entry = self.entries.get(body.get('model'))
         if not entry:
             raise self.F(404, '模型暂不可用')
@@ -40,12 +57,49 @@ class Models:
         try:
             # Whitelist inference fields; clients cannot choose URLs, credentials or routing.
             payload = {k: body[k] for k in ('messages', 'tools', 'tool_choice', 'temperature', 'top_p', 'response_format') if k in body}
+            # Local chat templates require exactly one system message at the beginning.
+            # Preserve system priority and order instead of downgrading runtime instructions.
+            systems = [m.get('content', '') for m in messages if isinstance(m, dict) and m.get('role') == 'system']
+            if systems and all(isinstance(s, str) for s in systems):
+                payload['messages'] = [{'role': 'system', 'content': '\n\n'.join(systems)}] + [m for m in messages if not isinstance(m, dict) or m.get('role') != 'system']
+            if isinstance(payload.get('tools'), list):
+                payload['tools'] = [{**tool, 'function': {**tool['function'], 'parameters': inference_schema(tool['function'].get('parameters', {}))}} for tool in payload['tools']]
             maximum = body.get('max_tokens', 2048)
             if type(maximum) is not int or maximum < 1:
                 raise self.F(400, '输出长度不正确')
-            payload.update(model=entry['model'], stream=False, max_tokens=min(maximum, 4096), chat_template_kwargs={'enable_thinking': False})
+            streaming = body.get('stream') is True and emit is not None
+            payload.update(model=entry['model'], stream=streaming, max_tokens=min(maximum, 4096), chat_template_kwargs={'enable_thinking': False})
+            if streaming:
+                payload['stream_options'] = {'include_usage': True}
             request = urllib.request.Request(entry['url'], json.dumps(payload).encode(), {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + entry['key']})
             with urllib.request.urlopen(request, timeout=120) as response:
+                if streaming and 'text/event-stream' in response.headers.get('Content-Type', ''):
+                    size, started, data_lines = 0, time.monotonic(), []
+                    usage = {}
+                    while True:
+                        line = response.readline(1024 * 1024 + 1)
+                        size += len(line)
+                        if size > 8 * 1024 * 1024 or len(line) > 1024 * 1024 or time.monotonic() - started > 120:
+                            raise self.F(502, '模型流式响应超过限制')
+                        if not line:
+                            raise self.F(502, '模型响应中断，请重试')
+                        line = line.decode('utf-8').rstrip('\r\n')
+                        if line.startswith('data:'):
+                            data_lines.append(line[5:].lstrip())
+                        elif not line and data_lines:
+                            data = '\n'.join(data_lines)
+                            data_lines = []
+                            if data.strip() == '[DONE]':
+                                result = {'usage': usage}
+                                emit('[DONE]')
+                                return result
+                            event = json.loads(data)
+                            if not isinstance(event, dict) or event.get('error'):
+                                raise self.F(502, '模型响应异常，请重试')
+                            event['model'] = entry['id']
+                            if isinstance(event.get('usage'), dict):
+                                usage = event['usage']
+                            emit(json.dumps(event, ensure_ascii=False))
                 data = response.read(8 * 1024 * 1024 + 1)
                 if len(data) > 8 * 1024 * 1024:
                     raise self.F(502, '模型响应过大')
@@ -56,6 +110,15 @@ class Models:
                 return result
         except self.F:
             raise
+        except urllib.error.HTTPError as error:
+            # Do not expose upstream bodies: they can include prompts or service details.
+            status = error.code
+            error.close()
+            if status in (400, 413, 422):
+                raise self.F(400, '模型无法处理本次输入，请缩短会话或切换模型')
+            if status == 429:
+                raise self.F(429, '模型请求较多，请稍后重试')
+            raise self.F(503, '模型服务暂不可用，请稍后重试')
         except Exception:
             raise self.F(503, '模型服务暂时繁忙，请稍后重试')
         finally:

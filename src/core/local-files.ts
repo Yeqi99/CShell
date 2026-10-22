@@ -46,7 +46,12 @@ export class LocalFiles {
     if (names.length > limit) throw new Error('Directory exceeds entry limit');
     for (const name of names) {
       check();
-      const stat = await lstat(join(target, name));
+      // A protected or disappearing child must not hide its entire parent.
+      const stat = await lstat(join(target, name)).catch((error: NodeJS.ErrnoException) => {
+        if (['EACCES', 'EPERM', 'ENOENT', 'EBUSY'].includes(error.code ?? '')) return null;
+        throw error;
+      });
+      if (!stat) continue;
       entries.push({
         name,
         path: posix.join(canonical, name),

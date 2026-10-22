@@ -333,6 +333,7 @@ def handler(service):
 
         def dispatch(self):
             acquired=False
+            self.streaming=False
             try:
                 if self.path=='/v1/vault':
                     acquired=VAULT_SLOTS.acquire(False)
@@ -394,7 +395,9 @@ def handler(service):
                     elif self.path == '/v1/models' and self.command == 'GET':
                         value=service.models.catalog()
                     elif self.path == '/v1/models/chat/completions' and self.command == 'POST':
-                        value=service.models.complete(account,body)
+                        value=service.models.complete(account,body,self.stream_event if body.get('stream') is True else None)
+                        if self.streaming:
+                            return
                     elif self.path == '/v1/devices' and self.command == 'GET':
                         value=service.devices.list(account)
                     elif self.path == '/v1/devices/register' and self.command == 'POST':
@@ -426,13 +429,35 @@ def handler(service):
                         raise Failure(404, '接口不存在')
                 self.respond(200, value)
             except Failure as error:
-                self.respond(error.status, {'error': error.message})
+                if self.streaming:
+                    self.stream_event(json.dumps({'error': {'message': error.message}}, ensure_ascii=False))
+                else:
+                    self.respond(error.status, {'error': error.message})
             except (ValueError, TypeError, KeyError):
-                self.respond(400, {'error': '请求格式不正确'})
+                if self.streaming:
+                    self.stream_event(json.dumps({'error': {'message': '模型流式数据不完整'}}))
+                else:
+                    self.respond(400, {'error': '请求格式不正确'})
             except Exception:
-                self.respond(503, {'error': '服务暂时不可用'})
+                if self.streaming:
+                    self.close_connection=True
+                else:
+                    self.respond(503, {'error': '服务暂时不可用'})
             finally:
                 if acquired:VAULT_SLOTS.release()
+
+        def stream_event(self, data):
+            if not self.streaming:
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/event-stream; charset=utf-8')
+                self.send_header('Cache-Control', 'no-store')
+                self.send_header('X-Accel-Buffering', 'no')
+                self.send_header('Connection', 'close')
+                self.end_headers()
+                self.streaming=True
+                self.close_connection=True
+            self.wfile.write(('data: ' + data + '\n\n').encode('utf-8'))
+            self.wfile.flush()
 
         def respond(self, status, value):
             data = json.dumps(value, ensure_ascii=False).encode()

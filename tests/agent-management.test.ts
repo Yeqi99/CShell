@@ -40,6 +40,25 @@ test('Agent applications allow authenticated administration and preserve explici
   } finally { await f.close(); }
 });
 const shell = process.platform === 'win32' ? 'cmd' : 'bash';
+test('browser TLS transport can write while a read waits on the same authenticated channel', {timeout:15000}, async()=>{
+  const f=await fixture();
+  const echo=createServer(socket=>socket.pipe(socket));
+  await new Promise<void>(resolve=>echo.listen(0,'127.0.0.1',resolve));
+  let transport:Awaited<ReturnType<ClientProvider['browserTransport']>>|undefined;
+  try {
+    const {device}=await f.pair({allowHttp:true,allowManage:true});
+    transport=await f.provider.browserTransport(device.deviceId);
+    const channel=await transport.call('browser.open',{host:'127.0.0.1',port:(echo.address() as any).port}) as {id:string};
+    const pending=transport.call('browser.read',channel);
+    await transport.call('browser.write',{id:channel.id,sequence:0,data:Buffer.from('concurrent browser request').toString('base64')});
+    let timer:ReturnType<typeof setTimeout>|undefined;
+    try {
+      const result=await Promise.race([pending,new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(Error('browser read blocked its write')),3000)})]) as {data:string};
+      assert.equal(Buffer.from(result.data,'base64').toString(),'concurrent browser request');
+    } finally {clearTimeout(timer);}
+    await transport.call('browser.close',channel);
+  } finally {transport?.close();await f.close();await new Promise<void>(resolve=>echo.close(()=>resolve()));}
+});
 async function freePort() {
   const s = createServer();
   await new Promise<void>((r) => s.listen(0, '127.0.0.1', r));
@@ -204,7 +223,7 @@ test('Agent native management, hosting and relay grants are independent on provi
       ['allowHosting', 'hosting.list', ['client.status', 'relay.status'], 'agent_hosting'],
       ['allowRelay', 'relay.status', ['client.status', 'hosting.list'], 'agent_relay'],
     ] as const) {
-      const { device, session } = await f.pair({ [grant]: true });
+      const { device, session } = await f.pair({ allowHttp:false,allowManage:false,allowHosting:false,allowRelay:false,[grant]: true });
       const identity = await f.vault.identity();
       assert.ok(await f.provider.call(device.deviceId, { method: allowed }));
       assert.ok(await rawManage(f.port, identity, allowed));

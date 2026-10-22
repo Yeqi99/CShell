@@ -1,3 +1,4 @@
+import { ErrorNotice } from './ErrorNotice';
 import {isOfficialModel} from '../../shared/official-models';
 import { usePermissionNavigation } from '../permission-navigation';
 import {AiExtensionModelSelect} from './AiExtensionModelSelect';
@@ -278,9 +279,7 @@ export function AiPanel({
         </div>
       </header>
       {error && (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
+        <ErrorNotice title="智能体操作未完成" error={error} />
       )}
       <div className="agent-chat-page" hidden={page !== 'chat'}>
         <AiConversation

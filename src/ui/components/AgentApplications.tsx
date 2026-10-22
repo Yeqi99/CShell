@@ -1,3 +1,4 @@
+import { ErrorNotice } from './ErrorNotice';
 import { useEffect, useState } from 'react';
 import { appCatalogSchema, appTaskSchema, appPolicySchema } from '../../shared/agent-applications';
 import type { AgentCall, AgentTarget } from '../../shared/agent';
@@ -110,9 +111,7 @@ export function AgentApplications({
         )}
       </div>
       {error && (
-        <p role="alert" className="form-error">
-          {error}
-        </p>
+        <ErrorNotice title="应用操作未完成" error={error} />
       )}
       {busy && <p role="status">正在处理应用操作…</p>}
       <div className="machine-app-catalog">

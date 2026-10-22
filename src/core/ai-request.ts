@@ -28,7 +28,13 @@ export async function requestAiReply(
     const response = await transport(url, { ...init, signal: combined });
     if (!response.ok) {
       await response.body?.cancel();
-      throw new Error(`AI API HTTP ${response.status}`);
+      const hint = response.status===401 ? '模型登录已失效，请重新登录或检查 API Key'
+        :response.status===403 ? '当前账号无权使用此模型，请检查基座权限'
+        :response.status===429 ? '模型请求较多或额度已用完，请稍后重试或切换模型'
+        :response.status===400||response.status===413||response.status===422 ? '模型未接受本次输入，请缩短会话或切换兼容的模型'
+        :response.status>=500 ? '模型服务暂时无法响应，请稍后重试或切换模型'
+        :'模型请求失败，请检查基座连接';
+      throw new Error(`${hint}（AI API HTTP ${response.status}）`);
     }
     return await readAiResponse(response, onContent, activity);
   } catch (error) {

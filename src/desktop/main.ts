@@ -397,7 +397,7 @@ else
       });
       handle('views:close', id => monitorWindows.close(idSchema.parse(id)));
       handle('client:download-page', () =>
-        shell.openExternal('https://github.com/Yeqi99/CShell/releases'),
+        shell.openExternal('https://shell.canp.ai/'),
       );
       handle('client:probe', (endpoint) => clientProvider.probe(endpoint));
       handle('client:password-pair', async (info, password) => {
