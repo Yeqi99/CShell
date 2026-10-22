@@ -1,4 +1,4 @@
-import {readdir} from 'node:fs/promises';
+import {readdir,unlink} from 'node:fs/promises';
 import { browserPagePermission } from '../core/browser-interactions';
 import { agentBrowserStream, type BrowserAgentCall } from '../core/agent-browser-stream';
 import {
@@ -50,6 +50,12 @@ type Workspace = {
   proxy: Awaited<ReturnType<typeof createSshBrowserProxy>>;
 };
 export class MachineBrowser {
+  async cloudRestore(value:unknown){
+    const data=this.cloudValidate(value);await this.cloudImport(data);
+    const directory=join(app.getPath('userData'),'machine-browser');
+    const names=await readdir(directory).catch(error=>{if(error.code==='ENOENT')return [];throw error;});
+    for(const name of names)if(/^[a-f0-9]{64}\.bin$/.test(name)&&!Object.hasOwn(data,name.slice(0,-4)))await unlink(join(directory,name));
+  }
   cloudValidate(value:unknown){return z.record(z.string().regex(/^[a-f0-9]{64}$/),browserLibrarySchema).parse(value);}
   private cloudLibrary(key:string){return new BrowserLibrary(join(app.getPath('userData'),'machine-browser',key+'.bin'),{encrypt:s=>{if(!safeStorage.isEncryptionAvailable())throw Error('系统加密存储不可用');return safeStorage.encryptString(s);},decrypt:b=>safeStorage.decryptString(b)});}
   async cloudExport(){for(const w of this.live)this.save(w);const result:Record<string,import('../core/browser-library').BrowserLibraryData>={};let names:string[]=[];try{names=await readdir(join(app.getPath('userData'),'machine-browser'));}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e;}for(const name of names)if(/^[a-f0-9]{64}\.bin$/.test(name)){const key=name.slice(0,-4);result[key]=this.cloudLibrary(key).data;}return result;}

@@ -12,6 +12,7 @@ import { clientCodec } from './client-app';
 import { defaults } from '../shared/contracts';
 import { emptySharedAi } from '../shared/shared-ai';
 import type { DesktopAccountProfiles } from '../core/desktop-account-profiles';
+import {registerAccountImports} from './account-import';
 
 const assetName = z.string().regex(/^[a-f0-9]{64}\.(?:ttf|otf|woff|woff2|png)$/);
 const bundleSchema = z
@@ -82,7 +83,7 @@ export async function registerCloudHandlers(
     }
     return data;
   };
-  const apply = async (value: unknown) => {
+  const apply = async (value: unknown, rollback = false) => {
     const data = validate(value);
     await mkdir(join(directory, 'appearance'), { recursive: true });
     for (const [name, encoded] of Object.entries(data.assets))
@@ -91,8 +92,8 @@ export async function registerCloudHandlers(
     await http.cloudImport(data.http);
     if(data.opencode!==undefined)await openCode.cloudImport(data.opencode);
     await ai.cloudImport(data.ai);
-    await store.cloudImport(data.store);
-    if(data.browser!==undefined)await browser.cloudImport(data.browser);
+    await store.cloudImport(data.store,rollback);
+    if(data.browser!==undefined)await (rollback?browser.cloudRestore(data.browser):browser.cloudImport(data.browser));
   };
   const cloud = new CloudSync(directory, clientCodec, {
     ...(profileOptions?{
@@ -113,7 +114,7 @@ export async function registerCloudHandlers(
       try {
         await apply(value);
       } catch (error) {
-        await apply(previous);
+        await apply(previous,true);
         throw error;
       }
       publish();
@@ -121,6 +122,7 @@ export async function registerCloudHandlers(
   }, undefined, (url, options) => net.fetch(String(url), options));
   await cloud.load();
   if(profileOptions)await profileOptions.profiles.initialize(cloud.accountId());
+  if(profileOptions)registerAccountImports(handle,cloud,profileOptions.profiles,validate,snapshot,assertAccountIdle);
   ai.officialCredential=()=>cloud.sessionCredential();
   client.cloudLease=async id=>{const result=await cloud.accountRequest('/v1/devices/lease',{deviceId:id});return (await import('../shared/agent-relay')).agentRelayConnectionSchema.parse(result.relay);};
   handle('cloud:memory',()=>ai.memory());

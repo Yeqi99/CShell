@@ -79,12 +79,12 @@ export class Store {
     }
     return result;
   }
-  async cloudImport(value: unknown) {
+  async cloudImport(value: unknown, restoreHosts = false) {
     const next = this.cloudValidate(value), secrets: Record<string,string> = {};
     for (const profile of next.profiles) if (next.secrets[profile.id]) secrets[profile.id] = await this.codec.encrypt(JSON.stringify(next.secrets[profile.id]));
     const {extensions,...portable}=next;
     if(extensions){this.data.tools.commandSuggestions=extensions.commandSuggestions;this.data.tools.dockerSocket=extensions.dockerSocket;this.data.plugins=this.plugins().map(p=>({...p,manifest:{...p.manifest,commands:extensions.commands[p.manifest.id]??p.manifest.commands}}));}
-    this.data = {...this.data, ...portable, secrets, hosts:{...this.data.hosts,...next.hosts}};
+    this.data = {...this.data, ...portable, secrets, hosts:restoreHosts?next.hosts:{...this.data.hosts,...next.hosts}};
     await this.persist();
   }
   monitorViews(): MonitorView[] { return structuredClone(this.data.monitorViews); }

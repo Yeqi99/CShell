@@ -26,6 +26,21 @@ export interface CloudAdapter {
   import(value: unknown): Promise<void>;
 }
 export class CloudSync {
+  /** Serialize explicit local imports with uploads, downloads, and account transitions. */
+  async withAccountWorkspace<T>(accountId:string,operation:()=>Promise<T>){
+    return this.exclusive(async()=>{
+      if(this.data.session?.accountId!==accountId||!this.data.key)throw Error('账号状态已改变，请重新检查来源');
+      if(this.state==='conflict')throw Error('请先处理账号同步冲突');
+      return operation();
+    });
+  }
+  async importLocal(accountId:string,prepare:(current:unknown)=>Promise<unknown>){
+    return this.withAccountWorkspace(accountId,async()=>{
+      const next=await prepare(await this.adapter.export());
+      this.adapter.validate(next);
+      await this.adapter.import(next);
+    });
+  }
   private handedOff=false;
   activationDeferred(){return this.handedOff;}
   private data: LocalState = { revision: 0 };

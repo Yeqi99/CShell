@@ -1,3 +1,4 @@
+import type {AccountImportBridge as importAccountBridge} from './account-import';
 /** Shared wire format. Server never receives the plaintext vault or recovery key. */
 export interface CloudEnvelope {
   format: 1;
@@ -23,7 +24,7 @@ export interface CloudStatus {
   state: 'signed-out' | 'locked' | 'ready' | 'syncing' | 'conflict' | 'error';
   error?: string;
 }
-export interface CloudBridge {
+export interface CloudBridge extends importAccountBridge {
   cloudMemory():Promise<import('./account-memory').AccountHabit[]>;
   cloudRemember(input:{id?:string;text:string}):Promise<import('./account-memory').AccountHabit[]>;
   cloudForget(id:string):Promise<import('./account-memory').AccountHabit[]>;

@@ -2,6 +2,10 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { Bridge, SessionEvent } from '../shared/contracts';
 const bridge: Bridge = {
   platform: process.platform,
+  guestCacheClear:confirmation=>ipcRenderer.invoke('account:clear-guest',confirmation),
+  accountSources:()=>ipcRenderer.invoke('account:sources'),
+  accountSourcePreview:source=>ipcRenderer.invoke('account:source-preview',source),
+  accountSourceImport:(token,settings,choices)=>ipcRenderer.invoke('account:source-import',token,settings,choices),
   cloudStatus:()=>ipcRenderer.invoke('cloud:status'),
   onCloudChanged:listener=>{const fn=()=>listener();ipcRenderer.on('cloud:changed',fn);return()=>ipcRenderer.removeListener('cloud:changed',fn);},
   cloudRequestCode:email=>ipcRenderer.invoke('cloud:code',email),
