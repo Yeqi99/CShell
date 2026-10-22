@@ -85,6 +85,9 @@ export class MobileCoding {
     });
   }
   open(target: string, name: string, engine: 'codex' | 'claude' | 'market', openIde?: () => void) {
+    // Only connected machine desktops expose these launch actions. A previous
+    // disconnect must not permanently disable the restored machine's apps.
+    this.offline.delete(target);
     const key = target + ':' + engine;
     this.panels.get(this.current)?.render(false);
     for (const p of this.panels.values()) p.node.hidden = true;
