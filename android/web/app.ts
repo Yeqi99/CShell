@@ -1,3 +1,4 @@
+import {MachineHome,type MachineApp} from './machine-home';
 import {MobileCoding} from './coding';
 import {MobileCloud} from './cloud';
 import {MobileIde} from './ide';
@@ -54,7 +55,10 @@ const $ = (id: string) => document.getElementById(id)!;
 const desktop=new MobileDesktop(window.CShellNative);
 const mobileIde=new MobileIde(window.CShellNative);
 const mobileCoding=new MobileCoding(window.CShellNative,(id,apps)=>{machineApps.set(id,{...machineApps.get(id),...apps});updateMachineApps(id);});
-const machineApps=new Map<string,{browser?:boolean;ide?:boolean;codex?:boolean;claude?:boolean;market?:boolean}>();
+const machineHomes=new Map<string,MachineHome>();
+const machineShells=new Map<string,{label:string;index:number}[]>();
+const openedShells=new Map<string,number>();
+const machineApps=new Map<string,{browser?:boolean;ide?:boolean;codex?:boolean;claude?:boolean;market?:boolean;files?:boolean}>();
 const desktopStatus=new Map<string,{packageReady?:boolean;viewAllowed?:boolean;controlAllowed?:boolean;inputFeatures?:string[];qualityModes?:string[]}>();
 const icons: Record<string, string> = {
   browser: '<circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/>',
@@ -239,7 +243,8 @@ function navigate(next: string) {
   $('tabs').hidden = !terminal;
   $('terminal-tools').hidden = !terminal;
   $('minimal').hidden = !terminal;
-  $('back').hidden = !['connect', 'terminals', 'cagent'].includes(next);
+  $('back').hidden = !['connect', 'terminals', 'cagent'].includes(next) && !(next==='files'&&machineHomes.has(active));
+  $('back').setAttribute('aria-label',next==='files'&&machineHomes.has(active)?'返回机器':'返回工作台');
   $('minimal').setAttribute('aria-label', '极简模式');
   for (const b of document.querySelectorAll<HTMLElement>('[data-page]')) {
     const selected = b.dataset.page === (terminal ? 'session-page' : next === 'cagent' ? 'extensions' : next);
@@ -342,16 +347,17 @@ function row(name: string, detail: string, action: () => void, symbol = 'server'
   r.append(b);
   return r;
 }
+function connectedMachine(state: string) { return ['已连接', '已连接 CAgent', '正在打开终端'].includes(state); }
 function render() {
   $('overview-connections').textContent = String(profiles.length);
   $('overview-sessions').textContent = String(
-    [...sessions.values()].filter((s) => s.state === '已连接').length,
+    [...sessions.values()].filter((s) => connectedMachine(s.state)).length,
   );
   $('recent-connections').replaceChildren();
   for (const p of profiles.slice(-5).reverse())
     $('recent-connections').append(
       row(p.name, p.host, () => {
-        const live = [...sessions].find(([, s]) => s.profile.id === p.id && s.state === '已连接');
+        const live = [...sessions].find(([, s]) => s.profile.id === p.id && connectedMachine(s.state));
         live ? select(live[0]) : activateProfile(p);
       }),
     );
@@ -378,11 +384,11 @@ function render() {
     h.textContent = (group || '未分组') + ' · ' + list.length;
     $('server-list').append(h);
     for (const p of list) {
-      const live = [...sessions].find(([, s]) => s.profile.id === p.id && s.state === '已连接');
+      const live = [...sessions].find(([, s]) => s.profile.id === p.id && connectedMachine(s.state));
       const r = row(
         (p.favorite ? '★ ' : '') + p.name,
         (p.protocol === 'agent' ? 'Agent · ' : p.username + '@') + p.host + ' · ' + p.port,
-        () => (live ? select(live[0]) : openForm(p)),
+        () => (live ? select(live[0]) : activateProfile(p)),
       );
       if (live) {
         const indicator = document.createElement('span');
@@ -477,7 +483,7 @@ $('remember').onchange = profileFields;
 $('auth-password').onclick = () => setAuth('password');
 $('auth-key').onclick = () => setAuth('key');
 for (const id of ['new', 'empty-new', 'session-new', 'home-new']) $(id).onclick = () => openForm();
-$('back').onclick = () => navigate(page === 'cagent' ? 'extensions' : 'home');
+$('back').onclick = () => {if(page==='files'&&machineHomes.has(active)){select(active);machineHomes.get(active)!.show();}else navigate(page === 'cagent' ? 'extensions' : 'home');};
 window.mobileBack = () => {
   if(mobileCoding.visible){mobileCoding.close();return true;}
   if(mobileIde.visible){mobileIde.close();return true;}
@@ -487,6 +493,8 @@ window.mobileBack = () => {
     resize();
     return true;
   }
+  if(page==='files'&&machineHomes.has(active)){select(active);machineHomes.get(active)!.show();return true;}
+  if(page==='terminals'&&machineHomes.has(active)&&machineHomes.get(active)!.root.hidden){machineHomes.get(active)!.show();return true;}
   if (page !== 'home') {
     navigate(page === 'cagent' ? 'extensions' : 'home');
     return true;
@@ -566,10 +574,11 @@ form.onsubmit = (e) => {
   close.setAttribute('aria-label', '关闭 ' + p.name);
   close.onclick = () => {
     window.CShellNative.disconnect(id);
+    mobileCoding.disconnected(id, true); mobileIde.disconnected(id);
     terminal.dispose();
     element.remove();
     tab.remove();
-    sessions.delete(id);
+    sessions.delete(id);machineHomes.delete(id);machineApps.delete(id);machineShells.delete(id);openedShells.delete(id);
     if (active === id) select([...sessions.keys()].at(-1) || '');
     render();
   };
@@ -601,46 +610,27 @@ form.onsubmit = (e) => {
   select(id);
   window.CShellNative.connect(JSON.stringify({ ...p, ...credentials, cloudProfileId:p.id, id, port: Number(p.port) }));
 };
+function showMachine(id:string){const s=sessions.get(id);if(!s)return;let home=machineHomes.get(id);if(!home){home=new MachineHome(s.profile.name,s.profile.host,s.profile.id,s.profile.protocol==='agent'?'cagent':'cagent · SSH',(value)=>{dark=value;applyTheme();});machineHomes.set(id,home);s.element.append(home.root);const back=document.createElement('button');back.className='machine-home';back.textContent='机器桌面';back.setAttribute('aria-label','返回机器桌面');back.onclick=()=>home!.show();s.element.append(back);}home.show();updateMachineApps(id);}
 function updateMachineApps(id:string){
- const s=sessions.get(id),picker=s?.element.querySelector('.agent-environments'),cap=machineApps.get(id);if(!s||!picker||!cap)return;
- picker.querySelector('.machine-apps')?.remove();const apps=document.createElement('div');apps.className='machine-apps';
- if(cap.browser&&window.CShellNative.browserSupported?.()){const b=document.createElement('button');b.className='machine-app-browser';b.textContent='浏览器';b.onclick=()=>window.CShellNative.browserOpen?.(id,s.profile.name,'');apps.append(b);}
- if(cap.ide){const b=document.createElement('button');b.className='machine-app-ide';b.textContent='代码编辑器';b.onclick=()=>void mobileIde.open(id,s.profile.name);apps.append(b);}
- if(cap.market){const b=document.createElement('button');b.textContent='应用市场';b.onclick=()=>mobileCoding.open(id,s.profile.name,'market',()=>void mobileIde.open(id,s.profile.name));apps.append(b);}
- for(const engine of ['codex','claude'] as const){if(!cap[engine])continue;const b=document.createElement('button');b.textContent=engine==='codex'?'Codex':'Claude Code';b.onclick=()=>mobileCoding.open(id,s.profile.name,engine);apps.append(b);}
- for(const b of apps.querySelectorAll('button')){const label=b.textContent||'';const symbol=document.createElement('span');symbol.className='machine-app-icon';icon(symbol,label==='浏览器'?'browser':label==='应用市场'?'extensions':'terminal');const text=document.createElement('span');text.textContent=label;b.replaceChildren(symbol,text);}
- picker.insertBefore(apps,picker.children[2]||null);
+ const s=sessions.get(id),home=machineHomes.get(id),cap=machineApps.get(id)||{};if(!s||!home)return;
+ const apps:MachineApp[]=[];
+ if(cap.browser&&window.CShellNative.browserSupported?.())apps.push({id:'browser',name:'浏览器',detail:'通过这台机器访问网页',run:()=>window.CShellNative.browserOpen?.(id,s.profile.name,'')});
+ const shell=openedShells.get(id);
+ if(s.profile.protocol!=='agent')apps.push({id:'terminal',name:'SSH 终端',detail:'命令与终端历史',run:()=>{home.hide();s.terminal.focus();resize();}});
+ else for(const choice of machineShells.get(id)||[]){if(shell!==undefined&&choice.index!==shell)continue;apps.push({id:'terminal',name:choice.label,detail:shell!==undefined?'继续当前终端':'打开终端',run:()=>{if(openedShells.has(id)){home.hide();s.terminal.focus();resize();return;}s.state='正在打开终端';$('status').textContent=s.state;window.CShellNative.openAgent(id,choice.index);openedShells.set(id,choice.index);}});}
+ if(s.profile.protocol!=='agent'||cap.files)apps.push({id:'files',name:'文件',detail:'浏览、预览与传输',run:()=>{fileSource='remote';fileSession=id;navigate('files');syncFileSessions();}});
+ if(cap.market)apps.push({id:'market',name:'应用市场',detail:'安装与管理远端应用',run:()=>mobileCoding.open(id,s.profile.name,'market',()=>void mobileIde.open(id,s.profile.name))});
+ if(cap.ide)apps.push({id:'ide',name:'代码编辑器',detail:'项目文件与集成终端',run:()=>void mobileIde.open(id,s.profile.name)});
+ for(const engine of ['codex','claude'] as const)if(cap[engine])apps.push({id:engine,name:engine==='codex'?'Codex':'Claude Code',detail:'项目会话与模型服务',run:()=>mobileCoding.open(id,s.profile.name,engine)});
+ const remote=desktopStatus.get(id);if(remote?.packageReady)apps.push({id:'remote',name:'远程控制',detail:remote.viewAllowed?'查看和操作远端桌面':'等待远端共享或授权',disabled:!remote.viewAllowed,run:()=>desktop.open(id,remote)});
+ for(const app of apps)if(['ide','codex','claude'].includes(app.id)&&cap.market)app.manage=()=>mobileCoding.open(id,s.profile.name,'market',()=>void mobileIde.open(id,s.profile.name));
+ home.setApps(apps);
 }
-function updateAgentDesktopEntry(id: string) {
-  const session=sessions.get(id),status=desktopStatus.get(id);
-  const picker=session?.element.querySelector('.agent-environments');
-  if(!session||!picker)return;
-  picker.querySelector('.agent-desktop-entry')?.remove();
-  session.element.querySelector('.agent-desktop-shortcut')?.remove();
-  const entry=document.createElement('div');entry.className='agent-desktop-entry';
-  if(status?.packageReady){
-    const button=document.createElement('button');button.textContent='远程桌面';button.disabled=!status.viewAllowed;
-    button.onclick=()=>desktop.open(id,status);entry.append(button);
-    if(status.viewAllowed){const shortcut=document.createElement('button');shortcut.className='agent-desktop-shortcut';shortcut.textContent='远程桌面';shortcut.onclick=()=>desktop.open(id,status);session.element.append(shortcut);}
-    else{const note=document.createElement('p');note.className='muted caption';note.textContent='远程桌面尚不可用，请在被控设备开启屏幕共享并确认授权后重新连接。';entry.append(note);}
-  }else{const note=document.createElement('p');note.className='muted caption';note.textContent=status?'此设备尚未提供远程桌面。':'正在读取远程桌面状态…';entry.append(note);}
-  picker.insertBefore(entry,picker.children[2]||null);
-}
+function updateAgentDesktopEntry(id:string){updateMachineApps(id);}
 window.receive = (id, type, value) => {
   if(type==='cloud-result'){mobileCloud.receive(value);return;}
-  if(type==='ssh-workspace'){
-    const s=sessions.get(id);if(!s||s.state==='已断开'||value!=='ready')return;
-    const picker=document.createElement('section');picker.className='agent-environments ssh-workspace';
-    const title=document.createElement('h2');title.textContent=s.profile.name;
-    const subtitle=document.createElement('p');subtitle.textContent='cagent 工作区 · 通过 SSH 连接';
-    const terminal=document.createElement('button');terminal.textContent='SSH 终端';
-    terminal.onclick=()=>{picker.hidden=true;s.terminal.focus();resize();};
-    const files=document.createElement('button');files.textContent='文件';files.onclick=()=>navigate('files');
-    picker.append(title,subtitle,terminal,files);
-    s.element.querySelector('.agent-environments')?.remove();s.element.append(picker);
-    const home=document.createElement('button');home.className='machine-home';home.textContent='机器桌面';home.setAttribute('aria-label','返回机器桌面');home.onclick=()=>{picker.hidden=false;};s.element.append(home);
-    updateMachineApps(id);return;
-  }
+  if(type==='ssh-workspace'){const s=sessions.get(id);if(s&&s.state!=='已断开'&&value==='ready')showMachine(id);return;}
+
   if(type==='machine-result'){mobileIde.receive(id,value);mobileCoding.receive(id,value);return;}
   if(type==='machine-apps'){try{machineApps.set(id,JSON.parse(value));updateMachineApps(id);}catch{}return;}
   if (type === 'cagent-status') { receiveCAgent(value); return; }
@@ -672,29 +662,8 @@ window.receive = (id, type, value) => {
         label: string;
         distribution?: string;
       }[];
-      const picker = document.createElement('section');
-      picker.className = 'agent-environments';
-      const title = document.createElement('h2');
-      title.textContent = 'CAgent 机器';
-      const target = document.createElement('p');
-      target.textContent = s.profile.name + ' · ' + s.profile.host;
-      picker.append(title, target);
-      choices.forEach((choice, index) => {
-        const button = document.createElement('button');
-        button.textContent = choice.distribution ? choice.distribution + ' · WSL' : choice.label;
-        button.onclick = () => {
-          for (const b of picker.querySelectorAll('button')) b.disabled = true;
-          s.state = '正在打开终端';
-          $('status').textContent = s.state;
-          window.CShellNative.openAgent(id, index);
-        };
-        picker.append(button);
-      });
-      s.element.querySelector('.agent-environments')?.remove();
-      s.element.append(picker);
-      if (!choices.length) { const note=document.createElement('p');note.className='muted caption';note.textContent='此设备未提供终端，可使用已开放的远程桌面。';picker.append(note); }
-      updateAgentDesktopEntry(id);
-      updateMachineApps(id);
+      machineShells.set(id,choices.map((choice,index)=>({index,label:choice.distribution?choice.distribution+' · WSL':choice.label})));
+      showMachine(id);
       s.state = '已连接 CAgent';
     } catch {
       s.state = '环境列表无效';
@@ -708,18 +677,18 @@ window.receive = (id, type, value) => {
     );
   if (type === 'connected') {
     s.state = '已连接';
-    s.element.querySelector('.agent-environments')?.remove();
+    machineHomes.get(id)?.hide();
     if (s.profile.protocol === 'agent' && value) {
-      s.profile = { ...s.profile, name: s.profile.name + ' / ' + value };
-      s.tab.querySelector('button')!.textContent = s.profile.name;
+      updateMachineApps(id);
     }
     if (active === id) resize();
   }
   if (type === 'closed' || type === 'error') {
-    machineApps.delete(id);s.element.querySelector('.machine-home')?.remove();
+    mobileCoding.disconnected(id); mobileIde.disconnected(id);
+    machineApps.delete(id);machineHomes.get(id)?.disconnected();machineShells.delete(id);openedShells.delete(id);s.element.querySelector('.machine-home')?.remove();
     desktop.event(id,'desktop-closed',type==='error'?value:'机器连接已断开');desktopStatus.delete(id);
     s.state = '已断开';
-    s.element.querySelector('.agent-environments')?.remove();
+    if(!machineHomes.has(id))s.element.querySelector('.agent-environments')?.remove();
     if (type === 'error') s.terminal.writeln('\r\n' + value.replace(/[\x00-\x1f\x7f]/g, ' '));
   }
   if (active === id) $('status').textContent = s.state;

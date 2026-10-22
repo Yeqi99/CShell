@@ -6,20 +6,31 @@ import { AgentCapabilityMarket } from './AgentCapabilityMarket';
 import { AgentWsl } from './AgentWsl';
 import { RefreshCw, Package, Terminal, Globe, Code, Search } from 'lucide-react';
 import './agent-applications.css';
-import {DevelopmentMarket} from './DevelopmentMarket';
-import {agentRead} from '../agent-read';
+import { DevelopmentMarket } from './DevelopmentMarket';
+import { agentRead } from '../agent-read';
 
 export function AgentApplications({
   target,
   call,
-  onDevelopmentOpen,onDevelopmentChanged,
+  onDevelopmentOpen,
+  onDevelopmentChanged,
+  nativeCapabilities = true,
 }: {
   target: AgentTarget;
-  onIde?:()=>void;
-  onDevelopmentOpen?:(id:string)=>void;
-  onDevelopmentChanged?:()=>void;
+  onIde?: () => void;
+  nativeCapabilities?: boolean;
+  onDevelopmentOpen?: (id: string) => void;
+  onDevelopmentChanged?: () => void;
   call: (method: AgentCall['method'], params?: unknown) => Promise<unknown>;
 }) {
+  const stateLabel = (state: string) =>
+    ({
+      planned: '待确认',
+      running: '安装中',
+      completed: '已完成',
+      failed: '失败',
+      interrupted: '已中断',
+    })[state] || state;
   const [catalog, setCatalog] = useState<z.infer<typeof appCatalogSchema>>(),
     [task, setTask] = useState<z.infer<typeof appTaskSchema>>();
   const [policy, setPolicy] = useState<z.infer<typeof appPolicySchema>>(),
@@ -41,9 +52,9 @@ export function AgentApplications({
     }
   };
   const refresh = async () => {
-    setCatalog(appCatalogSchema.parse(await agentRead(()=>call('applications.list'))));
+    setCatalog(appCatalogSchema.parse(await agentRead(() => call('applications.list'))));
     {
-      const p = appPolicySchema.parse(await agentRead(()=>call('applications.policy')));
+      const p = appPolicySchema.parse(await agentRead(() => call('applications.policy')));
       setPolicy(p);
       setControllers(p.controllers.join('\n'));
     }
@@ -76,21 +87,28 @@ export function AgentApplications({
   }, [task?.id, task?.state, target.id]);
   return (
     <section className="agent-applications">
-      <header><h2>应用市场</h2>
+      <header>
+        <h2>应用市场</h2>
         <p>
           {target.name} · {catalog?.platform ?? '检查中'}
         </p>
       </header>
-      <DevelopmentMarket call={call} onOpen={onDevelopmentOpen} onChanged={onDevelopmentChanged}/>
-      {!target.id.startsWith('ssh:') && (
-        <AgentCapabilityMarket key={target.id} target={target} call={call} />
-      )}
-      {catalog?.platform === 'win32' && (
-        <details className="agent-system-apps" onToggle={(e) => setWslOpen(e.currentTarget.open)}>
-          <summary>Linux 虚拟机 · WSL</summary>
-          {wslOpen && <AgentWsl target={target.id} call={call} />}
-        </details>
-      )}
+      <div hidden={detail}>
+        <DevelopmentMarket
+          call={call}
+          onOpen={onDevelopmentOpen}
+          onChanged={onDevelopmentChanged}
+        />
+        {nativeCapabilities && !target.id.startsWith('ssh:') && (
+          <AgentCapabilityMarket key={target.id} target={target} call={call} />
+        )}
+        {nativeCapabilities && catalog?.platform === 'win32' && (
+          <details className="agent-system-apps" onToggle={(e) => setWslOpen(e.currentTarget.open)}>
+            <summary>Linux 虚拟机 · WSL</summary>
+            {wslOpen && <AgentWsl target={target.id} call={call} />}
+          </details>
+        )}
+      </div>
       {error && (
         <p role="alert" className="form-error">
           {error}
@@ -98,7 +116,7 @@ export function AgentApplications({
       )}
       {busy && <p role="status">正在处理应用操作…</p>}
       <div className="machine-app-catalog">
-        {policy && (
+        {policy && !detail && (
           <details className="machine-app-permissions">
             <summary>应用安装权限</summary>
             <label>
@@ -135,7 +153,16 @@ export function AgentApplications({
         {catalog && !catalog.enabled && (
           <p>应用安装未授权。请在目标 CAgent 本机的应用安装权限中启用；远程控制端还需指纹授权。</p>
         )}
-        {task && <div className="market-navigation"><button onClick={()=>setDetail(!detail)}>{detail ? "← 返回应用目录" : "查看安装任务"}</button><span>{task.app} · {task.state}</span></div>}
+        {task && (
+          <div className="market-navigation">
+            <button onClick={() => setDetail(!detail)}>
+              {detail ? '← 返回应用目录' : '查看安装任务'}
+            </button>
+            <span>
+              {task.app} · {stateLabel(task.state)}
+            </span>
+          </div>
+        )}
         <div className="agent-toolbar" hidden={detail}>
           <Search size={16} aria-hidden="true" />
           <input
@@ -155,6 +182,7 @@ export function AgentApplications({
         </div>
         <div className="agent-app-grid" hidden={detail}>
           {catalog?.applications
+            .filter((a) => nativeCapabilities || a.id !== 'browser')
             .filter((a) => (a.id + ' ' + a.package).toLowerCase().includes(query.toLowerCase()))
             .map((a) => (
               <button
@@ -162,7 +190,8 @@ export function AgentApplications({
                 disabled={busy || !catalog.enabled || task?.state === 'running'}
                 onClick={() =>
                   void run(async () => {
-                    setTask(appTaskSchema.parse(await call('applications.plan', { app: a.id }))); setDetail(true);
+                    setTask(appTaskSchema.parse(await call('applications.plan', { app: a.id })));
+                    setDetail(true);
                   })
                 }
               >
@@ -185,7 +214,7 @@ export function AgentApplications({
         {task && detail && (
           <section>
             <h3>
-              {task.app} · {task.state}
+              {task.app} · {stateLabel(task.state)}
             </h3>
             <p>安装目标：{target.name}</p>
             <code>

@@ -1,3 +1,5 @@
+import { ideLaunch } from './ide-launch';
+import { homedir } from 'node:os';
 import { spawn, execFile, type ChildProcess } from 'node:child_process';
 import { promisify } from 'node:util';
 import { mkdir, writeFile, stat } from 'node:fs/promises';
@@ -56,6 +58,7 @@ export class IdeService {
       const p = this.processes.get(owner);
       return {
         ready: !!version,
+        launchVersion: 1,
         version,
         reason: version ? '' : reason,
         directory: this.config.directory,
@@ -198,15 +201,16 @@ export class IdeService {
       return { stopped: true };
     }
     if (method === 'ide.start') {
-      const { cwd } = z
-        .object({ cwd: z.string().min(1).max(4096) })
+      const input = z
+        .object({ cwd: z.string().max(4096).default('') })
         .strict()
         .parse(raw);
+      const cwd = input.cwd || this.processes.get(owner)?.cwd || homedir();
       if (!isAbsolute(cwd) || !(await stat(cwd)).isDirectory()) throw Error('项目目录不存在');
       const existing = this.processes.get(owner);
       if (existing) {
         if (existing.cwd !== cwd) throw Error('请先停止当前项目');
-        return { url: existing.url, password: existing.password, cwd };
+        return { url: await ideLaunch(existing.url, existing.password, () => this.allowed(owner)), cwd };
       }
       if (!this.config.executable || this.installing) throw Error('请先完成 IDE 安装');
       if (this.processes.size >= 4) throw Error('IDE 会话数已达上限');
@@ -225,7 +229,7 @@ export class IdeService {
       );
       await mkdir(directory, { recursive: true });
       const password = randomBytes(24).toString('base64url'),
-        url = `http://127.0.0.1:${port}/?folder=${encodeURIComponent(cwd)}`;
+        url = `http://127.0.0.1:${port}/` + (input.cwd ? `?folder=${encodeURIComponent(cwd)}` : '');
       const child = spawn(
         this.config.executable,
         [
@@ -239,7 +243,7 @@ export class IdeService {
           join(directory, 'data'),
           '--extensions-dir',
           join(directory, 'extensions'),
-          cwd,
+          ...(input.cwd ? [cwd] : []),
         ],
         {
           cwd,
@@ -276,12 +280,14 @@ export class IdeService {
           this.stop(owner);
           throw Error('IDE 启动失败：' + log.replaceAll(password, '[隐藏]'));
         }
+        let healthy = false;
         try {
           const r = await fetch(`http://127.0.0.1:${port}/healthz`, {
             signal: AbortSignal.timeout(500),
           });
-          if (r.ok) return { url, password, cwd };
+          healthy = r.ok;
         } catch {}
+        if (healthy) return { url: await ideLaunch(url, password, () => this.allowed(owner)), cwd };
         await new Promise((r) => setTimeout(r, 200));
       }
       this.stop(owner);

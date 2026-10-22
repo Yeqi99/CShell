@@ -8,7 +8,7 @@ const directory = await mkdtemp(join(tmpdir(), 'cshell-mobile-apps-'));
 await build({
   stdin: {
     contents: `import {MobileCoding} from './android/web/coding';import {MobileIde} from './android/web/ide';import './android/web/style.css';
-const bridge={browserOpen:(id,name,url)=>window.opened={id,name,url},machineRequest:json=>{const p=JSON.parse(json);let result={};if(p.method==='coding.status')result={directory:'/data/coding',engines:[{engine:'codex',ready:true,path:'/private/codex',version:'fixture'}],profiles:[{id:'11111111-1111-4111-8111-111111111111',engine:'codex',name:'工作基座',auth:'official',endpoint:'',model:''}],installs:[]};if(p.method==='coding.tasks')result=[];if(p.method==='ide.status')result={ready:true,supported:true,directory:'/data/ide',version:'fixture'};if(p.method==='ide.start')result={url:'http://127.0.0.1:8080/?folder=%2Fdata%2Fproject',password:'fixture-password',cwd:'/data/project'};setTimeout(()=>{coding.receive(p.session,JSON.stringify({request:p.request,result}));ide.receive(p.session,JSON.stringify({request:p.request,result}));},0)}};
+const bridge={browserOpen:(id,name,url)=>window.opened={id,name,url},machineRequest:json=>{const p=JSON.parse(json);let result={};if(p.method==='coding.status')result={directory:'/data/coding',engines:[{engine:'codex',ready:true,launchVersion:1,path:'/private/codex',version:'fixture'}],profiles:[{id:'11111111-1111-4111-8111-111111111111',engine:'codex',name:'工作基座',auth:'official',endpoint:'',model:''}],installs:[]};if(p.method==='coding.tasks')result=[];if(p.method==='ide.status')result={ready:true,launchVersion:1,supported:true,directory:'/data/ide',version:'fixture'};if(p.method==='ide.start')result={url:'http://127.0.0.1:8080/?folder=%2Fdata%2Fproject',password:'fixture-password',cwd:'/data/project'};setTimeout(()=>{coding.receive(p.session,JSON.stringify({request:p.request,result}));ide.receive(p.session,JSON.stringify({request:p.request,result}));},0)}};
 const coding=new MobileCoding(bridge),ide=new MobileIde(bridge);window.showCoding=()=>coding.open('machine-a','美国机器','codex');window.showIde=()=>{coding.close();ide.open('machine-a','美国机器');};window.showCoding();`,
     resolveDir: process.cwd(),
     loader: 'ts',
@@ -52,8 +52,6 @@ try {
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
   await page.screenshot({ path: 'test-results/mobile-coding-accounts.png' });
   await page.evaluate(() => (window as any).showIde());
-  await page.getByLabel('项目目录').fill('/data/project');
-  await page.getByRole('button', { name: '打开项目' }).click();
   await page.waitForFunction(() => (window as any).opened);
   assert.equal(await page.evaluate(() => (window as any).opened.id), 'machine-a');
   for (const viewport of [

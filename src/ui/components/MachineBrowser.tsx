@@ -21,12 +21,15 @@ export function MachineBrowser({
   target,
   name,
   active,
+  appUrl,
 }: {
   target: string;
   name: string;
   active: boolean;
+  appUrl?: string;
 }) {
   const [library, setLibrary] = useState<'' | 'history' | 'bookmarks'>('');
+  const lifecycle = useRef(0);
   const [suggest, setSuggest] = useState(false),
     [suggestIndex, setSuggestIndex] = useState(-1),
     [clearConfirm, setClearConfirm] = useState(false);
@@ -51,18 +54,27 @@ export function MachineBrowser({
     [session],
   );
   const run = async (action: string, value?: unknown) => {
+    const generation = lifecycle.current;
     try {
       setError('');
       const next = await window.cshell.machineBrowser(session, action, value);
+      if (generation !== lifecycle.current) return;
       setState(next);
       return next;
     } catch (e) {
-      setError(String(e));
+      if (generation === lifecycle.current) setError(String(e));
     }
   };
   useEffect(() => {
+    lifecycle.current++;
     let cancelled = false;
-    void run('open');
+    setState({ tabs: [], selected: '', connected: true });
+    setLibrary('');
+    setSuggest(false);
+    setClearConfirm(false);
+    void run('open').then((opened) => {
+      if (opened && appUrl && !cancelled) void run('navigate', appUrl);
+    });
     const timer = setInterval(() => {
       void window.cshell
         .machineBrowser(session, 'status')
@@ -75,10 +87,11 @@ export function MachineBrowser({
     }, 500);
     return () => {
       cancelled = true;
+      lifecycle.current++;
       clearInterval(timer);
       void window.cshell.machineBrowser(session, 'hide').catch(() => {});
     };
-  }, [session]);
+  }, [session, appUrl]);
   const suggestions = browserSuggestions(address, state.history || [], state.bookmarks || []);
   const navigate = (url: string) => {
     setSuggest(false);
@@ -136,6 +149,7 @@ export function MachineBrowser({
   }, [
     session,
     active,
+    appUrl,
     library,
     suggest,
     suggestions.length,
@@ -148,7 +162,7 @@ export function MachineBrowser({
   ]);
   return (
     <section
-      className="machine-browser"
+      className={'machine-browser' + (appUrl ? ' machine-browser-app' : '')}
       data-fullscreen={!!selected?.fullscreen}
       aria-label="CShell 浏览器"
     >
@@ -399,7 +413,7 @@ export function MachineBrowser({
                   setLibrary('');
                   void (state.tabs.length
                     ? run('navigate', entry.url)
-                    : run('new').then(() => run('navigate', entry.url)));
+                    : run('new').then((created) => created && run('navigate', entry.url)));
                 }}
               >
                 <strong>{entry.title || entry.url}</strong>

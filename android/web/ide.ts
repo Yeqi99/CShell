@@ -1,27 +1,12 @@
 type Bridge = {
   machineRequest?: (json: string) => void;
+  browserOpenApp?: (id: string, name: string, url: string) => void;
   browserOpen?: (id: string, name: string, url: string) => void;
 };
 export class MobileIde {
   private root = document.createElement('section');
   private target = '';
-  private name = '';
-  private status: any;
-  private pending = new Map<
-    string,
-    {
-      target: string;
-      resolve: (v: any) => void;
-      reject: (e: Error) => void;
-      timer: ReturnType<typeof setTimeout>;
-    }
-  >();
-  private directory = '';
-  private cwd = '';
-  private plan: any;
-  private busy = false;
-  private error = '';
-  private poll?: ReturnType<typeof setInterval>;
+  private generation = 0;
   constructor(private bridge: Bridge) {
     this.root.className = 'mobile-ide';
     this.root.hidden = true;
@@ -31,8 +16,26 @@ export class MobileIde {
     return !this.root.hidden;
   }
   close() {
+    this.generation++;
     this.root.hidden = true;
-    if (this.poll) clearInterval(this.poll);
+  }
+  private pending = new Map<
+    string,
+    {
+      target: string;
+      resolve: (v: any) => void;
+      reject: (e: Error) => void;
+      timer: ReturnType<typeof setTimeout>;
+    }
+  >();
+  disconnected(target: string) {
+    if (this.target === target) this.close();
+    for (const [id, pending] of this.pending)
+      if (pending.target === target) {
+        clearTimeout(pending.timer);
+        this.pending.delete(id);
+        pending.reject(Error('机器连接已断开'));
+      }
   }
   receive(target: string, json: string) {
     try {
@@ -58,170 +61,47 @@ export class MobileIde {
     });
   }
   async open(id: string, name: string) {
-    if (this.poll) clearInterval(this.poll);
-    if (this.target !== id) {
-      this.directory = '';
-      this.cwd = '';
-      this.plan = undefined;
-      this.status = undefined;
-    }
+    const generation = ++this.generation;
     this.target = id;
-    this.name = name;
     this.root.hidden = false;
-    await this.run(() => this.refresh());
-    this.poll = setInterval(() => {
-      if (this.status?.installing && !this.busy) void this.run(() => this.refresh());
-    }, 2500);
-  }
-  private async refresh() {
-    const target = this.target,
-      v = await this.call('ide.status');
-    if (target !== this.target) return;
-    this.status = v;
-    this.directory ||= v.directory;
-    if (v.running) this.cwd = v.running.cwd;
-    if (v.installError) this.error = v.installError;
-  }
-  private async run(fn: () => Promise<unknown>) {
-    this.busy = true;
-    this.error = '';
-    this.render();
+    const back = document.createElement('button');
+    back.textContent = '返回机器';
+    back.onclick = () => this.close();
+    const header = document.createElement('header');
+    const nameplate = document.createElement('strong');
+    nameplate.textContent = '代码编辑器';
+    const machine = document.createElement('small');
+    machine.textContent = name;
+    header.append(back, nameplate, machine);
+    const body = document.createElement('div');
+    body.className = 'mobile-ide-launch';
+    const mark = document.createElement('span');
+    mark.className = 'mobile-ide-mark';
+    mark.textContent = '</>';
+    const title = document.createElement('h2');
+    title.textContent = '正在打开代码编辑器';
+    body.setAttribute('role', 'status');
+    body.append(mark, title);
+    this.root.replaceChildren(header, body);
     try {
-      await fn();
+      const status = await this.call('ide.status');
+      if (generation !== this.generation) return;
+      if (!status.ready) throw Error('请在应用市场完成代码编辑器安装。');
+      if (!status.launchVersion) throw Error('请更新这台机器的 cagent 后重试。');
+      const result = await this.call('ide.start', { cwd: status.running?.cwd || '' });
+      if (generation !== this.generation) return;
+      (this.bridge.browserOpenApp || this.bridge.browserOpen)?.(id, name, result.url);
+      this.root.hidden = true;
     } catch (e) {
-      this.error = String(e);
-    } finally {
-      this.busy = false;
-      this.render();
-    }
-  }
-  private element<K extends keyof HTMLElementTagNameMap>(tag: K, text = '', cls = '') {
-    const e = document.createElement(tag);
-    e.textContent = text;
-    if (cls) e.className = cls;
-    return e;
-  }
-  private button(text: string, fn: () => void, primary = false) {
-    const b = this.element('button', text, primary ? 'primary' : '');
-    b.disabled = this.busy;
-    b.onclick = fn;
-    return b;
-  }
-  private field(label: string, value: string, change: (v: string) => void) {
-    const l = this.element('label', label),
-      input = this.element('input');
-    input.value = value;
-    input.autocapitalize = 'none';
-    input.spellcheck = false;
-    input.disabled = this.busy;
-    input.oninput = () => change(input.value);
-    l.append(input);
-    return l;
-  }
-  private render() {
-    this.root.replaceChildren();
-    const header = this.element('header');
-    const close = this.button('‹', () => this.close());
-    close.disabled = false;
-    close.setAttribute('aria-label', '返回机器');
-    header.append(close, this.element('strong', '代码编辑器'), this.element('small', this.name));
-    this.root.append(header);
-    const body = this.element('div', '', 'mobile-ide-body');
-    this.root.append(body);
-    body.append(
-      this.element('div', '</>', 'mobile-ide-mark'),
-      this.element('h1', '随时进入项目'),
-      this.element('p', '编辑器在手机显示，文件与终端运行在当前机器。'),
-    );
-    if (this.error) {
-      const error = this.element('p', this.error, 'error');
-      error.setAttribute('role', 'alert');
-      body.append(error);
-    }
-    if (!this.status) {
-      body.append(this.element('p', this.busy ? '正在读取机器状态…' : '无法读取状态'));
-      return;
-    }
-    if(this.status.installing)body.append(this.button('取消安装',()=>void this.run(async()=>{await this.call('ide.cancel');await this.refresh();})));
-    if (this.status.ready) {
-      body.append(
-        this.field('项目目录', this.cwd, (v) => (this.cwd = v)),
-        this.button(
-          '打开项目',
-          () =>
-            void this.run(async () => {
-              const target = this.target,
-                name = this.name;
-              const r = this.status.running || (await this.call('ide.start', { cwd: this.cwd }));
-              if (this.target !== target) return;
-              await this.refresh();
-              this.bridge.browserOpen?.(target, name, r.url);
-            }),
-          true,
-        ),
-      );
-      if (this.status.running) {
-        const box = this.element('div', '', 'mobile-ide-access');
-        box.append(
-          this.element('strong', '本次访问密码'),
-          this.element('p', '长按复制，在 IDE 登录页粘贴。停止后失效。'),
-        );
-        const input = this.element('input');
-        input.value = this.status.running.password;
-        input.readOnly = true;
-        input.onclick = () => input.select();
-        box.append(
-          input,
-          this.button(
-            '停止 IDE',
-            () =>
-              void this.run(async () => {
-                await this.call('ide.stop');
-                await this.refresh();
-              }),
-          ),
-        );
-        body.append(box);
-      }
-      body.append(this.element('small', this.status.version));
-    } else if (!this.status.supported)
-      body.append(
-        this.element('p', '此机器没有可用的独立安装包。Windows 可在真实 WSL 连接中安装。'),
-      );
-    else {
-      body.append(
-        this.field('安装目录', this.directory, (v) => {
-          this.directory = v;
-          this.plan = undefined;
-        }),
-        this.button(
-          '检查安装计划',
-          () =>
-            void this.run(async () => {
-              this.plan = await this.call('ide.plan', { directory: this.directory });
-            }),
-        ),
-      );
-      if (this.plan) {
-        const card = this.element('div', '', 'mobile-ide-access');
-        card.append(
-          this.element('strong', 'code-server ' + this.plan.version),
-          this.element('p', this.plan.directory),
-        );
-        for (const step of this.plan.steps) card.append(this.element('p', step));
-        card.append(
-          this.button(
-            this.status.installing ? '正在安装…' : '安装到这台机器',
-            () =>
-              void this.run(async () => {
-                await this.call('ide.install', { id: this.plan.id, confirm: true });
-                await this.refresh();
-              }),
-            true,
-          ),
-        );
-        body.append(card);
-      }
+      if (generation !== this.generation) return;
+      title.textContent = '代码编辑器未能打开';
+      const message = document.createElement('p');
+      message.textContent = String(e);
+      message.setAttribute('role', 'alert');
+      const retry = document.createElement('button');
+      retry.textContent = '重试';
+      retry.onclick = () => void this.open(id, name);
+      body.append(message, retry);
     }
   }
 }

@@ -1,7 +1,7 @@
 import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { CodingApp } from '../../src/ui/components/CodingApp';
-import { DevelopmentMarket } from '../../src/ui/components/DevelopmentMarket';
+import { AgentApplications } from '../../src/ui/components/AgentApplications';
 import type { AgentCall } from '../../src/shared/agent';
 type Bridge = {
   machineRequest?: (json: string) => void;
@@ -14,6 +14,7 @@ export class MobileCoding {
     { node: HTMLElement; root: Root; render: (active: boolean) => void }
   >();
   private current = '';
+  private offline = new Set<string>();
   private pending = new Map<
     string,
     {
@@ -41,6 +42,23 @@ export class MobileCoding {
     this.root.hidden = true;
     this.panels.get(this.current)?.render(false);
   }
+  disconnected(target: string, dispose = false) {
+    this.offline.add(target);
+    for (const [id, pending] of this.pending)
+      if (pending.target === target) {
+        clearTimeout(pending.timer);
+        this.pending.delete(id);
+        pending.reject(Error('机器连接已断开'));
+      }
+    if (this.current.startsWith(target + ':')) this.close();
+    if (dispose)
+      for (const [key, panel] of this.panels)
+        if (key.startsWith(target + ':')) {
+          panel.root.unmount();
+          panel.node.remove();
+          this.panels.delete(key);
+        }
+  }
   receive(target: string, json: string) {
     try {
       const v = JSON.parse(json),
@@ -53,6 +71,7 @@ export class MobileCoding {
     } catch {}
   }
   private call(target: string, method: AgentCall['method'], params?: unknown) {
+    if (this.offline.has(target)) return Promise.reject(Error('机器连接已断开'));
     return new Promise<unknown>((resolve, reject) => {
       const request = crypto.randomUUID(),
         timer = setTimeout(() => {
@@ -66,6 +85,9 @@ export class MobileCoding {
     });
   }
   open(target: string, name: string, engine: 'codex' | 'claude' | 'market', openIde?: () => void) {
+    // Only connected machine desktops expose these launch actions. A previous
+    // disconnect must not permanently disable the restored machine's apps.
+    this.offline.delete(target);
     const key = target + ':' + engine;
     this.panels.get(this.current)?.render(false);
     for (const p of this.panels.values()) p.node.hidden = true;
@@ -91,12 +113,26 @@ export class MobileCoding {
       const render = (active: boolean) =>
         root.render(
           engine === 'market'
-            ? React.createElement(DevelopmentMarket, {
+            ? React.createElement(AgentApplications, {
                 call,
-                onChanged: (apps) => {
-                  if (apps) this.changed?.(target, apps);
+                target: { id: target, name, local: false, available: true },
+                nativeCapabilities: false,
+                onDevelopmentChanged: () => {
+                  void this.call(target, 'coding.status')
+                    .then((value: any) => {
+                      const ready = (engine: string) =>
+                        !!value.engines?.some((e: any) => e.engine === engine && e.ready);
+                      return this.call(target, 'ide.status').then((ide: any) =>
+                        this.changed?.(target, {
+                          codex: ready('codex'),
+                          claude: ready('claude'),
+                          ide: !!ide.ready,
+                        }),
+                      );
+                    })
+                    .catch(() => {});
                 },
-                onOpen: (id: string) => {
+                onDevelopmentOpen: (id: string) => {
                   if (id === 'ide') {
                     this.close();
                     openIde?.();

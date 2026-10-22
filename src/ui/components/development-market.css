@@ -156,3 +156,12 @@
     min-height: 130px;
   }
 }
+/* Keep the catalog visible in narrow app windows instead of stacking tall launch cards. */
+.development-market{container-type:inline-size}
+@container (max-width:560px){
+ .development-grid{grid-template-columns:1fr;gap:8px;margin-top:12px}
+ .development-grid>button,.agent-applications .development-grid>button{display:grid;grid-template-columns:42px minmax(0,1fr);column-gap:14px;row-gap:3px;min-height:88px;padding:12px 14px;align-items:center}
+ .development-grid .development-logo{grid-row:1/4}
+ .development-grid>button>strong,.development-grid>button>small,.development-grid .development-state{grid-column:2;min-width:0;overflow-wrap:anywhere}
+ .development-grid .development-state{margin-top:3px}
+}

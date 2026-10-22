@@ -443,10 +443,10 @@ export function LinuxDesktop({
               <div
                 className={
                   'desktop-window-content ' +
-                  (w.id === 'browser' || w.id === 'native' || w.id === 'terminal' || w.id === 'remote' || w.id === 'assistant' ? 'no-scroll' : '')
+                  (w.id === 'browser' || w.id === 'native' || w.id === 'terminal' || w.id === 'remote' || w.id === 'assistant' || w.id === 'ide' ? 'no-scroll' : '')
                 }
               >
-                {w.id==='ide'&&!closed&&<IdeApp call={call} openBrowser={async url=>{const session=target.startsWith('ssh:')?target.slice(4):target;await window.cshell.machineBrowser(session,'new');await window.cshell.machineBrowser(session,'navigate',url);open('browser');}}/>}
+                {w.id==='ide'&&!closed&&<IdeApp call={call} target={target} active={active&&visible&&front===w.id&&!menu&&!context}/>}
                 {['codex','claude'].includes(w.id)&&!closed&&<CodingApp onManage={()=>open('applications')} engine={w.id as 'codex'|'claude'} name={name} call={call} active={active&&visible&&front===w.id} openBrowser={async url=>{const session=target.startsWith('ssh:')?target.slice(4):target;await window.cshell.machineBrowser(session,'new');await window.cshell.machineBrowser(session,'navigate',url);open('browser');}}/>}
                 {w.id === 'browser' && !closed && <MachineBrowser target={target} name={name} active={active && visible && front === w.id && !menu && !context} />}
                 {w.id === 'native' && !closed && (
@@ -776,6 +776,7 @@ export function LinuxDesktop({
           <button role="menuitem" onClick={()=>{setWindows(v=>v.map(w=>({...w,minimized:true})));dismissContext();}}>显示桌面</button>
         </>:<>
           <button role="menuitem" onClick={()=>{open(context.id);dismissContext();}}>打开 / 恢复</button>
+          {['ide','codex','claude'].includes(context.id)&&<button role="menuitem" onClick={()=>{open('applications');dismissContext();}}>管理应用</button>}
           {['remote','native'].includes(context.id)&&<button role="menuitem" onClick={()=>{open(context.id);setOptions(context.id);dismissContext();}}>应用设置与操作</button>}
           {windows.some(w=>w.id===context.id&&!w.closed)&&<>
             <button role="menuitem" onClick={()=>{patch(context.id,{minimized:true});dismissContext();}}>最小化</button>

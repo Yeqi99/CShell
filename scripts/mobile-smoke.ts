@@ -236,9 +236,14 @@ try {
   await page.locator('#connect-actions button[type=submit]').click();
   await page.getByRole('button', { name: 'Ubuntu · WSL', exact: true }).waitFor();
   await page.screenshot({ path: 'test-results/android-agent-environments.png' });
+  const machineTabs = await page.locator('#tabs .tab').count();
+  await page.locator('#navigation [data-page=connections]').click();
+  await page.locator('#server-list .server-open').filter({hasText:'我的电脑'}).click();
+  assert.equal(await page.locator('#tabs .tab').count(),machineTabs);
+  await page.getByRole('button', {name:'Ubuntu · WSL',exact:true}).waitFor();
   await page.getByRole('button', { name: 'Ubuntu · WSL', exact: true }).click();
   assert.equal(await page.locator('#status').innerText(), '已连接');
-  assert.ok((await page.locator('#tabs').innerText()).includes('WSL · Ubuntu'));
+  assert.ok((await page.locator('#tabs').innerText()).includes('我的电脑'));
   assert.ok(
     await page.evaluate(() =>
       (window as any).nativeCalls.some((c: any) => c.index === 1 && c.openAgent),
@@ -278,18 +283,18 @@ try {
   await page.locator('[name=password]').fill('phone-test');
   await page.locator('#connect-actions button[type=submit]').click();
   const phonePicker=page.locator('.agent-environments:visible');
-  await phonePicker.getByText('此设备未提供终端，可使用已开放的远程桌面。',{exact:true}).waitFor();
-  assert.equal(await phonePicker.getByRole('button',{name:'远程桌面',exact:true}).isDisabled(),true);
-  assert.equal(await phonePicker.getByRole('button').count(),1);
+  await phonePicker.getByRole('heading',{name:'测试手机',exact:true}).waitFor();
+  assert.equal(await phonePicker.getByRole('button',{name:'远程控制',exact:true}).isDisabled(),true);
+  assert.equal(await phonePicker.locator('[data-app=terminal]').count(),0);
   await page.evaluate(()=>{
     const phone=(window as any).nativeCalls.find((call:any)=>call.host==='phone.test');
     (window as any).receive(phone.id,'desktop-status',JSON.stringify({packageReady:true,viewAllowed:true,controlAllowed:true,qualityModes:['bounded']}));
   });
-  await phonePicker.getByRole('button',{name:'远程桌面',exact:true}).click();
+  await phonePicker.getByRole('button',{name:'远程控制',exact:true}).click();
   await page.locator('.mobile-desktop:visible').waitFor();
   assert.ok(await page.evaluate(()=>(window as any).nativeCalls.some((call:any)=>call.desktopOpen)));
   assert.equal(await page.evaluate(()=>{const phone=(window as any).nativeCalls.find((call:any)=>call.host==='phone.test');return (window as any).nativeCalls.some((call:any)=>call.openAgent===phone.id);}),false);
-  await page.locator('.mobile-desktop:visible').getByRole('button',{name:'断开',exact:true}).click();
+  await page.locator('.mobile-desktop:visible').getByRole('button',{name:'返回机器',exact:true}).click();
   await phonePicker.waitFor();
   assert.deepEqual(errors, []);
   console.log(
