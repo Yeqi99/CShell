@@ -41,6 +41,9 @@ public class CagentWindow : Window {
   readonly Border accountBadge=new Border();
   DateTime accountChecked=DateTime.MinValue;
   string accountEmail="";
+  bool accountKnown;
+  class AccountDrafts { public Dictionary<string,string> Drafts; public string Selected; public string Input; }
+  readonly Dictionary<string,AccountDrafts> accountDrafts=new Dictionary<string,AccountDrafts>();
   public CagentWindow(string[] args){
     verification=args.Length>0&&args[0].StartsWith("--verify-");fixture=args.Length>0&&args[0]=="--fixture";if(fixture&&args.Length>1)screenshot=args[1];
     Title="CAgent";Width=428;Height=600;MinWidth=340;MinHeight=400;WindowStartupLocation=WindowStartupLocation.CenterScreen;
@@ -206,13 +209,20 @@ public class CagentWindow : Window {
   CheckBox Check(StackPanel p,string label,bool value){var c=new CheckBox{Content=label,IsChecked=value,Margin=new Thickness(0,8,0,8)};p.Children.Add(c);return c;}
   Button ActionButton(StackPanel p,string label,Func<Task> fn){var b=Button(label,label);b.Margin=new Thickness(0,8,0,8);b.Click+=async(s,e)=>{b.IsEnabled=false;try{await Guard(fn);}finally{b.IsEnabled=true;}};p.Children.Add(b);return b;}
   void UpdateAccount(Dictionary<string,object> value){
-    accountEmail=S(value,"email");bool signed=accountEmail!="";accountBadge.Visibility=signed?Visibility.Visible:Visibility.Collapsed;
+    string nextEmail=S(value,"email");
+    if(accountKnown&&nextEmail!=accountEmail){
+      accountDrafts[accountEmail]=new AccountDrafts{Drafts=new Dictionary<string,string>(drafts),Selected=selected,Input=input.Text};
+      AccountDrafts saved;drafts.Clear();selected=null;current=null;lastRender="";messages.Children.Clear();input.Text="";initialTaskLoaded=false;
+      if(accountDrafts.TryGetValue(nextEmail,out saved)){foreach(var pair in saved.Drafts)drafts[pair.Key]=pair.Value;selected=saved.Selected;input.Text=saved.Input;initialTaskLoaded=true;}
+      ShowWelcome();
+    }
+    accountKnown=true;accountEmail=nextEmail;bool signed=accountEmail!="";accountBadge.Visibility=signed?Visibility.Visible:Visibility.Collapsed;
     accountEntry.ToolTip=signed?accountEmail+" · 账号与同步":"登录与账号";AutomationProperties.SetName(accountEntry,Convert.ToString(accountEntry.ToolTip));
     if(tray!=null)tray.Text=signed?"CAgent Pro · 后台运行":"CAgent · 后台运行";
   }
   IEnumerable<DependencyObject> AccountElements(DependencyObject rootElement){yield return rootElement;foreach(object child in LogicalTreeHelper.GetChildren(rootElement)){var element=child as DependencyObject;if(element!=null)foreach(var nested in AccountElements(element))yield return nested;}}
   void VerifyAccountFlow(){
-    input.Text="未发送的草稿";RenderAccount(Obj("email","example@example.com","membership",Obj("active",false)));
+    UpdateAccount(Obj());input.Text="未发送的草稿";RenderAccount(Obj("email","example@example.com","membership",Obj("active",false)));
     if(accountBadge.Visibility!=Visibility.Visible)throw new Exception("Signed-in badge missing");
     bool free=false;foreach(var element in AccountElements(overlay)){var text=element as TextBlock;if(text!=null&&text.Text=="免费账号")free=true;}if(!free)throw new Exception("Free account was mislabeled");
     UpdateAccount(Obj());RenderAccountForm(false,"example@example.com");bool masked=false;Button register=null;

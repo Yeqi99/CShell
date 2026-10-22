@@ -52,6 +52,18 @@ export class CagentAssistant {
   async ensureOfficialModels(available:string[]){const providers=[...this.shared.providers];for(const p of officialModels)if(available.includes(p.model)&&!providers.some(x=>x.id===p.id))providers.push({...p});if(providers.length!==this.shared.providers.length){this.shared={...this.shared,providers};await this.vault.write('assistant-shared',this.shared);}}
   private shared:SharedAiConfig=emptySharedAi();
   cloudExport(){return structuredClone(this.shared);}
+  assertAccountIdle(){if(this.active)throw Error('请等待当前智能体任务结束后切换账号');}
+  localWorkspace(){this.assertAccountIdle();return structuredClone({shared:this.shared,settings:this.settings,tasks:this.tasks});}
+  emptyWorkspace(){return {shared:emptySharedAi(),settings:settingsSchema.parse({commands:false,review:true,delegates:[]}),tasks:[]};}
+  validateWorkspace(value:unknown){return z.object({shared:sharedAiConfigSchema,settings:settingsSchema,tasks:z.array(taskSchema).max(30)}).strict().parse(value);}
+  async restoreWorkspace(value:unknown){
+    this.assertAccountIdle();const next=this.validateWorkspace(value);
+    if(next.tasks.some(t=>t.state==='running'||t.state==='approval'))throw Error('账号工作区仍有未结束任务');
+    await this.vault.write('assistant-shared',next.shared);
+    await this.vault.write('assistant-settings',next.settings);
+    await this.vault.write('assistant-tasks',next.tasks);
+    this.shared=next.shared;this.settings=next.settings;this.tasks=next.tasks;
+  }
   async cloudImport(input:unknown){if(this.active)throw Error('请等待智能体任务结束后同步基座');const next=sharedAiConfigSchema.parse(input);const selected=next.providers.find(p=>p.url===this.settings.endpoint&&p.model===this.settings.model)??next.providers.find(p=>!p.extension);const settings=selected?settingsSchema.parse({...this.settings,endpoint:selected.url,model:selected.model,key:selected.key}):this.settings;await this.vault.write('assistant-shared',next);await this.vault.write('assistant-settings',settings);this.shared=next;this.settings=settings;}
   async remember(input:unknown){const q=habitWriteSchema.parse(input),id=q.id??randomUUID();const next={...this.shared,habits:habitsSchema.parse([...(this.shared.habits??[]).filter(x=>x.id!==id),{id,text:q.text,updatedAt:new Date().toISOString()}])};await this.vault.write('assistant-shared',next);this.shared=next;return next.habits;}
   async forget(id:string){z.string().uuid().parse(id);const next={...this.shared,habits:(this.shared.habits??[]).filter(x=>x.id!==id)};await this.vault.write('assistant-shared',next);this.shared=next;return next.habits;}

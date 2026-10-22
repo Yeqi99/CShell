@@ -1,4 +1,7 @@
 import { CloudSync } from '../core/cloud-sync';
+import { AccountWorkspaces } from '../core/account-workspaces';
+import { join } from 'node:path';
+import { emptySharedAi } from '../shared/shared-ai';
 import { defaults } from '../shared/contracts';
 import { sharedAiConfigSchema } from '../shared/shared-ai';
 import type { SecretCodec } from '../core/store';
@@ -24,6 +27,8 @@ export class CagentCloud {
     return this.hooks?.deviceId();
   }
   private cached: any;
+  private workspaces: AccountWorkspaces<{bundle: any; assistant: ReturnType<CagentAssistant['localWorkspace']>}>;
+  private emptyBundle(){return {format:1,store:{profiles:[],groups:[],preferences:defaults,presets:[],monitorViews:[],hosts:{},secrets:{}},ai:emptySharedAi(),devices:[],http:[],assets:{}};}
   private timer?: NodeJS.Timeout;
   private ticking = false;
   private pending: Promise<void> = Promise.resolve();
@@ -105,8 +110,18 @@ export class CagentCloud {
     codec: SecretCodec,
     private vault: ClientVault,
     private assistant: CagentAssistant,
+    request: typeof fetch = fetch,
   ) {
+    this.workspaces=new AccountWorkspaces(join(directory,'account-workspaces'),codec,{
+      capture:async()=>({bundle:structuredClone(this.cached),assistant:assistant.localWorkspace()}),
+      empty:()=>({bundle:this.emptyBundle(),assistant:assistant.emptyWorkspace()}),
+      validate:(value)=>{const v=z.object({bundle,assistant:z.unknown()}).strict().parse(value);return {bundle:v.bundle,assistant:assistant.validateWorkspace(v.assistant)};},
+      assertIdle:()=>assistant.assertAccountIdle(),
+      restore:async(value)=>{await assistant.restoreWorkspace(value.assistant);await vault.write('cloud-bundle',value.bundle);this.cached=structuredClone(value.bundle);},
+    });
     this.sync = new CloudSync(directory, codec, {
+      registrationSnapshot:async()=>this.emptyBundle(),
+      accountChanged:async(id)=>{const previous=this.workspaces.current();await this.workspaces.switchTo(id??'guest');return async()=>this.workspaces.switchTo(previous);},
       export: async () => ({ ...this.cached, ai: this.assistant.cloudExport() }),
       validate: (v) => {
         bundle.parse(v);
@@ -117,7 +132,7 @@ export class CagentCloud {
         await vault.write('cloud-bundle', next);
         this.cached = next;
       },
-    });
+    }, undefined, request);
   }
   async load() {
     this.assistant.officialCredential = () => this.sync.sessionCredential();
@@ -138,6 +153,7 @@ export class CagentCloud {
       assets: {},
     };
     await this.sync.load();
+    await this.workspaces.load(this.sync.accountId());
     void this.tick();
     this.timer = setInterval(() => void this.tick(), 15000);
     this.timer.unref();
@@ -188,6 +204,7 @@ export class CagentCloud {
       }
     }
     if (method === 'account.logout') {
+      this.assistant.assertAccountIdle();
       this.paused = true;
       try {
         await this.pending;

@@ -31,3 +31,13 @@
 开源来源凭据必须在原 Electron userData 加密上下文解密（不能直接复制密文给 Pro 解密），迁移通道不可输出秘密；按来源概况与冲突选择后才导入。现有用户 OpenCode 已恢复，不自动重导。
 
 CAgent 同样需要隔离 cached cloud bundle、assistant settings/shared/tasks，并在空云模型时清除前账号模型凭据；登录 UI 虽已完成，须等此项与真实同账号发现验收后才发包。现在不同邮箱直接切换要求先退出，避免设备身份静默重新绑定，不能用这一检查代替数据隔离。
+
+### 后续进展：CAgent 已接入本机账号隔离（仍未发布）
+
+上节的“CAgent 仍需隔离”已有代码实现：AccountWorkspaces 现已接入 CAgent，按 guest / accountId 保存独立加密 bundle 和 assistant settings/shared/tasks。新注册云端从空白配置开始；切换阻止活跃任务；退出恢复访客；新账号的智能体执行授权保持收敛。原生窗口按账号保存各自未发送草稿并清理前账号渲染内容。
+
+CloudSync 账号激活钩子现在返回回滚函数，登录信息保存失败时恢复旧上下文；退出同样走激活。另为账号保留加密同步基线，避免退出前未上传的本机修改在重登录时被旧云端覆盖。现有桌面 adapter 尚未接入这些钩子，因此桌面隔离/访客导入/缓存 UI 仍是下一步，不能认为已完成。
+
+新增 tests/cagent-cloud-accounts.test.ts 使用模拟云服务与真实 CAgentAssistant/ClientVault/CloudSync：访客不自动上传、A/B 偏好隔离、退出恢复访客、重登录保留未同步修改、OpenCode 和未知未来字段往返保留均通过。最新 TypeScript 检查和相关 16 项测试通过；C# 重新编译并验证 flow2.png.json 六项交互通过。依然没有真实账号/中继端到端验收，没有发布或改用户应用。
+
+还需审查异常回滚失败后的隔离状态、崩溃恢复及并发操作，完成桌面全数据隔离（不能只套 cloud bundle）、来源导入解密/冲突 UI、访客清理，并实现移动端相同边界后统一构建发布。

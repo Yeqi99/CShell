@@ -7,6 +7,25 @@ import { encryptVault, decryptVault, newRecoveryKey, unwrapRecoveryKey } from '.
 import { pbkdf2Sync, randomBytes } from 'node:crypto';
 import { CloudSync } from '../src/core/cloud-sync';
 
+test('account activation restores the previous context when persistence fails', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'cloud-activation-'));
+  let owner = 'guest', fail = false;
+  const codec = { encrypt: async (s: string) => { if (fail) { fail = false; throw Error('disk fixture'); } return s; }, decrypt: async (s: string) => s };
+  const id = 'a'.repeat(32);
+  const request: typeof fetch = async (url) => Response.json(String(url).endsWith('/login') ? { accountId: id, email: 'fixture@example.com', token: 'x'.repeat(43) } : { ok: true });
+  const cloud = new CloudSync(directory, codec, {
+    export: async () => ({}), import: async () => {}, validate: () => {},
+    accountChanged: async (next) => { const previous = owner; owner = next ?? 'guest'; return async () => { owner = previous; }; },
+  }, 'https://test.invalid', request);
+  try {
+    fail = true;
+    await assert.rejects(cloud.login('fixture@example.com', '123456'), /disk fixture/);
+    assert.equal(owner, 'guest'); assert.equal(cloud.status().email, undefined);
+    await cloud.login('fixture@example.com', '123456'); assert.equal(owner, id);
+    await cloud.logout(); assert.equal(owner, 'guest'); assert.equal(cloud.status().state, 'signed-out');
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
 test('password unlock authenticates the wrapped recovery key and account', () => {
   const salt=randomBytes(32), password='test-password-only', key=newRecoveryKey();
   const derived=pbkdf2Sync(password,salt,210000,32,'sha256').toString('base64url');

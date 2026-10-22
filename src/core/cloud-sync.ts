@@ -19,6 +19,8 @@ interface LocalState {
 }
 export interface CloudAdapter {
   export(): Promise<unknown>;
+  registrationSnapshot?(): Promise<unknown>;
+  accountChanged?(accountId: string | undefined): Promise<void | (() => Promise<void>)>;
   validate(value: unknown): void;
   import(value: unknown): Promise<void>;
 }
@@ -149,19 +151,30 @@ export class CloudSync {
     }
   }
   async accountRequest(path:string,body?:unknown){if(!this.data.session)throw Error('请先登录');return this.api(path,body);}
+  accountId(){return this.data.session?.accountId;}
   sessionCredential(){if(!this.data.session)throw Error('请先登录');return this.data.session.token;}
   async requestCode(email: string) {
     await this.api('/v1/auth/code', { email });
   }
+  private async activate(next:LocalState) {
+    const previous=this.data, previousState=this.state;
+    if(this.adapter.accountChanged && previous.session && previous.session.accountId!==next.session?.accountId){
+      const directory=join(this.directory,'cloud-accounts');await mkdir(directory,{recursive:true});
+      const path=join(directory,previous.session.accountId+'.enc');
+      await writeFile(path+'.tmp',await this.codec.encrypt(JSON.stringify({...previous,session:undefined})),{mode:0o600});await rename(path+'.tmp',path);
+    }
+    const undo=previous.session?.accountId!==next.session?.accountId ? await this.adapter.accountChanged?.(next.session?.accountId) : undefined;
+    try {this.data=next;this.state=!next.session?'signed-out':next.key?'ready':'locked';await this.persist();}
+    catch(error){this.data=previous;this.state=previousState;if(undo)await undo();throw error;}
+  }
   async register(email:string,code:string,password:string) {
     return this.exclusive(async()=>{
       const accountId=randomUUID().replaceAll('-',''),key=newRecoveryKey();
-      const snapshot=await this.adapter.export();
+      const snapshot=await (this.adapter.registrationSnapshot?.() ?? this.adapter.export());
       const session:CloudSession=await this.api('/v1/auth/register',{email,code,password,accountId,keybox:wrapRecoveryKey(key,password,accountId),envelope:encryptVault(snapshot,key,accountId)});
       if(session.accountId!==accountId || !/^[A-Za-z0-9_-]{43}$/.test(session.token))throw new Error('注册响应不正确，请使用密码登录');
-      this.data={session,key,revision:1,digest:vaultDigest(snapshot),baseline:snapshot,lastSync:new Date().toISOString(),membership:{active:false,expiresAt:null}};
-      this.state='ready';this.error=undefined;this.profileChecked=0;
-      await this.persist();return this.status();
+      await this.activate({session,key,revision:1,digest:vaultDigest(snapshot),baseline:snapshot,lastSync:new Date().toISOString(),membership:{active:false,expiresAt:null}});
+      this.error=undefined;this.profileChecked=0;return this.status();
     });
   }
   async login(email: string, code: string, password = false) {
@@ -171,11 +184,13 @@ export class CloudSync {
         throw new Error('登录响应不正确');
       this.profileChecked = 0;
       const same = this.data.session?.accountId === session.accountId;
-      this.data = same ? { ...this.data, session } : { session, revision: 0 };
-      if(password && session.keybox) this.data.key = unwrapRecoveryKey(session.keybox, code, session.accountId);
-      this.state = this.data.key ? 'ready' : 'locked';
-      this.error = undefined;
-      await this.persist();
+      const key=password && session.keybox ? unwrapRecoveryKey(session.keybox, code, session.accountId) : undefined;
+      let cached:LocalState|undefined;
+      if(!same&&this.adapter.accountChanged){try{cached=JSON.parse(await this.codec.decrypt(await readFile(join(this.directory,'cloud-accounts',session.accountId+'.enc'),'utf8')));if(!cached||!Number.isSafeInteger(cached.revision)||cached.revision<0)throw Error('Invalid cached cloud revision');}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw Error('账号本机同步记录无法读取，原数据已保留');}}
+      const next:LocalState=same?{...this.data,session}:{...(cached??{revision:0}),session};
+      if(key)next.key=key;
+      await this.activate(next);
+      this.error=undefined;
       return this.status();
     });
     if (this.data.key) {
@@ -326,9 +341,7 @@ export class CloudSync {
   async logout() {
     return this.exclusive(async () => {
       if (this.data.session) await this.api('/v1/auth/logout', {});
-      this.data = { revision: 0 };
-      await this.persist();
-      this.state = 'signed-out';
+      await this.activate({revision:0});
       this.error = undefined;
     });
   }
