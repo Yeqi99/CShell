@@ -2,6 +2,8 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { Bridge, SessionEvent } from '../shared/contracts';
 const bridge: Bridge = {
   platform: process.platform,
+  networkStatus: () => ipcRenderer.invoke('network:status'),
+  networkSave: route => ipcRenderer.invoke('network:save', route),
   machineBrowser:(id,action,value)=>ipcRenderer.invoke('machine-browser:action',id,action,value),
   onMachineBrowserFocus:listener=>{const fn=(_e:unknown,id:string)=>listener(id);ipcRenderer.on('machine-browser:focus',fn);return()=>{ipcRenderer.removeListener('machine-browser:focus',fn);};},
   linuxWorkspacePlan:(id,directory)=>ipcRenderer.invoke('linux:plan',id,directory),

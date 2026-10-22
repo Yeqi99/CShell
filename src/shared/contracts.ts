@@ -336,6 +336,8 @@ export interface Bridge
     MonitorViewsBridge,
     ActivityBridge {
   readonly platform: string;
+  networkStatus?(): Promise<import('./network-route').NetworkRouteStatus>;
+  networkSave?(route: import('./network-route').NetworkRoute): Promise<import('./network-route').NetworkRouteStatus>;
   reportError(error: { message: string; stack?: string }): void;
   openDiagnostics(): Promise<void>;
   setAlwaysOnTop(enabled: boolean): Promise<boolean>;

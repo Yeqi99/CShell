@@ -946,6 +946,8 @@
 
 /* Use pane width rather than desktop viewport width for composer controls. */
 .ai-panel { container: agent-pane / inline-size; }
+.agent-background-tasks { display:flex;align-items:center;gap:8px;margin:8px 12px 0;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--muted);font-size:12px; }
+.agent-background-tasks span:last-child { margin-left:auto;color:var(--accent); }
 .agent-composer-tools .agent-model { flex: 1 1 120px; max-width: 100%; }
 .agent-composer-tools .agent-account-model { flex: 1 1 150px; min-width: 0; max-width: 240px; text-overflow: ellipsis; }
 .agent-composer-tools .agent-thread-model { flex: 1 1 120px; min-width: 0; }

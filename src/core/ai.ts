@@ -53,10 +53,11 @@ const eventToolDenied = (name:string) => eventDeniedTools.has(name) || (name.sta
 const idSchema = z.string().uuid();
 export const modeSchema = z.enum(['review', 'restricted', 'allow']);
 export class AiService {
+  requestTransport?: typeof fetch;
   private jobs=new AgentJobs();
   readonly providerExtensions=new AiExtensionRegistry();
   private async resolveProvider(p:Provider,session:string){
-    return p.extension?{...p,...await this.providerExtensions.resolve(p.extension,session)}:{...p,transport:undefined};
+    return p.extension?{...p,...await this.providerExtensions.resolve(p.extension,session)}:{...p,transport:this.requestTransport};
   }
   extensionTools?: ()=>import('./connections/contracts').ConnectionTool[];
   eventTools?: (threadId:string)=>import('./connections/contracts').ConnectionTool[];

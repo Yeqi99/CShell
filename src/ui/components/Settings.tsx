@@ -1,4 +1,6 @@
 import { LocalEnvironmentSettings } from './LocalEnvironmentSettings';
+import { NetworkSettings } from './NetworkSettings';
+import { Globe } from 'lucide-react';
 import { Palette, Terminal, PanelsTopLeft, Blocks, ShieldCheck, Download } from 'lucide-react';
 import { UpdateSettings } from './UpdateSettings';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -31,6 +33,7 @@ export function Settings({
       ? [['local', Terminal, cn ? '本机终端' : 'Local terminal'] as const]
       : []),
     ['workspace', PanelsTopLeft, cn ? '工作区' : 'Workspace'],
+    ...(window.cshell.networkStatus ? [['network', Globe, cn ? '网络与代理' : 'Network & proxy'] as const] : []),
     ['extensions', Blocks, cn ? '扩展' : 'Extensions'],
     ['security', ShieldCheck, cn ? 'AI 与安全' : 'AI & security'],
     ['updates', Download, cn ? '关于与更新' : 'About & updates'],
@@ -116,6 +119,7 @@ export function Settings({
         <div hidden={category !== 'updates'}>
           <UpdateSettings english={!cn} />
         </div>
+        {window.cshell.networkStatus && <div hidden={category !== 'network'}><NetworkSettings/></div>}
         <div hidden={category !== 'workspace'}>
           <PresetControls draft={draft} onSelect={setDraft} onError={setError} />
         </div>
@@ -367,7 +371,7 @@ export function Settings({
           {t('cancel')}
         </button>
         <button
-          hidden={category === 'local'}
+          hidden={category === 'local' || category === 'network'}
           className="primary"
           form="workspace-preferences-form"
           disabled={busy || mcp.busy || (category === 'security' && !mcp.draft)}

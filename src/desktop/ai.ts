@@ -1,4 +1,5 @@
 import {TavilyExtension} from '../extensions/tavily/service';
+import {ApplicationNetworkRoute} from './network-route';
 import { AiService, type AiConnectionHost } from '../core/ai';
 import {OpenCodeExtension} from '../extensions/opencode/service';
 import {pluginEnabled} from '../shared/plugins';
@@ -26,6 +27,11 @@ export async function registerAiHandlers(
   wechat?: import('../core/wechat').WechatService,
 ) {
   const ai = new AiService(directory, store, connections, connectHost, { http, wechat });
+  const network = new ApplicationNetworkRoute(directory, store);
+  await network.load();
+  ai.requestTransport = network.fetch;
+  handle('network:status', () => network.status());
+  handle('network:save', input => network.save(input));
   const pending = new Map<string, AiThread>();
   let timer: ReturnType<typeof setTimeout> | undefined;
   ai.onThreadUpdate = (thread) => {
@@ -131,7 +137,7 @@ export async function registerAiHandlers(
     ai.dispose();
     clearTimeout(timer);
     pending.clear();
-    disposal = Promise.all([events.close(),ai.flush(),remoteClose]).then(()=>{});
+    disposal = Promise.all([events.close(),ai.flush(),remoteClose,network.close()]).then(()=>{});
     return disposal;
   };
 }

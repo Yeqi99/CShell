@@ -58,7 +58,7 @@ export function MonitorViews({ config }: { config: Config }) {
     </article>)}</div>
     {draft && <div className="view-editor">
       {sourceKind === 'ai' && <div className="view-actions">
-        <span className="muted">{text('新会话：CShell · 未绑定机器','New conversation: CShell · no machine binding')}</span>
+        <span className="muted">{text('新建智能体会话','New agent conversation')}</span>
         <select aria-label={text('新会话模型基座','New conversation provider')} value={newProvider || providers[0]?.id || ''} onChange={e=>setNewProvider(e.target.value)}>
           {!providers.length && <option value="">{text('请先配置模型基座','Configure a provider first')}</option>}{providers.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
         </select>

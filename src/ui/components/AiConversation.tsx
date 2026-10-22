@@ -50,6 +50,11 @@ export function AiConversation({
   executionVisible: boolean;
 }) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  // Submission has its own per-conversation lock; a slow save must not block
+  // sending or stopping a different conversation in the same panel.
+  const sending = useRef(new Set<string>());
+  const [sendErrors, setSendErrors] = useState<Record<string, string>>({});
+  const [pendingSends, setPendingSends] = useState<string[]>([]);
   const [modelChoices,setModelChoices]=useState<{ref:string;model:string;label?:string;available:boolean}[]>([]);
   const [chosenModel,setChosenModel]=useState('');
   const [modelsLoading,setModelsLoading]=useState(false);
@@ -76,7 +81,7 @@ export function AiConversation({
   }, [insertion]);
   const draftId = thread?.id ?? `new:${location}`;
   const text = drafts[draftId] ?? '';
-  const active = thread?.state === 'running' || thread?.state === 'approval';
+  const active = thread?.state === 'running' || thread?.state === 'approval' || pendingSends.includes(draftId);
   const viewport = useRef<HTMLDivElement>(null);
   const follow = useRef(true);
   const [away, setAway] = useState(false);
@@ -109,21 +114,37 @@ export function AiConversation({
     return()=>{alive=false};
   },[provider?.id,provider?.extension?.model,thread?.id]);
   const send = () => {
-    if (busy || active || modelsLoading || !text.trim() || !provider) return;
-    void run(async () => {
+    if (busy || active || sending.current.has(draftId) || modelsLoading || !text.trim() || !provider) return;
+    sending.current.add(draftId);
+    setPendingSends([...sending.current]);
+    setSendErrors(previous => ({ ...previous, [draftId]: '' }));
+    void (async () => {
+      let targetId = draftId;
+      try {
       const target = thread ?? (await create(chosenModel || undefined));
-      if (!thread) setDrafts((previous) => ({ ...previous, [target.id]: text }));
-      await window.cshell.aiSend(target.id, text);
+      targetId = target.id;
+      setSendErrors(previous => ({ ...previous, [targetId]: '' }));
+      sending.current.delete(draftId);
+      sending.current.add(targetId);
+      setPendingSends([...sending.current]);
       setDrafts((previous) => ({
         ...previous,
         [draftId]: previous[draftId] === text ? '' : previous[draftId],
-        [target.id]: previous[target.id] === text ? '' : previous[target.id],
       }));
-    });
+      await window.cshell.aiSend(targetId, text);
+      } catch (error) {
+        setSendErrors(previous => ({ ...previous, [targetId]: error instanceof Error ? error.message : String(error) }));
+        // Keep a newer draft. An unaccepted message remains available to edit.
+        setDrafts(previous => ({ ...previous, [targetId]: previous[targetId] || text }));
+      } finally {
+        sending.current.delete(targetId);
+        setPendingSends([...sending.current]);
+      }
+    })();
   };
   return (
     <>
-      <div className="agent-context">
+      {(thread?.target || (!thread && sessionId)) && <div className="agent-context">
         {thread?.sessionId || (!thread && sessionId) ? (
           <Terminal size={14} />
         ) : (
@@ -131,12 +152,10 @@ export function AiConversation({
         )}
         <span className="agent-target" title="全局智能体权限">
           {thread
-            ? (thread.target ?? 'CShell · 未绑定机器')
-            : sessionId
-              ? '当前连接 · 新会话'
-              : 'CShell · 未绑定机器'}
+            ? thread.target
+            : '当前连接 · 新会话'}
         </span>
-      </div>
+      </div>}
       <AiTaskTree thread={thread} snapshot={snapshot} open={openThread} />
       <div className="agent-conversation">
         <div
@@ -238,6 +257,7 @@ export function AiConversation({
           {thread?.error && (
             <ErrorNotice title="这次回复未完成" error={thread.error} />
           )}
+          {sendErrors[draftId] && <ErrorNotice title="消息未发送" error={sendErrors[draftId]} />}
           {thread?.state === 'running' && (
             <div className="agent-running" role="status">
               <span className="agent-wait-dots" aria-hidden="true"><i/><i/><i/></span>
@@ -352,7 +372,7 @@ export function AiConversation({
               className="icon agent-send"
               title="停止执行"
               aria-label="停止 AI"
-              disabled={busy}
+              disabled={busy || !thread}
               onClick={() => void run(() => window.cshell.aiStop(thread!.id))}
             >
               <Square size={14} />
