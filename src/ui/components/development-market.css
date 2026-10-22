@@ -27,7 +27,8 @@
 }
 .development-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 280px));
+  justify-content: start;
   gap: 12px;
   margin-top: 16px;
 }
@@ -38,7 +39,7 @@
   text-align: left;
   padding: 18px;
   gap: 10px;
-  min-height: 170px;
+  min-height: 148px;
   background: var(--bg);
 }
 .development-logo,
@@ -72,6 +73,16 @@
 .development-detail {
   max-width: 700px;
   margin: 16px auto;
+}
+.development-heading > div {
+  min-width: 0;
+}
+.development-detail p {
+  overflow-wrap: anywhere;
+}
+.development-detail select {
+  width: 100%;
+  min-width: 0;
 }
 .development-back {
   margin-bottom: 18px;
@@ -128,7 +139,7 @@
   align-items: flex-start;
   justify-content: flex-start;
   text-align: left;
-  min-height: 160px;
+  min-height: 148px;
 }
 .mobile-coding-body:has(> .development-market) {
   overflow: auto;
