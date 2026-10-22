@@ -57,3 +57,9 @@ Windows 与 Android 下载附件放入香港服务器 `/opt/cshell-downloads/`�
 桌面网络改用 Electron net.fetch，遵循系统代理与证书设置。启动及约每 15 秒自动同步，网络失败后继续重试，持久化 mutationId 防止重复写入。Windows 暂时文件占用时有界重试原子替换。Android 前台及网络恢复时自动检查；界面展示自然语言状态，不透出 IPC/网络内部异常。
 
 验证包含登录方式切换、自动恢复、暗色页面、无横向溢出、断网提示、错误后自动重试、重启后保留会员缓存；自动同步不绕过并发冲突确认。
+
+## Shared-core merge (2026-10-22)
+
+Pro merges the upstream history through `620c053` rather than copying individual application files. This includes the Android SSH-to-cagent machine workspace, bounded management requests, development applications and responsive machine layouts. The Android receive handler retains both cloud-sync and SSH workspace events. Desktop and Android registration now expose a top-of-form return-to-login action.
+
+Validation: TypeScript; 13 targeted sync, coding and management tests; mobile cloud and SSH-workspace smoke tests; installed Windows registration return flow; Android release/lint and signing identity verification. Android physical-device validation remains outstanding.
