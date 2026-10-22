@@ -1,3 +1,4 @@
+import { ErrorNotice } from './ErrorNotice';
 import { useEffect, useRef, useState } from 'react';
 import { AppWindow, Power, Send, Globe, SlidersHorizontal, Keyboard, X } from 'lucide-react';
 import type { AgentCall } from '../../shared/agent';
@@ -242,9 +243,7 @@ export function LinuxBrowserView({
         </div>
       )}
       {error && (
-        <p role="alert" className="form-error">
-          {error}
-        </p>
+        <ErrorNotice title="远端应用暂时无法显示" error={error} />
       )}
       {!status?.installed || !status.applications?.some((a: any) => a.available) ? (
         <div className="linux-empty">

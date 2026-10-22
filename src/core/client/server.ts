@@ -323,16 +323,26 @@ export class ClientServer {
         socket.destroy();
         return;
       }
-      queue = queue
+      // Browser reads wait for remote bytes. Serializing them with writes causes
+      // head-of-line blocking across every tab (and can deadlock a TLS handshake).
+      const browser = c.peer && req.op === 'manage' && agentCallSchema.safeParse(req.payload);
+      const concurrent = !!(browser && browser.success && browser.data.method.startsWith('browser.'));
+      const task = (concurrent ? Promise.resolve() : queue)
         .then(async () => {
           if (!c.alive) return;
           try {
             const result = await this.handle(c, cert.fingerprint256, req.op, req.payload);
             if (c.alive) await reply(socket, req.id, result);
-          } catch {
+          } catch (error) {
+            const code=(error as NodeJS.ErrnoException)?.code;
+            const detail=code==='EACCES'||code==='EPERM'?'目标系统拒绝访问，请检查运行 cagent 的账户权限（ACCESS_DENIED）'
+              :code==='ENOENT'?'目标文件或目录不存在，请刷新后重试（NOT_FOUND）'
+              :code==='ECONNREFUSED'?'目标服务没有响应，请确认服务已启动（CONNECTION_REFUSED）'
+              :error instanceof z.ZodError?'操作参数不完整或格式不正确，请检查输入或更新两端应用（INVALID_PARAMETERS）'
+              :'CAgent 请求失败：请检查远端权限和服务状态';
             if (c.alive) send(socket, { id: req.id, error: req.op === 'auth'
               ? 'CAgent 认证失败：配对已失效或密码不正确，请重新认证'
-              : 'CAgent 请求失败：请检查远端权限和服务状态' });
+              : detail });
             if (!c.peer) socket.end();
           }
         })
@@ -340,6 +350,7 @@ export class ClientServer {
           socket.destroy();
         })
         .finally(() => pending--);
+      if (!concurrent) queue = task;
     });
   }
   private async handle(c: Channel, fp: string, op: string, payload: unknown): Promise<unknown> {

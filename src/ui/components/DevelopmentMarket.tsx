@@ -1,3 +1,4 @@
+import { ErrorNotice } from './ErrorNotice';
 import { useEffect, useState } from 'react';
 import { Code2, Download, ArrowLeft, Check, RefreshCw, ShieldCheck } from 'lucide-react';
 import type { AgentCall } from '../../shared/agent';
@@ -96,9 +97,7 @@ export function DevelopmentMarket({
         </button>
       </header>
       {error && (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
+        <ErrorNotice title="应用操作未完成" error={error} />
       )}
       {app ? (
         <div className="development-detail">

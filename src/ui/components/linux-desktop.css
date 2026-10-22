@@ -20,6 +20,8 @@
   isolation: isolate;
   --panel: #f9fbff;
   --bg: #edf2f8;
+  --field: #eaf0f6;
+  color-scheme: light;
   --text: #24334a;
   --muted: #6d7a8c;
   --border: #dce3ed;
@@ -30,6 +32,8 @@
 .linux-desktop[data-theme='dark'] {
   --panel: #202b3b;
   --bg: #182332;
+  --field: #111922;
+  color-scheme: dark;
   --text: #e1e9f5;
   --muted: #9cacc1;
   --border: #354255;

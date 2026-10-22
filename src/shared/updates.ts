@@ -1,3 +1,4 @@
+import { downloadManifest, downloadPage, downloadRoot } from './download-source';
 export interface UpdateState {
   current: string;
   phase:
@@ -14,6 +15,7 @@ export interface UpdateState {
   error?: string;
   platform: string;
   retry?: 'check' | 'download';
+  automatic?: boolean;
 }
 export interface UpdateBridge {
   updateState(): Promise<UpdateState>;
@@ -21,9 +23,10 @@ export interface UpdateBridge {
   downloadUpdate(): Promise<UpdateState>;
   installUpdate(): Promise<void>;
   openUpdatePage(): Promise<void>;
+  updateAutomatic?(enabled: boolean): Promise<UpdateState>;
 }
-export const releasesPage = 'https://github.com/Yeqi99/CShell/releases';
-export const releaseApi = 'https://api.github.com/repos/Yeqi99/CShell/releases?per_page=30';
+export const releasesPage = downloadPage;
+export const releaseApi = downloadManifest;
 export function compareVersion(a: string, b: string): number {
   const parse = (v: string) => /^v?(\d+)\.(\d+)\.(\d+)$/.exec(v);
   const x = parse(a),
@@ -50,7 +53,7 @@ export function selectRelease(
   platform: string,
   arch: string,
 ): UpdateRelease | undefined {
-  if (!Array.isArray(input)) throw new Error('Invalid GitHub response');
+  if (!Array.isArray(input)) throw new Error('更新目录格式不正确');
   const suffix =
     platform === 'win32' && arch === 'x64'
       ? 'win-x64.exe'
@@ -72,7 +75,7 @@ export function selectRelease(
     for (const a of [asset, checksums]) {
       if (
         a.browser_download_url !==
-          'https://github.com/Yeqi99/CShell/releases/download/' + r.tag_name + '/' + a.name ||
+          downloadRoot + '/' + r.tag_name + '/' + a.name ||
         !Number.isSafeInteger(a.size) ||
         a.size <= 0 ||
         a.size > 600_000_000

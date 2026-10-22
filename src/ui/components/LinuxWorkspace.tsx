@@ -1,3 +1,4 @@
+import { ErrorNotice } from './ErrorNotice';
 import { MachineConnectionState } from './MachineConnectionState';
 import { useCallback, useEffect, useState } from 'react';
 import { Monitor, Terminal, ChevronRight, RefreshCw } from 'lucide-react';
@@ -149,9 +150,7 @@ export function LinuxWorkspace({
       ) : (
         <>
           {error && (
-            <p role="alert" className="form-error">
-              {error}
-            </p>
+            <ErrorNotice title="工作区操作未完成" error={error} />
           )}
           {!ready ? (
             <div className="linux-setup">

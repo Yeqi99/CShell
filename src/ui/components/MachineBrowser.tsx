@@ -1,4 +1,5 @@
 import { browserSuggestions } from '../../core/browser-interactions';
+import { ErrorNotice } from './ErrorNotice';
 import { useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft,
@@ -383,14 +384,10 @@ export function MachineBrowser({
         </section>
       )}
       {(error || !state.connected) && (
-        <div role="alert" className="machine-browser-error">
-          {!state.connected ? '服务器已断开，请重新连接；未切换本地网络' : error}
-        </div>
+        <ErrorNotice title={!state.connected ? '服务器连接已断开' : '网页操作未完成'} error={!state.connected ? '服务器已断开，请重新连接；未切换本地网络' : error} />
       )}
       {state.persistenceError && (
-        <div role="alert" className="machine-browser-error">
-          {state.persistenceError}
-        </div>
+        <ErrorNotice title="浏览器资料未能保存" error={state.persistenceError} />
       )}
       {library && (
         <section

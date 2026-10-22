@@ -11,7 +11,7 @@ const release = (version: string, suffix = 'win-x64.exe') => ({
   ].map((a) => ({
     ...a,
     browser_download_url:
-      'https://github.com/Yeqi99/CShell/releases/download/v' + version + '/' + a.name,
+      'https://shell.canp.ai/downloads/opensource/v' + version + '/' + a.name,
   })),
 });
 test('updates compare numeric versions and select complete platform releases including previews', () => {

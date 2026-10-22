@@ -1,3 +1,4 @@
+import { ErrorNotice } from './ErrorNotice';
 import {MachineConnectionState} from './MachineConnectionState';
 import {Monitor, Bot, ShieldCheck} from 'lucide-react';
 import {MachineRemoteControl} from './MachineRemoteControl';
@@ -55,7 +56,7 @@ export function AgentMachineWorkspace({device,target,preferences,active,onSessio
   <header><strong>{target.name}</strong><span>{device.host}:{device.port}</span><nav aria-label="机器功能">{(android?[['desktop','远程桌面'],['status','设备状态']]:machine?.terminalOnly?[['terminal','终端']]:machine?[...(linux?[['home','工作区']]:[]),['terminal','终端'],['files','文件'],...(linux?(machine.browserSupported?[['browser','浏览器']]:[]):[['desktop','远程桌面']]),['applications','应用市场'],['assistant','智能体'],['settings','设置与权限']]:[]).map(([id,label])=><button key={id} aria-pressed={section===id} onClick={()=>void choose(id)}>{label}</button>)}</nav><button className="machine-disconnect" onClick={()=>void onDisconnect().catch(e=>setError(String(e)))}>断开连接</button></header>
   {section==='loading'&&<p className="machine-panel" role="status">正在读取设备能力…</p>}
   {section==='status'&&<div className="machine-panel machine-device-status"><h3>设备状态</h3><button onClick={()=>void choose('status')}>刷新状态</button>{machine&&<dl><dt>系统</dt><dd>{machine.platform==='android'?'Android':machine.platform}</dd><dt>远程连接</dt><dd>{machine.running?'已开启':'已停止'}</dd>{android&&<><dt>屏幕共享</dt><dd>{desktop?.viewAllowed?'正在共享':'未共享，请在手机上开始共享并确认系统授权'}</dd><dt>触摸与键盘控制</dt><dd>{desktop?.controlAllowed?'已开启':'未开启，请在手机系统设置中启用 CAgent 辅助控制'}</dd></>}<dt>设备身份</dt><dd>{machine.deviceId||device.deviceId}</dd></dl>}</div>}
-  {error&&<p role="alert" className="form-error">{error}</p>}
+  {error&&<ErrorNotice title="机器操作未完成" error={error} />}
   {section==='home'&&<div className="linux-home"><span className="linux-eyebrow">YOUR REMOTE SPACE</span><h1>在 {target.name} 上工作</h1><p>应用在 Linux 运行，终端与文件保持在同一台机器。</p><div className="linux-apps">{[['terminal','终端','打开原生 Linux 终端'],['files','文件','浏览与传输文件'],...(machine?.browserSupported?[['browser','浏览器','使用服务器网络访问网页']]:[]),['applications','应用市场','安装系统与可视化应用']].map(([id,label,note])=><button className="linux-app" key={id} onClick={()=>void choose(id)}><strong>{label}</strong><small>{note}</small></button>)}</div></div>}
   <div className="machine-panel" hidden={section!=='browser'}>{visited.includes('browser')&&<LinuxBrowserView call={call} active={active&&section==='browser'} onMarket={()=>void choose('applications')}/>}</div>
   <div className="machine-terminal" hidden={section!=='terminal'}>

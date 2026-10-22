@@ -1,4 +1,5 @@
 import {useEffect,useRef,useState} from 'react';
+import {ErrorNotice} from './ErrorNotice';
 import {ArrowUp,RefreshCw,FolderPlus,Upload,Download,Pencil,Trash2,Folder,File} from 'lucide-react';
 import type {AgentCall} from '../../shared/agent';
 import type {FileEntry} from '../../shared/contracts';
@@ -6,7 +7,7 @@ export function AgentMachineFiles({call,target,pendingFiles=[],onFilesConsumed}:
  const [roots,setRoots]=useState<{root:string;label:string}[]>([]),[root,setRoot]=useState(''),[path,setPath]=useState('/'),[draft,setDraft]=useState('/'),[entries,setEntries]=useState<FileEntry[]>([]),[selected,setSelected]=useState<FileEntry>(),[busy,setBusy]=useState(false),[error,setError]=useState(''),[progress,setProgress]=useState(''),[action,setAction]=useState(''),[name,setName]=useState('');
  const downloadId=useRef('');
  const cancelled=useRef(false),alive=useRef(true),picker=useRef<HTMLInputElement>(null);
- const load=async(r:string,p:string)=>{setBusy(true);setError('');try{const result=await call('files.list',{root:r,path:p}) as {path:string;entries:FileEntry[]};if(!alive.current)return;setRoot(r);setPath(result.path);setDraft(result.path);setEntries(result.entries);setSelected(undefined);}catch(e){setError(String(e));setEntries([]);}finally{setBusy(false);}};
+ const load=async(r:string,p:string)=>{setBusy(true);setError('');setRoot(r);setPath(p);setDraft(p);setEntries([]);setSelected(undefined);try{const result=await call('files.list',{root:r,path:p}) as {path:string;entries:FileEntry[]};if(!alive.current)return;setRoot(r);setPath(result.path);setDraft(result.path);setEntries(result.entries);setSelected(undefined);}catch(e){setError(String(e));setEntries([]);}finally{setBusy(false);}};
  useEffect(()=>{alive.current=true;void (async()=>{try{const result=await call('files.roots') as {roots:{root:string;label:string}[]};if(!alive.current)return;setRoots(result.roots);if(result.roots[0])await load(result.roots[0].root,'/');}catch(e){setError('无法读取远端文件能力，请确认 CAgent 已更新且允许远程管理。'+String(e));}})();return()=>{alive.current=false;cancelled.current=true;if(downloadId.current)void window.cshell.agentFileCancel(downloadId.current);};},[call]);
  const check=()=>{if(cancelled.current||!alive.current)throw new Error('传输已取消');};
  const transfer=async(file?:globalThis.File)=>{
@@ -31,7 +32,7 @@ export function AgentMachineFiles({call,target,pendingFiles=[],onFilesConsumed}:
   <div className="machine-file-pending"><span>目标目录：{roots.find(r=>r.root===root)?.label} {path} · 可拖入文件，或复制文件后在此粘贴</span><button disabled={busy||!!action||!root} onClick={()=>void paste()}>粘贴文件</button></div>
   {!!pendingFiles.length&&<div className="machine-file-pending"><span>待上传：{pendingFiles.map(f=>f.name).join('、')}</span><button disabled={busy||!root} onClick={()=>void batch()}>上传到此目录</button><button disabled={busy} onClick={onFilesConsumed}>取消</button></div>}
   {action&&<form className="machine-file-action" onSubmit={e=>{e.preventDefault();void mutate()}}>{action==='delete'?<span>删除“{selected?.name}”？此操作无法撤销；文件夹须为空。</span>:<input autoFocus aria-label="名称" value={name} onChange={e=>setName(e.target.value)}/>}<button disabled={busy} type="submit">{action==='delete'?'确认删除':'确定'}</button><button disabled={busy} type="button" onClick={()=>setAction('')}>取消</button></form>}
-  {error&&<p role="alert" className="form-error">{error}</p>}<div role="status">{busy?(progress||'正在读取…'):progress}{busy&&progress&&<button onClick={()=>{cancelled.current=true;if(downloadId.current)void window.cshell.agentFileCancel(downloadId.current)}}>取消传输</button>}</div>
+  {error&&<ErrorNotice title="文件操作未完成" error={error} busy={busy} retry={root?()=>void load(root,path):undefined}/>}<div role="status">{busy?(progress||'正在读取…'):progress}{busy&&progress&&<button onClick={()=>{cancelled.current=true;if(downloadId.current)void window.cshell.agentFileCancel(downloadId.current)}}>取消传输</button>}</div>
   <table><thead><tr><th>名称</th><th>大小</th><th>修改时间</th></tr></thead><tbody>{entries.map(e=><tr key={e.path} aria-selected={selected?.path===e.path} onClick={()=>{if(!busy&&!action)setSelected(e)}}><td><button disabled={busy||!!action||e.symlink} onDoubleClick={()=>{if(e.directory)void load(root,e.path)}} onKeyDown={event=>{if(event.key==='Enter'&&e.directory)void load(root,e.path)}}>{e.directory?<Folder size={17}/>:<File size={17}/>} {e.name}{e.symlink?'（链接）':''}</button></td><td>{e.directory?'—':e.size.toLocaleString()+' B'}</td><td>{new Date(e.modified).toLocaleString()}</td></tr>)}</tbody></table>{!busy&&!error&&!entries.length&&<p>此目录为空</p>}
  </section>;
 }

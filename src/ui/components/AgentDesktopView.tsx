@@ -8,6 +8,7 @@ import {
 import { desktopScanCode, h264Codec } from '../desktop-keys';
 import type { DesktopViewInput } from '../../shared/desktop-view';
 import './agent-desktop-view.css';
+import { ErrorNotice } from './ErrorNotice';
 
 export function AgentDesktopView({
   target,
@@ -50,6 +51,9 @@ export function AgentDesktopView({
   },[]);
   const [expanded,setExpanded]=useState(false),[fullscreen,setFullscreen]=useState(false);
   const [frameSize,setFrameSize]=useState<{width:number;height:number}>();
+  const [fit,setFit]=useState<'fill'|'contain'|'native'>('fill');
+  const [zoom,setZoom]=useState(100),[pan,setPan]=useState(false);
+  const drag=useRef<{x:number;y:number;left:number;top:number}|undefined>(undefined);
   useEffect(()=>{
     const changed=()=>setFullscreen(document.fullscreenElement===view.current);
     document.addEventListener('fullscreenchange',changed);
@@ -57,16 +61,16 @@ export function AgentDesktopView({
   },[]);
   useEffect(()=>{
     const element=screen.current;if(!element)return;let disposed=false;
-    const resize=()=>{if(disposed||screen.current!==element)return;const box=element.getBoundingClientRect();const ratio=(info?.width??16)/(info?.height??9);const width=Math.min(box.width,box.height*ratio);setFrameSize({width,height:width/ratio});};
+    const resize=()=>{if(disposed||screen.current!==element)return;const box=element.getBoundingClientRect();const ratio=(info?.width??16)/(info?.height??9);const width=fit==='fill'?box.width:fit==='native'?(info?.width??box.width)/window.devicePixelRatio:Math.min(box.width,box.height*ratio);setFrameSize({width:width*zoom/100,height:(fit==='fill'?box.height:width/ratio)*zoom/100});};
     const observer=new ResizeObserver(resize);observer.observe(element);resize();
     return()=>{disposed=true;observer.disconnect();};
-  },[active,busy,info]);
+  },[active,busy,info,fit,zoom]);
   const toggleFullscreen=async()=>{release();try{if(document.fullscreenElement===view.current)await document.exitFullscreen();else await view.current?.requestFullscreen();}catch(e){setError('无法进入全屏：'+String(e));}};
   const decodeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const softwareDecode = useRef(false);
   const [quality, setQuality] = useState<DesktopQuality>({
-    fps: 60,
-    bitrate: 12000000,
+    fps: 30,
+    bitrate: 5000000,
     display: 0,
     adaptive: true,
   });
@@ -440,6 +444,9 @@ export function AgentDesktopView({
       </div>
       {qualityOpen && (
           <div className="desktop-quality">
+            <label>画面适配<select value={fit} onChange={e=>setFit(e.target.value as typeof fit)}><option value="fill">填满窗口</option><option value="contain">保持比例，完整显示</option><option value="native">系统原始比例</option></select></label>
+            <label>显示缩放 {zoom}%<input aria-label="远控画面缩放" type="range" min="50" max="200" step="5" value={zoom} onChange={e=>setZoom(Number(e.target.value))}/></label>
+            <label><input type="checkbox" checked={pan} onChange={e=>{release();drag.current=undefined;setPan(e.target.checked);}}/>拖动画面（暂停键鼠输入）</label>
             <div className="desktop-presets" aria-label="画质预设">{(['低','中','高','超高','无上限'] as const).map((name,index)=><button key={name} aria-pressed={index===4?!!quality.unlimited:!quality.unlimited&&quality.fps===[24,30,60,90][index]&&quality.bitrate===[2000000,5000000,12000000,30000000][index]} onClick={()=>setQuality({display:quality.display,fps:[24,30,60,90,60][index],bitrate:[2000000,5000000,12000000,30000000,12000000][index],adaptive:true,...(index===4?{unlimited:true}:{})})}>{name}</button>)}</div>
             {quality.unlimited&&<small>无上限：从原生分辨率、60 帧开始，持续测量网络和编解码余量，逐步提升，拥塞时降低。需要新版 CAgent。</small>}
             <label>
@@ -529,7 +536,7 @@ export function AgentDesktopView({
         </p>
       )}
       {(active || busy) && (
-        <div ref={screen} className="desktop-screen">
+        <div ref={screen} className={'desktop-screen desktop-scalable'+(pan?' desktop-pan':'')}>
           {picture && <span className="desktop-picture-status" role="status">{picture}</span>}
           <canvas
             ref={canvas}
@@ -539,11 +546,12 @@ export function AgentDesktopView({
             width={1}
             height={1}
             onBlur={release}
-            onKeyDown={(e) => key(e, true)}
-            onKeyUp={(e) => key(e, false)}
+            onKeyDown={(e) => {if(!pan)key(e, true);}}
+            onKeyUp={(e) => {if(!pan)key(e, false);}}
             onContextMenu={(e) => e.preventDefault()}
             onPointerDown={(e) => {
               e.currentTarget.focus();
+              if(pan&&screen.current){e.preventDefault();e.currentTarget.setPointerCapture(e.pointerId);drag.current={x:e.clientX,y:e.clientY,left:screen.current.scrollLeft,top:screen.current.scrollTop};return;}
               if (controlling.current) {
                 e.preventDefault();
                 e.currentTarget.setPointerCapture(e.pointerId);
@@ -559,6 +567,7 @@ export function AgentDesktopView({
               }
             }}
             onPointerUp={(e) => {
+              if(pan){drag.current=undefined;if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId);return;}
               if (controlling.current) {
                 e.preventDefault();
                 input({
@@ -573,6 +582,7 @@ export function AgentDesktopView({
             onPointerCancel={release}
             onLostPointerCapture={release}
             onPointerMove={(e) => {
+              if(pan){if(drag.current&&screen.current){screen.current.scrollLeft=drag.current.left-(e.clientX-drag.current.x);screen.current.scrollTop=drag.current.top-(e.clientY-drag.current.y);}return;}
               if (!controlling.current) return;
               const r = e.currentTarget.getBoundingClientRect();
               pointer.current = {
@@ -587,6 +597,7 @@ export function AgentDesktopView({
                 });
             }}
             onWheel={(e) => {
+              if(pan)return;
               if (controlling.current) {
                 input({
                   kind: 'wheel',
@@ -599,9 +610,7 @@ export function AgentDesktopView({
         </div>
       )}
       {error && (
-        <p role="alert" className="form-error">
-          {error}
-        </p>
+        <ErrorNotice title="远程控制遇到问题" error={error} />
       )}
     </section>
   );

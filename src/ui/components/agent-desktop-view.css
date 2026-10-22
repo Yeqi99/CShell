@@ -36,3 +36,6 @@
 :is(.minimal-mode,.monitor-screen) .desktop-tools-open.desktop-is-active>.desktop-toolbar{position:absolute;inset:0 0 auto;z-index:20;box-shadow:0 2px 12px #0002}
 :is(.minimal-mode,.monitor-screen) .desktop-tools-open.desktop-is-active>.desktop-info{display:none}
 :is(.minimal-mode,.monitor-screen) .desktop-tools-open.desktop-is-active>.desktop-quality{top:calc(var(--desktop-toolbar-height,52px) + 6px);max-height:calc(100% - var(--desktop-toolbar-height,52px) - 14px);z-index:21}
+.agent-desktop-view .desktop-scalable{overflow:auto;align-items:flex-start;justify-content:flex-start;overscroll-behavior:contain}
+.agent-desktop-view .desktop-scalable canvas{max-width:none;max-height:none;margin:auto;object-fit:fill}
+.agent-desktop-view .desktop-pan canvas{cursor:grab}.agent-desktop-view .desktop-pan canvas:active{cursor:grabbing}

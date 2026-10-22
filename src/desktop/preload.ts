@@ -102,6 +102,7 @@ const bridge: Bridge = {
   setAlwaysOnTop: (enabled) => ipcRenderer.invoke('window:always-on-top', enabled),
   setMinimalMode: (enabled) => ipcRenderer.invoke('window:minimal', enabled),
   updateState: () => ipcRenderer.invoke('update:state'),
+  updateAutomatic: (enabled: boolean) => ipcRenderer.invoke('update:automatic', enabled),
   checkUpdate: () => ipcRenderer.invoke('update:check'),
   downloadUpdate: () => ipcRenderer.invoke('update:download'),
   installUpdate: () => ipcRenderer.invoke('update:install'),

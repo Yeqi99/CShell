@@ -1,5 +1,5 @@
 import { app, shell, dialog, net, type BrowserWindow } from 'electron';
-import { mkdir, open, rename, rm, readFile } from 'node:fs/promises';
+import { mkdir, open, rename, rm, readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import {
@@ -17,7 +17,7 @@ export function registerUpdateHandlers(
   handle: (name: string, fn: (...args: any[]) => any) => void,
   window: BrowserWindow,
 ) {
-  let state: UpdateState = { current: app.getVersion(), phase: 'idle', platform: process.platform };
+  let state: UpdateState = { current: app.getVersion(), phase: 'idle', platform: process.platform, automatic:true };
   let release: UpdateRelease | undefined,
     file = '',
     expected = '',
@@ -27,11 +27,12 @@ export function registerUpdateHandlers(
     const response = await net.fetch(url, {
       headers: {
         'User-Agent': 'CShell/' + app.getVersion(),
-        Accept: 'application/vnd.github+json',
+        Accept: 'application/json',
       },
       signal: AbortSignal.timeout(timeout),
+      redirect: 'error',
     });
-    if (!response.ok) throw new Error('GitHub HTTP ' + response.status);
+    if (!response.ok) throw new Error('香港更新服务 HTTP ' + response.status);
     return response;
   };
   const fail = (e: unknown, retry: 'check' | 'download') => {
@@ -40,7 +41,7 @@ export function registerUpdateHandlers(
   };
   handle('update:state', () => state);
   handle('update:open-page', () => shell.openExternal(releasesPage));
-  handle('update:check', async () => {
+  const check = async () => {
     if (busy) return state;
     busy = true;
     release = undefined;
@@ -77,8 +78,9 @@ export function registerUpdateHandlers(
       busy = false;
     }
     return state;
-  });
-  handle('update:download', async () => {
+  };
+  handle('update:check', check);
+  const download = async () => {
     if (
       busy ||
       !release ||
@@ -124,7 +126,24 @@ export function registerUpdateHandlers(
       busy = false;
     }
     return state;
+  };
+  handle('update:download', download);
+  const automatic = async () => {
+    if(!state.automatic || busy || state.phase==='ready')return;
+    await check();
+    if(state.automatic && state.phase==='available')await download();
+  };
+  const settingsFile=join(app.getPath('userData'),'update-settings.json');
+  const settingsReady=readFile(settingsFile,'utf8').then(raw=>{state.automatic=JSON.parse(raw).automatic!==false;}).catch(()=>{});
+  handle('update:automatic',async(enabled:unknown)=>{
+    if(typeof enabled!=='boolean')throw Error('更新设置格式不正确');
+    await settingsReady;
+    await writeFile(settingsFile,JSON.stringify({automatic:enabled}));state.automatic=enabled;
+    if(enabled)void automatic();return state;
   });
+  const initial=setTimeout(()=>void settingsReady.then(automatic),30000);initial.unref();
+  const repeat=setInterval(()=>void settingsReady.then(automatic),6*60*60*1000);repeat.unref();
+  app.once('before-quit',()=>{clearTimeout(initial);clearInterval(repeat);});
   handle('update:install', async () => {
     if (busy || state.phase !== 'ready' || !file)
       throw new Error('Download and verify the update first');

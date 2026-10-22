@@ -104,10 +104,10 @@ export const clientAccessSchema = z
   .object({
     password: clientPasswordSchema,
     shells: z.array(clientShellSchema).min(1).max(6),
-    allowHttp: z.boolean().default(false),
-    allowManage: z.boolean().default(false),
-    allowHosting: z.boolean().default(false),
-    allowRelay: z.boolean().default(false),
+      allowHttp: z.boolean().default(true),
+      allowManage: z.boolean().default(true),
+      allowHosting: z.boolean().default(true),
+      allowRelay: z.boolean().default(true),
   })
   .strict();
 export const clientInfoSchema = clientInvitationSchema

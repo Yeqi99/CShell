@@ -1,3 +1,4 @@
+import { ErrorNotice } from './ErrorNotice';
 import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { AiConversation } from './AiConversation';
@@ -33,7 +34,7 @@ export function MonitorAiAssist() {
   const run=async(fn:()=>Promise<unknown>)=>{setBusy(true);setError('');try{await fn();await refresh();}catch(e){setError(String(e));}finally{setBusy(false);}};
   return <><TextAssist/><aside className="ai-panel monitor-context-assistant" hidden={!visible} aria-label="视图终端智能体" style={{position:'fixed',right:8,top:44,bottom:8,height:'auto',width:'min(480px, calc(100vw - 16px))',zIndex:40,boxShadow:'0 8px 32px #0002',borderRadius:10,background:'var(--panel)'}}>
     <header><strong>终端 AI 分析</strong><button aria-label="收起分析" title="收起分析（保留会话）" onClick={()=>setVisible(false)}><X size={16}/></button></header>
-    {error&&<p className="form-error" role="alert">{error}</p>}
+    {error&&<ErrorNotice title="智能体操作未完成" error={error} />}
     {busy&&!thread&&<p role="status">正在准备绑定此终端的会话…</p>}
     <div className="agent-chat-page">{thread&&<AiConversation snapshot={snapshot} thread={thread} insertion={insertion} location="terminal" providerId={thread.providerId} mode={thread.mode} sessionId={thread.sessionId} busy={busy} executionVisible={true}
       openThread={next=>{if(snapshot.threads.some(t=>t.id===next)){selected.current=next;setId(next);}else setError('该会话不属于当前视图');}}

@@ -1,25 +1,33 @@
-import {mkdir,writeFile,rename,rm} from 'node:fs/promises';
+import {mkdir,writeFile,rename,rm,readFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {createHash} from 'node:crypto';
-const repository='Yeqi99/CShell';
+import {downloadManifest,trustedDownload} from '../shared/download-source';
 export function newer(a:string,b:string){const x=a.split('.').map(Number),y=b.split('.').map(Number);for(let i=0;i<3;i++){if(x[i]!==y[i])return x[i]>y[i];}return false;}
 export function selectUpdate(releases:any[],current:string,arch:string){
- return releases.filter(r=>!r.draft&&!r.prerelease).flatMap(r=>(r.assets??[]).flatMap((a:any)=>{
+ return releases.filter(r=>!r.draft).flatMap(r=>(r.assets??[]).flatMap((a:any)=>{
   const m=/^CAgent-Setup-(\d+\.\d+\.\d+)-win-(x64|arm64)\.exe$/.exec(a.name??'');
   if(!m||m[2]!==arch||!newer(m[1],current))return [];
-  const url=new URL(a.browser_download_url);if(url.origin!=='https://github.com'||!url.pathname.startsWith('/'+repository+'/releases/download/'))return [];
+  if(!trustedDownload(a.browser_download_url)||!Number.isSafeInteger(a.size)||a.size<=0||a.size>256*1024*1024)return [];
+  const url=new URL(a.browser_download_url);
   if(!/^sha256:[a-f0-9]{64}$/i.test(a.digest??''))return [];
   return [{version:m[1],name:a.name,url:url.href,digest:a.digest.slice(7).toLowerCase(),size:a.size}];
  })).sort((a,b)=>newer(a.version,b.version)?-1:1)[0];
 }
 export class AgentUpdater{
  private candidate:ReturnType<typeof selectUpdate>;private state:any={phase:'idle'};
+ private verified?:{path:string;digest:string};
+ private automatic=true;private timer:ReturnType<typeof setInterval>|undefined;private checking=false;
  constructor(private directory:string,private version:string){}
- async check(){if(process.platform!=='win32')throw new Error('此平台请从 GitHub 下载更新');const r=await fetch('https://api.github.com/repos/'+repository+'/releases?per_page=30',{headers:{Accept:'application/vnd.github+json'},signal:AbortSignal.timeout(15000)});if(!r.ok)throw new Error('检查更新失败：GitHub HTTP '+r.status);this.candidate=selectUpdate(await r.json() as any[],this.version,process.arch);return {current:this.version,available:!!this.candidate,version:this.candidate?.version};}
- status(){return this.state;}
+ async initialize(){try{const saved=JSON.parse(await readFile(join(this.directory,'update-settings.json'),'utf8'));this.automatic=saved.automatic!==false;}catch{}if(process.platform==='win32'){this.timer=setInterval(()=>void this.tick(),6*60*60*1000);this.timer.unref();void this.tick();}}
+ close(){if(this.timer)clearInterval(this.timer);}
+ async settings(automatic?:boolean){if(automatic!==undefined){this.automatic=automatic;await mkdir(this.directory,{recursive:true});const path=join(this.directory,'update-settings.json');await writeFile(path+'.tmp',JSON.stringify({automatic}));await rename(path+'.tmp',path);if(automatic)void this.tick();}return {automatic:this.automatic,supported:process.platform==='win32'};}
+ private async tick(){if(!this.automatic||this.checking||['ready','downloading'].includes(this.state.phase))return;this.checking=true;try{const result=await this.check();if(result.available&&this.automatic)this.start();}catch(e){this.state={phase:'failed',error:e instanceof Error?e.message:String(e)};}finally{this.checking=false;}}
+ async check(){if(process.platform!=='win32')throw new Error('此平台尚不支持自动安装，请从香港下载页获取对应安装包');const r=await fetch(downloadManifest,{headers:{Accept:'application/json'},redirect:'error',signal:AbortSignal.timeout(15000)});if(!r.ok)throw new Error('检查更新失败：香港更新服务 HTTP '+r.status);const releases=await r.json();if(!Array.isArray(releases))throw new Error('更新目录格式不正确');this.candidate=selectUpdate(releases,this.version,process.arch);return {current:this.version,available:!!this.candidate,version:this.candidate?.version};}
+ status(){return {...this.state,automatic:this.automatic};}
+ async verify(){if(this.state.phase!=='ready'||!this.verified||createHash('sha256').update(await readFile(this.verified.path)).digest('hex')!==this.verified.digest)throw Error('更新文件已改变，请重新下载');return this.status();}
  start(){if(this.state.phase==='downloading')return this.state;if(!this.candidate)throw new Error('请先检查可用更新');const c=this.candidate;this.state={phase:'downloading',bytes:0,total:c.size};void this.download(c).catch(e=>{this.state={phase:'failed',error:e.message};});return this.state;}
  private async download(c:NonNullable<typeof this.candidate>){
   const dir=join(this.directory,'updates');await mkdir(dir,{recursive:true});const path=join(dir,c.name),part=path+'.part';
-  try{const r=await fetch(c.url,{signal:AbortSignal.timeout(300000)});if(!r.ok||!r.body)throw new Error('下载安装包失败');const chunks:Uint8Array[]=[];let count=0;for await(const chunk of r.body as any){count+=chunk.length;if(count>256*1024*1024||count>c.size)throw new Error('安装包大小异常');chunks.push(chunk);this.state={phase:'downloading',bytes:count,total:c.size};}const data=Buffer.concat(chunks);if(count!==c.size||createHash('sha256').update(data).digest('hex')!==c.digest)throw new Error('安装包校验失败');await writeFile(part,data);await rename(part,path);this.state={phase:'ready',path,version:c.version};}finally{await rm(part,{force:true});}
+  try{const r=await fetch(c.url,{redirect:'error',signal:AbortSignal.timeout(300000)});if(!r.ok||!r.body)throw new Error('下载安装包失败');const chunks:Uint8Array[]=[];let count=0;for await(const chunk of r.body as any){count+=chunk.length;if(count>256*1024*1024||count>c.size)throw new Error('安装包大小异常');chunks.push(chunk);this.state={phase:'downloading',bytes:count,total:c.size};}const data=Buffer.concat(chunks);if(count!==c.size||createHash('sha256').update(data).digest('hex')!==c.digest)throw new Error('安装包校验失败');await writeFile(part,data);await rename(part,path);this.verified={path,digest:c.digest};this.state={phase:'ready',path,version:c.version};}finally{await rm(part,{force:true});}
  }
 }

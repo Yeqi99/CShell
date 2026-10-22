@@ -1,3 +1,4 @@
+import { ErrorNotice } from './ErrorNotice';
 import { remoteWechatConfig } from '../../shared/wechat';
 import {WechatPlugin} from './WechatPlugin';
 import {Monitor,Package,MessageCircle} from 'lucide-react';
@@ -129,9 +130,7 @@ export function AgentCapabilityMarket({ target, call }: { target: AgentTarget; c
         </button>
       </div>
       {error && (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
+        <ErrorNotice title="应用能力操作未完成" error={error} />
       )}
       {!item ? (
         <>
@@ -459,9 +458,7 @@ function DesktopSettings({ target, call }: { target: AgentTarget; call: Call }) 
         />
       )}
       {error && (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
+        <ErrorNotice title="应用能力操作未完成" error={error} />
       )}
     </section>
   );

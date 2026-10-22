@@ -47,11 +47,11 @@ final class AppUpdates {
   private HttpURLConnection request(String address) throws Exception {
     for(int i=0;i<6;i++){
       URL u=new URL(address);
-      if(!"https".equals(u.getProtocol())||!Arrays.asList("api.github.com","github.com","release-assets.githubusercontent.com","objects.githubusercontent.com").contains(u.getHost()))throw new IOException("更新下载地址无效");
+      if(!"https".equals(u.getProtocol())||!"shell.canp.ai".equals(u.getHost()))throw new IOException("更新下载地址无效");
       HttpURLConnection c=(HttpURLConnection)u.openConnection();c.setConnectTimeout(20000);c.setReadTimeout(30000);c.setInstanceFollowRedirects(false);c.setRequestProperty("User-Agent","CShell/"+current());
       int status=c.getResponseCode();
       if(status>=300&&status<400){String location=c.getHeaderField("Location");c.disconnect();address=new URL(u,location).toString();continue;}
-      if(status!=200){c.disconnect();throw new IOException(status==403||status==429?"GitHub 限制了当前网络的请求，请稍后重试或打开下载页":"GitHub HTTP "+status);}return c;
+      if(status!=200){c.disconnect();throw new IOException(status==403||status==429?"香港下载服务限制了当前网络的请求，请稍后重试或打开下载页":"香港下载服务 HTTP "+status);}return c;
     }
     throw new IOException("下载重定向过多");
   }
@@ -65,13 +65,13 @@ final class AppUpdates {
     if(busy)return;busy=true;ready=null;readyHash=null;url=null;sums=null;name=null;version=null;state("正在检查更新…",false,-1);
     worker.execute(()->{
       try{
-        JSONArray list=new JSONArray(text("https://api.github.com/repos/Yeqi99/CShell/releases?per_page=30",2000000));
+        JSONArray list=new JSONArray(text("https://shell.canp.ai/downloads/opensource/releases.json",2000000));
         String best=current();boolean compatible=false;
         String selectedUrl=null,selectedSums=null,selectedName=null,selectedVersion=null;long selectedSize=0;
         for(int i=0;i<list.length();i++){
           JSONObject r=list.getJSONObject(i);String tag=r.optString("tag_name");
           if(r.optBoolean("draft")||!tag.matches("v[0-9]+\\.[0-9]+\\.[0-9]+"))continue;
-          String expected="CShell-"+tag.substring(1)+"-android-test.apk",base="https://github.com/Yeqi99/CShell/releases/download/"+tag+"/";
+          String expected="CShell-"+tag.substring(1)+"-android-test.apk",base="https://shell.canp.ai/downloads/opensource/"+tag+"/";
           JSONObject apk=null,checksum=null;JSONArray assets=r.getJSONArray("assets");
           for(int j=0;j<assets.length();j++){JSONObject a=assets.getJSONObject(j);if(expected.equals(a.optString("name")))apk=a;if("SHA256SUMS.txt".equals(a.optString("name")))checksum=a;}
           if(apk==null||checksum==null)continue;
