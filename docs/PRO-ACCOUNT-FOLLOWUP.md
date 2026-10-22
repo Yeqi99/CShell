@@ -77,3 +77,5 @@ CloudSync 新增 activationTarget：认证写入目标目录后提交活动目�
 用户授权给 854124946@qq.com 开通会员，已在香港生产库更新并写 admin_audit；账号 02d3ad7b5a484afc8bba4947f7a502d6，首次赠送一个日历月，到期北京时间 2026-11-22 22:59:08。不要重复赠送或重复延长。
 
 用户新增内核优先需求：CSV（含 iShell 等可识别字段）批量导入、多连接字符串预览解析；本机→目标及机器→机器延迟测试；CAgent 可视化桌面“机器信息”应用，详细概览/CPU/GPU/内存/磁盘/网络、真实时间序列与缺失能力状态；修复免费模型编造 server.cpu.view/server.disk.view 权限节点和吐出 Previous tool result，增强工具使用提示。必须先独立开源内核分支实现验证，再集成 Pro，保留全部已有 Pro 追加目标，不在 Pro 专属代码里重复开发内核。
+
+新内核工作已在 D:/.codex/worktrees/core-connection-tools/CShell 的 codex/core-connection-tools 分支开展（基于 64b06b6）；详情见该工作树 docs/CORE-CONNECTION-TOOLS.md。先完成该内核批次再同步 Pro。当前已修权限工具 enum/历史消息构造及本地 CSV/多连接解析模块，尚未接入完整 UI 或发布。继续时同时保留本文件尚未完成的 Pro 目标。
