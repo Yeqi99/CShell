@@ -53,17 +53,18 @@ export class CagentCloud {
         const profile = await this.sync.accountRequest('/v1/account');
         const catalog = await this.sync.accountRequest('/v1/models');
         await this.assistant.ensureOfficialModels(catalog.models.map((m: { id: string }) => m.id));
-        if (profile.membership.active) {
+        {
           if (Date.now() - this.lastEnroll > 30000) {
             const device = await this.hooks.enroll();
             const { accountPassword, ...publicDevice } = device;
             const answer = await this.sync.accountRequest('/v1/devices/register', publicDevice);
-            await this.hooks.start(answer.relay);
+            if (profile.membership.active && answer.relay) await this.hooks.start(answer.relay);
+            else await this.hooks.stop();
             const entry = {
               protocol: 1,
               ...device,
-              host: answer.relay.host,
-              port: answer.relay.port,
+              host: (answer.endpoint ?? answer.relay).host,
+              port: (answer.endpoint ?? answer.relay).port,
               accountManaged: true,
             };
             this.cached.devices = [
@@ -88,7 +89,8 @@ export class CagentCloud {
             this.lastEnroll = Date.now();
             this.transportError = undefined;
           }
-        } else await this.hooks.stop();
+        }
+        if (!profile.membership.active) await this.hooks.stop();
       }
       await this.sync.autoSync();
     } catch (e) {
@@ -173,7 +175,17 @@ export class CagentCloud {
         })
         .strict()
         .parse(input);
-      return this.sync.register(q.email, q.code, q.password);
+      if (this.sync.status().email) throw Error('请先退出当前账号，再创建账号');
+      this.paused = true;
+      try {
+        await this.pending;
+        const result = await this.sync.register(q.email, q.code, q.password);
+        this.lastEnroll = 0;
+        return result;
+      } finally {
+        this.paused = false;
+        void this.tick();
+      }
     }
     if (method === 'account.logout') {
       this.paused = true;

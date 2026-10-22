@@ -71,7 +71,10 @@ class ServiceTest(unittest.TestCase):
         device=str(uuid.uuid4());body={'deviceId':device,'name':'Machine','certificate':'-----BEGIN CERTIFICATE-----'+'A'*100+'-----END CERTIFICATE-----'}
         d=self.service.devices
         with patch.dict('os.environ',{'RELAY_HOST':'relay.example.com','RELAY_FINGERPRINT':'a'*64}):
-            with self.assertRaises(Failure):d.register(a,body)
+            self.assertIsNone(d.register(a,body)['relay'])
+            self.assertEqual(len(d.list(a)['devices']),1)
+            self.assertEqual(d.list(b)['devices'],[])
+            with self.assertRaises(Failure):d.lease(a,{'deviceId':device})
             for account in [a,b]:self.service.admin_membership({'account':account,'expiresAt':time.time()+3600,'reason':'relay test'})
             registration=d.register(a,body)['relay']['credential']
             with self.assertRaises(Failure):d.register(b,body)

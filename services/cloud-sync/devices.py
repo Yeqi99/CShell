@@ -30,7 +30,7 @@ class Devices:
   if not host or not re.fullmatch('[a-f0-9]{64}',fp):raise self.F(503,'会员连接服务尚未就绪')
   return {'host':host,'port':int(os.environ.get('RELAY_PORT','22444')),'fingerprint':fp}
  def register(self,account,body):
-  self.member(account);endpoint=self.endpoint();identity=body.get('deviceId');name=body.get('name');cert=body.get('certificate')
+  endpoint=self.endpoint();identity=body.get('deviceId');name=body.get('name');cert=body.get('certificate')
   try:uuid.UUID(identity)
   except (ValueError,TypeError,AttributeError):raise self.F(400,'设备标识不正确')
   if not isinstance(name,str) or not 1<=len(name)<=80 or not isinstance(cert,str) or not 100<=len(cert)<=8192 or 'BEGIN CERTIFICATE' not in cert:raise self.F(400,'设备信息不正确')
@@ -40,9 +40,9 @@ class Devices:
    if not row and db.execute('SELECT count(*) FROM cloud_devices WHERE account=?',(account,)).fetchone()[0]>=100:raise self.F(413,'账号最多关联 100 台机器')
    token=row[2] if row else secrets.token_hex(32)
    db.execute('INSERT OR REPLACE INTO cloud_devices VALUES(?,?,?,?,?,?)',(identity,account,cert,name,token,time.time()))
-  return {'relay':dict(endpoint,targetId=identity,credential=token)}
+  member=self.s.profile(account)['membership']['active']
+  return {'endpoint':endpoint,'relay':dict(endpoint,targetId=identity,credential=token) if member else None}
  def list(self,account):
-  self.member(account)
   with self.s.db() as db:rows=db.execute('SELECT id,name,certificate,seen FROM cloud_devices WHERE account=?',(account,)).fetchall()
   return {'devices':[{'deviceId':r[0],'name':r[1],'certificate':r[2],'online':r[3]>time.time()-90} for r in rows]}
  def lease(self,account,body):
