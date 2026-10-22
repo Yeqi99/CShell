@@ -1,4 +1,4 @@
-import { app } from 'electron';
+import { app, net } from 'electron';
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -92,10 +92,11 @@ export async function registerCloudHandlers(
       }
       publish();
     },
-  });
+  }, undefined, (url, options) => net.fetch(String(url), options));
   await cloud.load();
   handle('cloud:status', () => cloud.accountStatus());
   handle('cloud:code', (email) => cloud.requestCode(z.email().max(254).parse(email)));
+  handle('cloud:register',(email,code,password)=>cloud.register(z.email().max(254).parse(email),z.string().regex(/^\d{6}$/).parse(code),z.string().min(8).max(128).parse(password)));
   handle('cloud:login', (email, code, password = false) =>
     cloud.login(
       z.email().max(254).parse(email),
@@ -109,11 +110,8 @@ export async function registerCloudHandlers(
     cloud.sync(z.enum(['upload', 'download']).optional().parse(direction)),
   );
   handle('cloud:logout', () => cloud.logout());
-  const timer = setInterval(() => {
-    const status = cloud.status();
-    if (status.unlocked && status.revision > 0 && status.state === 'ready')
-      void cloud.sync().catch(() => {});
-  }, 60000);
+  void cloud.autoSync();
+  const timer = setInterval(() => { void cloud.autoSync(); }, 15000);
   timer.unref();
   app.once('before-quit', () => clearInterval(timer));
 }

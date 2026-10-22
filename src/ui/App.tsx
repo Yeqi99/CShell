@@ -1,3 +1,4 @@
+import './account.css';
 import { AccountEntry } from './components/AccountEntry';
 import { CloudSettings } from './components/CloudSettings';
 import {LinuxWorkspace} from './components/LinuxWorkspace';

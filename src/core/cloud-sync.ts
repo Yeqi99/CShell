@@ -2,7 +2,7 @@ import { mkdir, readFile, rename, writeFile, readdir, unlink } from 'node:fs/pro
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { SecretCodec } from './store';
-import { decryptVault, encryptVault, newRecoveryKey, vaultDigest, unwrapRecoveryKey } from './cloud-crypto';
+import { decryptVault, encryptVault, newRecoveryKey, vaultDigest, unwrapRecoveryKey, wrapRecoveryKey } from './cloud-crypto';
 import type { CloudEnvelope, CloudSession, CloudStatus, CloudRevision } from '../shared/cloud-sync';
 
 interface LocalState {
@@ -11,6 +11,7 @@ interface LocalState {
   revision: number;
   digest?: string;
   lastSync?: string;
+  membership?: CloudStatus["membership"];
   pending?: { baseRevision: number; mutationId: string; envelope: CloudEnvelope; digest: string };
 }
 export interface CloudAdapter {
@@ -23,15 +24,26 @@ export class CloudSync {
   private state: CloudStatus['state'] = 'signed-out';
   private error?: string;
   private busy = false;
-  private membership?: CloudStatus['membership'];
   private profileChecked = 0;
+  private profileLoading = false;
   async accountStatus() {
     const session = this.data.session;
-    if (session && Date.now() - this.profileChecked > 60000) {
-      this.profileChecked = Date.now();
-      try { const profile = await this.api('/v1/account'); if (this.data.session === session) this.membership = profile.membership; } catch { this.membership = undefined; }
+    if (session && !this.profileLoading && Date.now() - this.profileChecked > 60000) {
+      this.profileLoading = true;
+      void this.api('/v1/account').then(async profile => {
+        if (this.data.session !== session) return;
+        this.data.membership = profile.membership;
+        this.profileChecked = Date.now();
+        if (!this.busy) await this.exclusive(() => this.persist());
+      }).catch(() => { this.profileChecked = Date.now() - 45000; })
+        .finally(() => { this.profileLoading = false; });
     }
     return this.status();
+  }
+  async autoSync() {
+    if (!this.busy && this.data.session && this.data.key && this.state !== 'conflict') {
+      try { const first = !this.data.digest && this.data.revision === 0 && (await this.remote()).envelope; await this.sync(first ? 'download' : undefined); } catch { /* next tick retries without user intervention */ }
+    }
   }
   private preserveUnreadable = false;
   constructor(
@@ -58,7 +70,7 @@ export class CloudSync {
   }
   status(): CloudStatus {
     return {
-      membership: this.data.session ? this.membership : undefined,
+      membership: this.data.session ? this.data.membership : undefined,
       email: this.data.session?.email,
       unlocked: !!this.data.key,
       revision: this.data.revision,
@@ -78,10 +90,15 @@ export class CloudSync {
       this.preserveUnreadable = false;
     }
     await writeFile(join(this.directory, 'cloud-sync.enc.tmp'), text, { mode: 0o600 });
-    await rename(
-      join(this.directory, 'cloud-sync.enc.tmp'),
-      join(this.directory, 'cloud-sync.enc'),
-    );
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await rename(join(this.directory, 'cloud-sync.enc.tmp'), join(this.directory, 'cloud-sync.enc'));
+        break;
+      } catch (error) {
+        if (attempt >= 5 || !['EPERM', 'EBUSY', 'EACCES'].includes((error as NodeJS.ErrnoException).code || '')) throw error;
+        await new Promise(resolve => setTimeout(resolve, 80 * (attempt + 1)));
+      }
+    }
   }
   private async api(path: string, body?: unknown): Promise<any> {
     const response = await this.request(this.endpoint + path, {
@@ -93,7 +110,7 @@ export class CloudSync {
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       signal: AbortSignal.timeout(30000),
       redirect: 'error',
-    });
+    }).catch(() => { throw new Error('暂时无法连接云端，网络恢复后会自动继续同步'); });
     const reader = response.body?.getReader();
     if (!reader) throw new Error('云端响应为空');
     const chunks: Uint8Array[] = [];
@@ -109,7 +126,8 @@ export class CloudSync {
     } finally {
       await reader.cancel().catch(() => {});
     }
-    const value = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    let value: any;
+    try { value = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { throw new Error('云服务暂时不可用，稍后自动重试'); }
     if (!response.ok) {
       if (response.status === 409) this.state = 'conflict';
       throw new Error(typeof value.error === 'string' ? value.error.slice(0, 300) : '云端请求失败');
@@ -128,12 +146,23 @@ export class CloudSync {
   async requestCode(email: string) {
     await this.api('/v1/auth/code', { email });
   }
+  async register(email:string,code:string,password:string) {
+    return this.exclusive(async()=>{
+      const accountId=randomUUID().replaceAll('-',''),key=newRecoveryKey();
+      const snapshot=await this.adapter.export();
+      const session:CloudSession=await this.api('/v1/auth/register',{email,code,password,accountId,keybox:wrapRecoveryKey(key,password,accountId),envelope:encryptVault(snapshot,key,accountId)});
+      if(session.accountId!==accountId || !/^[A-Za-z0-9_-]{43}$/.test(session.token))throw new Error('注册响应不正确，请使用密码登录');
+      this.data={session,key,revision:1,digest:vaultDigest(snapshot),lastSync:new Date().toISOString(),membership:{active:false,expiresAt:null}};
+      this.state='ready';this.error=undefined;this.profileChecked=0;
+      await this.persist();return this.status();
+    });
+  }
   async login(email: string, code: string, password = false) {
     await this.exclusive(async () => {
       const session: CloudSession & {keybox?:any} = await this.api(password ? '/v1/auth/password-login' : '/v1/auth/login', password ? { email, password: code } : { email, code });
       if (!/^[a-f0-9]{32}$/.test(session.accountId) || !/^[A-Za-z0-9_-]{43}$/.test(session.token))
         throw new Error('登录响应不正确');
-      this.membership = undefined; this.profileChecked = 0;
+      this.profileChecked = 0;
       const same = this.data.session?.accountId === session.accountId;
       this.data = same ? { ...this.data, session } : { session, revision: 0 };
       if(password && session.keybox) this.data.key = unwrapRecoveryKey(session.keybox, code, session.accountId);

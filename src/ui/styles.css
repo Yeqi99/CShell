@@ -5963,11 +5963,3 @@ input[type='radio']:focus-visible {
 @media (prefers-reduced-motion:reduce){.visual-desktop-workspace > .tabbar{transition:none;}}
 /* Cloud controls live inside the existing settings workspace, preserving drafts. */
 .cloud-settings{max-width:760px}.cloud-settings fieldset{border:0;padding:0;display:grid;gap:12px;max-width:460px}.cloud-settings label{display:grid;gap:6px}.cloud-actions{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0}.cloud-recovery,.cloud-confirm{padding:16px;border:1px solid var(--border);border-radius:8px;margin:16px 0}.cloud-recovery textarea{width:100%;min-height:64px;resize:vertical}.cloud-recovery label{display:flex;align-items:center}.cloud-confirm button{margin-right:8px}
-
-/* Account is a first-class workspace, with a stable top-level entry. */
-.account-entry{display:flex;align-items:center;gap:8px;padding:5px 10px;border:1px solid var(--border,#dce1e9);border-radius:8px;background:transparent;color:inherit;-webkit-app-region:no-drag}
-.member-badge{display:inline-block;padding:2px 7px;border-radius:5px;font-size:11px;line-height:18px;background:#edf0f4;color:#596477;white-space:nowrap}.member-badge.active{background:#fff0ce;color:#795218;border:1px solid #ecd29c}
-.account-workspace{padding:40px 24px;overflow:auto;background:var(--bg,#f6f8fb)}
-.account-workspace .cloud-settings{max-width:460px;margin:0 auto;padding:32px;border:1px solid var(--border,#dce1e9);border-radius:18px;background:var(--panel,#fff);box-shadow:0 12px 40px #172b4d08}
-.cloud-settings h2{font-size:26px;letter-spacing:-.6px;margin:0 0 10px}.cloud-settings>p.muted{margin-bottom:28px;line-height:1.7}
-.cloud-settings fieldset{display:grid;gap:16px;border:0;padding:0;margin:0}.cloud-settings label{display:grid;gap:8px}.cloud-settings input{min-height:42px;border-radius:8px}.cloud-settings form .primary{width:100%;min-height:44px}.cloud-settings .cloud-advanced{margin:12px 0}.cloud-advanced summary{cursor:pointer;color:var(--muted,#6b7280);font-size:12px}.cloud-settings .form-actions{display:flex;flex-wrap:wrap;gap:10px}.cloud-settings small{display:block;margin-top:8px}

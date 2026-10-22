@@ -110,6 +110,10 @@ test('two devices restore, detect concurrent edits, preserve encrypted backup an
     drop = true;
     await assert.rejects(x.sync());
     const revision = remote.revision;
+    assert.equal(x.status().state, "error");
+    await x.autoSync();
+    assert.equal(x.status().state, "ready");
+    assert.equal(remote.revision, revision);
     x = make(
       'a',
       () => a,
@@ -122,4 +126,11 @@ test('two devices restore, detect concurrent edits, preserve encrypted backup an
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
+});
+test('registration initializes encrypted cloud and password login restores on a new device',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'cshell-signup-'));let registration:any;let restored:any;
+ const request:typeof fetch=async(url,options)=>{const path=String(url).split('/api')[1];if(path==='/v1/auth/register'){registration=JSON.parse(String(options!.body));return Response.json({accountId:registration.accountId,email:registration.email,token:'x'.repeat(43)});}if(path==='/v1/auth/password-login')return Response.json({accountId:registration.accountId,email:registration.email,token:'y'.repeat(43),keybox:registration.keybox});if(path==='/v1/vault')return Response.json({revision:1,envelope:registration.envelope});return Response.json({ok:true});};
+ const codec={encrypt:async(s:string)=>s,decrypt:async(s:string)=>s};const snapshot={connections:[{host:'fixture.internal'}],model:{key:'private-fixture-key'}};
+ try{const first=new CloudSync(join(dir,'a'),codec,{export:async()=>snapshot,validate:()=>{},import:async()=>{}},'https://test.invalid/api',request);await first.register('fixture@example.com','123456','fixture-password');assert.equal(first.status().state,'ready');assert(!JSON.stringify(registration.envelope).includes('private-fixture-key'));
+ const second=new CloudSync(join(dir,'b'),codec,{export:async()=>({}),validate:()=>{},import:async(v)=>{restored=v;}},'https://test.invalid/api',request);await second.login('fixture@example.com','fixture-password',true);assert.deepEqual(restored,snapshot);assert.equal(second.status().state,'ready');}finally{await rm(dir,{recursive:true,force:true});}
 });

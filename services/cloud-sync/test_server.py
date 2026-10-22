@@ -25,6 +25,25 @@ class ServiceTest(unittest.TestCase):
         with self.assertRaises(Failure):
             self.service.admin_membership({'account': account, 'expiresAt': float('nan'), 'reason': 'invalid'})
 
+    def test_registration_creates_password_keybox_and_vault_atomically(self):
+        import base64
+        email = 'new@example.com'
+        self.service.request_code(email, 'register-ip')
+        encrypted = {'format': 1, 'nonce': base64.b64encode(bytes(12)).decode(), 'ciphertext': base64.b64encode(bytes(32)).decode()}
+        body = {'email': email, 'code': self.mail[email], 'password': 'test-password-only', 'accountId': 'b'*32, 'keybox': {'salt': base64.b64encode(bytes(32)).decode(), 'envelope': encrypted}, 'envelope': encrypted}
+        wrong = dict(body, code='wrong')
+        with self.assertRaises(Failure):
+            self.service.register(wrong, 'register-ip')
+        self.assertEqual(len(self.service.admin_accounts()['accounts']), 0)
+        session = self.service.register(body, 'register-ip')
+        self.assertEqual(self.service.authenticate(session['token']), body['accountId'])
+        self.assertEqual(self.service.read(body['accountId'])['revision'], 1)
+        login = self.service.password_login(email, body['password'], 'password-ip')
+        self.assertEqual(login['keybox'], body['keybox'])
+        with self.assertRaises(Failure):
+            self.service.register(body, 'register-ip')
+        self.assertEqual(self.service.read(body['accountId'])['revision'], 1)
+
     def tearDown(self):
         self.directory.cleanup()
 

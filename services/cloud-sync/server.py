@@ -140,6 +140,54 @@ class Service:
             raise Failure(401, '验证码无效、过期或尝试次数已用尽')
         return {'accountId': account, 'email': email, 'token': token}
 
+    def register(self, body, ip):
+        email = self.email(body.get('email'))
+        self.limit('register-ip:' + self.digest(ip), 10, 600)
+        password, account, box = body.get('password'), body.get('accountId'), body.get('keybox')
+        if not isinstance(password, str) or not 8 <= len(password) <= 128 or not isinstance(account, str) or not re.fullmatch(r'[a-f0-9]{32}', account):
+            raise Failure(400, '密码须为 8 至 128 个字符')
+        def envelope(value, maximum):
+            if not isinstance(value, dict) or set(value) != {'format', 'nonce', 'ciphertext'} or value['format'] != 1:
+                raise Failure(400, '同步初始化数据不正确')
+            try:
+                if len(base64.b64decode(value['nonce'], validate=True)) != 12 or not 16 <= len(base64.b64decode(value['ciphertext'], validate=True)) <= maximum:
+                    raise ValueError()
+            except (ValueError, TypeError):
+                raise Failure(400, '同步初始化数据不正确')
+            return json.dumps(value, separators=(',', ':'))
+        if not isinstance(box, dict) or set(box) != {'salt', 'envelope'}:
+            raise Failure(400, '密钥初始化数据不正确')
+        try:
+            if len(base64.b64decode(box['salt'], validate=True)) != 32:
+                raise ValueError()
+        except (ValueError, TypeError):
+            raise Failure(400, '密钥初始化数据不正确')
+        envelope(box['envelope'], 512)
+        vault = envelope(body.get('envelope'), 8 * 1024 * 1024 + 16)
+        valid = False
+        with self.db() as db:
+            db.execute('BEGIN IMMEDIATE')
+            if db.execute('SELECT 1 FROM accounts WHERE email=? OR id=?', (email, account)).fetchone():
+                raise Failure(409, '邮箱已注册，请直接登录')
+            row = db.execute('SELECT digest,expires,attempts FROM codes WHERE email=?', (email,)).fetchone()
+            code = body.get('code')
+            if row and row[1] > time.time() and row[2] < 5:
+                db.execute('UPDATE codes SET attempts=attempts+1 WHERE email=?', (email,))
+                valid = isinstance(code, str) and bool(re.fullmatch(r'\d{6}', code)) and hmac.compare_digest(row[0], self.digest(email + ':' + code))
+                if valid:
+                    salt = secrets.token_hex(16)
+                    digest = hashlib.scrypt(password.encode(), salt=bytes.fromhex(salt), n=16384, r=8, p=1).hex()
+                    token = secrets.token_urlsafe(32)
+                    db.execute('INSERT INTO accounts VALUES(?,?)', (account, email))
+                    db.execute('INSERT INTO passwords VALUES(?,?,?)', (account, salt, digest))
+                    db.execute('INSERT INTO keyboxes VALUES(?,?)', (account, json.dumps(box)))
+                    db.execute('INSERT INTO vaults VALUES(?,?,?,?)', (account, 1, vault, secrets.token_hex(16)))
+                    db.execute('INSERT INTO sessions VALUES(?,?,?)', (self.digest(token), account, time.time()+30*86400))
+                    db.execute('DELETE FROM codes WHERE email=?', (email,))
+        if not valid:
+            raise Failure(401, '验证码无效、过期或尝试次数已用尽')
+        return {'accountId': account, 'email': email, 'token': token}
+
     def set_password(self, account, password):
         if not isinstance(password, str) or not 8 <= len(password) <= 128:
             raise Failure(400, '密码须为 8 至 128 个字符')
@@ -290,6 +338,8 @@ def handler(service):
                     value = {'ok': True, 'protocol': 1, 'mailConfigured': mail_configured()}
                 elif self.command == 'POST' and self.path == '/v1/auth/code':
                     value = service.request_code(body.get('email'), ip)
+                elif self.command == 'POST' and self.path == '/v1/auth/register':
+                    value = service.register(body, ip)
                 elif self.command == 'POST' and self.path == '/v1/auth/login':
                     value = service.login(body.get('email'), body.get('code'), ip)
                 elif self.command == 'POST' and self.path == '/v1/auth/password-login':

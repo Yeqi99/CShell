@@ -4,6 +4,11 @@ import type { CloudEnvelope } from '../shared/cloud-sync';
 export function newRecoveryKey() {
   return randomBytes(32).toString('base64url');
 }
+export function wrapRecoveryKey(key:string,password:string,account:string) {
+  const salt=randomBytes(32);
+  const derived=pbkdf2Sync(password,salt,210000,32,'sha256').toString('base64url');
+  return {salt:salt.toString('base64'),envelope:encryptVault({key},derived,account)};
+}
 export function unwrapRecoveryKey(box: {salt:string;envelope:CloudEnvelope}, password:string, account:string): string {
   const salt = Buffer.from(box.salt, 'base64');
   if(salt.length !== 32) throw new Error('自动解锁数据不正确');

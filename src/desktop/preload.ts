@@ -5,6 +5,7 @@ const bridge: Bridge = {
   cloudStatus:()=>ipcRenderer.invoke('cloud:status'),
   onCloudChanged:listener=>{const fn=()=>listener();ipcRenderer.on('cloud:changed',fn);return()=>ipcRenderer.removeListener('cloud:changed',fn);},
   cloudRequestCode:email=>ipcRenderer.invoke('cloud:code',email),
+  cloudRegister:(email,code,password)=>ipcRenderer.invoke('cloud:register',email,code,password),
   cloudLogin:(email,code,password)=>ipcRenderer.invoke('cloud:login',email,code,password),
   cloudUnlock:key=>ipcRenderer.invoke('cloud:unlock',key),
   cloudCreateVault:()=>ipcRenderer.invoke('cloud:create'),
