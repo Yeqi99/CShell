@@ -1,0 +1,21 @@
+[Unit]
+Description=CShell isolated model transport
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=cshell-sync
+Group=cshell-sync
+ExecStart=/usr/bin/ssh -N -T -o BatchMode=yes -o ExitOnForwardFailure=yes -o ServerAliveInterval=20 -o ServerAliveCountMax=3 -o StrictHostKeyChecking=yes -o UserKnownHostsFile=/etc/cshell-model-link/known_hosts -i /etc/cshell-model-link/id_ed25519 -L 127.0.0.1:18891:127.0.0.1:18091 -L 127.0.0.1:18892:127.0.0.1:18101 root@115.230.124.120
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+MemoryMax=64M
+CPUQuota=25%
+TasksMax=8
+
+[Install]
+WantedBy=multi-user.target

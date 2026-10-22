@@ -34,3 +34,9 @@ test('agent browser tunnel binds ownership, verifies write order and transports 
     await new Promise<void>((r) => server.close(() => r()));
   }
 });
+
+test('selected application proxy fails closed instead of dialing the original destination',async()=>{
+ let directConnections=0;const server=createServer(s=>{directConnections++;s.destroy();});await new Promise<void>(r=>server.listen(0,'127.0.0.1',r));
+ const network=new AgentBrowserNetwork(()=>true,async()=>{throw Error('Selected exit unavailable');});
+ try{await assert.rejects(network.call('browser.open',{host:'127.0.0.1',port:(server.address() as any).port},'owner'),/Selected exit unavailable/);assert.equal(directConnections,0);}finally{network.close();await new Promise<void>(r=>server.close(()=>r()));}
+});

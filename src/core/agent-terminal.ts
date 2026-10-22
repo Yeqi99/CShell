@@ -151,6 +151,7 @@ export class AgentTerminalProvider implements ManagedProvider {
       timer?: ReturnType<typeof setTimeout>;
     }
   >();
+  networkEnvironment?:()=>Record<string,string>;
   constructor(
     private emit: (event: SessionEvent) => void,
     private detect = detectAgentShells,
@@ -196,7 +197,7 @@ export class AgentTerminalProvider implements ManagedProvider {
     }>((resolve, reject) => {
       const child = spawnProcess(shell.executable, args, {
         cwd: homedir(),
-        env: process.env,
+        env: {...process.env,...(shell.environment==='host'?this.networkEnvironment?.():{})},
         windowsHide: true,
         windowsVerbatimArguments: request.shell === 'cmd',
         detached: process.platform !== 'win32',
@@ -277,6 +278,7 @@ export class AgentTerminalProvider implements ManagedProvider {
     const env = Object.fromEntries(
       Object.entries(process.env).filter((v): v is [string, string] => v[1] !== undefined),
     );
+    if(shell.environment==='host')Object.assign(env,this.networkEnvironment?.());
     delete env.ELECTRON_RUN_AS_NODE;
     delete env.CSHELL_AGENT_CONTROL_TOKEN;
     const pty = spawn(shell.executable, shell.args, {

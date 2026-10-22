@@ -34,7 +34,7 @@ public class MainActivity extends Activity {
   };
   private final Object trustLock = new Object();
   private static class Connection {
-    Session session; volatile SshAgentBridge bridge; ChannelShell shell; OutputStream output; AgentConnection agent, desktop; String agentEndpoint, agentHost; int agentPort;
+    Session session; volatile SshAgentBridge bridge; ChannelShell shell; OutputStream output; AgentConnection agent, desktop; String agentEndpoint, agentHost, cloudAgentId; int agentPort;
     final ExecutorService files = Executors.newSingleThreadExecutor();
     final ExecutorService writer = Executors.newSingleThreadExecutor();
     final Semaphore outputSlots = new Semaphore(8);
@@ -282,7 +282,7 @@ public class MainActivity extends Activity {
       final AgentConnection[] holder=new AgentConnection[1];
       synchronized(c){if(c.desktop!=null)return;holder[0]=new AgentConnection((type,value)->{if(c.desktop!=holder[0])return;if(type.startsWith("desktop-")&&!type.equals("desktop-status"))event(id,type,value);if(type.equals("error"))event(id,"desktop-error",value);});c.desktop=holder[0];}
       AgentConnection d=c.desktop;
-      workers.execute(()->{try{JSONObject p=new JSONObject(options);d.connect(c.agentHost,c.agentPort,"",certificate->trust(c.agentEndpoint,certificate,()->!destroyed&&connections.get(id)==c&&c.desktop==d));if(c.desktop!=d){d.close();return;}d.desktop(p.getJSONObject("quality"),p.optBoolean("control"));}catch(Exception e){event(id,"desktop-error",e.getMessage());d.close();synchronized(c){if(c.desktop==d)c.desktop=null;}}});
+      workers.execute(()->{try{JSONObject p=new JSONObject(options);connectAgentTransport(d,c,"",()->!destroyed&&connections.get(id)==c&&c.desktop==d);if(c.desktop!=d){d.close();return;}d.desktop(p.getJSONObject("quality"),p.optBoolean("control"));}catch(Exception e){event(id,"desktop-error",e.getMessage());d.close();synchronized(c){if(c.desktop==d)c.desktop=null;}}});
     }
     @JavascriptInterface public void desktopCommand(String id,String command) {
       Connection c=connections.get(id);if(c==null||c.desktop==null)return;
@@ -306,6 +306,12 @@ public class MainActivity extends Activity {
       if(connections.get(id)==c)event(id,"machine-apps",apps.toString());
     }catch(Exception e){if(bridge!=null)bridge.close();if(connections.get(id)==c)event(id,"ssh-workspace","unavailable");}
   }
+  private void connectAgentTransport(AgentConnection connection,Connection saved,String password,java.util.function.BooleanSupplier alive)throws Exception{
+    JSONObject device=saved.cloudAgentId==null||saved.cloudAgentId.isEmpty()?null:cloud.cloudAgent(saved.cloudAgentId);
+    if(device==null){connection.connect(saved.agentHost,saved.agentPort,password,certificate->trust(saved.agentEndpoint,certificate,alive));return;}
+    byte[] expected=java.security.cert.CertificateFactory.getInstance("X.509").generateCertificate(new java.io.ByteArrayInputStream(device.getString("certificate").getBytes(java.nio.charset.StandardCharsets.UTF_8))).getEncoded();
+    connection.connect(saved.agentHost,saved.agentPort,device.getString("accountPassword"),certificate->alive.getAsBoolean()&&java.security.MessageDigest.isEqual(expected,certificate),device.getJSONObject("relay"));
+  }
   private void connectAgent(String json) {
     workers.execute(() -> {
       String id = ""; Connection c = new Connection();
@@ -322,7 +328,8 @@ public class MainActivity extends Activity {
           event(sessionId,type,value);
         });
         if(connections.putIfAbsent(id,c)!=null)throw new IOException("连接已存在");
-        c.agent.connect(host,port,password,certificate->trust(endpoint,certificate,()->!destroyed && connections.get(sessionId)==c));
+        c.cloudAgentId=p.optString("cloudProfileId");
+        connectAgentTransport(c.agent,c,password,()->!destroyed&&connections.get(sessionId)==c);
         if(destroyed || connections.get(id)!=c)c.close();
       } catch(Exception e) { event(id,"error",e.getMessage()==null?"Agent 连接失败":e.getMessage()); c.close(); if(!id.isEmpty())connections.remove(id,c); }
     });

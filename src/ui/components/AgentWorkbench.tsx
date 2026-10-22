@@ -1,3 +1,4 @@
+import {AgentAccountNetwork} from './AgentAccountNetwork';
 import { AgentAssistantSettings } from './AgentAssistantSettings';
 import { AgentApplications } from './AgentApplications';
 import { useCallback, useEffect, useState } from 'react';
@@ -89,6 +90,7 @@ export function AgentConfiguration({ target, machine=false }: { target: AgentTar
           ['applications', '应用市场'],
           ['hosting', 'HTTP 服务'],
           ['relay', '中继'],
+          ['network', '网络'],
           ['wsl', 'WSL'],
           ['logs', '日志'],
         ].filter(([id])=>!machine||id!=='applications').map(([id, label]) => (
@@ -115,6 +117,7 @@ export function AgentConfiguration({ target, machine=false }: { target: AgentTar
       <div hidden={section !== 'relay'}>
         {visited.includes('relay') && <AgentRelayPanel target={target.id} call={call} />}
       </div>
+      <div hidden={section !== 'network'}>{visited.includes('network')&&<AgentAccountNetwork call={call}/>}</div>
       <div hidden={section !== 'wsl'}>
         {visited.includes('wsl') && <AgentWsl target={target.id} call={call} />}
       </div>

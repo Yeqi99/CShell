@@ -1,5 +1,6 @@
 import {
   installedPluginSchema,
+  pluginManifestSchema,
   catalogSchema,
   initialPlugins,
   builtinPlugins,
@@ -26,6 +27,7 @@ import {
   type Preferences,
 } from '../shared/contracts';
 
+const portableExtensionsSchema=z.object({commandSuggestions:z.boolean(),dockerSocket:toolsSettingsSchema.shape.dockerSocket,commands:z.record(z.string().max(100),pluginManifestSchema.shape.commands)}).strict();
 const schema = z.object({
   version: z.literal(1),
   monitorViews: z.array(monitorViewSchema).max(100).default([]),
@@ -64,10 +66,11 @@ export class Store {
       if (snapshot.secrets[profile.id]) secrets[profile.id] = JSON.parse(await this.codec.decrypt(snapshot.secrets[profile.id]));
     }
     return { profiles: snapshot.profiles, groups: snapshot.groups, preferences: snapshot.preferences,
-      presets: snapshot.presets, monitorViews: snapshot.monitorViews, hosts: snapshot.hosts, secrets };
+      presets: snapshot.presets, monitorViews: snapshot.monitorViews, hosts: snapshot.hosts, secrets, extensions:{commandSuggestions:snapshot.tools.commandSuggestions,dockerSocket:snapshot.tools.dockerSocket,commands:Object.fromEntries(this.plugins().map(p=>[p.manifest.id,p.manifest.commands]))} };
   }
   cloudValidate(value: unknown) {
     const result = schema.pick({profiles:true, groups:true, preferences:true, presets:true, monitorViews:true, hosts:true}).extend({
+      extensions:portableExtensionsSchema.optional(),
       secrets: z.record(z.string().uuid(), z.object({password:z.string().max(65536).optional(), privateKey:z.string().max(262144).optional(), passphrase:z.string().max(65536).optional()}).strict()),
     }).strict().parse(value);
     if (new Set(result.profiles.map(p=>p.id)).size !== result.profiles.length) throw new Error('云端存在重复连接');
@@ -79,7 +82,9 @@ export class Store {
   async cloudImport(value: unknown) {
     const next = this.cloudValidate(value), secrets: Record<string,string> = {};
     for (const profile of next.profiles) if (next.secrets[profile.id]) secrets[profile.id] = await this.codec.encrypt(JSON.stringify(next.secrets[profile.id]));
-    this.data = {...this.data, ...next, secrets, hosts:{...this.data.hosts,...next.hosts}};
+    const {extensions,...portable}=next;
+    if(extensions){this.data.tools.commandSuggestions=extensions.commandSuggestions;this.data.tools.dockerSocket=extensions.dockerSocket;this.data.plugins=this.plugins().map(p=>({...p,manifest:{...p.manifest,commands:extensions.commands[p.manifest.id]??p.manifest.commands}}));}
+    this.data = {...this.data, ...portable, secrets, hosts:{...this.data.hosts,...next.hosts}};
     await this.persist();
   }
   monitorViews(): MonitorView[] { return structuredClone(this.data.monitorViews); }

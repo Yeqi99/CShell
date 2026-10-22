@@ -4,3 +4,6 @@
 .auth-switch{display:flex;justify-content:center;gap:6px;margin-top:22px!important;font-size:12px;color:var(--muted)}.auth-content [hidden]{display:none!important}
 
 .auth-content{position:relative}.auth-back{display:flex;align-items:center;gap:6px;border:0;background:transparent;color:var(--muted);font-size:12px;padding:6px 0;margin-bottom:16px}.auth-back:hover{color:var(--accent)}
+.account-memory .memory-caption{font-size:12px;color:var(--muted);margin:8px 0 12px}.memory-item{display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);padding:10px 0}.memory-item p{flex:1;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6}.memory-item button{padding:5px;background:transparent;color:var(--muted)}.account-memory textarea{margin-top:12px;width:100%;min-height:72px;resize:vertical;padding:10px;border:1px solid var(--border);border-radius:7px;background:var(--panel);color:var(--text);font:inherit}.account-memory form>div{display:flex;gap:8px;justify-content:flex-end;margin-top:8px}.account-memory form button{display:flex;align-items:center;gap:4px;font-size:12px;padding:6px 10px}
+
+.account-storage progress{width:100%;height:5px;accent-color:var(--accent,#2563eb);border:0;border-radius:4px}.account-storage p{font-size:12px;color:var(--muted);margin:12px 0 0;line-height:1.7}

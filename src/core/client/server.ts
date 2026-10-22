@@ -66,6 +66,7 @@ export class ClientServer {
     private vault: ClientVault,
     private terminal: ManagedProvider,
     private options: {
+      http?: (request:import('../../shared/http').HttpWireRequest,signal:AbortSignal)=>Promise<unknown>;
       desktopStream?: (socket: TLSSocket, owner: string) => Promise<void>;
       manage?: (method: string, params: unknown, signal: AbortSignal, owner: string) => Promise<unknown>;
       shells?: () => Promise<AgentShellOption[]>;
@@ -479,7 +480,7 @@ export class ClientServer {
       c.socket.once('close', closed);
       try {
         if (!c.alive || !this.peers.includes(c.peer)) throw new Error('Revoked');
-        return await executeHttp(request, abort.signal, undefined, 65536);
+        return this.options.http?await this.options.http(request,abort.signal):await executeHttp(request, abort.signal, undefined, 65536);
       } finally {
         c.socket.off('close', closed);
       }

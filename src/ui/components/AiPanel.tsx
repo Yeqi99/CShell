@@ -1,3 +1,4 @@
+import {isOfficialModel} from '../../shared/official-models';
 import { usePermissionNavigation } from '../permission-navigation';
 import {AiExtensionModelSelect} from './AiExtensionModelSelect';
 import { AiPermissionTree } from './AiPermissionTree';
@@ -513,7 +514,7 @@ export function AiPanel({
               >
                 <strong>{p.name}</strong>
                 <small>
-                  {p.model} · {p.extension ? '由扩展提供' : p.hasKey ? '已保存 Key' : '无 Key'}
+                  {p.model} · {isOfficialModel(p.url,p.model)?'账号免费模型':p.extension ? '由扩展提供' : p.hasKey ? '已保存 Key' : '无 Key'}
                 </small>
               </button>
               <button

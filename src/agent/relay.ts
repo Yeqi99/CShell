@@ -82,6 +82,7 @@ export function writeRelayControl(socket: TLSSocket, value: unknown) {
 }
 
 export interface AgentRelayOptions {
+  authorize?:(input:{targetId:string;credential:string;operation:string;continuation?:boolean})=>Promise<boolean>;
   vault: ClientVault;
   identity: ClientIdentity;
   audit?: (event: {
@@ -373,14 +374,17 @@ export class AgentRelayService {
         AbortSignal.timeout(this.config.connectTimeoutMs),
       ]);
       const input = requestSchema.parse(await readRelayLine(socket, signal));
-      const selected = this.config.targets.find((candidate) => candidate.id === input.targetId);
+      const external=!!this.options.authorize;
+      if(external&&!(await this.options.authorize!(input)))throw Error('Relay account authorization denied');
+      if(external){let checking=false;const timer=setInterval(()=>{if(checking)return;checking=true;void this.options.authorize!({...input,continuation:true}).then(allowed=>{if(!allowed)close();}).catch(close).finally(()=>{checking=false;});},30000);timer.unref();socket.once('close',()=>clearInterval(timer));}
+      const selected = this.config.targets.find((candidate) => candidate.id === input.targetId)??(external?{id:input.targetId,mode:'reverse' as const,host:'',port:22443}:undefined);
       if (!selected) throw new Error('Relay target is not authorized');
       targetId = selected.id;
       if (input.operation !== 'forward') {
         if (
-          selected.mode !== 'reverse' ||
+          !external && (selected.mode !== 'reverse' ||
           !Object.hasOwn(this.registrationCredentials, targetId) ||
-          !equal(this.registrationCredentials[targetId], input.credential)
+          !equal(this.registrationCredentials[targetId], input.credential))
         )
           throw new Error('Relay registration authorization denied');
         if (input.operation === 'register') {
@@ -394,7 +398,7 @@ export class AgentRelayService {
         pending.resolve(socket);
         return;
       }
-      if (!equal(this.credential, input.credential)) throw new Error('Relay authorization denied');
+      if (!external && !equal(this.credential, input.credential)) throw new Error('Relay authorization denied');
       if (this.tunnels.size >= this.config.maxConnections)
         throw new Error('Relay connection limit exceeded');
       this.tunnels.add(close);

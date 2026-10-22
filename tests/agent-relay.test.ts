@@ -298,3 +298,23 @@ test('Relay cannot convert forwarding credentials to target authorization and co
     await f.close();
   }
 });
+
+
+test('Account relay authorizes dynamic targets and keeps registration credentials separate from forwarding leases', async()=>{
+ const f=await fixture();const registration='c'.repeat(64),lease='d'.repeat(64);let member=true;
+ const relay=new AgentRelayService({vault:f.vault,identity:f.identity,authorize:async q=>member&&q.targetId==='owned'&&q.credential===(q.operation==='forward'?lease:registration)});
+ const reverse=new AgentReverseRelayService({vault:f.vault});
+ try{
+  await relay.load();await relay.configure({...f.config,targets:[]});await relay.start();
+  const options={...f.options(),targetId:'owned',credential:lease};
+  await assert.rejects(openRelayTunnel({...options,targetId:'other-account'}),/unauthorized/);
+  await assert.rejects(openRelayTunnel({...options,operation:'register'}),/unauthorized/);
+  await reverse.load();const {signal,...endpoint}=options;
+  await reverse.configure({enabled:true,relay:{...endpoint,credential:registration},localPort:f.targetPort});await reverse.start();await until(()=>reverse.status().connected);
+  await assert.rejects(openRelayTunnel({...options,credential:registration}),/unauthorized/);
+  const outer=await openRelayTunnel(options),inner=tlsConnect({socket:outer,rejectUnauthorized:false});inner.on('error',()=>{});await once(inner,'secureConnect');
+  assert.equal(new X509Certificate(inner.getPeerCertificate().raw).fingerprint256,fingerprint(f.targetIdentity.certificate));
+  const response=once(inner,'data');inner.write('account reverse tunnel');assert.equal((await response)[0].toString(),'account reverse tunnel');inner.destroy();
+  member=false;await assert.rejects(openRelayTunnel(options),/unauthorized/);
+ }finally{await reverse.stop();await relay.stop();await f.close();}
+});

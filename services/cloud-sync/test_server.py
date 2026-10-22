@@ -44,6 +44,75 @@ class ServiceTest(unittest.TestCase):
             self.service.register(body, 'register-ip')
         self.assertEqual(self.service.read(body['accountId'])['revision'], 1)
 
+    def test_quotas_upgrade_and_downgrade_preserve_existing_cloud(self):
+        import base64,time,uuid
+        from unittest.mock import patch
+        account=self.login('quota@example.com','quota')['accountId']
+        def put(size,rev):
+            return self.service.write(account,{'baseRevision':rev,'mutationId':str(uuid.uuid4()),'envelope':{'format':1,'nonce':base64.b64encode(bytes(12)).decode(),'ciphertext':base64.b64encode(bytes(size+16)).decode()}})
+        with patch('server.FREE_BYTES',32),patch('server.MEMBER_BYTES',128):
+            put(32,0)
+            with self.assertRaises(Failure) as failure:put(33,1)
+            self.assertEqual(failure.exception.status,413)
+            self.assertEqual(self.service.read(account)['revision'],1)
+            self.service.admin_membership({'account':account,'expiresAt':time.time()+3600,'reason':'test upgrade'})
+            put(100,1)
+            self.assertEqual(self.service.profile(account)['storage'],{'usedBytes':100,'limitBytes':128})
+            self.service.admin_membership({'account':account,'expiresAt':0,'reason':'test downgrade'})
+            self.assertEqual(self.service.read(account)['revision'],2)
+            with self.assertRaises(Failure):put(110,2)
+            put(90,2)
+            self.assertEqual(self.service.profile(account)['storage']['usedBytes'],90)
+
+    def test_account_relay_isolates_roles_tenants_and_revocation(self):
+        import time,uuid
+        from unittest.mock import patch
+        a=self.login('relay-a@example.com','ra')['accountId'];b=self.login('relay-b@example.com','rb')['accountId']
+        device=str(uuid.uuid4());body={'deviceId':device,'name':'Machine','certificate':'-----BEGIN CERTIFICATE-----'+'A'*100+'-----END CERTIFICATE-----'}
+        d=self.service.devices
+        with patch.dict('os.environ',{'RELAY_HOST':'relay.example.com','RELAY_FINGERPRINT':'a'*64}):
+            with self.assertRaises(Failure):d.register(a,body)
+            for account in [a,b]:self.service.admin_membership({'account':account,'expiresAt':time.time()+3600,'reason':'relay test'})
+            registration=d.register(a,body)['relay']['credential']
+            with self.assertRaises(Failure):d.register(b,body)
+            with self.assertRaises(Failure):d.lease(b,{'deviceId':device})
+            lease=d.lease(a,{'deviceId':device})['relay']['credential']
+            other=str(uuid.uuid4());d.register(a,dict(body,deviceId=other))
+            d.network(a,{'source':device,'target':other})
+            with self.assertRaises(Failure):d.network(a,{'source':other,'target':device})
+            with self.assertRaises(Failure):d.network(b,{'source':device,'target':other})
+            self.assertEqual(len(d.network(a)['routes']),1)
+            d.network(a,{'source':device,'target':None})
+            self.assertEqual(d.network(a)['routes'],[])
+            def allowed(token,operation):return d.authorize({'targetId':device,'credential':token,'operation':operation})['allowed']
+            self.assertTrue(allowed(registration,'register'));self.assertFalse(allowed(registration,'forward'))
+            self.assertTrue(allowed(lease,'forward'));self.assertFalse(allowed(lease,'register'))
+            self.service.admin_membership({'account':a,'expiresAt':0,'reason':'revoke test'})
+            self.assertFalse(allowed(lease,'forward'));self.assertFalse(allowed(registration,'channel'))
+
+    def test_official_gateway_uses_private_endpoint_and_records_usage(self):
+        import json,threading
+        from http.server import HTTPServer,BaseHTTPRequestHandler
+        seen=[]
+        class Upstream(BaseHTTPRequestHandler):
+            def log_message(self,*args):pass
+            def do_POST(self):
+                body=json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+                seen.append((self.headers['Authorization'],body))
+                data=json.dumps({'choices':[{'message':{'role':'assistant','content':'OK'}}],'usage':{'prompt_tokens':3,'completion_tokens':1}}).encode()
+                self.send_response(200);self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data)
+        upstream=HTTPServer(('127.0.0.1',0),Upstream);thread=threading.Thread(target=upstream.serve_forever,daemon=True);thread.start()
+        try:
+            account=self.login('model@example.com','model')['accountId']
+            self.service.models.entries={'fixture':{'id':'fixture','name':'Fixture','model':'private-model','key':'private-upstream-key','url':'http://127.0.0.1:'+str(upstream.server_port)}}
+            self.assertNotIn('private-upstream-key',str(self.service.models.catalog()))
+            result=self.service.models.complete(account,{'model':'fixture','messages':[{'role':'user','content':'hello'}],'url':'http://invalid.example','max_tokens':9999,'stream':True})
+            self.assertEqual(result['model'],'fixture');self.assertEqual(seen[0][0],'Bearer private-upstream-key');self.assertEqual(seen[0][1]['max_tokens'],4096);self.assertFalse(seen[0][1]['stream'])
+            usage=self.service.models.usage();self.assertEqual(usage['usage'][0]['succeeded'],1);self.assertEqual(usage['recent'][0]['inputTokens'],3)
+            with self.assertRaises(Failure):self.service.models.complete(account,{'model':'unknown','messages':[{}]})
+            self.assertNotIn('hello',str(usage))
+        finally:upstream.shutdown();upstream.server_close();thread.join()
+
     def tearDown(self):
         self.directory.cleanup()
 

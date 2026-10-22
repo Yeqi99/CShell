@@ -30,7 +30,7 @@ export function encryptVault(value: unknown, key: string, accountId: string): Cl
   const cipher = createCipheriv('aes-256-gcm', keyBytes(key), nonce);
   cipher.setAAD(aad(accountId));
   const bytes = Buffer.from(JSON.stringify(value));
-  if (bytes.length > 8 * 1024 * 1024) throw new Error('同步数据超过 8 MiB 上限');
+  if (bytes.length > 64 * 1024 * 1024) throw new Error('同步数据超过 64 MiB 上限');
   const encrypted = Buffer.concat([cipher.update(bytes), cipher.final(), cipher.getAuthTag()]);
   return { format: 1, nonce: nonce.toString('base64'), ciphertext: encrypted.toString('base64') };
 }
@@ -39,7 +39,7 @@ export function decryptVault(envelope: CloudEnvelope, key: string, accountId: st
     envelope?.format !== 1 ||
     typeof envelope.nonce !== 'string' ||
     typeof envelope.ciphertext !== 'string' ||
-    envelope.ciphertext.length > 12 * 1024 * 1024
+    envelope.ciphertext.length > 90 * 1024 * 1024
   )
     throw new Error('不支持的云端数据格式');
   const nonce = Buffer.from(envelope.nonce, 'base64'),

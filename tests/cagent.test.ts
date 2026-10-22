@@ -91,3 +91,17 @@ test('installed capability tools require side-effect approval and are rechecked 
  }finally{await service.close();}
 });
 
+
+test('shared bases and account habits survive restart without transferring agent grants',async()=>{
+ const f=await fixture();try{
+  await f.service.configure({...config,commands:false,review:true,delegates:[]});
+  const memory=await f.service.remember({text:'Prefer concise Chinese answers'});const shared=f.service.cloudExport();
+  assert.equal(shared.habits?.[0].text,'Prefer concise Chinese answers');assert.equal(shared.providers.length,1);
+  const originalId=shared.providers[0].id;
+  await f.service.cloudImport({...shared,providers:[{...shared.providers[0],name:'Shared base',model:'new-model'}]});
+  assert.equal(f.service.snapshot().commands,false);assert.equal(f.service.snapshot().review,true);assert.deepEqual(f.service.snapshot().delegates,[]);
+  assert.equal(f.service.cloudExport().providers[0].id,originalId);
+  await f.service.forget(memory[0].id);assert.deepEqual(f.service.cloudExport().habits,[]);
+  assert.deepEqual((f.data.get('assistant-shared') as any).habits,[]);
+ }finally{await f.service.close();}
+});

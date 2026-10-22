@@ -18,6 +18,7 @@ const bundleSchema = z
     ai: z.unknown(),
     devices: z.unknown(),
     http: z.unknown(),
+    browser: z.unknown().optional(),
     assets: z.record(assetName, z.string().max(11 * 1024 * 1024)).default({}),
   })
   .strict();
@@ -29,6 +30,7 @@ export async function registerCloudHandlers(
   client: ClientProvider,
   http: HttpWorkspaces,
   publish: () => void,
+  browser: import('./machine-browser').MachineBrowser,
 ) {
   const directory = app.getPath('userData');
   const snapshot = async () => {
@@ -52,6 +54,7 @@ export async function registerCloudHandlers(
       store: data,
       ai: ai.cloudExport(),
       devices: client.cloudExport(),
+      browser: await browser.cloudExport(),
       http: http.cloudExport(),
       assets,
     };
@@ -62,6 +65,7 @@ export async function registerCloudHandlers(
     ai.cloudValidate(data.ai);
     client.cloudValidate(data.devices);
     http.cloudValidate(data.http);
+    if(data.browser!==undefined)browser.cloudValidate(data.browser);
     for (const [name, encoded] of Object.entries(data.assets)) {
       const bytes = Buffer.from(encoded, 'base64');
       if (createHash('sha256').update(bytes).digest('hex') !== name.split('.')[0])
@@ -78,6 +82,7 @@ export async function registerCloudHandlers(
     await http.cloudImport(data.http);
     await ai.cloudImport(data.ai);
     await store.cloudImport(data.store);
+    if(data.browser!==undefined)await browser.cloudImport(data.browser);
   };
   const cloud = new CloudSync(directory, clientCodec, {
     export: snapshot,
@@ -94,6 +99,11 @@ export async function registerCloudHandlers(
     },
   }, undefined, (url, options) => net.fetch(String(url), options));
   await cloud.load();
+  ai.officialCredential=()=>cloud.sessionCredential();
+  client.cloudLease=async id=>{const result=await cloud.accountRequest('/v1/devices/lease',{deviceId:id});return (await import('../shared/agent-relay')).agentRelayConnectionSchema.parse(result.relay);};
+  handle('cloud:memory',()=>ai.memory());
+  handle('cloud:remember',input=>ai.remember(input));
+  handle('cloud:forget',id=>ai.forget(id));
   handle('cloud:status', () => cloud.accountStatus());
   handle('cloud:code', (email) => cloud.requestCode(z.email().max(254).parse(email)));
   handle('cloud:register',(email,code,password)=>cloud.register(z.email().max(254).parse(email),z.string().regex(/^\d{6}$/).parse(code),z.string().min(8).max(128).parse(password)));
@@ -110,8 +120,10 @@ export async function registerCloudHandlers(
     cloud.sync(z.enum(['upload', 'download']).optional().parse(direction)),
   );
   handle('cloud:logout', () => cloud.logout());
-  void cloud.autoSync();
-  const timer = setInterval(() => { void cloud.autoSync(); }, 15000);
+  let refreshing=false,modelsChecked=0;
+  const tick=async()=>{if(refreshing)return;refreshing=true;try{await cloud.autoSync();if(cloud.status().email&&Date.now()-modelsChecked>60000){const catalog=await cloud.accountRequest('/v1/models');if(await ai.ensureOfficialModels(catalog.models.map((m:{id:string})=>m.id)))publish();modelsChecked=Date.now();}}catch{}finally{refreshing=false;}};
+  void tick();
+  const timer = setInterval(() => { void tick(); }, 15000);
   timer.unref();
   app.once('before-quit', () => clearInterval(timer));
 }

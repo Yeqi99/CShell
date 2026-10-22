@@ -46,7 +46,8 @@ final class AgentConnection implements AutoCloseable {
   private final List<String> earlyOutput = new ArrayList<>();
   private int earlySize;
   AgentConnection(Events events) { this.events = events; }
-  void connect(String host, int port, String password, Trust trust) throws Exception {
+  void connect(String host, int port, String password, Trust trust) throws Exception {connect(host,port,password,trust,null);}
+  void connect(String host, int port, String password, Trust trust, JSONObject relay) throws Exception {
     if(closed.get())throw new IOException("连接已取消");
     if (android.os.Build.VERSION.SDK_INT < 29) throw new IOException("Agent 连接需要 Android 10 或更新版本（TLS 1.3）");
     SSLContext context = SSLContext.getInstance("TLSv1.3");
@@ -58,9 +59,23 @@ final class AgentConnection implements AutoCloseable {
         // Exact persisted leaf pin / human confirmation is checked before application traffic below.
       }
     }},null);
-    SSLSocket s=(SSLSocket)context.getSocketFactory().createSocket(); socket=s;
+    SSLSocket s;
+    if(relay!=null){
+      SSLSocket outer=(SSLSocket)context.getSocketFactory().createSocket();socket=outer;
+      try{
+        outer.setEnabledProtocols(new String[]{"TLSv1.3"});outer.connect(new InetSocketAddress(relay.getString("host"),relay.getInt("port")),10000);outer.setSoTimeout(10000);outer.startHandshake();
+        byte[] pin=java.security.MessageDigest.getInstance("SHA-256").digest(outer.getSession().getPeerCertificates()[0].getEncoded());StringBuilder hex=new StringBuilder();for(byte b:pin)hex.append(String.format(java.util.Locale.ROOT,"%02x",b&255));
+        if(!hex.toString().equalsIgnoreCase(relay.getString("fingerprint").replace(":","")))throw new IOException("中继身份校验失败");
+        JSONObject hello=new JSONObject().put("protocol","cshell-relay/1").put("operation","forward").put("targetId",relay.getString("targetId")).put("credential",relay.getString("credential"));
+        outer.getOutputStream().write((hello.toString()+"\n").getBytes(StandardCharsets.UTF_8));outer.getOutputStream().flush();
+        ByteArrayOutputStream line=new ByteArrayOutputStream();int ch;while((ch=outer.getInputStream().read())!=-1&&ch!=10){if(line.size()>=4096)throw new IOException("中继响应过大");line.write(ch);}
+        if(ch!=10||!new JSONObject(line.toString("UTF-8")).optBoolean("ok"))throw new IOException("机器离线或会员连接未授权");
+        s=(SSLSocket)context.getSocketFactory().createSocket(outer,host,port,true);
+      }catch(Exception e){outer.close();throw e;}
+    }else s=(SSLSocket)context.getSocketFactory().createSocket();
+    socket=s;
     if(closed.get()){s.close();throw new IOException("连接已取消");}
-    s.setEnabledProtocols(new String[]{"TLSv1.3"});s.connect(new InetSocketAddress(host,port),10000);s.setSoTimeout(10000);s.startHandshake();
+    s.setEnabledProtocols(new String[]{"TLSv1.3"});if(relay==null)s.connect(new InetSocketAddress(host,port),10000);s.setSoTimeout(10000);s.startHandshake();
     byte[] certificate=s.getSession().getPeerCertificates()[0].getEncoded();
     if(!trust.verify(certificate)||closed.get())throw new IOException("Agent 身份未获信任或连接已取消");
     s.setSoTimeout(0);

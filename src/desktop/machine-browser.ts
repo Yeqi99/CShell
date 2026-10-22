@@ -1,3 +1,4 @@
+import {readdir} from 'node:fs/promises';
 import { browserPagePermission } from '../core/browser-interactions';
 import { agentBrowserStream, type BrowserAgentCall } from '../core/agent-browser-stream';
 import {
@@ -11,7 +12,7 @@ import {
 } from 'electron';
 import { createHash, randomUUID } from 'node:crypto';
 import { join } from 'node:path';
-import { BrowserLibrary, browserUrl } from '../core/browser-library';
+import { BrowserLibrary, browserUrl, browserLibrarySchema } from '../core/browser-library';
 import { z } from 'zod';
 import { createSshBrowserProxy } from '../core/ssh-browser-proxy';
 import type { SshService } from '../core/ssh';
@@ -33,6 +34,7 @@ type Tab = {
   fullscreen?: boolean;
 };
 type Workspace = {
+  cloudKey:string;
   validate?: () => void;
   release?: () => void;
   monitor?: NodeJS.Timeout;
@@ -48,6 +50,11 @@ type Workspace = {
   proxy: Awaited<ReturnType<typeof createSshBrowserProxy>>;
 };
 export class MachineBrowser {
+  cloudValidate(value:unknown){return z.record(z.string().regex(/^[a-f0-9]{64}$/),browserLibrarySchema).parse(value);}
+  private cloudLibrary(key:string){return new BrowserLibrary(join(app.getPath('userData'),'machine-browser',key+'.bin'),{encrypt:s=>{if(!safeStorage.isEncryptionAvailable())throw Error('系统加密存储不可用');return safeStorage.encryptString(s);},decrypt:b=>safeStorage.decryptString(b)});}
+  async cloudExport(){for(const w of this.live)this.save(w);const result:Record<string,import('../core/browser-library').BrowserLibraryData>={};let names:string[]=[];try{names=await readdir(join(app.getPath('userData'),'machine-browser'));}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e;}for(const name of names)if(/^[a-f0-9]{64}\.bin$/.test(name)){const key=name.slice(0,-4);result[key]=this.cloudLibrary(key).data;}return result;}
+  async cloudImport(value:unknown){const data=this.cloudValidate(value);for(const [key,record]of Object.entries(data)){const lib=this.cloudLibrary(key);lib.data=record;lib.save();for(const w of this.live)if(w.cloudKey===key){w.library.data.history=structuredClone(record.history);w.library.data.bookmarks=structuredClone(record.bookmarks);this.save(w);}}}
+
   private agentTransport?: (
     id: string,
   ) => Promise<{ key: string; call: BrowserAgentCall; validate: () => void; close?: () => void }>;
@@ -216,6 +223,7 @@ export class MachineBrowser {
 
         ses.on('will-download', (event) => event.preventDefault());
         const w: Workspace = {
+          cloudKey:key,
           library,
           connectionId: id,
           tabs: new Map(),

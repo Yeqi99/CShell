@@ -563,7 +563,7 @@ else
             window.webContents.send('cloud:changed');
             window.webContents.send('ai:providers-changed');
           }
-        }),
+        }, machineBrowser),
       );
       registerPresetHandlers(handle, window, app.getPath('userData'), store, text);
       window.once('closed', () => {

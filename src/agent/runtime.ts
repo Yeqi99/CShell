@@ -1,3 +1,5 @@
+import {AccountNetwork} from './account-network';
+import {CagentCloud} from './cloud';
 import {IdeService} from './ide';
 import {AgentBrowserNetwork} from './browser-network';
 import {CodingService} from './coding';
@@ -9,7 +11,7 @@ import {startupState,setStartup} from './startup';
 import { access } from 'node:fs/promises';
 import { join, dirname, resolve } from 'node:path';
 import { networkInterfaces } from 'node:os';
-import { X509Certificate, createPublicKey } from 'node:crypto';
+import { X509Certificate, createPublicKey ,randomBytes} from 'node:crypto';
 import { z } from 'zod';
 import { ClientServer } from '../core/client/server';
 import { ClientVault } from '../core/client/identity';
@@ -88,7 +90,8 @@ export async function createAgentRuntime(
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     canImportLegacy = true;
   }
-  const vault = new ClientVault(directory, await agentCodec(directory));
+  const codec=await agentCodec(directory);
+  const vault = new ClientVault(directory, codec);
   const interruptedImport = await vault.read('legacy-import-pending', legacySchema.nullable());
   if (interruptedImport) {
     await finishLegacyImport(vault, interruptedImport);
@@ -103,6 +106,7 @@ export async function createAgentRuntime(
       ...(s.distribution ? { distribution: s.distribution } : {}),
     }));
   server = new ClientServer(vault, terminal, {
+    http:(request,signal)=>accountNetwork.http(request,signal),
     manage: (method, params, signal, owner) => dispatch(method, params, signal, false, owner),
     desktopStream: (socket,owner) => desktop.service.acceptAuthenticated(socket,owner),
     shells,
@@ -143,16 +147,20 @@ export async function createAgentRuntime(
     return terminal.execute(input,signal,output);
   },allowed:owner=>server.managementAllowed(owner),capabilityTools:()=>packages.tools(),capabilityInvoke:(input,signal,owner)=>packages.invoke(input,owner,signal)});
   await assistant.load();
+  const account=new CagentCloud(directory,codec,vault,assistant);
   const coding=new CodingService(vault,directory,owner=>owner==='local'||(server.managementAllowed(owner)&&server.status().peers.some(p=>p.fingerprint===owner&&p.shells.some(s=>server.status().allowedShells?.includes(s)))));
   await coding.load();
   const ide=new IdeService(vault,directory,owner=>owner==='local'||server.managementAllowed(owner));await ide.load();
-  const browserNetwork=new AgentBrowserNetwork(owner=>owner==='local'||server.browserAllowed(owner));
+  const accountNetwork=new AccountNetwork(account,new ClientVault(join(directory,'account-network'),codec));await accountNetwork.load();terminal.networkEnvironment=()=>accountNetwork.environment();
+  const browserNetwork=new AgentBrowserNetwork(owner=>owner==='local'||server.browserAllowed(owner),(host,port)=>accountNetwork.open(host,port));
   const hosting = new HostingService(join(directory, 'hosting'));
   await hosting.load();
   let relay = new AgentRelayService({ vault, identity: await vault.identity() });
   await relay.load();
   const reverseRelay = new AgentReverseRelayService({ vault });
   await reverseRelay.load();
+  const accountReverse=new AgentReverseRelayService({vault:new ClientVault(join(directory,'account-transport'),codec)});await accountReverse.load();let accountRelayStamp='';
+  account.setTransport({deviceId:()=>server.status().deviceId,enroll:async()=>{let state=server.status();if(!state.passwordConfigured){await server.setAccess({password:randomBytes(32).toString('hex'),shells:[...new Set((await shells()).map(s=>s.shell))],allowManage:true,allowHttp:true,allowHosting:true,allowRelay:true});state=server.status();}if(!state.running)await server.start({bind:'127.0.0.1',port:state.port??22443});const info=JSON.parse(server.connectionInfo('127.0.0.1'));return {deviceId:info.deviceId,name:info.name,certificate:info.certificate,accountPassword:await server.revealPassword()};},start:async relay=>{const stamp=JSON.stringify(relay);if(accountRelayStamp===stamp&&accountReverse.status().running)return;await accountReverse.configure({enabled:true,relay,localHost:'127.0.0.1',localPort:server.status().port});await accountReverse.start();accountRelayStamp=stamp;},stop:async()=>{await accountReverse.stop();}});await account.load();
   const wsl = new AgentWslService(vault);
   await wsl.load();
   const wslNetwork = new WslNetworkSettings();
@@ -188,8 +196,11 @@ export async function createAgentRuntime(
   ): Promise<unknown> {
     signal.throwIfAborted();
     if (closed) throw new Error('Agent 已关闭');
+    if(method.startsWith('account.')){if(!local)throw Error('账号操作仅允许本机执行');return account.call(method,params);}
     if(method.startsWith('update.')){if(!local)throw new Error('更新只允许在本机执行');if(method==='update.check')return updater.check();if(method==='update.download')return updater.start();if(method==='update.status')return updater.status();throw new Error('未知更新操作');}
     const admin=local || (owner!=='local' && server.managementAllowed(owner));
+    if(method==='network.status')return accountNetwork.status();
+    if(method==='network.configure')return accountNetwork.configure(params);
     if(method.startsWith('browser.')){if(!local&&owner==='local')throw Error('未授权');return browserNetwork.call(method,params,owner);}
     if(method.startsWith('ide.')){if(!admin)throw Error('未授权');return ide.call(method,params,owner);}
     if(method.startsWith('coding.')){if(!admin)throw Error('未授权');return ['coding.permission','coding.start','coding.configure','coding.profile.save','coding.profile.remove','coding.install'].includes(method)?serialized(()=>coding.call(method,params,owner)):coding.call(method,params,owner);}
@@ -504,9 +515,11 @@ export async function createAgentRuntime(
     closed = true;
     await visual.dispose();
     await files.close();
+    await accountNetwork.close();
     browserNetwork.close();
     await coding.close();
     ide.close();
+    await account.close();
     await assistant.close();
     await control?.close();
     await mutation;

@@ -14,6 +14,7 @@ export interface CloudRevision {
   envelope: CloudEnvelope | null;
 }
 export interface CloudStatus {
+  storage?:{usedBytes:number;limitBytes:number};
   membership?: { active: boolean; expiresAt: number | null };
   email?: string;
   unlocked: boolean;
@@ -23,6 +24,9 @@ export interface CloudStatus {
   error?: string;
 }
 export interface CloudBridge {
+  cloudMemory():Promise<import('./account-memory').AccountHabit[]>;
+  cloudRemember(input:{id?:string;text:string}):Promise<import('./account-memory').AccountHabit[]>;
+  cloudForget(id:string):Promise<import('./account-memory').AccountHabit[]>;
   onCloudChanged(listener: () => void): () => void;
   cloudStatus(): Promise<CloudStatus>;
   cloudRequestCode(email: string): Promise<void>;

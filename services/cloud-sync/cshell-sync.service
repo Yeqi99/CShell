@@ -23,8 +23,8 @@ ProtectKernelTunables=true
 ProtectControlGroups=true
 RestrictSUIDSGID=true
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
-MemoryMax=256M
-CPUQuota=50%
+MemoryMax=1G
+CPUQuota=100%
 TasksMax=32
 LimitNOFILE=256
 

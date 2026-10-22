@@ -2,6 +2,8 @@
 
 Run behind HTTPS reverse proxy on loopback. CF token is scoped to Email Sending.
 """
+from devices import Devices
+from models import Models
 import base64
 import hashlib
 import hmac
@@ -19,7 +21,10 @@ import urllib.request
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-MAX_BODY = 12 * 1024 * 1024
+FREE_BYTES = 2 * 1024 * 1024
+MEMBER_BYTES = 64 * 1024 * 1024
+MAX_BODY = 90 * 1024 * 1024
+VAULT_SLOTS = threading.BoundedSemaphore(1)
 
 
 class Failure(Exception):
@@ -34,7 +39,7 @@ class Service:
         with self.db() as db:
             db.executescript('''
             PRAGMA journal_mode=WAL;
-            PRAGMA max_page_count=32768;
+            PRAGMA max_page_count=2097152;
             CREATE TABLE IF NOT EXISTS accounts(id TEXT PRIMARY KEY,email TEXT UNIQUE NOT NULL);
             CREATE TABLE IF NOT EXISTS passwords(account TEXT PRIMARY KEY,salt TEXT NOT NULL,digest TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS keyboxes(account TEXT PRIMARY KEY,box TEXT NOT NULL);
@@ -45,6 +50,14 @@ class Service:
             CREATE TABLE IF NOT EXISTS vaults(account TEXT PRIMARY KEY,revision INTEGER,envelope TEXT,mutation TEXT);
             CREATE TABLE IF NOT EXISTS limits(bucket TEXT PRIMARY KEY,start REAL,count INTEGER);
             ''')
+
+        with self.db() as db:
+            if 'byte_size' not in [r[1] for r in db.execute('PRAGMA table_info(vaults)')]:
+                db.execute('ALTER TABLE vaults ADD COLUMN byte_size INTEGER NOT NULL DEFAULT 0')
+                db.execute("UPDATE vaults SET byte_size=max(0,length(json_extract(envelope,'$.ciphertext'))/4*3-2+length(replace(substr(json_extract(envelope,'$.ciphertext'),-2),'=',''))-16)")
+
+        self.devices=Devices(self,Failure)
+        self.models=Models(self,Failure)
 
     @contextmanager
     def db(self):
@@ -61,13 +74,17 @@ class Service:
             email = db.execute('SELECT email FROM accounts WHERE id=?', (account,)).fetchone()
             row = db.execute('SELECT expires FROM memberships WHERE account=?', (account,)).fetchone()
         expires = row[0] if row else 0
-        return {'email': email[0], 'membership': {'active': expires > time.time(), 'expiresAt': expires or None}}
+        with self.db() as db:
+            stored=db.execute('SELECT byte_size FROM vaults WHERE account=?',(account,)).fetchone()
+        used=stored[0] if stored else 0
+        active=expires>time.time()
+        return {'email':email[0], 'membership':{'active':active,'expiresAt':expires or None},'storage':{'usedBytes':used,'limitBytes':MEMBER_BYTES if active else FREE_BYTES},'entitlements':{'relay':active,'officialModels':bool(self.models.entries)}}
 
     def admin_accounts(self):
         with self.db() as db:
-            rows = db.execute('SELECT a.id,a.email,COALESCE(v.revision,0),COALESCE(m.expires,0) FROM accounts a LEFT JOIN vaults v ON v.account=a.id LEFT JOIN memberships m ON m.account=a.id ORDER BY a.email LIMIT 1000').fetchall()
+            rows = db.execute('SELECT a.id,a.email,COALESCE(v.revision,0),COALESCE(m.expires,0),COALESCE(v.byte_size,0) FROM accounts a LEFT JOIN vaults v ON v.account=a.id LEFT JOIN memberships m ON m.account=a.id ORDER BY a.email LIMIT 1000').fetchall()
             audit = db.execute('SELECT at,account,action,detail FROM admin_audit ORDER BY id DESC LIMIT 50').fetchall()
-        return {'accounts': [{'id': r[0], 'email': r[1], 'revision': r[2], 'membership': {'active': r[3] > time.time(), 'expiresAt': r[3] or None}} for r in rows], 'audit': [{'at': r[0], 'account': r[1], 'action': r[2], 'detail': r[3]} for r in audit]}
+        return {'accounts': [{'id': r[0], 'email': r[1], 'revision': r[2], 'storage':{'usedBytes':r[4],'limitBytes':MEMBER_BYTES if r[3]>time.time() else FREE_BYTES}, 'membership': {'active': r[3] > time.time(), 'expiresAt': r[3] or None}} for r in rows], 'audit': [{'at': r[0], 'account': r[1], 'action': r[2], 'detail': r[3]} for r in audit]}
 
     def admin_membership(self, body):
         account, expires, reason = body.get('account'), body.get('expiresAt'), body.get('reason')
@@ -163,7 +180,7 @@ class Service:
         except (ValueError, TypeError):
             raise Failure(400, '密钥初始化数据不正确')
         envelope(box['envelope'], 512)
-        vault = envelope(body.get('envelope'), 8 * 1024 * 1024 + 16)
+        vault = envelope(body.get('envelope'), FREE_BYTES + 16)
         valid = False
         with self.db() as db:
             db.execute('BEGIN IMMEDIATE')
@@ -181,7 +198,7 @@ class Service:
                     db.execute('INSERT INTO accounts VALUES(?,?)', (account, email))
                     db.execute('INSERT INTO passwords VALUES(?,?,?)', (account, salt, digest))
                     db.execute('INSERT INTO keyboxes VALUES(?,?)', (account, json.dumps(box)))
-                    db.execute('INSERT INTO vaults VALUES(?,?,?,?)', (account, 1, vault, secrets.token_hex(16)))
+                    db.execute('INSERT INTO vaults(account,revision,envelope,mutation,byte_size) VALUES(?,?,?,?,?)', (account, 1, vault, secrets.token_hex(16),len(base64.b64decode(body['envelope']['ciphertext']))-16))
                     db.execute('INSERT INTO sessions VALUES(?,?,?)', (self.digest(token), account, time.time()+30*86400))
                     db.execute('DELETE FROM codes WHERE email=?', (email,))
         if not valid:
@@ -239,7 +256,7 @@ class Service:
             raise Failure(400, '不支持的密文格式')
         try:
             nonce, ciphertext = base64.b64decode(envelope['nonce'], validate=True), base64.b64decode(envelope['ciphertext'], validate=True)
-            if len(nonce) != 12 or not 16 <= len(ciphertext) <= 8 * 1024 * 1024 + 16:
+            if len(nonce) != 12 or not 16 <= len(ciphertext) <= MEMBER_BYTES + 16:
                 raise ValueError()
         except (ValueError, TypeError):
             raise Failure(400, '密文大小或编码不正确')
@@ -251,9 +268,14 @@ class Service:
                 if row[2] != encoded:
                     raise Failure(409, '重复请求内容不一致')
                 return {'revision': row[0]}
+            member=db.execute('SELECT expires FROM memberships WHERE account=?',(account,)).fetchone()
+            allowance=MEMBER_BYTES if member and member[0]>time.time() else FREE_BYTES
+            previous_size=len(base64.b64decode(json.loads(row[2])['ciphertext'])) if row else 0
+            if len(ciphertext)>allowance+16 and len(ciphertext)>=previous_size:
+                raise Failure(413, '云空间已满，请减少同步内容或升级会员；现有云端数据保留')
             if revision != (row[0] if row else 0):
                 raise Failure(409, '另一台设备已更新云端，请检查同步冲突')
-            db.execute('INSERT OR REPLACE INTO vaults VALUES(?,?,?,?)', (account, revision + 1, encoded, mutation))
+            db.execute('INSERT OR REPLACE INTO vaults(account,revision,envelope,mutation,byte_size) VALUES(?,?,?,?,?)', (account, revision + 1, encoded, mutation,len(ciphertext)-16))
         return {'revision': revision + 1}
 
     def logout(self, token):
@@ -310,27 +332,47 @@ def handler(service):
             self.connection.settimeout(25)
 
         def dispatch(self):
+            acquired=False
             try:
+                if self.path=='/v1/vault':
+                    acquired=VAULT_SLOTS.acquire(False)
+                    if not acquired:raise Failure(429,'同步服务繁忙，客户端会自动重试')
                 admin = self.path.startswith('/v1/admin/')
                 if admin:
-                    secret = os.environ.get('ADMIN_API_TOKEN', '')
-                    if not secret or not hmac.compare_digest(self.headers.get('X-Admin-Token', ''), secret):
+                    relay_auth=self.path=='/v1/admin/relay/authorize'
+                    secret = os.environ.get('RELAY_AUTH_TOKEN' if relay_auth else 'ADMIN_API_TOKEN', '')
+                    if not secret or not hmac.compare_digest(self.headers.get('X-Relay-Token' if relay_auth else 'X-Admin-Token', ''), secret):
                         raise Failure(403, '管理员认证失败')
                     if self.headers.get('Origin') not in (None, 'https://admin-shell.canp.ai'):
                         raise Failure(403, '来源不允许')
                 if not admin and self.headers.get('Origin'):
                     raise Failure(403, '仅允许原生客户端')
                 ip = self.headers.get('X-Real-IP', self.client_address[0])
-                service.limit('api:' + service.digest(ip), 120, 60)
+                if not admin:
+                    bearer=self.headers.get('Authorization','').removeprefix('Bearer ')
+                    if bearer and not self.path.startswith('/v1/auth/'):
+                        service.authenticate(bearer);bucket=service.digest(bearer)
+                    else:bucket=service.digest(ip)
+                    service.limit('api:' + bucket, 240, 60)
                 body = {}
                 if self.command == 'POST':
                     size = int(self.headers.get('Content-Length', '0'))
+                    limit=int(FREE_BYTES*4/3)+65536
+                    if self.path=='/v1/vault':
+                        token=self.headers.get('Authorization','').removeprefix('Bearer ')
+                        current=service.profile(service.authenticate(token))
+                        limit=int(max(current['storage']['limitBytes'],current['storage']['usedBytes'])*4/3)+65536
+                    if size>limit: raise Failure(413,'请求超过账号云空间额度')
                     if not 0 < size <= MAX_BODY or self.headers.get('Transfer-Encoding'):
                         raise Failure(413, '请求大小不正确')
                     body = json.loads(self.rfile.read(size))
                     if not isinstance(body, dict):
                         raise Failure(400, '请求格式不正确')
-                if admin and self.path == '/v1/admin/accounts' and self.command == 'GET':
+                if admin and self.path == '/v1/admin/relay/authorize' and self.command == 'POST':
+                    value=service.devices.authorize(body)
+                elif admin and self.path == '/v1/admin/model-usage' and self.command == 'GET':
+                    value=service.models.usage()
+                elif admin and self.path == '/v1/admin/accounts' and self.command == 'GET':
                     value = service.admin_accounts()
                 elif admin and self.path == '/v1/admin/membership' and self.command == 'POST':
                     value = service.admin_membership(body)
@@ -347,7 +389,21 @@ def handler(service):
                 else:
                     token = self.headers.get('Authorization', '').removeprefix('Bearer ')
                     account = service.authenticate(token)
-                    if self.path == '/v1/account' and self.command == 'GET':
+                    if self.path == '/v1/network' and self.command in ('GET','POST'):
+                        value=service.devices.network(account,body if self.command=='POST' else None)
+                    elif self.path == '/v1/models' and self.command == 'GET':
+                        value=service.models.catalog()
+                    elif self.path == '/v1/models/chat/completions' and self.command == 'POST':
+                        value=service.models.complete(account,body)
+                    elif self.path == '/v1/devices' and self.command == 'GET':
+                        value=service.devices.list(account)
+                    elif self.path == '/v1/devices/register' and self.command == 'POST':
+                        value=service.devices.register(account,body)
+                    elif self.path == '/v1/devices/lease' and self.command == 'POST':
+                        value=service.devices.lease(account,body)
+                    elif self.path == '/v1/devices/remove' and self.command == 'POST':
+                        value=service.devices.remove(account,body)
+                    elif self.path == '/v1/account' and self.command == 'GET':
                         value = service.profile(account)
                     elif self.path == '/v1/auth/keybox' and self.command == 'POST':
                         encoded = json.dumps(body)
@@ -375,6 +431,8 @@ def handler(service):
                 self.respond(400, {'error': '请求格式不正确'})
             except Exception:
                 self.respond(503, {'error': '服务暂时不可用'})
+            finally:
+                if acquired:VAULT_SLOTS.release()
 
         def respond(self, status, value):
             data = json.dumps(value, ensure_ascii=False).encode()

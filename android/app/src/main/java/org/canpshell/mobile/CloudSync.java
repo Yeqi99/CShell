@@ -49,7 +49,7 @@ final class CloudSync {
       if(body!=null){connection.setRequestMethod("POST");connection.setDoOutput(true);byte[] payload=bytes(body.toString());connection.setFixedLengthStreamingMode(payload.length);try(OutputStream out=connection.getOutputStream()){out.write(payload);}}
       int status=connection.getResponseCode();InputStream input=status<400?connection.getInputStream():connection.getErrorStream();
       if(input==null)throw new IOException("云端响应为空");
-      ByteArrayOutputStream output=new ByteArrayOutputStream();try(InputStream in=input){byte[] buffer=new byte[8192];int n;while((n=in.read(buffer))!=-1){if(output.size()+n>13*1024*1024)throw new IOException("云端响应超过上限");output.write(buffer,0,n);}}
+      ByteArrayOutputStream output=new ByteArrayOutputStream();try(InputStream in=input){byte[] buffer=new byte[8192];int n;while((n=in.read(buffer))!=-1){if(output.size()+n>90*1024*1024)throw new IOException("云端响应超过上限");output.write(buffer,0,n);}}
       JSONObject result=new JSONObject(output.toString("UTF-8"));
       if(status!=200)throw new IOException(result.optString("error","云端请求失败"));return result;
     }finally{connection.disconnect();}
@@ -63,7 +63,7 @@ final class CloudSync {
   }
   private JSONObject encrypt(JSONObject data)throws Exception{
     byte[] raw=Base64.decode(state.getString("key"),Base64.URL_SAFE|Base64.NO_WRAP|Base64.NO_PADDING),nonce=new byte[12];new SecureRandom().nextBytes(nonce);
-    byte[] plaintext=bytes(data.toString());if(plaintext.length>8*1024*1024)throw new IOException("同步数据超过 8 MiB");
+    byte[] plaintext=bytes(data.toString());if(plaintext.length>64*1024*1024)throw new IOException("同步数据超过 64 MiB");
     return new JSONObject().put("format",1).put("nonce",b64(nonce)).put("ciphertext",b64(CloudCipher.transform(true,raw,nonce,plaintext,state.getJSONObject("session").getString("accountId"))));
   }
   private void validate(JSONObject data)throws Exception{
@@ -158,6 +158,14 @@ final class CloudSync {
     }else if(action.equals("logout")){api("auth/logout",new JSONObject());state.remove("session");state.remove("key");state.remove("pending");state.remove("pendingBundle");save();}
     else if(!action.equals("status"))throw new IOException("不支持的同步操作");
     return result.put("status",status());
+  }
+  synchronized JSONObject cloudAgent(String profileId)throws Exception{
+    load();if(!state.has("session")||!state.has("bundle"))return null;
+    JSONObject bundle=state.getJSONObject("bundle");JSONArray profiles=bundle.getJSONObject("store").getJSONArray("profiles");boolean known=false;
+    for(int i=0;i<profiles.length();i++){JSONObject p=profiles.getJSONObject(i);if(p.optString("id").equals(profileId)&&p.optString("protocol").equals("client"))known=true;}
+    if(!known)return null;
+    JSONArray devices=bundle.getJSONArray("devices");for(int i=0;i<devices.length();i++){JSONObject d=devices.getJSONObject(i);if(d.optString("deviceId").equals(profileId)&&d.optBoolean("accountManaged"))return new JSONObject(d.toString()).put("relay",api("devices/lease",new JSONObject().put("deviceId",profileId)).getJSONObject("relay"));}
+    return null;
   }
   synchronized void fillCredentials(JSONObject request)throws Exception{
     load();if(!state.has("bundle")||!request.has("cloudProfileId"))return;

@@ -1,3 +1,4 @@
+import {AccountMemory} from './AccountMemory';
 import { useEffect, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, Cloud, Eye, EyeOff, ShieldCheck, LogOut, Crown, Mail, LockKeyhole } from 'lucide-react';
 import type { CloudStatus } from '../../shared/cloud-sync';
@@ -55,6 +56,8 @@ export function CloudSettings() {
       <div className="account-section"><h2>跨设备同步 <ShieldCheck size={14}/></h2><div className="account-detail-row"><span>连接与已保存凭据</span><span className="account-included"><Check size={14}/> 自动同步</span></div><div className="account-detail-row"><span>基座模型与个人设置</span><span className="account-included"><Check size={14}/> 自动同步</span></div></div>
       {!status.unlocked&&<form className="account-exception" onSubmit={e=>{e.preventDefault();void login();}}><p>输入账号密码，恢复此设备上的加密配置。</p><input aria-label="账号密码" type="password" autoComplete="current-password" required value={secret} onChange={e=>setSecret(e.target.value)}/><button className="auth-submit" disabled={busy}>继续</button></form>}
       {status.state==='conflict'&&<div className="account-exception"><p>两台设备同时修改了配置。请选择保留哪一份；另一份会先备份。</p><button onClick={()=>setDirection('download')}>保留云端更改</button><button onClick={()=>setDirection('upload')}>保留此设备更改</button>{direction&&<div><p>确认使用{direction==='download'?'云端':'此设备'}配置？</p><button disabled={busy} onClick={()=>void run(async()=>{await window.cshell.cloudSync(direction);setDirection(undefined);})}>确认</button><button onClick={()=>setDirection(undefined)}>取消</button></div>}</div>}
+      {status.storage&&<div className="account-section account-storage"><h2>云空间</h2><div className="account-detail-row"><span>连接、模型、扩展偏好与浏览器记录</span><strong>{(status.storage.usedBytes/1048576).toFixed(2)} / {Math.round(status.storage.limitBytes/1048576)} MiB</strong></div><progress aria-label="云空间用量" max={status.storage.limitBytes} value={status.storage.usedBytes}/><p>仅同步配置与记录，浏览器 Cookie、缓存和登录状态保留在本机。</p></div>}
+      <AccountMemory/>
       <div className="account-footer"><span><ShieldCheck size={14}/> 配置已加密保护</span><button className="account-signout" onClick={()=>setLogoutConfirm(true)}><LogOut size={14}/>退出登录</button></div>
       {logoutConfirm&&<div className="account-exception"><p>退出后停止此设备的云同步，已保存的本机配置保留。</p><button disabled={busy} onClick={()=>void run(async()=>{await window.cshell.cloudLogout();setLogoutConfirm(false);})}>确认退出</button><button onClick={()=>setLogoutConfirm(false)}>取消</button></div>}
       {error&&<p className="account-feedback" role="alert">{error}</p>}

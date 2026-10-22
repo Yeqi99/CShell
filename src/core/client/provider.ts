@@ -31,7 +31,7 @@ import { frames, send, textChunks } from './wire';
 import { ManagementQueue } from './management-queue';
 const deviceSchema = clientInvitationSchema
   .omit({ token: true, expires: true })
-  .extend({ relay: agentRelayConnectionSchema.optional() });
+  .extend({ relay: agentRelayConnectionSchema.optional(),accountManaged:z.boolean().optional(),accountPassword:clientPasswordSchema.optional() });
 type Device = z.infer<typeof deviceSchema>;
 class ClientChannel {
   certificate = '';
@@ -212,6 +212,8 @@ export class ClientProvider implements ManagedProvider {
     private vault: ClientVault,
     private emit: (event: SessionEvent) => void,
   ) {}
+  cloudLease?:(id:string)=>Promise<AgentRelayConnection>;
+  private async cloudDevice(device:Device){if(!device.accountManaged)return device;if(!this.cloudLease)throw Error('请登录 Pro 账号后连接会员机器');return {...device,relay:await this.cloudLease(device.deviceId)};}
   async load() {
     this.devices = (await this.vault.read('devices', z.array(deviceSchema).max(100))) ?? [];
   }
@@ -231,7 +233,7 @@ export class ClientProvider implements ManagedProvider {
     // Controller identity stays local: new installations still authenticate to the target.
   }
   list(): ClientDevice[] {
-    return this.devices.map(({ certificate, relay: _relay, ...d }) => ({
+    return this.devices.map(({ certificate, relay: _relay, accountPassword:_password, accountManaged:_managed, ...d }) => ({
       ...d,
       fingerprint: fingerprint(certificate),
     }));
@@ -349,13 +351,13 @@ export class ClientProvider implements ManagedProvider {
     if (!device) throw new Error('Agent 尚未连接并核对身份');
     const call = agentCallSchema.parse(input);
     const channel = await dial(
-      device,
+      await this.cloudDevice(device),
       await (this.identity ??= this.vault.identity()),
       () => {},
       signal,
     );
     try {
-      const auth = this.verifyAuth(await channel.request('auth', { name: hostname() }), deviceId);
+      const auth = this.verifyAuth(await channel.request('auth', { name: hostname(),...(device.accountManaged?{password:device.accountPassword}:{}) }), deviceId);
       if (
         call.method !== 'agent.shells' &&
         !auth.capabilities.includes(agentCapability(call.method))
@@ -366,18 +368,25 @@ export class ClientProvider implements ManagedProvider {
       channel.socket.destroy();
     }
   }
+  async accountHttp(deviceId:string,request:HttpWireRequest,signal:AbortSignal){
+    const device=this.devices.find(d=>d.deviceId===deviceId);if(!device)throw Error('出口机器身份不可用');
+    const channel=await dial(await this.cloudDevice(device),await(this.identity??=this.vault.identity()),()=>{},signal);
+    try{const auth=this.verifyAuth(await channel.request('auth',{name:hostname(),...(device.accountManaged?{password:device.accountPassword}:{})}),deviceId);if(!auth.capabilities.includes('http.send'))throw Error('出口机器未授权 HTTP');return httpResponseSchema.parse(await channel.request('http',request,request.timeoutMs+5000));}finally{channel.socket.destroy();}
+  }
   async browserTransport(deviceId:string){
     const device=this.devices.find(d=>d.deviceId===deviceId);if(!device)throw Error('Agent 身份不可用');
-    const channel=await dial(device,await(this.identity??=this.vault.identity()),()=>{},new AbortController().signal);
-    try{const auth=this.verifyAuth(await channel.request('auth',{name:hostname()}),deviceId);if(!auth.capabilities.includes('http.send'))throw Error('未授权浏览器网络访问');}
+    const channel=await dial(
+      await this.cloudDevice(device),await(this.identity??=this.vault.identity()),()=>{},new AbortController().signal);
+    try{const auth=this.verifyAuth(await channel.request('auth',{name:hostname(),...(device.accountManaged?{password:device.accountPassword}:{})}),deviceId);if(!auth.capabilities.includes('http.send'))throw Error('未授权浏览器网络访问');}
     catch(e){channel.socket.destroy();throw e;}
     return {call:async(method:string,params?:unknown)=>{if(!method.startsWith('browser.'))throw Error('浏览器通道操作无效');if(channel.socket.destroyed)throw Error('浏览器通道已断开');return channel.request('manage',agentCallSchema.parse({method,params}),30000);},validate:()=>{if(channel.socket.destroyed)throw Error('浏览器通道已断开');},close:()=>channel.socket.destroy()};
   }
   /** Dedicated TLS channel, same pinned device and optional end-to-end management relay. */
   async openDesktopStream(deviceId:string,signal:AbortSignal=new AbortController().signal){
     const device=this.devices.find(d=>d.deviceId===deviceId);if(!device)throw new Error('Agent identity not configured');
-    const channel=await dial(device,await(this.identity??=this.vault.identity()),()=>{},signal);
-    try{const auth=this.verifyAuth(await channel.request('auth',{name:hostname()}),deviceId);if(!auth.capabilities.includes('agent.manage'))throw new Error('Desktop transport management permission denied');
+    const channel=await dial(
+      await this.cloudDevice(device),await(this.identity??=this.vault.identity()),()=>{},signal);
+    try{const auth=this.verifyAuth(await channel.request('auth',{name:hostname(),...(device.accountManaged?{password:device.accountPassword}:{})}),deviceId);if(!auth.capabilities.includes('agent.manage'))throw new Error('Desktop transport management permission denied');
       const response=await channel.request('desktop-stream');if(!(response as {desktopStream?:boolean})?.desktopStream)throw new Error('Desktop stream unsupported');return channel.socket;
     }catch(error){channel.socket.destroy();throw error;}
   }
@@ -397,13 +406,13 @@ export class ClientProvider implements ManagedProvider {
       const device = this.devices.find((d) => d.deviceId === deviceId);
       if (!device) throw new Error('Agent unavailable');
       const channel = await dial(
-        device,
+      await this.cloudDevice(device),
         await (this.identity ??= this.vault.identity()),
         () => {},
         new AbortController().signal,
       );
       try {
-        return this.verifyAuth(await channel.request('auth', { name: hostname() }), deviceId)
+        return this.verifyAuth(await channel.request('auth', { name: hostname(),...(device.accountManaged?{password:device.accountPassword}:{}) }), deviceId)
           .shells.filter((shell) => shell !== 'wsl')
           .map((shell) => ({ shell, label: shell }));
       } finally {
@@ -425,7 +434,7 @@ export class ClientProvider implements ManagedProvider {
     const early: string[] = [];
     let earlySize = 0;
     const channel = await dial(
-      device,
+      await this.cloudDevice(device),
       await (this.identity ??= this.vault.identity()),
       (event, data) => {
         if (event === 'data') {
@@ -446,7 +455,7 @@ export class ClientProvider implements ManagedProvider {
     );
     try {
       const auth = this.verifyAuth(
-        await channel.request('auth', { name: hostname() }),
+        await channel.request('auth', { name: hostname(),...(device.accountManaged?{password:device.accountPassword}:{}) }),
         device.deviceId,
       );
       if (!auth.shells.includes(config.shell)) throw new Error('Client 未授权此 Shell');
@@ -498,14 +507,14 @@ export class ClientProvider implements ManagedProvider {
           auth.capabilities.includes('http.send') && config.shell !== 'wsl'
             ? async (request: HttpWireRequest, abort: AbortSignal) => {
                 const exchange = await dial(
-                  device,
+      await this.cloudDevice(device),
                   await (this.identity ??= this.vault.identity()),
                   () => {},
                   abort,
                 );
                 try {
                   const grant = this.verifyAuth(
-                    await exchange.request('auth', { name: hostname() }),
+                    await exchange.request('auth', { name: hostname(),...(device.accountManaged?{password:device.accountPassword}:{}) }),
                     device.deviceId,
                   );
                   if (!grant.capabilities.includes('http.send'))
@@ -542,14 +551,14 @@ export class ClientProvider implements ManagedProvider {
                       distribution: config.distribution,
                     });
                     const exchange = await dial(
-                      device,
+      await this.cloudDevice(device),
                       await (this.identity ??= this.vault.identity()),
                       () => {},
                       abort,
                     );
                     try {
                       const grant = this.verifyAuth(
-                        await exchange.request('auth', { name: hostname() }),
+                        await exchange.request('auth', { name: hostname(),...(device.accountManaged?{password:device.accountPassword}:{}) }),
                         device.deviceId,
                       );
                       if (

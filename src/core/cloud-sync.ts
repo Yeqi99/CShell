@@ -12,6 +12,7 @@ interface LocalState {
   digest?: string;
   lastSync?: string;
   membership?: CloudStatus["membership"];
+  storage?:CloudStatus["storage"];
   pending?: { baseRevision: number; mutationId: string; envelope: CloudEnvelope; digest: string };
 }
 export interface CloudAdapter {
@@ -33,6 +34,7 @@ export class CloudSync {
       void this.api('/v1/account').then(async profile => {
         if (this.data.session !== session) return;
         this.data.membership = profile.membership;
+        this.data.storage=profile.storage;
         this.profileChecked = Date.now();
         if (!this.busy) await this.exclusive(() => this.persist());
       }).catch(() => { this.profileChecked = Date.now() - 45000; })
@@ -71,6 +73,7 @@ export class CloudSync {
   status(): CloudStatus {
     return {
       membership: this.data.session ? this.data.membership : undefined,
+      storage:this.data.storage,
       email: this.data.session?.email,
       unlocked: !!this.data.key,
       revision: this.data.revision,
@@ -120,7 +123,7 @@ export class CloudSync {
         const r = await reader.read();
         if (r.done) break;
         bytes += r.value.length;
-        if (bytes > 13 * 1024 * 1024) throw new Error('云端响应超过上限');
+        if (bytes > 90 * 1024 * 1024) throw new Error('云端响应超过上限');
         chunks.push(r.value);
       }
     } finally {
@@ -143,6 +146,8 @@ export class CloudSync {
       this.busy = false;
     }
   }
+  async accountRequest(path:string,body?:unknown){if(!this.data.session)throw Error('请先登录');return this.api(path,body);}
+  sessionCredential(){if(!this.data.session)throw Error('请先登录');return this.data.session.token;}
   async requestCode(email: string) {
     await this.api('/v1/auth/code', { email });
   }
