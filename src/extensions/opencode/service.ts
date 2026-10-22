@@ -99,22 +99,41 @@ export class OpenCodeExtension implements AiProviderExtension {
         this.loadError = 'OpenCode 扩展配置读取失败，请检查本机凭据存储';
     }
   }
+  // Backend-only: plaintext exists only inside the encrypted cloud vault pipeline.
+  async cloudExport() {
+    await this.saving;
+    if (this.loadError) throw Error(this.loadError);
+    return structuredClone(this.config);
+  }
+  cloudValidate(value: unknown) {
+    const next = configSchema.parse(value);
+    if (new Set(next.accounts.map(a => a.id)).size !== next.accounts.length)
+      throw Error('云端 OpenCode 账号重复');
+    return next;
+  }
+  async cloudImport(value: unknown) {
+    const next = this.cloudValidate(value);
+    await this.mutate(() => next, false);
+    this.cache.clear();
+    this.invalidRefresh.clear();
+  }
   private account(id = 'default') {
     const a = this.config.accounts.find((a) => a.id === id);
     if (!a) throw Error('此 OpenCode 账号未配置或已移除，请重新选择账号');
     return a;
   }
-  private async mutate(change: () => z.infer<typeof configSchema>) {
+  private async mutate(change: () => z.infer<typeof configSchema>, requireEnabled = true) {
     const task = this.saving
       .catch(() => {})
       .then(async () => {
-        this.check();
+        if (requireEnabled) this.check();
+        else if (this.loadError) throw Error(this.loadError);
         const next = configSchema.parse(change());
         const path = join(this.host.directory, 'opencode.enc');
         await mkdir(dirname(path), { recursive: true });
         const temp = path + '.' + randomUUID() + '.tmp';
         await writeFile(temp, await this.host.encrypt(JSON.stringify(next)));
-        this.check();
+        if (requireEnabled) this.check();
         await rename(temp, path);
         this.config = next;
       });

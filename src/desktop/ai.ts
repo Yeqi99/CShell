@@ -24,7 +24,7 @@ export async function registerAiHandlers(
   publish?: (channel: string, value?: unknown) => void,
   http?: import('../core/http-workspaces').HttpWorkspaces,
   wechat?: import('../core/wechat').WechatService,
-  setupCloud?: (ai: AiService) => Promise<void>,
+  setupCloud?: (ai: AiService, openCode: OpenCodeExtension) => Promise<void>,
 ) {
   const ai = new AiService(directory, store, connections, connectHost, { http, wechat });
   const pending = new Map<string, AiThread>();
@@ -38,10 +38,10 @@ export async function registerAiHandlers(
     }, 40);
   };
   await ai.load();
-  await setupCloud?.(ai);
   const openCode=new OpenCodeExtension({directory:join(directory,'extensions','opencode'),enabled:()=>pluginEnabled(store.plugins(),'opencode'),encrypt:s=>store.encryptPrivate(s),decrypt:s=>store.decryptPrivate(s),saveProvider:async p=>{await ai.saveProvider(p);publish?.('ai:providers-changed');},open:async url=>(await import('electron')).shell.openExternal(url)});
   await openCode.load();
   ai.providerExtensions.register(openCode);
+  await setupCloud?.(ai, openCode);
   const tavily=new TavilyExtension({directory:join(directory,'extensions','tavily'),enabled:()=>pluginEnabled(store.plugins(),'tavily'),encrypt:s=>store.encryptPrivate(s),decrypt:s=>store.decryptPrivate(s)});
   await tavily.load();ai.extensionTools=()=>tavily.tools();
   handle('ai:extension-call',(id,action,input)=>id==='cshell.tavily'?tavily.call(z.string().max(80).parse(action),input):ai.providerExtensions.call(z.string().max(100).parse(id),z.string().max(80).parse(action),input));

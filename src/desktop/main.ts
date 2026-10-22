@@ -558,12 +558,12 @@ else
         },
         http,
         wechat,
-        ai => registerCloudHandlers(handle, store, ai, clientProvider, http, () => {
+        (ai, openCode) => registerCloudHandlers(handle, store, ai, clientProvider, http, () => {
           if (!window.isDestroyed()) {
             window.webContents.send('cloud:changed');
             window.webContents.send('ai:providers-changed');
           }
-        }, machineBrowser),
+        }, machineBrowser, openCode),
       );
       registerPresetHandlers(handle, window, app.getPath('userData'), store, text);
       window.once('closed', () => {

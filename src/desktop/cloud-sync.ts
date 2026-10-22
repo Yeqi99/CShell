@@ -19,6 +19,7 @@ const bundleSchema = z
     devices: z.unknown(),
     http: z.unknown(),
     browser: z.unknown().optional(),
+    opencode: z.unknown().optional(),
     assets: z.record(assetName, z.string().max(11 * 1024 * 1024)).default({}),
   })
   .strict();
@@ -31,6 +32,7 @@ export async function registerCloudHandlers(
   http: HttpWorkspaces,
   publish: () => void,
   browser: import('./machine-browser').MachineBrowser,
+  openCode: import('../extensions/opencode/service').OpenCodeExtension,
 ) {
   const directory = app.getPath('userData');
   const snapshot = async () => {
@@ -53,6 +55,7 @@ export async function registerCloudHandlers(
       format: 1,
       store: data,
       ai: ai.cloudExport(),
+      opencode: await openCode.cloudExport(),
       devices: client.cloudExport(),
       browser: await browser.cloudExport(),
       http: http.cloudExport(),
@@ -63,6 +66,7 @@ export async function registerCloudHandlers(
     const data = bundleSchema.parse(value);
     store.cloudValidate(data.store);
     ai.cloudValidate(data.ai);
+    if(data.opencode!==undefined)openCode.cloudValidate(data.opencode);
     client.cloudValidate(data.devices);
     http.cloudValidate(data.http);
     if(data.browser!==undefined)browser.cloudValidate(data.browser);
@@ -80,6 +84,7 @@ export async function registerCloudHandlers(
       await writeFile(join(directory, 'appearance', name), Buffer.from(encoded, 'base64'));
     await client.cloudImport(data.devices);
     await http.cloudImport(data.http);
+    if(data.opencode!==undefined)await openCode.cloudImport(data.opencode);
     await ai.cloudImport(data.ai);
     await store.cloudImport(data.store);
     if(data.browser!==undefined)await browser.cloudImport(data.browser);
