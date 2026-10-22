@@ -141,11 +141,12 @@ export class MachineBrowser {
     w.selected = '';
   }
   private async workspace(id: string) {
+    const sourceId = id.startsWith('ide@') ? id.slice(4) : id;
     let pending = this.workspaces.get(id);
     if (pending) return pending;
     pending = (async () => {
-      const remote = /^[0-9a-f-]{36}$/i.test(id) ? undefined : await this.agentTransport?.(id);
-      if (!remote && !/^[0-9a-f-]{36}$/i.test(id)) throw Error('浏览器连接不可用');
+      const remote = /^[0-9a-f-]{36}$/i.test(sourceId) ? undefined : await this.agentTransport?.(sourceId);
+      if (!remote && !/^[0-9a-f-]{36}$/i.test(sourceId)) throw Error('浏览器连接不可用');
       if (remote) {
         try {
           await remote.call('browser.status');
@@ -154,7 +155,7 @@ export class MachineBrowser {
           throw error;
         }
       }
-      const connection = remote ? undefined : this.ssh.get(id);
+      const connection = remote ? undefined : this.ssh.get(sourceId);
       const key = createHash('sha256')
         .update(
           remote
@@ -166,6 +167,7 @@ export class MachineBrowser {
                 connection!.profile.username,
               ]),
         )
+        .update(id.startsWith('ide@') ? ':ide' : '')
         .digest('hex');
       if (this.owners.has(key) && this.owners.get(key) !== id) {
         remote?.close?.();
@@ -186,7 +188,7 @@ export class MachineBrowser {
           return;
         }
         try {
-          const c = this.ssh.get(id);
+          const c = this.ssh.get(sourceId);
           if (c.closed) throw Error('SSH 已断开');
           c.client.forwardOut('127.0.0.1', 0, host, port, (e, s) => done(e || null, s));
         } catch (e) {
@@ -284,7 +286,7 @@ export class MachineBrowser {
           this.dispose(w);
           this.owners.delete(key);
         }
-        if (w.connected) {
+        if (w.connected && !id.startsWith('ide@')) {
           const saved = library.data.tabs.map((t) => ({ ...t })),
             selected = library.data.selected;
           for (const item of saved) {

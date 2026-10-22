@@ -21,10 +21,12 @@ export function MachineBrowser({
   target,
   name,
   active,
+  appUrl,
 }: {
   target: string;
   name: string;
   active: boolean;
+  appUrl?: string;
 }) {
   const [library, setLibrary] = useState<'' | 'history' | 'bookmarks'>('');
   const [suggest, setSuggest] = useState(false),
@@ -62,7 +64,7 @@ export function MachineBrowser({
   };
   useEffect(() => {
     let cancelled = false;
-    void run('open');
+    void run('open').then(() => { if (appUrl && !cancelled) void run('navigate', appUrl); });
     const timer = setInterval(() => {
       void window.cshell
         .machineBrowser(session, 'status')
@@ -136,6 +138,7 @@ export function MachineBrowser({
   }, [
     session,
     active,
+  appUrl,
     library,
     suggest,
     suggestions.length,
@@ -148,7 +151,7 @@ export function MachineBrowser({
   ]);
   return (
     <section
-      className="machine-browser"
+      className={'machine-browser' + (appUrl ? ' machine-browser-app' : '')}
       data-fullscreen={!!selected?.fullscreen}
       aria-label="CShell 浏览器"
     >

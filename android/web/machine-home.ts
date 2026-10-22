@@ -21,6 +21,7 @@ export type MachineApp = {
   name: string;
   detail: string;
   run: () => void;
+  manage?: () => void;
   disabled?: boolean;
 };
 const symbols: Record<string, any> = {
@@ -141,7 +142,21 @@ export class MachineHome {
       mark.className = 'machine-tile-icon';
       const text = el('span', 'machine-tile-name', app.name);
       button.append(mark, text, el('small', 'machine-tile-detail', app.detail));
-      button.onclick = () => this.launch(app);
+      let held = false;
+      let hold: ReturnType<typeof setTimeout> | undefined;
+      const menu = () => {
+        if (!app.manage || this.offline) return;
+        held = true;
+        this.panel.replaceChildren(); this.panel.hidden = false;
+        const title = el('h2', '', app.name), back = el('button', '', '返回桌面'), manage = el('button', '', '管理应用');
+        back.onclick = () => { this.panel.hidden = true; };
+        manage.onclick = () => { this.panel.hidden = true; app.manage?.(); };
+        this.panel.append(title, manage, back);
+      };
+      button.onpointerdown = () => { held = false; hold = setTimeout(menu, 550); };
+      button.onpointerup = button.onpointercancel = button.onpointerleave = () => clearTimeout(hold);
+      button.oncontextmenu = e => { if(app.manage) {e.preventDefault(); clearTimeout(hold); menu();} };
+      button.onclick = () => { if(!held) this.launch(app); held = false; };
       this.grid.append(button);
     }
     if (!this.grid.childElementCount) this.grid.append(el('p', 'machine-empty', '没有匹配的应用'));
@@ -156,6 +171,7 @@ export class MachineHome {
       const list = el('div', 'machine-recent-list');
       for (const app of recent) {
         const b = el('button', '');
+        b.disabled = this.offline;
         b.append(glyph(symbols[app.id] || Terminal), el('span', '', app.name));
         b.onclick = () => this.launch(app);
         list.append(b);

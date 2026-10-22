@@ -303,3 +303,5 @@
 @container browser (max-width: 440px) {
   .machine-browser-toolbar input { order:-1; flex:0 0 100%; width:100%; }
 }
+
+.machine-browser-app .machine-browser-tabs,.machine-browser-app .machine-browser-toolbar{display:none}.machine-app-launch{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:32px;text-align:center}.machine-app-launch h2{font-size:20px;margin:0}.machine-app-launch p{max-width:520px;overflow-wrap:anywhere}

@@ -12,7 +12,7 @@ import {
   Check,
   Trash2,
   RefreshCw,
-  Download,
+
   ShieldCheck,
 } from 'lucide-react';
 import Markdown from 'react-markdown';
@@ -49,7 +49,6 @@ export function CodingApp({
   call,
   openBrowser,
   active,
-  onManage,
 }: {
   engine: CodingEngine;
   name: string;
@@ -245,12 +244,6 @@ export function CodingApp({
           <Settings size={16} />
           账号与基座
         </button>
-        {onManage && (
-          <button onClick={onManage}>
-            <Download size={16} />
-            在应用市场管理
-          </button>
-        )}
       </aside>
       <main className="coding-main">
         <header>

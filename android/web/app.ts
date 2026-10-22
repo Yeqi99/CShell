@@ -55,7 +55,7 @@ const mobileCoding=new MobileCoding(window.CShellNative,(id,apps)=>{machineApps.
 const machineHomes=new Map<string,MachineHome>();
 const machineShells=new Map<string,{label:string;index:number}[]>();
 const openedShells=new Map<string,number>();
-const machineApps=new Map<string,{browser?:boolean;ide?:boolean;codex?:boolean;claude?:boolean;market?:boolean}>();
+const machineApps=new Map<string,{browser?:boolean;ide?:boolean;codex?:boolean;claude?:boolean;market?:boolean;files?:boolean}>();
 const desktopStatus=new Map<string,{packageReady?:boolean;viewAllowed?:boolean;controlAllowed?:boolean;inputFeatures?:string[];qualityModes?:string[]}>();
 const icons: Record<string, string> = {
   browser: '<circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/>',
@@ -612,11 +612,12 @@ function updateMachineApps(id:string){
  const shell=openedShells.get(id);
  if(s.profile.protocol!=='agent')apps.push({id:'terminal',name:'SSH 终端',detail:'命令与终端历史',run:()=>{home.hide();s.terminal.focus();resize();}});
  else for(const choice of machineShells.get(id)||[]){if(shell!==undefined&&choice.index!==shell)continue;apps.push({id:'terminal',name:choice.label,detail:shell!==undefined?'继续当前终端':'打开终端',run:()=>{if(openedShells.has(id)){home.hide();s.terminal.focus();resize();return;}s.state='正在打开终端';$('status').textContent=s.state;window.CShellNative.openAgent(id,choice.index);openedShells.set(id,choice.index);}});}
- apps.push({id:'files',name:'文件',detail:'浏览、预览与传输',run:()=>{fileSource='remote';fileSession=id;navigate('files');syncFileSessions();}});
+ if(s.profile.protocol!=='agent'||cap.files)apps.push({id:'files',name:'文件',detail:'浏览、预览与传输',run:()=>{fileSource='remote';fileSession=id;navigate('files');syncFileSessions();}});
  if(cap.market)apps.push({id:'market',name:'应用市场',detail:'安装与管理远端应用',run:()=>mobileCoding.open(id,s.profile.name,'market',()=>void mobileIde.open(id,s.profile.name))});
  if(cap.ide)apps.push({id:'ide',name:'代码编辑器',detail:'项目文件与集成终端',run:()=>void mobileIde.open(id,s.profile.name)});
  for(const engine of ['codex','claude'] as const)if(cap[engine])apps.push({id:engine,name:engine==='codex'?'Codex':'Claude Code',detail:'项目会话与模型服务',run:()=>mobileCoding.open(id,s.profile.name,engine)});
  const remote=desktopStatus.get(id);if(remote?.packageReady)apps.push({id:'remote',name:'远程控制',detail:remote.viewAllowed?'查看和操作远端桌面':'等待远端共享或授权',disabled:!remote.viewAllowed,run:()=>desktop.open(id,remote)});
+ for(const app of apps)if(['ide','codex','claude'].includes(app.id)&&cap.market)app.manage=()=>mobileCoding.open(id,s.profile.name,'market',()=>void mobileIde.open(id,s.profile.name));
  home.setApps(apps);
 }
 function updateAgentDesktopEntry(id:string){updateMachineApps(id);}
