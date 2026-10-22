@@ -60,13 +60,7 @@ export function ServerSidebar({
   const [working, setWorking] = useState(false);
   const [dragging, setDragging] = useState('');
   const [drop, setDrop] = useState<{ group: string; before?: string } | null>(null);
-  const finishDrop = () => {
-    const id = dragging, destination = drop;
-    setDragging(''); setDrop(null);
-    if (!id || !destination || !onMove || destination.before === id) return;
-    setWorking(true);
-    void onMove(id, destination.group, destination.before).catch(report).finally(() => setWorking(false));
-  };
+  const pointerDrag = useRef<{id:string;x:number;y:number;active:boolean;drop?:{group:string;before?:string}} | undefined>(undefined);
   const popup = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLElement | null>(null);
   const report = (e: unknown) => {
@@ -324,8 +318,6 @@ export function ServerSidebar({
             key={`${section.favorite ? 'favorite' : 'group'}:${section.id}`}
             className={`server-group ${dragging && drop?.group === section.id && !drop.before ? 'group-drop-target' : ''}`}
             data-group={section.favorite ? undefined : section.id}
-            onDragOver={e => { if (!dragging || section.favorite || working) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDrop({ group: section.id }); }}
-            onDrop={e => { if (!dragging || section.favorite) return; e.preventDefault(); finishDrop(); }}
           >
             <div className="group-heading">
               <button
@@ -368,13 +360,33 @@ export function ServerSidebar({
                 <div
                   key={profile.id}
                   className={`server-item ${activeProfile === profile.id ? 'active' : ''}`}
-                  draggable={!!onMove && !working}
+                  draggable={false}
+                  data-profile={profile.id}
+                  onPointerDown={e => {
+                    if (!onMove || working || e.button !== 0 || (e.target as HTMLElement).closest('.favorite-button,.server-more')) return;
+                    pointerDrag.current = { id:profile.id, x:e.clientX, y:e.clientY, active:false };
+                  }}
+                  onPointerMove={e => {
+                    const drag = pointerDrag.current; if (!drag) return;
+                    if (!drag.active && Math.hypot(e.clientX-drag.x,e.clientY-drag.y)<6) return;
+                    if (!drag.active) e.currentTarget.setPointerCapture(e.pointerId);
+                    drag.active=true; setDragging(drag.id); closeMenu();
+                    const hit=document.elementFromPoint(e.clientX,e.clientY), group=hit?.closest<HTMLElement>('[data-group]');
+                    if (!group) { drag.drop=undefined; setDrop(null); return; }
+                    const row=hit?.closest<HTMLElement>('[data-profile]');
+                    drag.drop={group:group.dataset.group!,before:row?.dataset.profile}; setDrop(drag.drop);
+                    const list=group.closest('.server-list'); if(list){const rect=list.getBoundingClientRect(); if(e.clientY<rect.top+30)list.scrollTop-=12;else if(e.clientY>rect.bottom-30)list.scrollTop+=12;}
+                  }}
+                  onPointerUp={e => {
+                    const drag=pointerDrag.current; pointerDrag.current=undefined; setDragging('');setDrop(null);
+                    if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId);
+                    if(!drag?.active||!drag.drop||drag.drop.before===drag.id||!onMove)return;
+                    e.preventDefault();setWorking(true);void onMove(drag.id,drag.drop.group,drag.drop.before).catch(report).finally(()=>setWorking(false));
+                  }}
+                  onPointerCancel={() => {pointerDrag.current=undefined;setDragging('');setDrop(null);}}
+                  onKeyDown={e => {if(e.key==='Escape'){pointerDrag.current=undefined;setDragging('');setDrop(null);}}}
                   data-dragging={dragging === profile.id || undefined}
                   data-drop-before={!!dragging && !section.favorite && drop?.before === profile.id || undefined}
-                  onDragStart={e => { closeMenu(); setDragging(profile.id); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('application/x-cshell-profile', profile.id); }}
-                  onDragEnd={() => { setDragging(''); setDrop(null); }}
-                  onDragOver={e => { if (!dragging || section.favorite || working) return; e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'move'; setDrop({ group: section.id, before: profile.id }); }}
-                  onDrop={e => { if (!dragging || section.favorite) return; e.preventDefault(); e.stopPropagation(); finishDrop(); }}
                   onContextMenu={(e) => {
                     e.preventDefault();
                     openMenu(
@@ -387,6 +399,7 @@ export function ServerSidebar({
                   <div className="server-row">
                     <button
                       className="server-open"
+                      draggable={false}
                       onDoubleClick={() => onConnect(profile)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
@@ -571,3 +584,4 @@ export function ServerSidebar({
     </aside>
   );
 }
+

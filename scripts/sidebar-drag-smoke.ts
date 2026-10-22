@@ -16,19 +16,21 @@ async function main() {
     });
     console.log('before reload'); await page.reload({timeout:10000, waitUntil:'domcontentloaded'}); console.log('reloaded');
     const row = (name: string) => page.locator('[data-group="开发"] .server-item').filter({ has: page.getByText(name, { exact: true }) });
-    const dataTransfer = await page.evaluateHandle(() => new DataTransfer());
-    await row('C').dispatchEvent('dragstart', { dataTransfer });
-    await row('A').dispatchEvent('dragover', { dataTransfer });
-    await row('A').dispatchEvent('drop', { dataTransfer });
-    await row('C').dispatchEvent('dragend', { dataTransfer });
+    if (process.env.CSHELL_NATIVE_DRAG_TEST) {
+      await page.evaluate(() => { document.title = 'CShell — Native drag fixture'; });
+      await page.evaluate(() => { (window as any).dragEvents=[]; for(const type of ['pointerdown','pointerup','dragstart','dragover','drop','dragend'])document.addEventListener(type,event=>{(window as any).dragEvents.push([type,(event.target as HTMLElement).className]);},true); });
+      console.log('NATIVE_READY');
+      await new Promise<void>(resolve => process.stdin.once('data', () => resolve()));
+      console.log('NATIVE_RESULT', await page.evaluate(async () => (await window.cshell.config()).profiles.map(p => ({ name:p.name, group:p.group }))));
+      console.log('NATIVE_EVENTS', await page.evaluate(() => (window as any).dragEvents));
+      return;
+    }
+    await row('C').dragTo(row('A'));
     await page.waitForFunction(async () => (await window.cshell.config()).profiles[0].name === 'C', undefined, {timeout:10000});
-    await row('A').dispatchEvent('dragstart', { dataTransfer });
-    await page.locator('[data-group="生产"]').dispatchEvent('dragover', { dataTransfer });
-    await page.locator('[data-group="生产"]').dispatchEvent('drop', { dataTransfer });
+    await row('A').dragTo(page.locator('[data-group="生产"] .group-title'));
     await page.waitForFunction(async () => (await window.cshell.config()).profiles.find(p => p.name === 'A')?.group === '生产', undefined, {timeout:10000});
     const before = await page.evaluate(async () => JSON.stringify((await window.cshell.config()).profiles));
-    await row('B').dispatchEvent('dragstart', { dataTransfer });
-    await row('B').dispatchEvent('dragend', { dataTransfer });
+    await row('B').hover(); await page.mouse.down(); await page.mouse.move(400,30,{steps:12}); await page.keyboard.press('Escape'); await page.mouse.up();
     assert.equal(await page.evaluate(async () => JSON.stringify((await window.cshell.config()).profiles)), before);
     console.log('before reload'); await page.reload({timeout:10000, waitUntil:'domcontentloaded'}); console.log('reloaded');
     await page.locator('[data-group="生产"] .server-item').waitFor();

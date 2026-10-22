@@ -5976,3 +5976,4 @@ input[type='radio']:focus-visible {
 .sidebar .server-item[data-drop-before] { box-shadow:0 -3px 0 var(--accent); }
 .sidebar .group-drop-target { background:var(--accent-soft); outline:1px dashed var(--accent); outline-offset:-3px; border-radius:8px; }
 .sidebar-drag-hint { padding:8px 14px; font-size:var(--sidebar-detail-size,13px); color:var(--accent); line-height:1.5; }
+.sidebar { position:relative; } .sidebar-drag-hint { position:absolute; bottom:36px; left:8px; right:8px; z-index:20; pointer-events:none; border:1px solid var(--accent-border); border-radius:8px; background:var(--panel); box-shadow:0 4px 16px #0002; }
