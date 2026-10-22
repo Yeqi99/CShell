@@ -54,6 +54,7 @@ const mobileCoding=new MobileCoding(window.CShellNative,(id,apps)=>{machineApps.
 const machineApps=new Map<string,{browser?:boolean;ide?:boolean;codex?:boolean;claude?:boolean;market?:boolean}>();
 const desktopStatus=new Map<string,{packageReady?:boolean;viewAllowed?:boolean;controlAllowed?:boolean;inputFeatures?:string[];qualityModes?:string[]}>();
 const icons: Record<string, string> = {
+  browser: '<circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/>',
   extensions: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 17.5h7m-3.5-3.5v7"/>',
   home: '<path d="m3 10 9-7 9 7v10H3Z M9 20v-7h6v7"/>',
   folder: '<path d="M3 7V4h6l3 3h9v13H3Z"/>',
@@ -603,6 +604,7 @@ function updateMachineApps(id:string){
  if(cap.ide){const b=document.createElement('button');b.className='machine-app-ide';b.textContent='代码编辑器';b.onclick=()=>void mobileIde.open(id,s.profile.name);apps.append(b);}
  if(cap.market){const b=document.createElement('button');b.textContent='应用市场';b.onclick=()=>mobileCoding.open(id,s.profile.name,'market',()=>void mobileIde.open(id,s.profile.name));apps.append(b);}
  for(const engine of ['codex','claude'] as const){if(!cap[engine])continue;const b=document.createElement('button');b.textContent=engine==='codex'?'Codex':'Claude Code';b.onclick=()=>mobileCoding.open(id,s.profile.name,engine);apps.append(b);}
+ for(const b of apps.querySelectorAll('button')){const label=b.textContent||'';const symbol=document.createElement('span');symbol.className='machine-app-icon';icon(symbol,label==='浏览器'?'browser':label==='应用市场'?'extensions':'terminal');const text=document.createElement('span');text.textContent=label;b.replaceChildren(symbol,text);}
  picker.insertBefore(apps,picker.children[2]||null);
 }
 function updateAgentDesktopEntry(id: string) {
@@ -621,6 +623,19 @@ function updateAgentDesktopEntry(id: string) {
   picker.insertBefore(entry,picker.children[2]||null);
 }
 window.receive = (id, type, value) => {
+  if(type==='ssh-workspace'){
+    const s=sessions.get(id);if(!s||s.state==='已断开'||value!=='ready')return;
+    const picker=document.createElement('section');picker.className='agent-environments ssh-workspace';
+    const title=document.createElement('h2');title.textContent=s.profile.name;
+    const subtitle=document.createElement('p');subtitle.textContent='cagent 工作区 · 通过 SSH 连接';
+    const terminal=document.createElement('button');terminal.textContent='SSH 终端';
+    terminal.onclick=()=>{picker.hidden=true;s.terminal.focus();resize();};
+    const files=document.createElement('button');files.textContent='文件';files.onclick=()=>navigate('files');
+    picker.append(title,subtitle,terminal,files);
+    s.element.querySelector('.agent-environments')?.remove();s.element.append(picker);
+    const home=document.createElement('button');home.className='machine-home';home.textContent='机器桌面';home.setAttribute('aria-label','返回机器桌面');home.onclick=()=>{picker.hidden=false;};s.element.append(home);
+    updateMachineApps(id);return;
+  }
   if(type==='machine-result'){mobileIde.receive(id,value);mobileCoding.receive(id,value);return;}
   if(type==='machine-apps'){try{machineApps.set(id,JSON.parse(value));updateMachineApps(id);}catch{}return;}
   if (type === 'cagent-status') { receiveCAgent(value); return; }
@@ -696,6 +711,7 @@ window.receive = (id, type, value) => {
     if (active === id) resize();
   }
   if (type === 'closed' || type === 'error') {
+    machineApps.delete(id);s.element.querySelector('.machine-home')?.remove();
     desktop.event(id,'desktop-closed',type==='error'?value:'机器连接已断开');desktopStatus.delete(id);
     s.state = '已断开';
     s.element.querySelector('.agent-environments')?.remove();
