@@ -15,6 +15,7 @@ import { startClientApplication, clientCodec } from './client-app';
 import { ClientProvider } from '../core/client/provider';
 import { ClientVault } from '../core/client/identity';
 import { registerCloudHandlers } from './cloud-sync';
+import { DesktopAccountProfiles } from '../core/desktop-account-profiles';
 import { clientShellSchema } from '../shared/client';
 import { LocalTerminalProvider } from '../core/connections/local-terminal-provider';
 import { WslSetup } from './wsl-setup';
@@ -81,6 +82,12 @@ const clientMode = process.argv.includes('--client') || app.getName() === 'CShel
 if(isPro && !clientMode){app.setName(productName);app.setPath('userData',join(app.getPath('appData'),productName));app.setAppUserModelId('org.canpshell.pro');}
 if (clientMode) app.setPath('userData', join(app.getPath('appData'), 'CShell Client'));
 if (process.env.CSHELL_TEST_DATA) app.setPath('userData', process.env.CSHELL_TEST_DATA);
+// Keep the single-instance lock at the installation's root, not at an account profile.
+const hasLock = app.requestSingleInstanceLock();
+const accountProfiles=isPro&&!clientMode?new DesktopAccountProfiles(app.getPath('userData')):undefined;
+if(accountProfiles)app.setPath('userData',accountProfiles.bootDirectory());
+if(accountProfiles||process.env.CSHELL_TEST_DATA)app.setPath('sessionData',app.getPath('userData'));
+let accountTransition=false;
 const diagnostics = new Diagnostics(app.getPath('userData'), app.getVersion());
 process.on('uncaughtExceptionMonitor', error => diagnostics.record('main.uncaught', error));
 process.on('unhandledRejection', error => diagnostics.record('main.rejection', error));
@@ -98,7 +105,6 @@ ipcMain.on('diagnostics:error', (event, value) => {
   if (typeof value.stack === 'string') error.stack = value.stack.slice(0, 12000);
   diagnostics.record('renderer.error', error);
 });
-const hasLock = app.requestSingleInstanceLock();
 // A launcher may leave the first window hidden. Focusing alone cannot reveal it.
 // Register before async initialization so a second launch is never missed.
 const revealWindow = () => {
@@ -309,6 +315,7 @@ else
         viewHandlers.set(name, fn);
         ipcMain.handle(name, async (event, ...args) => {
           validateSender(event);
+          if(accountTransition&&name!=='cloud:status')throw Error('正在打开账号工作区，请稍候');
           const viewSender = monitorWindows.accepts(event);
           if (viewSender) monitorWindows.authorize(event, name, args);
           if (viewSender && monitorWindows.skip(event, name, args)) return;
@@ -563,7 +570,11 @@ else
             window.webContents.send('cloud:changed');
             window.webContents.send('ai:providers-changed');
           }
-        }, machineBrowser, openCode),
+        }, machineBrowser, openCode, accountProfiles?{
+          profiles:accountProfiles,
+          assertIdle:()=>{if(ssh.size||localTerminal.size||clientProvider.size||transfers.size||http.running)throw Error('请先关闭连接并等待传输结束，再切换账号');},
+          block:(value:boolean)=>{accountTransition=value;},
+        }:undefined),
       );
       registerPresetHandlers(handle, window, app.getPath('userData'), store, text);
       window.once('closed', () => {

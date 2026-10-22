@@ -9,6 +9,9 @@ import type { AiService } from '../core/ai';
 import type { ClientProvider } from '../core/client/provider';
 import type { HttpWorkspaces } from '../core/http-workspaces';
 import { clientCodec } from './client-app';
+import { defaults } from '../shared/contracts';
+import { emptySharedAi } from '../shared/shared-ai';
+import type { DesktopAccountProfiles } from '../core/desktop-account-profiles';
 
 const assetName = z.string().regex(/^[a-f0-9]{64}\.(?:ttf|otf|woff|woff2|png)$/);
 const bundleSchema = z
@@ -33,8 +36,10 @@ export async function registerCloudHandlers(
   publish: () => void,
   browser: import('./machine-browser').MachineBrowser,
   openCode: import('../extensions/opencode/service').OpenCodeExtension,
+  profileOptions?:{profiles:DesktopAccountProfiles;assertIdle():void;block(value:boolean):void},
 ) {
   const directory = app.getPath('userData');
+  const assertAccountIdle=()=>{profileOptions?.assertIdle();if(ai.snapshot().threads.some(t=>t.state==='running'||t.state==='approval'||t.goal?.state==='active'))throw Error('请先停止智能体任务，再切换账号');};
   const snapshot = async () => {
     const data = await store.cloudExport(),
       assets: Record<string, string> = {};
@@ -90,6 +95,17 @@ export async function registerCloudHandlers(
     if(data.browser!==undefined)await browser.cloudImport(data.browser);
   };
   const cloud = new CloudSync(directory, clientCodec, {
+    ...(profileOptions?{
+      registrationSnapshot:async()=>({format:1,store:{profiles:[],groups:[],preferences:defaults,presets:[],monitorViews:[],hosts:{},secrets:{}},ai:emptySharedAi(),devices:[],http:[],browser:{},opencode:{accounts:[]},assets:{}}),
+      activationTarget:async(accountId:string|undefined)=>{
+        assertAccountIdle();const target=await profileOptions.profiles.prepare(accountId);
+        return {directory:target.directory,commit:async()=>{
+          assertAccountIdle();profileOptions.block(true);
+          try{await target.commit();}catch(error){profileOptions.block(false);throw error;}
+          setImmediate(()=>{app.relaunch();app.quit();});
+        }};
+      },
+    }:{}),
     export: snapshot,
     validate,
     import: async (value) => {
@@ -104,6 +120,7 @@ export async function registerCloudHandlers(
     },
   }, undefined, (url, options) => net.fetch(String(url), options));
   await cloud.load();
+  if(profileOptions)await profileOptions.profiles.initialize(cloud.accountId());
   ai.officialCredential=()=>cloud.sessionCredential();
   client.cloudLease=async id=>{const result=await cloud.accountRequest('/v1/devices/lease',{deviceId:id});return (await import('../shared/agent-relay')).agentRelayConnectionSchema.parse(result.relay);};
   handle('cloud:memory',()=>ai.memory());
@@ -124,9 +141,9 @@ export async function registerCloudHandlers(
   handle('cloud:sync', (direction) =>
     cloud.sync(z.enum(['upload', 'download']).optional().parse(direction)),
   );
-  handle('cloud:logout', () => cloud.logout());
+  handle('cloud:logout', () => {assertAccountIdle();return cloud.logout();});
   let refreshing=false,modelsChecked=0;
-  const tick=async()=>{if(refreshing)return;refreshing=true;try{await cloud.autoSync();if(cloud.status().email&&Date.now()-modelsChecked>60000){const catalog=await cloud.accountRequest('/v1/models');if(await ai.ensureOfficialModels(catalog.models.map((m:{id:string})=>m.id)))publish();modelsChecked=Date.now();}}catch{}finally{refreshing=false;}};
+  const tick=async()=>{if(refreshing||cloud.activationDeferred())return;refreshing=true;try{await cloud.autoSync();if(!cloud.activationDeferred()&&cloud.status().email&&Date.now()-modelsChecked>60000){const catalog=await cloud.accountRequest('/v1/models');if(await ai.ensureOfficialModels(catalog.models.map((m:{id:string})=>m.id)))publish();modelsChecked=Date.now();}}catch{}finally{refreshing=false;}};
   void tick();
   const timer = setInterval(() => { void tick(); }, 15000);
   timer.unref();

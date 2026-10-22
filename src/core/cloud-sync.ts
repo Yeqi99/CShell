@@ -18,6 +18,7 @@ interface LocalState {
   pending?: { baseRevision: number; mutationId: string; envelope: CloudEnvelope; digest: string };
 }
 export interface CloudAdapter {
+  activationTarget?(accountId:string|undefined):Promise<{directory:string;commit():Promise<void>}>;
   export(): Promise<unknown>;
   registrationSnapshot?(): Promise<unknown>;
   accountChanged?(accountId: string | undefined): Promise<void | (() => Promise<void>)>;
@@ -25,6 +26,8 @@ export interface CloudAdapter {
   import(value: unknown): Promise<void>;
 }
 export class CloudSync {
+  private handedOff=false;
+  activationDeferred(){return this.handedOff;}
   private data: LocalState = { revision: 0 };
   private state: CloudStatus['state'] = 'signed-out';
   private error?: string;
@@ -32,6 +35,7 @@ export class CloudSync {
   private profileChecked = 0;
   private profileLoading = false;
   async accountStatus() {
+    if(this.handedOff)return this.status();
     const session = this.data.session;
     if (session && !this.profileLoading && Date.now() - this.profileChecked > 60000) {
       this.profileLoading = true;
@@ -47,6 +51,7 @@ export class CloudSync {
     return this.status();
   }
   async autoSync() {
+    if(this.handedOff)return;
     if (!this.busy && this.data.session && this.data.key && this.state !== 'conflict') {
       try { const first = !this.data.digest && this.data.revision === 0 && (await this.remote()).envelope; await this.sync(first ? 'download' : undefined); } catch { /* next tick retries without user intervention */ }
     }
@@ -142,6 +147,7 @@ export class CloudSync {
     return value;
   }
   private async exclusive<T>(operation: () => Promise<T>): Promise<T> {
+    if(this.handedOff)throw Error('正在打开账号工作区，请稍候');
     if (this.busy) throw new Error('同步操作正在进行');
     this.busy = true;
     try {
@@ -150,7 +156,7 @@ export class CloudSync {
       this.busy = false;
     }
   }
-  async accountRequest(path:string,body?:unknown){if(!this.data.session)throw Error('请先登录');return this.api(path,body);}
+  async accountRequest(path:string,body?:unknown){if(this.handedOff)throw Error('正在打开账号工作区，请稍候');if(!this.data.session)throw Error('请先登录');return this.api(path,body);}
   accountId(){return this.data.session?.accountId;}
   sessionCredential(){if(!this.data.session)throw Error('请先登录');return this.data.session.token;}
   async requestCode(email: string) {
@@ -158,6 +164,22 @@ export class CloudSync {
   }
   private async activate(next:LocalState) {
     const previous=this.data, previousState=this.state;
+    if(this.adapter.activationTarget&&previous.session?.accountId!==next.session?.accountId){
+      const target=await this.adapter.activationTarget(next.session?.accountId);
+      const path=join(target.directory,'cloud-sync.enc');
+      if(next.session&&next.revision===0){
+        try{
+          const saved:LocalState=JSON.parse(await this.codec.decrypt(await readFile(path,'utf8')));
+          if(saved.session?.accountId!==next.session.accountId||!Number.isSafeInteger(saved.revision)||saved.revision<0)throw Error('Invalid account context');
+          next={...saved,session:next.session,...(next.key?{key:next.key}:{})};
+        }catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw Error('目标账号的本机同步记录无法读取，原数据已保留');}
+      }
+      await mkdir(target.directory,{recursive:true});
+      await writeFile(path+'.tmp',await this.codec.encrypt(JSON.stringify(next)),{mode:0o600});await rename(path+'.tmp',path);
+      await target.commit();
+      this.handedOff=true;this.data=next;this.state=!next.session?'signed-out':next.key?'ready':'locked';
+      return;
+    }
     if(this.adapter.accountChanged && previous.session && previous.session.accountId!==next.session?.accountId){
       const directory=join(this.directory,'cloud-accounts');await mkdir(directory,{recursive:true});
       const path=join(directory,previous.session.accountId+'.enc');
@@ -193,7 +215,7 @@ export class CloudSync {
       this.error=undefined;
       return this.status();
     });
-    if (this.data.key) {
+    if (this.data.key && !this.handedOff) {
       const first = !this.data.digest && (await this.remote()).envelope;
       await this.sync(first ? 'download' : undefined);
     }
@@ -235,6 +257,7 @@ export class CloudSync {
     });
   }
   async sync(direction?: 'upload' | 'download') {
+    if(this.handedOff)throw Error('正在打开账号工作区，请稍候');
     return this.exclusive(async () => {
       if (!this.data.session || !this.data.key) throw new Error('请先登录并解锁保险库');
       this.state = 'syncing';
@@ -339,6 +362,8 @@ export class CloudSync {
     for (const name of backups.slice(0, -20)) await unlink(join(directory, name));
   }
   async logout() {
+    const deadline=Date.now()+30000;
+    while(this.busy){if(Date.now()>deadline)throw Error('同步仍在进行，请稍后退出账号');await new Promise(resolve=>setTimeout(resolve,25));}
     return this.exclusive(async () => {
       if (this.data.session) await this.api('/v1/auth/logout', {});
       await this.activate({revision:0});

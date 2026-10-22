@@ -41,3 +41,13 @@ CloudSync 账号激活钩子现在返回回滚函数，登录信息保存失败�
 新增 tests/cagent-cloud-accounts.test.ts 使用模拟云服务与真实 CAgentAssistant/ClientVault/CloudSync：访客不自动上传、A/B 偏好隔离、退出恢复访客、重登录保留未同步修改、OpenCode 和未知未来字段往返保留均通过。最新 TypeScript 检查和相关 16 项测试通过；C# 重新编译并验证 flow2.png.json 六项交互通过。依然没有真实账号/中继端到端验收，没有发布或改用户应用。
 
 还需审查异常回滚失败后的隔离状态、崩溃恢复及并发操作，完成桌面全数据隔离（不能只套 cloud bundle）、来源导入解密/冲突 UI、访客清理，并实现移动端相同边界后统一构建发布。
+
+## 2026-10-22：桌面端完整工作区隔离（未发布）
+
+新增 DesktopAccountProfiles：升级后的原工作区原位保留并登记 legacy owner；之后的 guest / 不同账号进入 root/account-profiles/<owner> 独立 Electron userData 与 sessionData。不复制访客配置，只保留 OS 保护的 Local State 加密上下文。Windows Chromium 首次退出时才可能刷出 Local State，因此新进程在 Electron 初始化前补齐复制，不能在第一次登录时强制要求文件已经存在。
+
+CloudSync 新增 activationTarget：认证写入目标目录后提交活动目录，当前进程停止同步并重新打开应用。不会在旧访客 adapter 上下载/上传账号数据；已有目标账号的同步基线保留。主窗口在提交切换时阻止新 IPC 操作，连接、传输、HTTP 或智能体任务活跃时拒绝切换。退出等待短暂后台同步完成，不要求用户反复点击。配置、权限、历史、扩展数据、Cookie 与 Chromium 存储随整个目录隔离。
+
+验证：TypeScript 与相关 10 项单元测试通过；Pro 生产构建通过。scripts/account-profile-smoke.cjs 在临时目录、模拟云端、真实 Electron 中完成访客→账号→访客：连接与加密习惯不串入账号，持久 Cookie 和 localStorage 隔离，退出后访客数据恢复。测试拦截 relaunch 并手动重启隔离实例，不调用真实云服务。测试残余 Electron 已核对无存活。正式 CShell/CAgent 0.8.3 未关闭、未修改或安装。
+
+仍未实现：来源预览与显式导入、冲突选择、访客缓存管理 UI；Android 同等隔离；实际账号和会员中继端到端验证；所有包与下载渠道更新。不得发布这个中间版本。下一步从读取来源实现：开源/访客只能从后台固定路径选择，在隔离 Electron 加密上下文中解密，秘密仅经受限父子进程管道传递，预览只向 renderer 返回条目概况。导入不转移本地授权，确认后合并并重新加密；清除不能递归删除 legacy 根目录（其中可能还有账号目录）。还需故障恢复、切换并发与 active IPC/API 的边界审查。

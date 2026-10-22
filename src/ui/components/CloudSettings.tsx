@@ -59,7 +59,7 @@ export function CloudSettings() {
       {status.storage&&<div className="account-section account-storage"><h2>云空间</h2><div className="account-detail-row"><span>连接、模型、扩展偏好与浏览器记录</span><strong>{(status.storage.usedBytes/1048576).toFixed(2)} / {Math.round(status.storage.limitBytes/1048576)} MiB</strong></div><progress aria-label="云空间用量" max={status.storage.limitBytes} value={status.storage.usedBytes}/><p>仅同步配置与记录，浏览器 Cookie、缓存和登录状态保留在本机。</p></div>}
       <AccountMemory/>
       <div className="account-footer"><span><ShieldCheck size={14}/> 配置已加密保护</span><button className="account-signout" onClick={()=>setLogoutConfirm(true)}><LogOut size={14}/>退出登录</button></div>
-      {logoutConfirm&&<div className="account-exception"><p>退出后停止此设备的云同步，已保存的本机配置保留。</p><button disabled={busy} onClick={()=>void run(async()=>{await window.cshell.cloudLogout();setLogoutConfirm(false);})}>确认退出</button><button onClick={()=>setLogoutConfirm(false)}>取消</button></div>}
+      {logoutConfirm&&<div className="account-exception"><p>退出后重新打开未登录工作区。账号数据保留，不会混入未登录数据。</p><button disabled={busy} onClick={()=>void run(async()=>{await window.cshell.cloudLogout();setLogoutConfirm(false);})}>确认退出</button><button onClick={()=>setLogoutConfirm(false)}>取消</button></div>}
       {error&&<p className="account-feedback" role="alert">{error}</p>}
     </>}
   </section>;
