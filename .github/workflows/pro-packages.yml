@@ -1,0 +1,56 @@
+name: Pro experimental desktop packages
+on:
+  push:
+    tags: ['pro-v*']
+permissions:
+  contents: write
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: macos-latest, platform: mac, arch: arm64}
+          - {os: macos-15-intel, platform: mac, arch: x64}
+          - {os: ubuntu-24.04, platform: linux, arch: x64}
+          - {os: ubuntu-24.04-arm, platform: linux, arch: arm64}
+    runs-on: ${{ matrix.os }}
+    env:
+      CSHELL_EDITION: pro
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/prepare-pty.mjs
+      - run: pnpm exec tsc --noEmit
+      - run: pnpm exec tsx --test tests/cloud-merge.test.ts tests/cloud-sync.test.ts tests/agent-relay.test.ts
+      - run: pnpm exec vite build && node scripts/build.mjs
+      - run: pnpm exec electron-builder --config electron-builder.pro.cjs --${{ matrix.platform }} --${{ matrix.arch }} --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pro-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            release/pro-*/*.dmg
+            release/pro-*/*.AppImage
+            release/pro-*/*.deb
+          if-no-files-found: error
+      - name: Upload verified build artifacts to the existing prerelease
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=(release/pro-*/*.dmg release/pro-*/*.AppImage release/pro-*/*.deb)
+          test ${#files[@]} -gt 0
+          for file in "${files[@]}"; do
+            if command -v sha256sum >/dev/null; then sha256sum "$file" > "$file.sha256"; else shasum -a 256 "$file" > "$file.sha256"; fi
+          done
+          gh release upload "$GITHUB_REF_NAME" "${files[@]}" release/pro-*/*.sha256

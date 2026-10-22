@@ -152,7 +152,7 @@ try {
   await page.locator('[name=host]').fill('test.example');
   await page.locator('[name=name]').fill('测试连接');
   await page.locator('[name=group]').fill('开发');
-  await page.locator('[name=password]').fill('secret-not-persisted');
+  await page.locator('[name=password]:visible').fill('secret-not-persisted');
   await page.locator('#back').click();
   await page.locator('#new').click();
   assert.equal(await page.locator('[name=host]').inputValue(), 'test.example');
@@ -166,7 +166,7 @@ try {
   );
   await page.screenshot({ path: 'test-results/android-servers.png' });
   await page.locator('#server-list .server-open').click();
-  await page.locator('[name=password]').fill('secret');
+  await page.locator('[name=password]:visible').fill('secret');
   await page.locator('#connect-actions button[type=submit]').click();
   try {
     await page.waitForFunction(
@@ -231,7 +231,7 @@ try {
   assert.equal(await page.locator('[name=port]').inputValue(), '47831');
   await page.locator('[name=host]').fill('agent.test');
   await page.locator('[name=name]').fill('我的电脑');
-  await page.locator('[name=password]').fill('agent-secret-not-persisted');
+  await page.locator('[name=password]:visible').fill('agent-secret-not-persisted');
   await page.locator('[name=favorite]').check();
   await page.locator('#connect-actions button[type=submit]').click();
   await page.getByRole('button', { name: 'Ubuntu · WSL', exact: true }).waitFor();
@@ -280,7 +280,7 @@ try {
   await page.locator('#protocol-agent').click();
   await page.locator('[name=host]').fill('phone.test');
   await page.locator('[name=name]').fill('测试手机');
-  await page.locator('[name=password]').fill('phone-test');
+  await page.locator('[name=password]:visible').fill('phone-test');
   await page.locator('#connect-actions button[type=submit]').click();
   const phonePicker=page.locator('.agent-environments:visible');
   await phonePicker.getByRole('heading',{name:'测试手机',exact:true}).waitFor();

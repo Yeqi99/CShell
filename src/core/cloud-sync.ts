@@ -4,12 +4,14 @@ import { randomUUID } from 'node:crypto';
 import type { SecretCodec } from './store';
 import { decryptVault, encryptVault, newRecoveryKey, vaultDigest, unwrapRecoveryKey, wrapRecoveryKey } from './cloud-crypto';
 import type { CloudEnvelope, CloudSession, CloudStatus, CloudRevision } from '../shared/cloud-sync';
+import { mergeCloud } from './cloud-merge';
 
 interface LocalState {
   session?: CloudSession;
   key?: string;
   revision: number;
   digest?: string;
+  baseline?: unknown;
   lastSync?: string;
   membership?: CloudStatus["membership"];
   storage?:CloudStatus["storage"];
@@ -157,7 +159,7 @@ export class CloudSync {
       const snapshot=await this.adapter.export();
       const session:CloudSession=await this.api('/v1/auth/register',{email,code,password,accountId,keybox:wrapRecoveryKey(key,password,accountId),envelope:encryptVault(snapshot,key,accountId)});
       if(session.accountId!==accountId || !/^[A-Za-z0-9_-]{43}$/.test(session.token))throw new Error('注册响应不正确，请使用密码登录');
-      this.data={session,key,revision:1,digest:vaultDigest(snapshot),lastSync:new Date().toISOString(),membership:{active:false,expiresAt:null}};
+      this.data={session,key,revision:1,digest:vaultDigest(snapshot),baseline:snapshot,lastSync:new Date().toISOString(),membership:{active:false,expiresAt:null}};
       this.state='ready';this.error=undefined;this.profileChecked=0;
       await this.persist();return this.status();
     });
@@ -236,6 +238,7 @@ export class CloudSync {
             const r = await this.api('/v1/vault', p);
             this.data.revision = r.revision;
             this.data.digest = p.digest;
+            this.data.baseline = decryptVault(p.envelope,this.data.key,this.data.session.accountId);
             delete this.data.pending;
             await this.persist();
           } catch (error) {
@@ -245,14 +248,26 @@ export class CloudSync {
             this.state = 'syncing';
           }
         }
-        const remote = await this.remote(),
+        const remote = await this.remote();
+        let
           local = await this.adapter.export(),
           digest = vaultDigest(local);
         const changed = this.data.digest !== digest,
           remoteChanged = remote.revision !== this.data.revision;
         if (!direction && ((!this.data.digest && remote.envelope) || (changed && remoteChanged))) {
+          if(this.data.baseline!==undefined&&remote.envelope){
+            const other=decryptVault(remote.envelope,this.data.key,this.data.session.accountId);
+            let merged:unknown;
+            try{merged=mergeCloud(this.data.baseline,local,other);this.adapter.validate(merged)}catch{
+              this.state='conflict';throw new Error('同一项配置在多端发生冲突，原始数据已保留');
+            }
+            await this.backup(local,'local');await this.backup(other,'remote');
+            if(vaultDigest(await this.adapter.export())!==digest)throw new Error('本机设置已变化，稍后自动重试');
+            await this.adapter.import(merged);local=await this.adapter.export();digest=vaultDigest(local);
+          }else{
           this.state = 'conflict';
           throw new Error('本机与云端均有数据变化，请选择保留本机或恢复云端；覆盖前会保留加密备份');
+          }
         }
         if (direction === 'download' || (!changed && remoteChanged)) {
           if (!remote.envelope) throw new Error('云端尚无数据');
@@ -264,6 +279,7 @@ export class CloudSync {
             throw new Error('本机设置已变化，请重新同步');
           await this.adapter.import(value);
           this.data.digest = vaultDigest(await this.adapter.export());
+          this.data.baseline = await this.adapter.export();
           this.data.revision = remote.revision;
         } else if (changed || direction === 'upload') {
           if (remote.envelope) {
@@ -280,6 +296,7 @@ export class CloudSync {
           const result = await this.api('/v1/vault', this.data.pending);
           this.data.revision = result.revision;
           this.data.digest = digest;
+          this.data.baseline = local;
           delete this.data.pending;
         }
         this.data.lastSync = new Date().toISOString();

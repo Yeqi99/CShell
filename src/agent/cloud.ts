@@ -148,10 +148,17 @@ export class CagentCloud {
         .object({ email: z.email(), password: z.string().min(8).max(128) })
         .strict()
         .parse(input);
-      const result = await this.sync.login(q.email, q.password, true);
-      this.lastEnroll = 0;
-      void this.tick();
-      return result;
+      this.paused = true;
+      try {
+        await this.pending;
+        await this.hooks?.stop();
+        const result = await this.sync.login(q.email, q.password, true);
+        this.lastEnroll = 0;
+        return result;
+      } finally {
+        this.paused = false;
+        void this.tick();
+      }
     }
     if (method === 'account.code') {
       const q = z.object({ email: z.email() }).strict().parse(input);
