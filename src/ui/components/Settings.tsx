@@ -170,6 +170,13 @@ export function Settings({
               </label>
             </div>
             <h2>{t('fonts')}</h2>
+            <div hidden={category !== 'appearance'}>
+              <div className="form-grid">
+                {([['uiFontSize', cn ? '界面字号' : 'Interface size', 12, 20], ['sidebarFontSize', cn ? '连接名称字号' : 'Connection name size', 12, 22], ['sidebarGroupSize', cn ? '分组标题字号' : 'Group title size', 12, 22], ['sidebarDetailSize', cn ? '地址与说明字号' : 'Address size', 11, 20]] as const).map(([key, label, min, max]) => <label key={key}>{label}<input type="number" min={min} max={max} value={draft[key]} onChange={e => setDraft(previous => ({ ...previous, [key]: Math.max(min, Math.min(max, Number(e.target.value) || min)) }))}/></label>)}
+                <label>{cn ? '侧边栏间距' : 'Sidebar spacing'}<select aria-label={cn ? '侧边栏间距' : 'Sidebar spacing'} value={draft.sidebarDensity} onChange={e => setDraft(previous => ({ ...previous, sidebarDensity: e.target.value as Preferences['sidebarDensity'] }))}><option value="compact">{cn ? '紧凑' : 'Compact'}</option><option value="comfortable">{cn ? '舒适' : 'Comfortable'}</option><option value="spacious">{cn ? '宽松' : 'Spacious'}</option></select></label>
+              </div>
+              <button type="button" onClick={() => setDraft(previous => ({ ...previous, uiFont: defaults.uiFont, uiFontAsset: null, uiFontSize: defaults.uiFontSize, sidebarFontSize: defaults.sidebarFontSize, sidebarGroupSize: defaults.sidebarGroupSize, sidebarDetailSize: defaults.sidebarDetailSize, sidebarDensity: defaults.sidebarDensity }))}>{cn ? '恢复界面字体与间距' : 'Reset interface typography'}</button>
+            </div>
             <p className="muted">
               {fontState === 'loading'
                 ? t('detectingFonts')
@@ -382,3 +389,4 @@ export function Settings({
     </section>
   );
 }
+

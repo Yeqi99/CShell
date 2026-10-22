@@ -357,6 +357,12 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
     document.documentElement.dataset.theme = preferences.theme;
     document.documentElement.lang = config.preferences.locale;
     document.body.style.fontFamily = preferences.uiFont;
+    const style = document.documentElement.style;
+    style.setProperty('--ui-font-size', `${preferences.uiFontSize ?? 15}px`);
+    style.setProperty('--sidebar-font-size', `${preferences.sidebarFontSize ?? 15}px`);
+    style.setProperty('--sidebar-group-size', `${preferences.sidebarGroupSize ?? 14}px`);
+    style.setProperty('--sidebar-detail-size', `${preferences.sidebarDetailSize ?? 13}px`);
+    style.setProperty('--sidebar-row-padding', `${({ compact: 7, comfortable: 11, spacious: 15 })[preferences.sidebarDensity ?? 'comfortable']}px`);
   }, [preferences]);
   useAppearance(preferences, onError);
   useEffect(() => {
