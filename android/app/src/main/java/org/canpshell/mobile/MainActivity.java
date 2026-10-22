@@ -34,11 +34,11 @@ public class MainActivity extends Activity {
   };
   private final Object trustLock = new Object();
   private static class Connection {
-    Session session; ChannelShell shell; OutputStream output; AgentConnection agent, desktop; String agentEndpoint, agentHost; int agentPort;
+    Session session; volatile SshAgentBridge bridge; ChannelShell shell; OutputStream output; AgentConnection agent, desktop; String agentEndpoint, agentHost; int agentPort;
     final ExecutorService files = Executors.newSingleThreadExecutor();
     final ExecutorService writer = Executors.newSingleThreadExecutor();
     final Semaphore outputSlots = new Semaphore(8);
-    synchronized void close() { if (desktop != null) desktop.close(); desktop=null; if (agent != null) agent.close(); files.shutdownNow(); writer.shutdownNow(); outputSlots.release(8); if (shell != null) shell.disconnect(); if (session != null) session.disconnect(); }
+    synchronized void close() { if(bridge!=null)bridge.close(); if (desktop != null) desktop.close(); desktop=null; if (agent != null) agent.close(); files.shutdownNow(); writer.shutdownNow(); outputSlots.release(8); if (shell != null) shell.disconnect(); if (session != null) session.disconnect(); }
   }
   @Override public void onCreate(Bundle state) {
     super.onCreate(state);
@@ -177,8 +177,8 @@ public class MainActivity extends Activity {
       });
     }
     @JavascriptInterface public boolean browserSupported(){return MachineBrowser.supported();}
-    @JavascriptInterface public void browserOpen(String id,String name,String url){Connection c=connections.get(id);if(c==null||c.agent==null)return;runOnUiThread(()->{if(connections.get(id)==c)browser.open(id,name,c.agent,url);});}
-    @JavascriptInterface public void machineRequest(String json){if(destroyed||json.length()>131072)return;workers.execute(()->{String request="",id="";try{JSONObject p=new JSONObject(json);request=p.getString("request");UUID.fromString(request);id=p.getString("session");String method=p.getString("method");if(!method.matches("^(ide|coding)\\.[a-zA-Z.]+$"))throw new IOException("不支持的机器应用操作");Connection c=connections.get(id);if(c==null||c.agent==null)throw new IOException("机器连接已断开");Object result=c.agent.manage(method,p.opt("params"));event(id,"machine-result",new JSONObject().put("request",request).put("result",result).toString());}catch(Exception e){try{event(id,"machine-result",new JSONObject().put("request",request).put("error",e.getMessage()).toString());}catch(Exception ignored){}}});}
+    @JavascriptInterface public void browserOpen(String id,String name,String url){Connection c=connections.get(id);if(c==null)return;runOnUiThread(()->{if(connections.get(id)!=c)return;if(c.bridge!=null)browser.openSsh(id,name,c.bridge.browserIdentity(),c.session,url);else if(c.agent!=null)browser.open(id,name,c.agent,url);});}
+    @JavascriptInterface public void machineRequest(String json){if(destroyed||json.length()>131072)return;workers.execute(()->{String request="",id="";try{JSONObject p=new JSONObject(json);request=p.getString("request");UUID.fromString(request);id=p.getString("session");String method=p.getString("method");if(!method.matches("^(ide|coding)\\.[a-zA-Z.]+$"))throw new IOException("不支持的机器应用操作");Connection c=connections.get(id);if(c==null||(c.agent==null&&c.bridge==null))throw new IOException("机器连接已断开");Object result=c.bridge!=null?c.bridge.manage(method,p.opt("params")):c.agent.manage(method,p.opt("params"));event(id,"machine-result",new JSONObject().put("request",request).put("result",result).toString());}catch(Exception e){try{event(id,"machine-result",new JSONObject().put("request",request).put("error",e.getMessage()).toString());}catch(Exception ignored){}}});}
     @JavascriptInterface public boolean agentSupported() { return android.os.Build.VERSION.SDK_INT >= 29; }
     @JavascriptInterface public String version() { return updates.current(); }
     @JavascriptInterface public void checkUpdate() { updates.check(); }
@@ -220,13 +220,13 @@ public class MainActivity extends Activity {
           c.shell = (ChannelShell)c.session.openChannel("shell");
           c.shell.setPtyType("xterm-256color", 80, 24, 0, 0);
           InputStream input = c.shell.getInputStream(); c.output = c.shell.getOutputStream(); c.shell.connect(15000);
-          event(id, "connected", ""); byte[] buffer = new byte[16384]; int n;
+          event(id, "connected", ""); final String machineId=id; workers.execute(()->probeSshWorkspace(machineId,c)); byte[] buffer = new byte[16384]; int n;
           while (!destroyed && connections.get(id) == c && (n = input.read(buffer)) != -1) {
             if (!c.outputSlots.tryAcquire(30, TimeUnit.SECONDS)) throw new IOException("终端渲染超时");
             event(id, "data", Base64.encodeToString(buffer, 0, n, Base64.NO_WRAP));
           }
         } catch (Exception e) { event(id, "error", e.getMessage() == null ? "连接失败" : e.getMessage()); }
-        finally { c.close(); if (!id.isEmpty()) { connections.remove(id, c); event(id, "closed", ""); } }
+        finally { c.close(); final String closedId=id; runOnUiThread(()->browser.disconnected(closedId)); if (!id.isEmpty()) { connections.remove(id, c); event(id, "closed", ""); } }
       });
     }
     @JavascriptInterface public void fileRequest(String json) {
@@ -292,6 +292,19 @@ public class MainActivity extends Activity {
     }
     @JavascriptInterface public void desktopClose(String id) {Connection c=connections.get(id);if(c==null)return;synchronized(c){AgentConnection d=c.desktop;c.desktop=null;if(d!=null)d.close();}}
     @JavascriptInterface public void disconnect(String id) { runOnUiThread(()->browser.disconnected(id)); Connection c = connections.remove(id); if (c != null) workers.execute(c::close); }
+  }
+  private void probeSshWorkspace(String id,Connection c) {
+    SshAgentBridge bridge=null;
+    try {
+      bridge=new SshAgentBridge(c.session);
+      synchronized(c){if(destroyed||connections.get(id)!=c||!c.session.isConnected()){bridge.close();return;}c.bridge=bridge;}
+      event(id,"ssh-workspace","ready");
+      JSONObject apps=new JSONObject().put("browser",true);
+      if(connections.get(id)==c)event(id,"machine-apps",apps.toString());
+      try{JSONObject ide=(JSONObject)bridge.manage("ide.status",new JSONObject());apps.put("ide",ide.optBoolean("supported")&&ide.optBoolean("ready"));if(ide.optBoolean("supported"))apps.put("market",true);}catch(Exception ignored){}
+      try{JSONObject coding=(JSONObject)bridge.manage("coding.status",new JSONObject());if(coding.optBoolean("supported"))apps.put("market",true);JSONArray engines=coding.optJSONArray("engines");if(engines!=null)for(int i=0;i<engines.length();i++){JSONObject e=engines.getJSONObject(i);apps.put(e.getString("engine"),e.optBoolean("ready"));}}catch(Exception ignored){}
+      if(connections.get(id)==c)event(id,"machine-apps",apps.toString());
+    }catch(Exception e){if(bridge!=null)bridge.close();if(connections.get(id)==c)event(id,"ssh-workspace","unavailable");}
   }
   private void connectAgent(String json) {
     workers.execute(() -> {

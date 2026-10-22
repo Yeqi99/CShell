@@ -1,4 +1,6 @@
 .coding-app {
+  position: relative;
+  container: coding / inline-size;
   height: 100%;
   min-height: 0;
   display: flex;
@@ -8,10 +10,10 @@
   overflow: hidden;
 }
 .coding-sidebar {
-  width: 200px;
+  width: 168px;
   flex-shrink: 0;
   background: var(--bg);
-  padding: 16px 10px;
+  padding: 12px 10px;
   display: flex;
   flex-direction: column;
   gap: 9px;
@@ -73,8 +75,8 @@
   overflow: hidden;
 }
 .coding-main > header {
-  height: 54px;
-  min-height: 54px;
+  height: 46px;
+  min-height: 46px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -106,6 +108,7 @@
   gap: 6px;
 }
 .coding-project {
+  flex-shrink: 0;
   display: flex;
   gap: 8px;
   align-items: center;
@@ -130,29 +133,30 @@
   min-height: 0;
   overflow: auto;
   overscroll-behavior: contain;
-  padding: 20px 24px;
+  padding: 12px 20px;
 }
 .coding-empty {
-  min-height: 260px;
-  height: 100%;
+  min-height: min-content;
+  min-height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 8px;
   text-align: center;
 }
 .coding-empty > div {
   display: grid;
   place-items: center;
-  width: 66px;
-  height: 66px;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
   border-radius: 20px;
   background: linear-gradient(135deg, #e2edff, #d6f1e9);
   color: #36618f;
 }
 .coding-empty h2 {
-  font-size: 20px;
+  font-size: 18px;
   margin: 8px 0 0;
 }
 .coding-empty p {
@@ -196,16 +200,18 @@
   cursor: pointer;
 }
 .coding-compose {
-  margin: 0 18px 16px;
-  padding: 10px;
+  flex-shrink: 0;
+  margin: 0 14px 12px;
+  padding: 8px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--bg);
 }
 .coding-compose textarea {
   width: 100%;
-  min-height: 70px;
-  max-height: 160px;
+  min-height: 48px;
+  height: 56px;
+  max-height: 120px;
   resize: vertical;
   background: transparent;
   border: 0;
@@ -231,6 +237,66 @@
   overflow: auto;
   padding: 24px;
   overscroll-behavior: contain;
+}
+.coding-settings > * {
+  max-width: 760px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.coding-account-intro p {
+  margin-bottom: 0;
+}
+.coding-auth-choices strong,
+.coding-profile-grid strong {
+  overflow-wrap: anywhere;
+}
+.coding-account-intro {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 22px;
+}
+.coding-account-intro > span {
+  width: 50px;
+  height: 50px;
+  border-radius: 15px;
+  background: var(--hover);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.coding-account-intro h2 {
+  margin: 0;
+}
+.coding-auth-choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 28px;
+}
+.coding-auth-choices > button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  gap: 10px;
+  padding: 18px;
+  background: var(--bg);
+  border-radius: 12px;
+  min-height: 130px;
+}
+.coding-auth-choices small {
+  color: var(--muted);
+  line-height: 1.5;
+}
+.coding-auth-choices > button:first-child {
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+}
+@media (max-width: 600px) {
+  .coding-auth-choices {
+    grid-template-columns: 1fr;
+  }
 }
 .coding-settings h2 {
   font-size: 19px;
@@ -267,7 +333,7 @@
 }
 .coding-profile-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 240px));
   gap: 10px;
 }
 .coding-profile-grid > button {
@@ -320,6 +386,7 @@
   color: var(--muted);
 }
 .coding-error {
+  flex-shrink: 0;
   color: #ad3434;
   background: #d9484810;
   padding: 9px 16px;
@@ -344,4 +411,101 @@
   }
 }
 
-.coding-menu-toggle{display:none!important}@media(max-width:600px){.coding-app{position:relative}.coding-sidebar{display:none;position:absolute;inset:52px auto 0 0;width:min(300px,85%);z-index:10;box-shadow:12px 0 40px #17293d30}.coding-app[data-menu=true] .coding-sidebar{display:flex}.coding-menu-toggle{display:inline-flex!important}.coding-main{width:100%;min-width:0}.coding-main>header{padding:8px!important}.coding-main input,.coding-main textarea{font-size:16px}.coding-app button{min-height:42px!important}.coding-compose{padding:12px!important}.coding-compose>div{flex-wrap:wrap}.coding-compose select{max-width:100%;min-height:38px}.coding-settings{padding:18px!important}.coding-profile-grid{grid-template-columns:1fr!important}}
+.coding-menu-toggle {
+  display: none !important;
+}
+@container coding (max-width: 620px) {
+  .coding-sidebar {
+    display: none;
+    position: absolute;
+    inset: 46px auto 0 0;
+    width: min(260px, 85%);
+    z-index: 10;
+    box-shadow: 12px 0 40px #17293d30;
+  }
+  .coding-app[data-menu='true'] .coding-sidebar {
+    display: flex;
+  }
+  .coding-menu-toggle {
+    display: inline-flex !important;
+  }
+  .coding-main > header {
+    padding: 0 10px;
+  }
+  .coding-ready {
+    display: none;
+  }
+  .coding-settings {
+    padding: 16px;
+  }
+  .coding-auth-choices {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .coding-auth-choices > button {
+    min-height: 104px;
+    padding: 14px;
+    gap: 7px;
+  }
+  .coding-compose > div {
+    flex-wrap: wrap;
+  }
+  .coding-compose select {
+    max-width: 100%;
+    min-width: 0;
+  }
+  .coding-account-intro {
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+}
+@media (max-width: 600px) {
+  .coding-app {
+    position: relative;
+  }
+  .coding-sidebar {
+    display: none;
+    position: absolute;
+    inset: 52px auto 0 0;
+    width: min(300px, 85%);
+    z-index: 10;
+    box-shadow: 12px 0 40px #17293d30;
+  }
+  .coding-app[data-menu='true'] .coding-sidebar {
+    display: flex;
+  }
+  .coding-menu-toggle {
+    display: inline-flex !important;
+  }
+  .coding-main {
+    width: 100%;
+    min-width: 0;
+  }
+  .coding-main > header {
+    padding: 8px !important;
+  }
+  .coding-main input,
+  .coding-main textarea {
+    font-size: 16px;
+  }
+  .coding-app button {
+    min-height: 42px !important;
+  }
+  .coding-compose {
+    padding: 12px !important;
+  }
+  .coding-compose > div {
+    flex-wrap: wrap;
+  }
+  .coding-compose select {
+    max-width: 100%;
+    min-height: 38px;
+  }
+  .coding-settings {
+    padding: 18px !important;
+  }
+  .coding-profile-grid {
+    grid-template-columns: 1fr !important;
+  }
+}

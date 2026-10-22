@@ -1,6 +1,7 @@
 import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { CodingApp } from '../../src/ui/components/CodingApp';
+import { DevelopmentMarket } from '../../src/ui/components/DevelopmentMarket';
 import type { AgentCall } from '../../src/shared/agent';
 type Bridge = {
   machineRequest?: (json: string) => void;
@@ -22,7 +23,13 @@ export class MobileCoding {
       timer: ReturnType<typeof setTimeout>;
     }
   >();
-  constructor(private bridge: Bridge) {
+  constructor(
+    private bridge: Bridge,
+    private changed?: (
+      target: string,
+      apps: { codex: boolean; claude: boolean; ide: boolean },
+    ) => void,
+  ) {
     this.root.className = 'mobile-coding';
     this.root.hidden = true;
     document.body.append(this.root);
@@ -58,7 +65,7 @@ export class MobileCoding {
       );
     });
   }
-  open(target: string, name: string, engine: 'codex' | 'claude') {
+  open(target: string, name: string, engine: 'codex' | 'claude' | 'market', openIde?: () => void) {
     const key = target + ':' + engine;
     this.panels.get(this.current)?.render(false);
     for (const p of this.panels.values()) p.node.hidden = true;
@@ -83,13 +90,27 @@ export class MobileCoding {
         this.call(target, method, params);
       const render = (active: boolean) =>
         root.render(
-          React.createElement(CodingApp, {
-            engine,
-            name,
-            call,
-            active,
-            openBrowser: async (url: string) => this.bridge.browserOpen?.(target, name, url),
-          }),
+          engine === 'market'
+            ? React.createElement(DevelopmentMarket, {
+                call,
+                onChanged: (apps) => {
+                  if (apps) this.changed?.(target, apps);
+                },
+                onOpen: (id: string) => {
+                  if (id === 'ide') {
+                    this.close();
+                    openIde?.();
+                  } else this.open(target, name, id as 'codex' | 'claude');
+                },
+              })
+            : React.createElement(CodingApp, {
+                engine,
+                name,
+                call,
+                active,
+                onManage: () => this.open(target, name, 'market', openIde),
+                openBrowser: async (url: string) => this.bridge.browserOpen?.(target, name, url),
+              }),
         );
       this.panels.set(key, { node, root, render });
     }

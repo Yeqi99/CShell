@@ -53,6 +53,7 @@ export type CodingTask = {
 export const codingMethods = [
   'coding.status',
   'coding.configure',
+  'coding.permission',
   'coding.profile.save',
   'coding.profile.remove',
   'coding.install.plan',

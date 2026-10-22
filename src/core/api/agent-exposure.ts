@@ -28,6 +28,7 @@ export const agentApiExcludedMethods = {
   'coding.profile.remove': 'Machine application RPC is restricted to its authenticated workspace and owner.',
   'coding.profile.save': 'Machine application RPC is restricted to its authenticated workspace and owner.',
   'coding.configure': 'Machine application RPC is restricted to its authenticated workspace and owner.',
+  'coding.permission': 'Application permission changes are restricted to the authenticated machine workspace and owner.',
   'coding.status': 'Machine application RPC is restricted to its authenticated workspace and owner.',
   'ide.stop': 'Machine application RPC is restricted to its authenticated workspace and owner.',
   'ide.start': 'Machine application RPC is restricted to its authenticated workspace and owner.',

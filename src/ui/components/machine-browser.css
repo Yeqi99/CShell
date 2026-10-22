@@ -272,3 +272,34 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.machine-browser {
+  container: browser / inline-size;
+}
+@container browser (max-width:600px) {
+  .machine-browser-route {
+    display: none;
+  }
+  .machine-browser-toolbar {
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 6px 8px;
+  }
+  .machine-browser-toolbar input {
+    flex: 1;
+    min-width: 100px;
+  }
+  .machine-browser-start {
+    padding: 16px;
+    gap: 8px;
+  }
+  .machine-browser-start h2 {
+    font-size: 18px;
+  }
+  .machine-browser-start p {
+    font-size: 12px;
+    overflow-wrap: anywhere;
+  }
+}
+@container browser (max-width: 440px) {
+  .machine-browser-toolbar input { order:-1; flex:0 0 100%; width:100%; }
+}

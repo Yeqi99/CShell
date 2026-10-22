@@ -130,17 +130,120 @@ test('model profiles reject credentials in endpoint and external plaintext HTTP'
   );
 });
 
+test('application operation limits persist per owner and reject excess task access', async () => {
+  const f = await fixture(),
+    id = randomUUID();
+  try {
+    await f.service.call(
+      'coding.profile.save',
+      { id, engine: 'claude', name: 'official', auth: 'official' },
+      'owner',
+    );
+    await f.service.call('coding.permission', { engine: 'claude', mode: 'read' }, 'owner');
+    await assert.rejects(
+      f.service.call(
+        'coding.start',
+        { profileId: id, cwd: f.d, prompt: 'fixture', mode: 'execute' },
+        'owner',
+      ),
+      /超出应用权限/,
+    );
+    assert.equal(
+      (await f.service.call('coding.status', {}, 'other')).permissions.claude,
+      'execute',
+    );
+    const restored = new CodingService(f.vault, f.d, () => true);
+    await restored.load();
+    assert.equal((await restored.call('coding.status', {}, 'owner')).permissions.claude, 'read');
+    await restored.close();
+  } finally {
+    await f.service.close();
+  }
+});
+
+test('failed permission persistence does not expand active grants',async()=>{
+  const f=await fixture();
+  try{
+    await f.service.call('coding.permission',{engine:'codex',mode:'read'},'owner');
+    const write=f.vault.write.bind(f.vault);
+    f.vault.write=async(name,value)=>{if(name==='coding-permissions')throw Error('fixture storage failure');return write(name,value);};
+    await assert.rejects(f.service.call('coding.permission',{engine:'codex',mode:'execute'},'owner'),/storage failure/);
+    assert.equal((await f.service.call('coding.status',{},'owner')).permissions.codex,'read');
+  }finally{await f.service.close();}
+});
+
 test('Claude native-package wrapper installs privately with lifecycle scripts disabled', async () => {
-  const f=await fixture(),npm=join(f.d,'npm.cjs'),id=randomUUID();
-  await writeFile(npm,`const fs=require('fs'),path=require('path');if(!process.argv.includes('--ignore-scripts'))process.exit(2);if(process.env.npm_config_userconfig===process.env.npm_config_globalconfig)process.exit(3);const prefix=process.argv[process.argv.indexOf('--prefix')+1];const d=path.join(prefix,'node_modules','@anthropic-ai','claude-code');fs.mkdirSync(d,{recursive:true});fs.writeFileSync(path.join(d,'cli-wrapper.cjs'),"console.log('2.1.306 (Claude Code)')");`);
+  const f = await fixture(),
+    npm = join(f.d, 'npm.cjs'),
+    id = randomUUID();
+  await writeFile(
+    npm,
+    `const fs=require('fs'),path=require('path');if(!process.argv.includes('--ignore-scripts'))process.exit(2);if(process.env.npm_config_userconfig===process.env.npm_config_globalconfig)process.exit(3);const prefix=process.argv[process.argv.indexOf('--prefix')+1];const d=path.join(prefix,'node_modules','@anthropic-ai','claude-code');fs.mkdirSync(d,{recursive:true});fs.writeFileSync(path.join(d,'cli-wrapper.cjs'),"console.log('2.1.306 (Claude Code)')");`,
+  );
   // The fixture supplies only the upstream plan and npm process; the real
   // installer, isolated config, launcher discovery and version probe execute.
-  (f.service as any).plans.set(id,{owner:'owner',engine:'claude',directory:join(f.d,'private'),version:'2.1.306',npm});
-  try{
-    const job=await f.service.call('coding.install',{id},'owner');
-    const status=await until(()=>f.service.call('coding.status',{},'owner'),s=>s.installs.find((j:any)=>j.id===job.id)?.state!=='running');
-    assert.equal(status.installs.find((j:any)=>j.id===job.id).state,'completed');
-    assert.equal(status.engines.find((e:any)=>e.engine==='claude').ready,true);
-    assert.match(status.engines.find((e:any)=>e.engine==='claude').path,/cli-wrapper\.cjs$/);
-  }finally{await f.service.close();}
+  (f.service as any).plans.set(id, {
+    owner: 'owner',
+    engine: 'claude',
+    directory: join(f.d, 'private'),
+    version: '2.1.306',
+    npm,
+  });
+  try {
+    const job = await f.service.call('coding.install', { id }, 'owner');
+    const status = await until(
+      () => f.service.call('coding.status', {}, 'owner'),
+      (s) => s.installs.find((j: any) => j.id === job.id)?.state !== 'running',
+    );
+    assert.equal(status.installs.find((j: any) => j.id === job.id).state, 'completed');
+    assert.equal(status.engines.find((e: any) => e.engine === 'claude').ready, true);
+    assert.match(status.engines.find((e: any) => e.engine === 'claude').path, /cli-wrapper\.cjs$/);
+  } finally {
+    await f.service.close();
+  }
+});
+
+test('cancel during version verification keeps the previous engine selected', async () => {
+  const f = await fixture(),
+    npm = join(f.d, 'npm-cancel.cjs'),
+    id = randomUUID();
+  await writeFile(
+    npm,
+    `const fs=require('fs'),path=require('path');const d=path.join(process.argv[process.argv.indexOf('--prefix')+1],'node_modules','@openai','codex','bin');fs.mkdirSync(d,{recursive:true});fs.writeFileSync(path.join(d,'codex.js'),"console.log('1.0.0')");`,
+  );
+  let release!: () => void, entered!: () => void;
+  const gate = new Promise<void>((r) => (release = r)),
+    started = new Promise<void>((r) => (entered = r));
+  const service = f.service as any,
+    probe = service.probe.bind(service);
+  service.probe = async (engine: string, candidate?: string) => {
+    if (candidate) {
+      entered();
+      await gate;
+      return { ready: true, version: 'codex-cli 1.0.0', path: candidate };
+    }
+    return probe(engine);
+  };
+  service.plans.set(id, {
+    owner: 'owner',
+    engine: 'codex',
+    directory: join(f.d, 'private'),
+    version: '1.0.0',
+    npm,
+  });
+  try {
+    const before = (await f.service.call('coding.status', {}, 'owner')).engines[0].path;
+    const job = await f.service.call('coding.install', { id }, 'owner');
+    await started;
+    await f.service.call('coding.install.cancel', job, 'owner');
+    release();
+    await new Promise((r) => setTimeout(r, 50));
+    const status = await f.service.call('coding.status', {}, 'owner');
+    assert.equal(status.installs[0].state, 'cancelled');
+    assert.equal(status.engines[0].path, before);
+    assert.equal('abort' in status.installs[0], false);
+  } finally {
+    release();
+    await f.service.close();
+  }
 });

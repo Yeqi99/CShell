@@ -50,13 +50,15 @@ final class MachineBrowser implements AutoCloseable {
   private Button button(String text,String label,Runnable run){Button b=new Button(activity);b.setText(text);b.setTextSize(17);b.setTextColor(Color.rgb(35,54,78));b.setContentDescription(label);b.setAllCaps(false);b.setMinWidth(0);b.setMinimumWidth(0);b.setPadding(dp(9),0,dp(9),0);b.setBackground(background(Color.TRANSPARENT,10));b.setOnClickListener(v->run.run());return b;}
   private void addTool(String text,String label,Runnable run){toolbar.addView(button(text,label,run),new LinearLayout.LayoutParams(0,dp(48),1));}
   void open(String id,String name,AgentConnection agent,String url){open(id,name,agent.browserIdentity(),agent::manage,url);}
-  void open(String id,String name,String identity,MachineBrowserProxy.Rpc agent,String url){
+  void open(String id,String name,String identity,MachineBrowserProxy.Rpc agent,String url){open(id,name,identity,agent,null,url);}
+  void openSsh(String id,String name,String identity,com.jcraft.jsch.Session ssh,String url){open(id,name,identity,null,ssh,url);}
+  private void open(String id,String name,String identity,MachineBrowserProxy.Rpc agent,com.jcraft.jsch.Session ssh,String url){
     if(!supported()){Toast.makeText(activity,"请更新 Android System WebView 以使用独立机器浏览器",Toast.LENGTH_LONG).show();return;}
     if(target.equals(id)&&ready){layout.setVisibility(View.VISIBLE);layout.bringToFront();if(current!=null)current.onResume();if(url!=null&&!url.isEmpty())navigate(url);return;}
     closeSession();closed=false;target=id;label=name;profile="machine-"+identity;
     layout.setVisibility(View.VISIBLE);layout.bringToFront();status.setText("正在连接 · "+name);progress.setIndeterminate(true);
     final String requested=id;
-    workers.execute(()->{try{MachineBrowserProxy next=new MachineBrowserProxy(agent);activity.runOnUiThread(()->{
+    workers.execute(()->{try{MachineBrowserProxy next=ssh!=null?new MachineBrowserProxy(ssh):new MachineBrowserProxy(agent);activity.runOnUiThread(()->{
       if(closed||!target.equals(requested)){next.close();return;}proxy=next;
       ProxyController.getInstance().setProxyOverride(new ProxyConfig.Builder().addProxyRule("socks://127.0.0.1:"+next.port()).removeImplicitRules().build(),activity::runOnUiThread,()->{
         if(closed||proxy!=next)return;ready=true;progress.setIndeterminate(false);status.setText(name+" · 机器网络");restore();if(tabs.isEmpty())newTab("about:blank");if(url!=null&&!url.isEmpty())navigate(url);

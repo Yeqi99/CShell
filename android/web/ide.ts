@@ -124,7 +124,7 @@ export class MobileIde {
     const close = this.button('‹', () => this.close());
     close.disabled = false;
     close.setAttribute('aria-label', '返回机器');
-    header.append(close, this.element('strong', '代码工作室'), this.element('small', this.name));
+    header.append(close, this.element('strong', '代码编辑器'), this.element('small', this.name));
     this.root.append(header);
     const body = this.element('div', '', 'mobile-ide-body');
     this.root.append(body);

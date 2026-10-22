@@ -49,7 +49,7 @@ export function IdeApp({
           <Code2 size={30} />
         </span>
         <div>
-          <h2>代码工作室</h2>
+          <h2>代码编辑器</h2>
           <p>code-server · 项目在当前机器运行</p>
         </div>
       </header>
