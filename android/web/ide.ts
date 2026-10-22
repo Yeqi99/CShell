@@ -8,10 +8,17 @@ export class MobileIde {
   private target = '';
   private generation = 0;
   constructor(private bridge: Bridge) {
-    this.root.className = 'mobile-ide'; this.root.hidden = true; document.body.append(this.root);
+    this.root.className = 'mobile-ide';
+    this.root.hidden = true;
+    document.body.append(this.root);
   }
-  get visible() { return !this.root.hidden; }
-  close() { this.generation++; this.root.hidden = true; }
+  get visible() {
+    return !this.root.hidden;
+  }
+  close() {
+    this.generation++;
+    this.root.hidden = true;
+  }
   private pending = new Map<
     string,
     {
@@ -21,6 +28,15 @@ export class MobileIde {
       timer: ReturnType<typeof setTimeout>;
     }
   >();
+  disconnected(target: string) {
+    if (this.target === target) this.close();
+    for (const [id, pending] of this.pending)
+      if (pending.target === target) {
+        clearTimeout(pending.timer);
+        this.pending.delete(id);
+        pending.reject(Error('机器连接已断开'));
+      }
+  }
   receive(target: string, json: string) {
     try {
       const v = JSON.parse(json),
@@ -46,25 +62,46 @@ export class MobileIde {
   }
   async open(id: string, name: string) {
     const generation = ++this.generation;
-    this.target = id; this.root.hidden = false;
-    const back = document.createElement('button'); back.textContent = '返回机器'; back.onclick = () => this.close();
-    const title = document.createElement('h2'); title.textContent = '正在打开代码编辑器';
-    this.root.replaceChildren(back, title);
+    this.target = id;
+    this.root.hidden = false;
+    const back = document.createElement('button');
+    back.textContent = '返回机器';
+    back.onclick = () => this.close();
+    const header = document.createElement('header');
+    const nameplate = document.createElement('strong');
+    nameplate.textContent = '代码编辑器';
+    const machine = document.createElement('small');
+    machine.textContent = name;
+    header.append(back, nameplate, machine);
+    const body = document.createElement('div');
+    body.className = 'mobile-ide-launch';
+    const mark = document.createElement('span');
+    mark.className = 'mobile-ide-mark';
+    mark.textContent = '</>';
+    const title = document.createElement('h2');
+    title.textContent = '正在打开代码编辑器';
+    body.setAttribute('role', 'status');
+    body.append(mark, title);
+    this.root.replaceChildren(header, body);
     try {
       const status = await this.call('ide.status');
       if (generation !== this.generation) return;
       if (!status.ready) throw Error('请在应用市场完成代码编辑器安装。');
       if (!status.launchVersion) throw Error('请更新这台机器的 cagent 后重试。');
-      const result = await this.call('ide.start', {cwd: status.running?.cwd || ''});
+      const result = await this.call('ide.start', { cwd: status.running?.cwd || '' });
       if (generation !== this.generation) return;
       (this.bridge.browserOpenApp || this.bridge.browserOpen)?.(id, name, result.url);
       this.root.hidden = true;
-    } catch(e) {
+    } catch (e) {
       if (generation !== this.generation) return;
       title.textContent = '代码编辑器未能打开';
-      const message = document.createElement('p'); message.textContent = String(e); message.setAttribute('role', 'alert');
-      const retry = document.createElement('button'); retry.textContent = '重试'; retry.onclick = () => void this.open(id, name);
-      this.root.append(message, retry);
+      const message = document.createElement('p');
+      message.textContent = String(e);
+      message.setAttribute('role', 'alert');
+      const retry = document.createElement('button');
+      retry.textContent = '重试';
+      retry.onclick = () => void this.open(id, name);
+      body.append(message, retry);
     }
   }
 }

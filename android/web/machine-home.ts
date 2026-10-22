@@ -148,10 +148,13 @@ export class MachineHome {
         if (!app.manage || this.offline) return;
         held = true;
         this.panel.replaceChildren(); this.panel.hidden = false;
-        const title = el('h2', '', app.name), back = el('button', '', '返回桌面'), manage = el('button', '', '管理应用');
+        const title = el('h2', '', app.name), back = el('button', '', '‹'), manage = el('button', 'machine-manage-action', '管理应用');
+        back.setAttribute('aria-label','返回桌面');
+        const header = el('header'), body = el('div','machine-preferences-body');
+        header.append(back, title); manage.prepend(glyph(Package)); body.append(manage);
         back.onclick = () => { this.panel.hidden = true; };
         manage.onclick = () => { this.panel.hidden = true; app.manage?.(); };
-        this.panel.append(title, manage, back);
+        this.panel.append(header, body);
       };
       button.onpointerdown = () => { held = false; hold = setTimeout(menu, 550); };
       button.onpointerup = button.onpointercancel = button.onpointerleave = () => clearTimeout(hold);

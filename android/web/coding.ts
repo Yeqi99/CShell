@@ -14,6 +14,7 @@ export class MobileCoding {
     { node: HTMLElement; root: Root; render: (active: boolean) => void }
   >();
   private current = '';
+  private offline = new Set<string>();
   private pending = new Map<
     string,
     {
@@ -41,6 +42,23 @@ export class MobileCoding {
     this.root.hidden = true;
     this.panels.get(this.current)?.render(false);
   }
+  disconnected(target: string, dispose = false) {
+    this.offline.add(target);
+    for (const [id, pending] of this.pending)
+      if (pending.target === target) {
+        clearTimeout(pending.timer);
+        this.pending.delete(id);
+        pending.reject(Error('机器连接已断开'));
+      }
+    if (this.current.startsWith(target + ':')) this.close();
+    if (dispose)
+      for (const [key, panel] of this.panels)
+        if (key.startsWith(target + ':')) {
+          panel.root.unmount();
+          panel.node.remove();
+          this.panels.delete(key);
+        }
+  }
   receive(target: string, json: string) {
     try {
       const v = JSON.parse(json),
@@ -53,6 +71,7 @@ export class MobileCoding {
     } catch {}
   }
   private call(target: string, method: AgentCall['method'], params?: unknown) {
+    if (this.offline.has(target)) return Promise.reject(Error('机器连接已断开'));
     return new Promise<unknown>((resolve, reject) => {
       const request = crypto.randomUUID(),
         timer = setTimeout(() => {

@@ -343,16 +343,17 @@ function row(name: string, detail: string, action: () => void, symbol = 'server'
   r.append(b);
   return r;
 }
+function connectedMachine(state: string) { return ['已连接', '已连接 CAgent', '正在打开终端'].includes(state); }
 function render() {
   $('overview-connections').textContent = String(profiles.length);
   $('overview-sessions').textContent = String(
-    [...sessions.values()].filter((s) => s.state === '已连接').length,
+    [...sessions.values()].filter((s) => connectedMachine(s.state)).length,
   );
   $('recent-connections').replaceChildren();
   for (const p of profiles.slice(-5).reverse())
     $('recent-connections').append(
       row(p.name, p.host, () => {
-        const live = [...sessions].find(([, s]) => s.profile.id === p.id && s.state === '已连接');
+        const live = [...sessions].find(([, s]) => s.profile.id === p.id && connectedMachine(s.state));
         live ? select(live[0]) : activateProfile(p);
       }),
     );
@@ -379,11 +380,11 @@ function render() {
     h.textContent = (group || '未分组') + ' · ' + list.length;
     $('server-list').append(h);
     for (const p of list) {
-      const live = [...sessions].find(([, s]) => s.profile.id === p.id && s.state === '已连接');
+      const live = [...sessions].find(([, s]) => s.profile.id === p.id && connectedMachine(s.state));
       const r = row(
         (p.favorite ? '★ ' : '') + p.name,
         (p.protocol === 'agent' ? 'Agent · ' : p.username + '@') + p.host + ' · ' + p.port,
-        () => (live ? select(live[0]) : openForm(p)),
+        () => (live ? select(live[0]) : activateProfile(p)),
       );
       if (live) {
         const indicator = document.createElement('span');
@@ -569,6 +570,7 @@ form.onsubmit = (e) => {
   close.setAttribute('aria-label', '关闭 ' + p.name);
   close.onclick = () => {
     window.CShellNative.disconnect(id);
+    mobileCoding.disconnected(id, true); mobileIde.disconnected(id);
     terminal.dispose();
     element.remove();
     tab.remove();
@@ -676,6 +678,7 @@ window.receive = (id, type, value) => {
     if (active === id) resize();
   }
   if (type === 'closed' || type === 'error') {
+    mobileCoding.disconnected(id); mobileIde.disconnected(id);
     machineApps.delete(id);machineHomes.get(id)?.disconnected();machineShells.delete(id);openedShells.delete(id);s.element.querySelector('.machine-home')?.remove();
     desktop.event(id,'desktop-closed',type==='error'?value:'机器连接已断开');desktopStatus.delete(id);
     s.state = '已断开';

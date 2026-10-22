@@ -13,12 +13,12 @@ await build({
     contents: `
 import React from 'react';import{createRoot}from'react-dom/client';
 import{AgentApplications}from'./src/ui/components/AgentApplications';import{CodingApp}from'./src/ui/components/CodingApp';import{IdeApp}from'./src/ui/components/IdeApp';import{MachineBrowser}from'./src/ui/components/MachineBrowser';import{MachineConnectionState}from'./src/ui/components/MachineConnectionState';import{LinuxDesktop}from'./src/ui/components/LinuxDesktop';import './src/ui/styles.css';
-const call=async m=>{if(m==='coding.status')return{supported:true,directory:'/data/cagent/apps',engines:[{engine:'codex',ready:true,version:'1.0'}],profiles:[],installs:[]};if(m==='coding.tasks')return[];if(m==='ide.status')return{supported:true,ready:true,directory:'/data/editor',version:'code-server 4.0'};if(m==='applications.list')return{platform:'linux',manager:'apt',enabled:true,applications:[{id:'git',package:'git'},{id:'python',package:'python3'},{id:'curl',package:'curl'}]};if(m==='applications.policy')return{enabled:true,controllers:['*']};if(m.startsWith('packages.'))return[];return{};};
+const call=async m=>{if(m==='coding.status')return{supported:true,directory:'/data/cagent/apps',engines:[{engine:'codex',ready:true,version:'1.0'}],profiles:[],installs:[]};if(m==='coding.tasks')return[];if(m==='ide.start')return{url:'http://127.0.0.1:8080/'};if(m==='ide.status')return{launchVersion:1,supported:true,ready:true,directory:'/data/editor',version:'code-server 4.0'};if(m==='applications.list')return{platform:'linux',manager:'apt',enabled:true,applications:[{id:'git',package:'git'},{id:'python',package:'python3'},{id:'curl',package:'curl'}]};if(m==='applications.policy')return{enabled:true,controllers:['*']};if(m.startsWith('packages.'))return[];return{};};
 window.cshell={onMachineBrowserFocus:()=>()=>{},machineBrowser:async()=>({tabs:[{id:'one',title:'新标签页',url:'about:blank',zoom:1}],selected:'one',connected:true,history:[],bookmarks:[]}),events:()=>()=>{}};
 const params=new URLSearchParams(location.search),view=params.get('view');let app;
 if(view==='market')app=<AgentApplications target={{id:'ssh:fixture',name:'美国机器'}} call={call}/>;
 if(view==='coding')app=<CodingApp engine="codex" name="美国机器 · 开发环境" active call={call} openBrowser={async()=>{}}/>;
-if(view==='editor')app=<IdeApp call={call} openBrowser={async()=>{}}/>;
+if(view==='editor')app=<IdeApp call={call} target="ssh:fixture" active/>;
 if(view==='browser')app=<MachineBrowser target="ssh:fixture" name="美国机器" active/>;
 if(view==='connection')app=<MachineConnectionState name="美国机器" phase="error" error="连接超时，请重试" primary={{label:'重新连接',run:()=>{}}} secondary={{label:'SSH 终端',run:()=>{}}}/>;
 if(view==='desktop')app=<LinuxDesktop name="美国机器" target="ssh:fixture" machine={{platform:'linux',deviceId:'fixture'}} call={call} active/>;
