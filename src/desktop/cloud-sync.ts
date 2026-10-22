@@ -12,6 +12,7 @@ import { clientCodec } from './client-app';
 import { defaults } from '../shared/contracts';
 import { emptySharedAi } from '../shared/shared-ai';
 import type { DesktopAccountProfiles } from '../core/desktop-account-profiles';
+import {AccountWorkspaceMismatch} from '../core/desktop-account-profiles';
 import {registerAccountImports} from './account-import';
 
 const assetName = z.string().regex(/^[a-f0-9]{64}\.(?:ttf|otf|woff|woff2|png)$/);
@@ -121,14 +122,26 @@ export async function registerCloudHandlers(
     },
   }, undefined, (url, options) => net.fetch(String(url), options));
   await cloud.load();
-  if(profileOptions)await profileOptions.profiles.initialize(cloud.accountId());
+  if(profileOptions){
+    try{await profileOptions.profiles.initialize(cloud.accountId());}
+    catch(error){
+      if(!(error instanceof AccountWorkspaceMismatch))throw error;
+      profileOptions.block(true);
+      await cloud.quarantineWorkspaceSession();
+      const guest=await profileOptions.profiles.prepare();await guest.commit();
+      await writeFile(join(guest.directory,'account-recovery.json'),JSON.stringify({version:1,at:new Date().toISOString()}),{mode:0o600});
+      app.relaunch();
+      const restart=new Error('Account workspace recovered; restarting safely');restart.name='AccountWorkspaceRestart';throw restart;
+    }
+  }
   if(profileOptions)registerAccountImports(handle,cloud,profileOptions.profiles,validate,snapshot,assertAccountIdle);
   ai.officialCredential=()=>cloud.sessionCredential();
   client.cloudLease=async id=>{const result=await cloud.accountRequest('/v1/devices/lease',{deviceId:id});return (await import('../shared/agent-relay')).agentRelayConnectionSchema.parse(result.relay);};
   handle('cloud:memory',()=>ai.memory());
   handle('cloud:remember',input=>ai.remember(input));
   handle('cloud:forget',id=>ai.forget(id));
-  handle('cloud:status', () => cloud.accountStatus());
+  const workspaceRecovered=await readFile(join(directory,'account-recovery.json'),'utf8').then(()=>true,()=>false);
+  handle('cloud:status', async () => ({...await cloud.accountStatus(),...(workspaceRecovered?{workspaceRecovered:true}:{})}));
   handle('cloud:code', (email) => cloud.requestCode(z.email().max(254).parse(email)));
   handle('cloud:register',(email,code,password)=>cloud.register(z.email().max(254).parse(email),z.string().regex(/^\d{6}$/).parse(code),z.string().min(8).max(128).parse(password)));
   handle('cloud:login', (email, code, password = false) =>

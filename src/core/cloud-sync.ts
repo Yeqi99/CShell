@@ -26,6 +26,13 @@ export interface CloudAdapter {
   import(value: unknown): Promise<void>;
 }
 export class CloudSync {
+  /** Preserve contradictory authentication without ever syncing that workspace. */
+  async quarantineWorkspaceSession(){
+    this.handedOff=true;
+    try{await rename(join(this.directory,'cloud-sync.enc'),join(this.directory,`cloud-sync-recovery-${Date.now()}-${randomUUID()}.enc`));}
+    catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw Error('无法保留异常登录记录，未更改工作区');}
+    this.data={revision:0};this.state='signed-out';
+  }
   /** Serialize explicit local imports with uploads, downloads, and account transitions. */
   async withAccountWorkspace<T>(accountId:string,operation:()=>Promise<T>){
     return this.exclusive(async()=>{

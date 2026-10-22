@@ -7,6 +7,9 @@ import {z} from 'zod';
 const owner=z.union([z.literal('guest'),z.string().regex(/^[a-f0-9]{32}$/)]);
 const stateSchema=z.object({version:z.literal(1),legacy:owner,active:owner}).strict();
 type State=z.infer<typeof stateSchema>;
+export class AccountWorkspaceMismatch extends Error {
+ constructor(){super('登录状态与本机工作区不一致，已停止云同步');this.name='AccountWorkspaceMismatch';}
+}
 /** The legacy workspace stays in place. Every subsequent account gets a full Electron profile. */
 export class DesktopAccountProfiles {
   private state?:State;
@@ -39,7 +42,7 @@ export class DesktopAccountProfiles {
   async initialize(accountId?:string){
     const id=owner.parse(accountId??'guest');
     if(!this.state)await this.persist({version:1,legacy:id,active:id});
-    else if(this.state.active!==id)throw Error('登录状态与本机工作区不一致，已停止云同步');
+    else if(this.state.active!==id)throw new AccountWorkspaceMismatch();
   }
   async prepare(accountId?:string){
     if(!this.state)throw Error('账号工作区尚未初始化');

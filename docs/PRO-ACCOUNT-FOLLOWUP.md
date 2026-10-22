@@ -69,3 +69,11 @@ CloudSync 新增 activationTarget：认证写入目标目录后提交活动目�
 - Android 检查发现后续必须处理的实际缺口：web/cloud.ts 注册直接打包访客连接；WebView profiles/theme/cloud-snapshot-hash 共用未隔离；logout 仅移除 session/key 但保留 bundle，旧 fillCredentials 没有检查登录解锁状态。本次先给 fillCredentials 增加 session + key 前置检查，阻止退出后继续使用账号凭据；完整账号/访客隔离、未上传更改保留、注册空白云初始数据与显式载入仍需一起实现，不能只改注册为空而丢掉访客配置。Android 原生浏览器/机器凭据存储也需纳入隔离审查，不可只改 localStorage 便宣称完成。
 - 桌面导入还有异常回滚失败后阻止继续上传、跨进程并发及设置草稿相容性需要进一步验证；CAgent 真实身份发现/会员中继、网络出口、各平台正式包验收仍未完成。0.8.3 下载源、正式应用及真实用户配置不变。
 - Android compileDebugJavaWithJavac 离线编译成功（Pro 构建配置）；存在已有 SDK XML/Gradle 弃用警告。本次不是 Android 真机测试或安装包发布。
+
+## 2026-10-22：测试启动异常恢复
+
+用户看到的“登录状态与本机工作区不一致”来自新隔离实现的测试版本。正式安装的 Pro app.asar SHA256 仍为 D581ADC37A56AF3897D1C0FB1E098DF89BBBE8CFA754054A464A600201FED967；检查安装内容不包含该报错，未修改正式用户配置。
+已将不一致情况改为：保留原加密登录文件为 cloud-sync-recovery-*.enc，不联网、不上传、不改原配置；提交 guest 目录并重新打开；登录页说明原配置保留、可重新登录。隔离测试 CSHELL_TEST_DATA 启动异常只写诊断，不弹系统错误框。TypeScript/Pro 构建通过；8 项相关单元测试通过；真实 Electron scripts/account-recovery-smoke.cjs 验证备份、原账号文件保留、干净 guest 启动、零云请求及零系统错误框，截图已检查。仍待和剩余功能统一发布，未安装中间版。
+用户授权给 854124946@qq.com 开通会员，已在香港生产库更新并写 admin_audit；账号 02d3ad7b5a484afc8bba4947f7a502d6，首次赠送一个日历月，到期北京时间 2026-11-22 22:59:08。不要重复赠送或重复延长。
+
+用户新增内核优先需求：CSV（含 iShell 等可识别字段）批量导入、多连接字符串预览解析；本机→目标及机器→机器延迟测试；CAgent 可视化桌面“机器信息”应用，详细概览/CPU/GPU/内存/磁盘/网络、真实时间序列与缺失能力状态；修复免费模型编造 server.cpu.view/server.disk.view 权限节点和吐出 Previous tool result，增强工具使用提示。必须先独立开源内核分支实现验证，再集成 Pro，保留全部已有 Pro 追加目标，不在 Pro 专属代码里重复开发内核。

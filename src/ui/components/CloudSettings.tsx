@@ -36,6 +36,7 @@ export function CloudSettings() {
     {!status.email ? <div className="auth-content">
       <button type="button" className="auth-back" hidden={!registering} disabled={busy} onClick={backToLogin}><ArrowLeft size={16}/>返回登录</button>
       <img className="auth-brand" src={brand} alt="CShell Pro"/>
+      {status.workspaceRecovered&&<p className="account-recovery-note" role="status">已恢复到未登录工作区。原账号配置保留，重新登录即可继续。</p>}
       <h1>{registering?"创建 CShell 账号":"登录 CShell"}</h1><p className="auth-description">{registering?"一个账号，同步你的工作环境。":"在你的设备间，延续工作。"}</p>
       <form onSubmit={e=>{e.preventDefault();void login();}}>
         <fieldset disabled={busy}>

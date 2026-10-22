@@ -3,9 +3,25 @@ import assert from 'node:assert/strict';
 import {mkdtemp,writeFile,readFile,rm} from 'node:fs/promises';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
-import {DesktopAccountProfiles} from '../src/core/desktop-account-profiles';
+import {DesktopAccountProfiles,AccountWorkspaceMismatch} from '../src/core/desktop-account-profiles';
+import {readdir} from 'node:fs/promises';
 import {CloudSync} from '../src/core/cloud-sync';
 import {encryptVault,newRecoveryKey,wrapRecoveryKey} from '../src/core/cloud-crypto';
+
+test('mismatched authentication is quarantined before returning to guest; no cloud requests or config writes',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'desktop-recovery-'));const a='a'.repeat(32),b='b'.repeat(32);
+ const codec={encrypt:async(s:string)=>s,decrypt:async(s:string)=>s};let calls=0;
+ try{
+  await writeFile(join(root,'Local State'),'fixture-context');await writeFile(join(root,'config.json'),'original account config');
+  const profiles=new DesktopAccountProfiles(root);await profiles.initialize(a);
+  const original=JSON.stringify({session:{accountId:b,email:'fixture@example.com',token:'x'.repeat(43)},key:newRecoveryKey(),revision:7});await writeFile(join(root,'cloud-sync.enc'),original);
+  const cloud=new CloudSync(root,codec,{export:async()=>{throw Error('must not export');},validate:()=>{},import:async()=>{throw Error('must not import');}},'https://fixture.invalid',async()=>{calls++;throw Error('must not request');});
+  await cloud.load();await assert.rejects(profiles.initialize(cloud.accountId()),AccountWorkspaceMismatch);
+  await cloud.quarantineWorkspaceSession();const guest=await profiles.prepare();await guest.commit();await cloud.autoSync();await cloud.accountStatus();assert.equal(calls,0);
+  const backup=(await readdir(root)).find(n=>n.startsWith('cloud-sync-recovery-'));assert(backup);assert.equal(await readFile(join(root,backup),'utf8'),original);assert.equal(await readFile(join(root,'config.json'),'utf8'),'original account config');
+  assert.notEqual(guest.directory,root);await assert.rejects(readFile(join(guest.directory,'config.json')),{code:'ENOENT'});assert.equal(new DesktopAccountProfiles(root).current(),'guest');
+ }finally{await rm(root,{recursive:true,force:true});}
+});
 
 test('desktop profiles preserve the legacy directory and copy only the encryption context',async()=>{
  const root=await mkdtemp(join(tmpdir(),'desktop-profiles-'));

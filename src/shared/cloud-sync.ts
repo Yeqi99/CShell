@@ -15,6 +15,7 @@ export interface CloudRevision {
   envelope: CloudEnvelope | null;
 }
 export interface CloudStatus {
+  workspaceRecovered?:boolean;
   storage?:{usedBytes:number;limitBytes:number};
   membership?: { active: boolean; expiresAt: number | null };
   email?: string;

@@ -1050,7 +1050,7 @@ else
     })
     .catch((error) => {
       diagnostics.record('startup.failed', error);
-      dialog.showErrorBox('CShell', error.message);
+      if(error.name!=='AccountWorkspaceRestart'&&!process.env.CSHELL_TEST_DATA)dialog.showErrorBox('CShell', error.message);
       app.quit();
     });
 app.on('window-all-closed', () => app.quit());
