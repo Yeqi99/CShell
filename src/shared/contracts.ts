@@ -370,6 +370,8 @@ export interface Bridge
   importAppearance(kind: 'font' | 'background', token?: string): Promise<AppearanceAsset | null>;
   appearanceData(id: string): Promise<string>;
   saveProfile(profile: Profile): Promise<void>;
+  aiDrafts?(): Promise<Record<string, string>>;
+  aiDraftSave?(id: string, text: string): Promise<void>;
   deleteProfile(id: string): Promise<void>;
   manageGroup(action: GroupAction): Promise<void>;
   preferences(value: Preferences): Promise<void>;

@@ -132,6 +132,8 @@ const bridge: Bridge = {
   localEnvironment: () => ipcRenderer.invoke('local-terminal:environment'),
   saveLocalEnvironment: (rows) => ipcRenderer.invoke('local-terminal:environment-save', rows),
   aiSnapshot: () => ipcRenderer.invoke('ai:snapshot'),
+  aiDrafts: () => ipcRenderer.invoke('ai:drafts'),
+  aiDraftSave: (id, text) => ipcRenderer.invoke('ai:draft-save', id, text),
   aiGoalSave: (id, input) => ipcRenderer.invoke('ai:goal-save', id, input),
   aiGoalAction: (id, action, sessionId) =>
     ipcRenderer.invoke('ai:goal-action', id, action, sessionId),

@@ -1,5 +1,6 @@
 import { AiToolRecord, toolInput } from './AiToolRecord';
 import { AiTaskTree } from './AiWork';
+import { useAiDrafts } from '../ai-drafts';
 import { useEffect, useRef, useState } from 'react';
 import {
   ArrowDown,
@@ -49,7 +50,7 @@ export function AiConversation({
   configure: () => void;
   executionVisible: boolean;
 }) {
-  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [drafts, setDrafts, draftError] = useAiDrafts();
   // Submission has its own per-conversation lock; a slow save must not block
   // sending or stopping a different conversation in the same panel.
   const sending = useRef(new Set<string>());
@@ -127,11 +128,11 @@ export function AiConversation({
       sending.current.delete(draftId);
       sending.current.add(targetId);
       setPendingSends([...sending.current]);
+      await window.cshell.aiSend(targetId, text);
       setDrafts((previous) => ({
         ...previous,
         [draftId]: previous[draftId] === text ? '' : previous[draftId],
       }));
-      await window.cshell.aiSend(targetId, text);
       } catch (error) {
         setSendErrors(previous => ({ ...previous, [targetId]: error instanceof Error ? error.message : String(error) }));
         // Keep a newer draft. An unaccepted message remains available to edit.
@@ -257,6 +258,7 @@ export function AiConversation({
           {thread?.error && (
             <ErrorNotice title="这次回复未完成" error={thread.error} />
           )}
+          {draftError && <ErrorNotice title="草稿保存" error={draftError} />}
           {sendErrors[draftId] && <ErrorNotice title="消息未发送" error={sendErrors[draftId]} />}
           {thread?.state === 'running' && (
             <div className="agent-running" role="status">

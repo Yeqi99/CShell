@@ -59,6 +59,14 @@ async function main() {
     assert.equal(threads.length, 2);
     assert.ok(threads.every(t => t.state !== 'running' && !t.pending));
     assert.equal(requests, before, 'restart must not replay requests');
+    const restoredDrafts = await page.evaluate(() => window.cshell.aiDrafts!());
+    assert.equal(restoredDrafts[threads.find(t => t.title === '任务 A')!.id], 'A 的后续草稿');
+    assert.ok(!Object.values(restoredDrafts).includes('任务 B'), 'accepted prompt must not be restored as an unsent draft');
+    await page.getByRole('button', { name: 'AI 智能体', exact: true }).click();
+    const recoveredPanel = page.getByRole('complementary', { name: 'AI 智能体' });
+    await recoveredPanel.getByRole('button', { name: '会话记录', exact: true }).click();
+    await recoveredPanel.locator('.agent-history-row > button').filter({ hasText: '任务 A' }).first().click();
+    assert.equal(await recoveredPanel.getByRole('textbox', { name: '发送给智能体' }).inputValue(), 'A 的后续草稿');
     console.log('PASS: parallel conversations, independent drafts, scoped stop and restart without replay');
   } finally {
     if (app) {
