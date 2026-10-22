@@ -212,6 +212,8 @@ export function Settings({
               </div>
             </div>
             <div className="font-size-row" hidden={category !== 'terminal'}>
+              <label><input type="checkbox" checked={draft.terminalClipboardKeys} onChange={event => setDraft({ ...draft, terminalClipboardKeys: event.target.checked })}/>{cn ? 'Ctrl+C / Ctrl+V 复制粘贴（原生按键在快捷键栏）' : 'Ctrl+C / Ctrl+V copy and paste (native keys in toolbar)'}</label>
+              <label><input type="checkbox" checked={draft.terminalSemanticColors} onChange={event => setDraft({ ...draft, terminalSemanticColors: event.target.checked })}/>{cn ? '提示符与链接辅助配色' : 'Highlight prompts and links'}</label>
               <label>
                 {t('terminalLineHeight')}
                 <input

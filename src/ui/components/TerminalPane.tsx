@@ -6,7 +6,8 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { SearchAddon } from '@xterm/addon-search';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
-import { ArrowDown, ArrowUp, X, Search } from 'lucide-react';
+import { ArrowDown, ArrowUp, X, Search, Keyboard } from 'lucide-react';
+import { installTerminalColors } from '../terminal-colors';
 import type { Preferences } from '../../shared/contracts';
 import { subscribeTerminal, registerTerminalSnapshot } from '../terminalBus';
 import { useI18n } from '../i18n';
@@ -58,6 +59,10 @@ export function TerminalPane({
   const { t } = useI18n();
   const aiAvailable = useAiProviders().providers.length > 0;
   const [zoom, setZoom] = useState(0);
+  const [keysOpen, setKeysOpen] = useState(false);
+  const [nativeKeys, setNativeKeys] = useState(false);
+  const clipboardKeys = useRef(true);
+  clipboardKeys.current = preferences.terminalClipboardKeys && !nativeKeys;
   const [textPath, setTextPath] = useState('');
   const [editingPath, setEditingPath] = useState('');
   const [showTextEditor, setShowTextEditor] = useState(false);
@@ -202,7 +207,7 @@ export function TerminalPane({
   const paste = () =>
     void window.cshell
       .pasteText()
-      .then((text) => term.current?.paste(text))
+      .then((text) => { if (suggestionState.current.active && !suggestionState.current.closed) term.current?.paste(text); })
       .catch(errorRef.current);
   useEffect(() => {
     const terminal = new Terminal({
@@ -224,6 +229,14 @@ export function TerminalPane({
     search.current = finder;
     terminal.attachCustomKeyEventHandler((event) => {
       const state = suggestionState.current;
+      if (clipboardKeys.current && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && ['KeyC', 'KeyV'].includes(event.code)) {
+        event.preventDefault();
+        if (event.type === 'keydown' && !event.repeat && state.active) {
+          if (event.code === 'KeyC') copy();
+          else if (!state.closed) paste();
+        }
+        return false;
+      }
       const options =
         state.active && !state.closed && state.enabled ? suggestionsFor(state.input) : [];
       if (
@@ -488,6 +501,10 @@ export function TerminalPane({
     };
   }, [id]);
   useEffect(() => {
+    if (!term.current || !preferences.terminalSemanticColors) return;
+    return installTerminalColors(term.current, preferences.theme === 'dark');
+  }, [id, preferences.terminalSemanticColors, preferences.theme]);
+  useEffect(() => {
     if (term.current) {
       term.current.options.fontFamily = preferences.terminalFont;
       term.current.options.fontSize = Math.max(10, Math.min(28, preferences.fontSize + zoom));
@@ -564,6 +581,14 @@ export function TerminalPane({
       }}
       onClick={() => setContextMenu(null)}
     >
+      <div className="terminal-keybar">
+        <button className="terminal-key-toggle" aria-expanded={keysOpen} title="终端快捷键" onClick={() => setKeysOpen(value => !value)}><Keyboard size={15}/>快捷键</button>
+        {keysOpen && <>
+          <button onClick={copy}>复制</button><button disabled={closed} onClick={paste}>粘贴</button>
+          {([['中断 · Ctrl+C', '\x03'], ['挂起 · Ctrl+Z', '\x1a'], ['结束输入 · Ctrl+D', '\x04'], ['原生 Ctrl+V', '\x16'], ['Esc', '\x1b']] as const).map(([label, value]) => <button key={label} disabled={closed} title={`发送 ${label} 到当前终端`} onClick={() => { if (!closed && active) { void window.cshell.input(id, value).catch(errorRef.current); term.current?.focus(); } }}>{label}</button>)}
+          <label><input type="checkbox" checked={nativeKeys || !preferences.terminalClipboardKeys} disabled={!preferences.terminalClipboardKeys} onChange={event => setNativeKeys(event.target.checked)}/>原生按键</label>
+        </>}
+      </div>
       {textEditingSupported && !!detected && !closed && <form className="text-editor-options" onSubmit={event => {event.preventDefault();if(textPath.startsWith('/')){setEditingPath(textPath);setShowTextEditor(true);}}}>
         <input aria-label="文件完整路径" placeholder="文件完整路径，如 /etc/config.conf" value={textPath} onChange={event => setTextPath(event.target.value)}/>
         <button disabled={!textPath.startsWith('/')}>内置编辑器</button>

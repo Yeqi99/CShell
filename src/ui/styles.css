@@ -393,6 +393,11 @@ small {
 .terminal-pane.active {
   display: flex;
 }
+.terminal-keybar { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; padding: 3px 12px; flex-shrink: 0; border-bottom: 1px solid var(--border); }
+.terminal-keybar button { display: inline-flex; align-items: center; gap: 5px; padding: 3px 7px; min-height: 26px; font-size: 12px; background: transparent; border: 1px solid transparent; border-radius: 5px; color: inherit; }
+.terminal-keybar button:hover { background: var(--hover); border-color: var(--border); }
+.terminal-keybar label { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; margin-left: auto; }
+.terminal-keybar button:focus-visible { outline: 2px solid #3478df; outline-offset: 1px; }
 .terminal-tools {
   display: flex;
   align-items: center;
