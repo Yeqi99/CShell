@@ -42,7 +42,11 @@ const fs=require('node:fs/promises'),path=require('node:path'),os=require('node:
   assert.deepEqual(await page.evaluate(()=>window.cshell.cloudMemory()),[]);
   assert.equal(await page.evaluate(()=>localStorage.getItem('account-fixture')),null);
   assert.deepEqual(await app.evaluate(({session})=>session.defaultSession.cookies.get({url:'https://fixture.invalid'})),[]);
-  await page.getByRole('button',{name:'账号与会员',exact:true}).click();
+  await page.getByRole('status',{name:'发现本机配置',exact:true}).waitFor();
+  assert.equal((await page.evaluate(()=>window.cshell.config())).profiles.length,0,'notice cannot import');
+  await fs.mkdir('test-results',{recursive:true});await page.screenshot({path:'test-results/account-source-notice.png'});
+  await page.getByRole('button',{name:'查看并选择',exact:true}).click();
+  assert.equal(await page.getByRole('status',{name:'发现本机配置',exact:true}).count(),0);
   await page.getByRole('button',{name:/Pro 未登录工作区/}).click();
   await page.getByRole('button',{name:'载入当前账号',exact:true}).waitFor();
   await fs.mkdir('test-results',{recursive:true});

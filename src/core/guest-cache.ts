@@ -19,5 +19,8 @@ export async function clearGuestCache(directory:string,currentDirectory:string){
  }
  // Preflight every resolved absolute path before deleting anything. Identity, cloud auth,
  // other accounts and the original open-source folder are never selected.
- for(const path of targets)await rm(path,{recursive:true,force:true,maxRetries:3,retryDelay:100});
+ for(const path of targets){
+  try{await rm(path,{recursive:true,force:true,maxRetries:3,retryDelay:100});}
+  catch{throw Error('未登录数据未全部清除，部分文件可能正在使用。账号数据未清除，请稍后重试。');}
+ }
 }

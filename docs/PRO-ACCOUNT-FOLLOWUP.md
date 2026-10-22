@@ -61,3 +61,11 @@ CloudSync 新增 activationTarget：认证写入目标目录后提交活动目�
 - 验证：TypeScript、Pro 生产构建通过；13 项账号/同步/导入/清理单元测试通过。scripts/account-source-smoke.cjs 用真实 Electron 加密夹具验证密码/OpenCode ID 保留、原文件逐字节不变、损坏来源拒绝；scripts/account-profile-smoke.cjs 回归通过。scripts/account-import-smoke.cjs 验证预览不导入、确认后连接/加密习惯载入、退出原访客不变；--clear 验证取消不清除、确认清理不影响账号、退出为干净访客（含 Cookie/localStorage）。截图 test-results/account-import-preview.png 已查看。测试仅使用临时目录与模拟云服务，正式用户账号/软件不变。
 
 仍未收口：登录后主页主动提示（目前来源提示在账号页）、设置分类入口、来源缓存/跨进程并发与故障回滚进一步审查、移动端账号隔离/同步、真实 CAgent 同账号发现/付费中继验收、应用网络出口及全部正式包验证。不得把以上单元测试与隔离 Electron 流程当作全平台发布验收。当前 0.8.3 下载源保持不变；完成剩余要求后再递增版本统一发布。
+
+## 2026-10-22：登录后的来源提示与 Android 边界排查（未发布）
+
+- 顶栏账号下方提供一次性、可关闭的来源提示，列出开源/访客来源，点击“查看并选择”进入账号页；不抢焦点、不自动导入。每个隔离账号工作区单独记住提示已处理，设置中的“账号与云同步”本来已复用 CloudSettings，因此载入及清理入口同样可用。
+- 真实 Electron scripts/account-import-smoke.cjs --clear 已验证提示显示、提示本身不导入、查看后关闭、显式导入与清理全链路。test-results/account-source-notice.png 已查看；TypeScript/Pro 生产构建通过。清理文件被占用时改为明确提示未全部完成，不能误报成功。
+- Android 检查发现后续必须处理的实际缺口：web/cloud.ts 注册直接打包访客连接；WebView profiles/theme/cloud-snapshot-hash 共用未隔离；logout 仅移除 session/key 但保留 bundle，旧 fillCredentials 没有检查登录解锁状态。本次先给 fillCredentials 增加 session + key 前置检查，阻止退出后继续使用账号凭据；完整账号/访客隔离、未上传更改保留、注册空白云初始数据与显式载入仍需一起实现，不能只改注册为空而丢掉访客配置。Android 原生浏览器/机器凭据存储也需纳入隔离审查，不可只改 localStorage 便宣称完成。
+- 桌面导入还有异常回滚失败后阻止继续上传、跨进程并发及设置草稿相容性需要进一步验证；CAgent 真实身份发现/会员中继、网络出口、各平台正式包验收仍未完成。0.8.3 下载源、正式应用及真实用户配置不变。
+- Android compileDebugJavaWithJavac 离线编译成功（Pro 构建配置）；存在已有 SDK XML/Gradle 弃用警告。本次不是 Android 真机测试或安装包发布。

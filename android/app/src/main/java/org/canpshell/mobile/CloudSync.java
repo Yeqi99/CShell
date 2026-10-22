@@ -168,7 +168,7 @@ final class CloudSync {
     return null;
   }
   synchronized void fillCredentials(JSONObject request)throws Exception{
-    load();if(!state.has("bundle")||!request.has("cloudProfileId"))return;
+    load();if(!state.has("session")||!state.has("key")||!state.has("bundle")||!request.has("cloudProfileId"))return;
     JSONObject data=state.getJSONObject("bundle").getJSONObject("store");JSONArray profiles=data.getJSONArray("profiles");
     for(int i=0;i<profiles.length();i++){
       JSONObject p=profiles.getJSONObject(i);if(!p.getString("id").equals(request.getString("cloudProfileId")))continue;
