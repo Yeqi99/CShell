@@ -240,6 +240,46 @@ export class Store {
       this.data.groups = this.groups();
     await this.persist();
   }
+  /** Append a confirmed import in one durable write; never changes existing credentials or trust. */
+  async importProfiles(values: { profile: Profile; password?: string }[], duplicates: 'skip' | 'keep') {
+    if (!values.length || values.length > 5000) throw new Error('请选择 1 至 5000 条连接');
+    if (!['skip', 'keep'].includes(duplicates)) throw new Error('重复项策略无效');
+    const prepared = await Promise.all(values.map(async value => ({
+      profile: profileSchema.parse(value.profile),
+      secret: value.password === undefined ? undefined : await this.codec.encrypt(JSON.stringify({
+        password: z.string().max(16000).parse(value.password),
+      })),
+    })));
+    const endpoint = (p: Profile) => JSON.stringify([p.protocol ?? 'ssh', p.host.toLowerCase().replace(/\.$/, ''), p.port, p.username]);
+    const task = this.writes.catch(() => {}).then(async () => {
+      const known = new Set(this.data.profiles.map(endpoint));
+      const ids = new Set(this.data.profiles.map(p => p.id));
+      const accepted: typeof prepared = [];
+      for (const value of prepared) {
+        if (!['ssh', 'rdp'].includes(value.profile.protocol ?? 'ssh')) throw new Error('此类型不能批量导入');
+        if (ids.has(value.profile.id)) throw new Error('连接标识已存在，请重新预览');
+        ids.add(value.profile.id);
+        const key = endpoint(value.profile);
+        if (duplicates === 'skip' && known.has(key)) continue;
+        known.add(key); accepted.push(value);
+      }
+      const groups = [...new Set([...this.groups(), ...accepted.map(v => v.profile.group).filter(Boolean)])];
+      if (groups.length > 1000) throw new Error('GROUP_LIMIT');
+      const secrets = Object.fromEntries(accepted.filter(v => v.secret !== undefined).map(v => [v.profile.id, v.secret!]));
+      const data = { ...this.data, groups, profiles: [...this.data.profiles, ...accepted.map(v => v.profile)], secrets: { ...this.data.secrets, ...secrets } };
+      await mkdir(this.directory, { recursive: true });
+      const temporary = join(this.directory, 'config.json.tmp');
+      await writeFile(temporary, JSON.stringify(data, null, 2), { mode: 0o600 });
+      await rename(temporary, join(this.directory, 'config.json'));
+      // Preserve unrelated in-memory edits made while the filesystem write awaited.
+      this.data.profiles.push(...accepted.map(v => v.profile));
+      Object.assign(this.data.secrets, secrets);
+      this.data.groups = [...new Set([...this.groups(), ...accepted.map(v => v.profile.group).filter(Boolean)])];
+      return { imported: accepted.map(v => v.profile.id), skipped: values.length - accepted.length };
+    });
+    this.writes = task.then(() => {}, () => {});
+    return task;
+  }
   async deleteProfile(id: string) {
     this.data.groups = this.groups();
     this.data.profiles = this.data.profiles.filter((p) => p.id !== id);

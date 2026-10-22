@@ -1,4 +1,5 @@
 import { RdpConnectionForm } from './RdpConnectionForm';
+import { ConnectionImport } from './ConnectionImport';
 import { ClientConnectForm, type ClientConnected } from './ClientConnectForm';
 import { useI18n } from '../i18n';
 import type { LocalShell, LocalConnectionTarget } from '../../shared/local-terminal';
@@ -43,6 +44,7 @@ export function ConnectionEntry({
   const [query, setQuery] = useState('');
   const [localError, setLocalError] = useState('');
   const [opening, setOpening] = useState(false);
+  const [importing, setImporting] = useState(false);
   const windows = window.cshell.platform === 'win32';
   const kinds = [
     ...(http
@@ -99,11 +101,14 @@ export function ConnectionEntry({
   };
   return (
     <div className="connection-entry connection-flow">
+      {importing && <ConnectionImport onSaved={onSaved} onBack={() => setImporting(false)}/>}
+      <div hidden={importing} style={{height: '100%'}}>
       <div hidden={kind !== null} className="connection-start">
         <header className="connection-start-heading">
           <h1>{cn ? '新建连接' : 'New connection'}</h1>
           <p>{cn ? '你想连接什么？' : 'What would you like to connect to?'}</p>
         </header>
+        {window.cshell.connectionImportText && <button className="secondary" onClick={() => setImporting(true)}>{cn ? '批量导入连接' : 'Import connections'}</button>}
         <div className="connection-kind-grid">
           {kinds.map(({ id, title, description, icon: Icon }) => (
             <button
@@ -203,6 +208,7 @@ export function ConnectionEntry({
             {visited.includes('rdp') && <RdpConnectionForm embedded onSaved={onSaved} />}
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

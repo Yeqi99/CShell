@@ -336,6 +336,11 @@ export interface Bridge
     MonitorViewsBridge,
     ActivityBridge {
   readonly platform: string;
+  connectionImportText?(text: string): Promise<import('../core/connection-import').ConnectionImportPreview>;
+  connectionImportFile?(delimiter: ',' | ';' | '\t'): Promise<import('../core/connection-import').ConnectionImportPreview | null>;
+  connectionImportPreview?(token: string, options: { mapping?: Partial<Record<import('./connection-batch').ImportColumn, number>>; username?: string }): Promise<import('../core/connection-import').ConnectionImportPreview>;
+  connectionImportApply?(token: string, rows: number[], policy: 'skip' | 'keep'): Promise<{ imported: string[]; skipped: number }>;
+  connectionImportDiscard?(token: string): Promise<void>;
   networkStatus?(): Promise<import('./network-route').NetworkRouteStatus>;
   networkSave?(route: import('./network-route').NetworkRoute): Promise<import('./network-route').NetworkRouteStatus>;
   reportError(error: { message: string; stack?: string }): void;

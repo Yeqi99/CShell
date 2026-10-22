@@ -2,6 +2,11 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { Bridge, SessionEvent } from '../shared/contracts';
 const bridge: Bridge = {
   platform: process.platform,
+  connectionImportText: text => ipcRenderer.invoke('connections:import-text', text),
+  connectionImportFile: delimiter => ipcRenderer.invoke('connections:import-file', delimiter),
+  connectionImportPreview: (token, options) => ipcRenderer.invoke('connections:import-preview', token, options),
+  connectionImportApply: (token, rows, policy) => ipcRenderer.invoke('connections:import-apply', token, rows, policy),
+  connectionImportDiscard: token => ipcRenderer.invoke('connections:import-discard', token),
   networkStatus: () => ipcRenderer.invoke('network:status'),
   networkSave: route => ipcRenderer.invoke('network:save', route),
   machineBrowser:(id,action,value)=>ipcRenderer.invoke('machine-browser:action',id,action,value),
