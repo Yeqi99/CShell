@@ -1,6 +1,7 @@
 import { build } from 'esbuild';
 await build({
   entryPoints: ['src/desktop/main.ts'],
+  define: {__CSHELL_PRO__: JSON.stringify(process.env.CSHELL_EDITION === 'pro')},
   outfile: 'dist/main/main.cjs',
   bundle: true,
   platform: 'node',

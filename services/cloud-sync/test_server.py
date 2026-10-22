@@ -10,6 +10,21 @@ class ServiceTest(unittest.TestCase):
         self.mail = {}
         self.service = Service(self.directory.name + '/test.sqlite', secrets.token_bytes(32), lambda email, code: self.mail.update({email: code}))
 
+    def test_membership_is_real_and_audited(self):
+        session = self.login('member@example.com', 'member-ip')
+        account = session['accountId']
+        self.assertFalse(self.service.profile(account)['membership']['active'])
+        import time
+        self.service.admin_membership({'account': account, 'expiresAt': time.time()+86400, 'reason': 'test grant'})
+        self.assertTrue(self.service.profile(account)['membership']['active'])
+        self.service.admin_membership({'account': account, 'expiresAt': 0, 'reason': 'test revoke'})
+        self.assertFalse(self.service.profile(account)['membership']['active'])
+        result = self.service.admin_accounts()
+        self.assertEqual(len(result['audit']), 2)
+        self.assertNotIn('token', str(result))
+        with self.assertRaises(Failure):
+            self.service.admin_membership({'account': account, 'expiresAt': float('nan'), 'reason': 'invalid'})
+
     def tearDown(self):
         self.directory.cleanup()
 

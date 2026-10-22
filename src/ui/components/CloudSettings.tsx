@@ -34,9 +34,9 @@ export function CloudSettings() {
   };
   return (
     <section className="settings-section cloud-settings">
-      <h3>账号与云同步 · Pro</h3>
+      <h2>{status?.email ? "我的账号" : "登录 CShell"}</h2>
       <p className="muted">
-        连接、已保存凭据、基座模型、设置方案和视图加密同步。机器权限与运行中的会话保留在各自设备。
+        登录后，连接、模型和个人设置会自动同步。
       </p>
       {!status?.email ? (
         <form
@@ -85,13 +85,14 @@ export function CloudSettings() {
                 onChange={(e) => setCode(e.target.value)}
               />
             </label>
-            <button className="primary">注册 / 登录</button>
+            <button className="primary">{busy ? "正在登录…" : passwordMode ? "登录" : "验证并登录"}</button>
           </fieldset>
         </form>
       ) : (
         <>
           <p>
-            <strong>{status.email}</strong> · 云端版本 {status.revision}
+            <strong>{status.email}</strong> <span className={status.membership?.active ? "member-badge active" : "member-badge"}>{status.membership ? status.membership.active ? "PRO 会员" : "普通账号" : "会员状态待刷新"}</span>
+            {status.membership?.active && status.membership.expiresAt && <small> 有效期至 {new Date(status.membership.expiresAt * 1000).toLocaleDateString()}</small>}
           </p>
           {!status.unlocked ? (
             <fieldset disabled={busy}>
@@ -164,7 +165,7 @@ export function CloudSettings() {
                 >
                   立即同步
                 </button>
-                <button
+                <details className="cloud-advanced"><summary>同步恢复选项</summary><button
                   className="secondary"
                   disabled={busy}
                   onClick={() => setDirection('upload')}
@@ -177,7 +178,7 @@ export function CloudSettings() {
                   onClick={() => setDirection('download')}
                 >
                   恢复云端到本机
-                </button>
+                </button></details>
               </div>
               {direction && (
                 <div className="cloud-confirm" role="group" aria-label="确认同步方向">

@@ -94,7 +94,7 @@ export async function registerCloudHandlers(
     },
   });
   await cloud.load();
-  handle('cloud:status', () => cloud.status());
+  handle('cloud:status', () => cloud.accountStatus());
   handle('cloud:code', (email) => cloud.requestCode(z.email().max(254).parse(email)));
   handle('cloud:login', (email, code, password = false) =>
     cloud.login(

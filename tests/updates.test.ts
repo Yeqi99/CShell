@@ -14,6 +14,14 @@ const release = (version: string, suffix = 'win-x64.exe') => ({
       'https://github.com/Yeqi99/CShell/releases/download/v' + version + '/' + a.name,
   })),
 });
+
+test('Pro and base applications select only their own release assets', () => {
+  const base = release('0.8.2');
+  const pro = JSON.parse(JSON.stringify(base).replaceAll('CShell-0.8.2', 'CShell-Pro-0.8.2'));
+  assert.equal(selectRelease([base], 'win32', 'x64', true), undefined);
+  assert.equal(selectRelease([pro], 'win32', 'x64'), undefined);
+  assert.equal(selectRelease([pro], 'win32', 'x64', true)?.asset.name, 'CShell-Pro-0.8.2-win-x64.exe');
+});
 test('updates compare numeric versions and select complete platform releases including previews', () => {
   assert.equal(compareVersion('0.3.10', '0.3.9'), 1);
   assert.equal(

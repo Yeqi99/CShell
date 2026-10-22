@@ -12,7 +12,8 @@ await build({
 });
 await copyFile('android/web/index.html', `${directory}/index.html`);
 
-await copyFile('assets/icon.png', `${directory}/icon.png`);
-await copyFile('assets/icon.png', 'android/app/src/main/res/drawable/icon.png');
+const brandIcon = process.env.CSHELL_EDITION === 'pro' ? 'assets/brand/cshell-pro.png' : 'assets/icon.png';
+await copyFile(brandIcon, `${directory}/icon.png`);
+await copyFile(brandIcon, 'android/app/src/main/res/drawable/icon.png');
 
 await copyFile('THIRD_PARTY_NOTICES.txt', `${directory}/THIRD_PARTY_NOTICES.txt`);

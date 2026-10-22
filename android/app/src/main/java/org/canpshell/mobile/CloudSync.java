@@ -16,6 +16,8 @@ import javax.crypto.spec.*;
 final class CloudSync {
   private final Context context;
   private JSONObject state;
+  private JSONObject membership;
+  private long profileChecked;
   CloudSync(Context context) { this.context=context; }
   private SecretKey localKey()throws Exception{
     KeyStore store=KeyStore.getInstance("AndroidKeyStore");store.load(null);String alias="cshell-cloud-sync";
@@ -72,7 +74,11 @@ final class CloudSync {
     data.getJSONObject("ai").getJSONArray("providers");data.getJSONArray("devices");
   }
   private JSONObject status()throws Exception{
-    return new JSONObject().put("email",state.has("session")?state.getJSONObject("session").getString("email"):"")
+    if(state.has("session") && System.currentTimeMillis()-profileChecked>60000){
+      profileChecked=System.currentTimeMillis();
+      try{membership=api("account",null).getJSONObject("membership");}catch(Exception ignored){membership=null;}
+    }
+    return new JSONObject().put("membership",membership).put("email",state.has("session")?state.getJSONObject("session").getString("email"):"")
       .put("unlocked",state.has("key")).put("revision",state.optLong("revision",0));
   }
   private JSONObject publicData(JSONObject data)throws Exception{
@@ -92,7 +98,7 @@ final class CloudSync {
     else if((action.equals("login") || action.equals("password-login"))){
       JSONObject session=api("auth/"+action,new JSONObject().put("email",request.getString("email")).put(action.equals("password-login")?"password":"code",request.getString("code")));
       if(!state.has("session")||!state.getJSONObject("session").getString("accountId").equals(session.getString("accountId")))state=new JSONObject();
-      state.put("session",session);
+      membership=null;profileChecked=0;state.put("session",session);
       if(action.equals("password-login") && !session.isNull("keybox")){
         JSONObject box=session.getJSONObject("keybox"), envelope=box.getJSONObject("envelope");
         byte[] salt=android.util.Base64.decode(box.getString("salt"),android.util.Base64.DEFAULT);

@@ -38,6 +38,8 @@ class Service:
             CREATE TABLE IF NOT EXISTS accounts(id TEXT PRIMARY KEY,email TEXT UNIQUE NOT NULL);
             CREATE TABLE IF NOT EXISTS passwords(account TEXT PRIMARY KEY,salt TEXT NOT NULL,digest TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS keyboxes(account TEXT PRIMARY KEY,box TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS memberships(account TEXT PRIMARY KEY,expires REAL NOT NULL);
+            CREATE TABLE IF NOT EXISTS admin_audit(id INTEGER PRIMARY KEY,at REAL,account TEXT,action TEXT,detail TEXT);
             CREATE TABLE IF NOT EXISTS codes(email TEXT PRIMARY KEY,digest TEXT,expires REAL,attempts INTEGER);
             CREATE TABLE IF NOT EXISTS sessions(digest TEXT PRIMARY KEY,account TEXT,expires REAL);
             CREATE TABLE IF NOT EXISTS vaults(account TEXT PRIMARY KEY,revision INTEGER,envelope TEXT,mutation TEXT);
@@ -53,6 +55,31 @@ class Service:
                     yield connection
             finally:
                 connection.close()
+
+    def profile(self, account):
+        with self.db() as db:
+            email = db.execute('SELECT email FROM accounts WHERE id=?', (account,)).fetchone()
+            row = db.execute('SELECT expires FROM memberships WHERE account=?', (account,)).fetchone()
+        expires = row[0] if row else 0
+        return {'email': email[0], 'membership': {'active': expires > time.time(), 'expiresAt': expires or None}}
+
+    def admin_accounts(self):
+        with self.db() as db:
+            rows = db.execute('SELECT a.id,a.email,COALESCE(v.revision,0),COALESCE(m.expires,0) FROM accounts a LEFT JOIN vaults v ON v.account=a.id LEFT JOIN memberships m ON m.account=a.id ORDER BY a.email LIMIT 1000').fetchall()
+            audit = db.execute('SELECT at,account,action,detail FROM admin_audit ORDER BY id DESC LIMIT 50').fetchall()
+        return {'accounts': [{'id': r[0], 'email': r[1], 'revision': r[2], 'membership': {'active': r[3] > time.time(), 'expiresAt': r[3] or None}} for r in rows], 'audit': [{'at': r[0], 'account': r[1], 'action': r[2], 'detail': r[3]} for r in audit]}
+
+    def admin_membership(self, body):
+        account, expires, reason = body.get('account'), body.get('expiresAt'), body.get('reason')
+        if not isinstance(expires, (int, float)) or isinstance(expires, bool) or not 0 <= expires <= time.time() + 3660 * 86400 or not isinstance(reason, str) or not 2 <= len(reason.strip()) <= 300:
+            raise Failure(400, '请填写有效到期时间及操作原因')
+        with self.db() as db:
+            if not db.execute('SELECT 1 FROM accounts WHERE id=?', (account,)).fetchone():
+                raise Failure(404, '账号不存在')
+            previous = db.execute('SELECT expires FROM memberships WHERE account=?', (account,)).fetchone()
+            db.execute('INSERT OR REPLACE INTO memberships VALUES(?,?)', (account, expires))
+            db.execute('INSERT INTO admin_audit(at,account,action,detail) VALUES(?,?,?,?)', (time.time(), account, 'membership', json.dumps({'before': previous[0] if previous else 0, 'after': expires, 'reason': reason.strip()}, ensure_ascii=False)))
+        return self.profile(account)
 
     def digest(self, value):
         return hmac.new(self.pepper, value.encode(), hashlib.sha256).hexdigest()
@@ -236,7 +263,14 @@ def handler(service):
 
         def dispatch(self):
             try:
-                if self.headers.get('Origin'):
+                admin = self.path.startswith('/v1/admin/')
+                if admin:
+                    secret = os.environ.get('ADMIN_API_TOKEN', '')
+                    if not secret or not hmac.compare_digest(self.headers.get('X-Admin-Token', ''), secret):
+                        raise Failure(403, '管理员认证失败')
+                    if self.headers.get('Origin') not in (None, 'https://admin-shell.canp.ai'):
+                        raise Failure(403, '来源不允许')
+                if not admin and self.headers.get('Origin'):
                     raise Failure(403, '仅允许原生客户端')
                 ip = self.headers.get('X-Real-IP', self.client_address[0])
                 service.limit('api:' + service.digest(ip), 120, 60)
@@ -248,7 +282,11 @@ def handler(service):
                     body = json.loads(self.rfile.read(size))
                     if not isinstance(body, dict):
                         raise Failure(400, '请求格式不正确')
-                if self.command == 'GET' and self.path == '/v1/health':
+                if admin and self.path == '/v1/admin/accounts' and self.command == 'GET':
+                    value = service.admin_accounts()
+                elif admin and self.path == '/v1/admin/membership' and self.command == 'POST':
+                    value = service.admin_membership(body)
+                elif self.command == 'GET' and self.path == '/v1/health':
                     value = {'ok': True, 'protocol': 1, 'mailConfigured': mail_configured()}
                 elif self.command == 'POST' and self.path == '/v1/auth/code':
                     value = service.request_code(body.get('email'), ip)
@@ -259,7 +297,9 @@ def handler(service):
                 else:
                     token = self.headers.get('Authorization', '').removeprefix('Bearer ')
                     account = service.authenticate(token)
-                    if self.path == '/v1/auth/keybox' and self.command == 'POST':
+                    if self.path == '/v1/account' and self.command == 'GET':
+                        value = service.profile(account)
+                    elif self.path == '/v1/auth/keybox' and self.command == 'POST':
                         encoded = json.dumps(body)
                         if len(encoded) > 2048 or set(body) != {'salt', 'envelope'}:
                             raise Failure(400, '密钥包装格式不正确')

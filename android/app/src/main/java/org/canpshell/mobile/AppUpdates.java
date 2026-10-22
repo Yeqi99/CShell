@@ -71,7 +71,7 @@ final class AppUpdates {
         for(int i=0;i<list.length();i++){
           JSONObject r=list.getJSONObject(i);String tag=r.optString("tag_name");
           if(r.optBoolean("draft")||!tag.matches("v[0-9]+\\.[0-9]+\\.[0-9]+"))continue;
-          String expected="CShell-"+tag.substring(1)+"-android-test.apk",base="https://github.com/Yeqi99/CShell/releases/download/"+tag+"/";
+          String expected=(activity.getPackageName().endsWith(".pro")?"CShell-Pro-":"CShell-")+tag.substring(1)+"-android-test.apk",base="https://github.com/Yeqi99/CShell/releases/download/"+tag+"/";
           JSONObject apk=null,checksum=null;JSONArray assets=r.getJSONArray("assets");
           for(int j=0;j<assets.length();j++){JSONObject a=assets.getJSONObject(j);if(expected.equals(a.optString("name")))apk=a;if("SHA256SUMS.txt".equals(a.optString("name")))checksum=a;}
           if(apk==null||checksum==null)continue;

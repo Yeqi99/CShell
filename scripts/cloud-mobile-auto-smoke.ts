@@ -23,10 +23,15 @@ try{
       }};
   })()`);
   await page.goto('https://fixture.invalid/');
-  await page.locator('#navigation [data-page=settings]').click();
-  await page.waitForFunction(()=>document.getElementById('cloud-message')?.textContent==='操作完成',undefined,{timeout:15000});
+  await page.locator('#account-entry').click();
+  await page.locator('#cloud-login').waitFor();
+  await page.screenshot({path:'test-results/cloud-android-login.png',fullPage:true});
+  assert.equal(await page.locator('#cloud-code-field').isVisible(),false);
+  await page.locator('#cloud-mode-code').click();
+  assert.equal(await page.locator('#cloud-password-field').isVisible(),false);
+  await page.locator('#cloud-mode-password').click();
   await page.getByLabel('邮箱',{exact:true}).fill('test@example.com');await page.locator('#cloud-login').getByLabel('密码',{exact:true}).fill('123456');
-  await page.getByRole('button',{name:'密码登录',exact:true}).click();
+  await page.getByRole('button',{name:'登录',exact:true}).click();
   await page.getByText('已配置基座 · configured-model',{exact:true}).waitFor();
   assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('profiles')!)[0].name),'同步的服务器');
   assert.equal(await page.evaluate(()=>localStorage.getItem('theme')),'dark');

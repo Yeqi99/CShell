@@ -49,6 +49,7 @@ export function selectRelease(
   input: unknown,
   platform: string,
   arch: string,
+  pro = false,
 ): UpdateRelease | undefined {
   if (!Array.isArray(input)) throw new Error('Invalid GitHub response');
   const suffix =
@@ -65,7 +66,7 @@ export function selectRelease(
     .sort((a, b) => compareVersion(b.tag_name, a.tag_name));
   for (const r of releases) {
     const version = r.tag_name.slice(1),
-      name = 'CShell-' + version + '-' + suffix;
+      name = (pro ? 'CShell-Pro-' : 'CShell-') + version + '-' + suffix;
     const asset = r.assets.find((a: ReleaseAsset) => a.name === name),
       checksums = r.assets.find((a: ReleaseAsset) => a.name === 'SHA256SUMS.txt');
     if (!asset || !checksums) continue;

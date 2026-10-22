@@ -23,7 +23,7 @@ const badging = execFileSync(
   { encoding: 'utf8', windowsHide: true },
 );
 const pkg = /^package: name='([^']+)' versionCode='([^']+)' versionName='([^']+)'/m.exec(badging);
-if (!pkg || pkg[1] !== identity.packageName || pkg[2] !== String(code) || pkg[3] !== version)
+if (!pkg || pkg[1] !== (identity.packageName + (process.env.CSHELL_EDITION === 'pro' ? '.pro' : '')) || pkg[2] !== String(code) || pkg[3] !== version)
   throw new Error('APK package/version does not match package.json');
 const java = process.env.JAVA_HOME
   ? join(process.env.JAVA_HOME, 'bin', process.platform === 'win32' ? 'java.exe' : 'java')

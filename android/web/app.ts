@@ -226,6 +226,7 @@ function navigate(next: string) {
     'session-page',
     'connect',
     'settings',
+    'account',
     'extensions',
     'cagent',
     'terminals',

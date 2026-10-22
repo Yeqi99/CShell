@@ -1,3 +1,5 @@
+import { AccountEntry } from './components/AccountEntry';
+import { CloudSettings } from './components/CloudSettings';
 import {LinuxWorkspace} from './components/LinuxWorkspace';
 import {SavedAgentConnection} from './components/SavedAgentConnection';
 import { MonitorViews } from './components/MonitorViews';
@@ -84,7 +86,10 @@ import {
   terminalCloseReason,
   terminalSnapshot,
 } from './terminalBus';
-import brandMark from '../../assets/icon.svg';
+import baseBrandMark from '../../assets/icon.svg';
+import proBrandMark from '../../assets/brand/cshell-pro.svg';
+import { isPro } from '../shared/edition';
+const brandMark = isPro ? proBrandMark : baseBrandMark;
 
 type Tab = {
   client?: { device: ClientDevice; shell: ClientShell; distribution?: string };
@@ -234,7 +239,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
     [form, setForm] = useState<Profile | 'new' | null>(null),
     [settings, setSettings] = useState(false),
     [surface, setSurface] = useState<
-      'terminal' | 'connection' | 'quick' | 'settings' | 'extensions' | 'activity' | 'wsl' | 'machine' | 'views' | 'home'
+      'terminal' | 'connection' | 'quick' | 'settings' | 'extensions' | 'activity' | 'wsl' | 'machine' | 'views' | 'home' | 'account'
     >('home'),
     [palette, setPalette] = useState(false),
     [error, setError] = useState(''),
@@ -242,6 +247,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
     [transfers, setTransfers] = useState<Transfer[]>([]),
     [confirmDelete, setConfirmDelete] = useState<Profile | null>(null),
     [confirmClose, setConfirmClose] = useState<Tab | null>(null);
+  const [accountOpen,setAccountOpen]=useState(false);
   const [linuxWorkspaces,setLinuxWorkspaces]=useState<string[]>([]);
   const [linuxModes,setLinuxModes]=useState<Record<string,boolean>>({});
   const linuxRestored=useRef(new Set<string>());
@@ -630,6 +636,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
           <strong>CShell</strong>
         </div>
         <div className="titlebar-space" />
+        {isPro && <AccountEntry onOpen={()=>{setAccountOpen(true);setSurface("account");}}/>}
         <button className="icon" title="视图" aria-label="视图" onClick={() => { setViewsOpen(true); setSurface('views'); }}><LayoutDashboard size={18}/></button>
         <button
           className="icon"
@@ -901,6 +908,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
                   </button>
                 </div>
               ))}
+              {accountOpen && <div className={`tab ${surface === "account" ? "active" : ""}`}><button onClick={()=>setSurface("account")}>我的账号</button><button className="icon" aria-label="关闭账号页面" onClick={()=>{setAccountOpen(false);if(surface==="account")setSurface("home");}}><X size={13}/></button></div>}
               {viewsOpen && <div className={`tab ${surface === 'views' ? 'active' : ''}`}><button onClick={() => setSurface('views')}>视图</button><button className="icon" aria-label="关闭视图设置" onClick={() => { setViewsOpen(false); if (surface === 'views') setSurface('terminal'); }}><X size={13}/></button></div>}
               {extensions && (
                 <div
@@ -1192,6 +1200,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
               />
             </div>
           )}
+          {accountOpen && <div className="workspace-editor account-workspace" hidden={surface!=="account"}><CloudSettings/></div>}
           {viewsOpen && <div className="workspace-editor" hidden={surface !== 'views'}><MonitorViews config={config}/></div>}{machines.map(m=><div key={m.target.id} className="workspace-editor" hidden={surface!=='machine'||machineId!==m.target.id}><AgentMachineWorkspace onDisconnect={()=>closeMachine(m.target.id)} device={m.device} target={m.target} preferences={preferences} onSessionCount={(count,ids)=>{setMachineSessionCounts(v=>v[m.target.id]===count?v:{...v,[m.target.id]:count});setMachineSessionIds(v=>JSON.stringify(v[m.target.id])===JSON.stringify(ids)?v:{...v,[m.target.id]:ids});}} active={surface==='machine'&&machineId===m.target.id}/></div>)}
           <div className="workspace-editor" hidden={surface !== 'home' && !(surface === 'terminal' && !tabs.length)}>
             <WorkbenchHome config={config} active={surface === 'home' || (surface === 'terminal' && !tabs.length)} currentCount={currentSsh.length + currentDevices.length}

@@ -14,6 +14,7 @@ export interface CloudRevision {
   envelope: CloudEnvelope | null;
 }
 export interface CloudStatus {
+  membership?: { active: boolean; expiresAt: number | null };
   email?: string;
   unlocked: boolean;
   revision: number;

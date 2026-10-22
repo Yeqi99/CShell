@@ -1,3 +1,4 @@
+import { isPro } from '../shared/edition';
 import { app, shell, dialog, net, type BrowserWindow } from 'electron';
 import { mkdir, open, rename, rm, readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
@@ -59,6 +60,7 @@ export function registerUpdateHandlers(
         await (await request(releaseApi)).json(),
         process.platform,
         process.arch,
+        isPro,
       );
       file = '';
       expected = '';

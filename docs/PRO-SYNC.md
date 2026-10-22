@@ -26,9 +26,9 @@ Pro 是同一 CShell 客户端中的账号能力，不复制工作台、不维�
 
 ## 部署
 
-香港主机的 `/opt/cshell-sync/server.py` 以独立 `cshell-sync` 用户运行，SQLite 在 `/var/lib/cshell-sync/`；环境文件 `/etc/cshell-sync.env` 为 root 0600。只监听 127.0.0.1:8789，由已有 Caddy 的 `shell.canp.ai/api/` 转发。原管理页面仍要求访问密码。单独限制 256 MiB 内存、0.5 CPU、32 任务、16 个请求线程和请求体大小。
+香港主机的 `/opt/cshell-sync/server.py` 以独立 `cshell-sync` 用户运行，SQLite 在 `/var/lib/cshell-sync/`；环境文件 `/etc/cshell-sync.env` 为 root 0600。只监听 127.0.0.1:8789，由已有 Caddy 的 `shell.canp.ai/api/` 转发。门户位于根路径，管理页面迁移到 `admin-shell.canp.ai` 并要求访问密码。单独限制 256 MiB 内存、0.5 CPU、32 任务、16 个请求线程和请求体大小。
 
-Cloudflare Email Sending 通过 HTTPS 发送验证码。需要 Workers Paid、已验证发信域名和专用于 Email Sending 的服务凭据。付款、DNS、邮件投递实际验证完成前，不标记注册可用。
+验证码通过已配置的 163 SMTP SSL 发出。Cloudflare 提供域名解析和 HTTPS 代理；无需 Workers Paid。SMTP 授权凭据仅保存在服务器受限环境文件中。
 
 发布前必须完成：真实邮件收件、正式账号注册、本机数据加密上传与第二设备恢复验证、跨平台构建及产物核验。当前测试通过不代表这些线上验收已完成。
 
@@ -37,3 +37,15 @@ Cloudflare Email Sending 通过 HTTPS 发送验证码。需要 Workers Paid、�
 已配置账号支持固定密码登录。恢复密钥通过 PBKDF2-HMAC-SHA256（210000 次、随机 32 字节盐）派生的密钥进行 AES-GCM 包装；服务端保存包装密文，客户端登录后自动解锁并恢复配置。Windows 后台约每分钟同步，Android 前台约每 30 秒检查本机变化或云端版本。首次恢复前保留本机备份，并发编辑保留冲突处理，不静默覆盖。
 
 当前测试账号已配置该流程；密码修改与遗忘密码后重新包装流程尚未提供。验证码登录仍保留，新的未配置账号不应被宣称已具备自动解锁功能。
+
+## Pro 构建与安装标识
+
+设置 `CSHELL_EDITION=pro` 后运行 Vite、`scripts/build.mjs` 和 `scripts/build-android.mjs`。Windows 使用 `electron-builder --config electron-builder.pro.cjs`，应用 ID 为 `org.canpshell.pro`，产品名称和数据目录为 `CShell Pro`，与普通版独立。Android Gradle 在同一环境变量下使用 `org.canpshell.mobile.pro` 和 `CShell Pro` 名称。两端均使用已确认的 `assets/brand/cshell-pro.*`，不重绘或改动普通版/cagent 资源。更新器只匹配本产品的发行附件。
+
+## 账号体验与门户（2026-10-22）
+
+Pro 桌面顶栏常驻账号入口，在可关闭的工作区标签打开账号页。Android 顶栏提供同一入口，密码与验证码登录分开，只显示当前需要的字段；状态查询不再显示“操作完成”。客户端从 `/v1/account` 获取真实会员有效期，安装 Pro 不自动获得会员。
+
+`services/portal` 为 `https://shell.canp.ai` 的公开下载门户；`services/admin` 复用原管理平台，账号列表和会员操作审计连接真实服务，其余支付、套餐、模型用量模块仍明确为草稿。管理员通过 `https://admin-shell.canp.ai` 访问，Caddy Basic Auth 保护整个主机，反向代理注入独立 `ADMIN_API_TOKEN`。公开 API 转发必须移除该头，服务端管理员接口校验 token，写操作校验浏览器 Origin。会员修改必须填写原因，前后有效期写入审计；不会伪造充值订单。
+
+Windows 与 Android 下载附件放入香港服务器 `/opt/cshell-downloads/`，校验值使用 `SHA256SUMS.txt`。安装包未完成核验不得替换公开附件。Windows 当前为未签名测试安装包，Android 使用现有发布证书签名。Pro 的其他平台尚未发布。

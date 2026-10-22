@@ -65,6 +65,7 @@ import { registerPresetHandlers } from './presets';
 import { registerAppearanceHandlers } from './appearance';
 import { registerFileHandlers } from './file-handlers';
 import { ResourceInspection } from '../core/resource-inspection';
+import { isPro, productName } from '../shared/edition';
 
 let window: BrowserWindow;
 let ssh: SshService;
@@ -77,6 +78,7 @@ const pathSchema = z
   .max(4096)
   .refine((p) => !/[\0\r\n]/.test(p));
 const clientMode = process.argv.includes('--client') || app.getName() === 'CShell Client';
+if(isPro && !clientMode){app.setName(productName);app.setPath('userData',join(app.getPath('appData'),productName));app.setAppUserModelId('org.canpshell.pro');}
 if (clientMode) app.setPath('userData', join(app.getPath('appData'), 'CShell Client'));
 if (process.env.CSHELL_TEST_DATA) app.setPath('userData', process.env.CSHELL_TEST_DATA);
 const diagnostics = new Diagnostics(app.getPath('userData'), app.getVersion());
@@ -142,8 +144,8 @@ else
         ...initialWindowBounds(
           screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea,
         ),
-        title: 'CShell · CanpShell',
-        icon: join(app.getAppPath(), 'assets/icon.png'),
+        title: productName + ' · CanpShell',
+        icon: join(app.getAppPath(), isPro ? 'assets/brand/cshell-pro.png' : 'assets/icon.png'),
         backgroundColor: store.snapshot().preferences.theme === 'light' ? '#ffffff' : '#171f28',
         show: false,
         titleBarStyle: 'hidden',

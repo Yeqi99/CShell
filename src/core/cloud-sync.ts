@@ -23,6 +23,16 @@ export class CloudSync {
   private state: CloudStatus['state'] = 'signed-out';
   private error?: string;
   private busy = false;
+  private membership?: CloudStatus['membership'];
+  private profileChecked = 0;
+  async accountStatus() {
+    const session = this.data.session;
+    if (session && Date.now() - this.profileChecked > 60000) {
+      this.profileChecked = Date.now();
+      try { const profile = await this.api('/v1/account'); if (this.data.session === session) this.membership = profile.membership; } catch { this.membership = undefined; }
+    }
+    return this.status();
+  }
   private preserveUnreadable = false;
   constructor(
     private directory: string,
@@ -48,6 +58,7 @@ export class CloudSync {
   }
   status(): CloudStatus {
     return {
+      membership: this.data.session ? this.membership : undefined,
       email: this.data.session?.email,
       unlocked: !!this.data.key,
       revision: this.data.revision,
@@ -122,6 +133,7 @@ export class CloudSync {
       const session: CloudSession & {keybox?:any} = await this.api(password ? '/v1/auth/password-login' : '/v1/auth/login', password ? { email, password: code } : { email, code });
       if (!/^[a-f0-9]{32}$/.test(session.accountId) || !/^[A-Za-z0-9_-]{43}$/.test(session.token))
         throw new Error('登录响应不正确');
+      this.membership = undefined; this.profileChecked = 0;
       const same = this.data.session?.accountId === session.accountId;
       this.data = same ? { ...this.data, session } : { session, revision: 0 };
       if(password && session.keybox) this.data.key = unwrapRecoveryKey(session.keybox, code, session.accountId);
