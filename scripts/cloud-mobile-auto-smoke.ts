@@ -30,7 +30,7 @@ try{
   assert.equal(await page.locator('#cloud-register-code').isVisible(),true);
   assert.equal(await page.locator('#cloud-mode-code').isVisible(),false);
   await page.screenshot({path:'test-results/cloud-android-register.png',fullPage:true});
-  await page.locator('#cloud-register-toggle').click();
+  await page.locator('#cloud-back-login').click();
   assert.equal(await page.locator('#cloud-code-field').isVisible(),false);
   await page.locator('#cloud-mode-code').click();
   assert.equal(await page.locator('#cloud-password-field').isVisible(),false);

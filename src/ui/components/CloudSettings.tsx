@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowRight, Check, Cloud, Eye, EyeOff, ShieldCheck, LogOut, Crown, Mail, LockKeyhole } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Cloud, Eye, EyeOff, ShieldCheck, LogOut, Crown, Mail, LockKeyhole } from 'lucide-react';
 import type { CloudStatus } from '../../shared/cloud-sync';
 import brand from '../../../assets/brand/cshell-pro.svg';
 const readable = (error: unknown) => {
@@ -23,6 +23,7 @@ export function CloudSettings() {
   }, []);
   useEffect(()=>{if(!cooldown)return;const timer=setTimeout(()=>setCooldown(c=>c-1),1000);return()=>clearTimeout(timer);},[cooldown]);
   const run=async(action:()=>Promise<unknown>)=>{setBusy(true);setError('');setNotice('');try{await action();setStatus(await window.cshell.cloudStatus());}catch(e){setError(readable(e));}finally{setBusy(false);}};
+  const backToLogin=()=>{setRegistering(false);setPasswordMode(true);setSecret('');setVerification('');setError('');setNotice('');};
   const login=()=>run(async()=>{if(registering)await window.cshell.cloudRegister(email,verification,secret);else await window.cshell.cloudLogin(status?.email || email,secret,passwordMode || !!status?.email);setSecret('');setVerification('');});
   const member=status?.membership;
   const active=!!member?.active && !!member.expiresAt && member.expiresAt*1000>Date.now();
@@ -31,6 +32,7 @@ export function CloudSettings() {
   if (!status) return <section className="account-page-content" aria-label="正在加载账号"><div className="account-skeleton"/></section>;
   return <section className={'account-page-content '+(status.email?'signed-in':'signed-out')}>
     {!status.email ? <div className="auth-content">
+      <button type="button" className="auth-back" hidden={!registering} disabled={busy} onClick={backToLogin}><ArrowLeft size={16}/>返回登录</button>
       <img className="auth-brand" src={brand} alt="CShell Pro"/>
       <h1>{registering?"创建 CShell 账号":"登录 CShell"}</h1><p className="auth-description">{registering?"一个账号，同步你的工作环境。":"在你的设备间，延续工作。"}</p>
       <form onSubmit={e=>{e.preventDefault();void login();}}>
