@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+<defs>
+<linearGradient id="bg" x2="1" y2="1"><stop stop-color="#00594b"/><stop offset=".58" stop-color="#003d32"/><stop offset="1" stop-color="#001d17"/></linearGradient>
+<linearGradient id="mark" x1=".8" y1="0" x2=".2" y2="1" gradientUnits="objectBoundingBox"><stop stop-color="#c5f8e7"/><stop offset=".44" stop-color="#25d8bc"/><stop offset="1" stop-color="#008375"/></linearGradient>
+<linearGradient id="facet" x2="1" y2=".4"><stop stop-color="#006e65"/><stop offset=".52" stop-color="#00e2bd"/><stop offset="1" stop-color="#004638"/></linearGradient>
+<linearGradient id="gold" x2=".3" y2="1"><stop stop-color="#ffe7a5"/><stop offset=".5" stop-color="#ffd475"/><stop offset="1" stop-color="#d89b20"/></linearGradient>
+</defs>
+<rect x="8" y="8" width="240" height="240" rx="54" fill="url(#bg)"/>
+
+<path d="m166 70-23-14q-15-8-29 0L69 82Q57 89 57 103v62q0 13 12 20l46 27q13 7 25 0l24-14q10-6 0-13l-27-15q-9 5-17 0l-21-12q-5-3-5-9v-34q0-6 5-9l20-12q10-6 20 0l27-16q10-4 0-8Z" fill="url(#mark)"/>
+<path d="M57 110v55q0 13 12 20l46 27q13 7 25 0l24-14q10-6 0-13l-27-15-17 5-22-15-15-30Z" fill="url(#facet)" opacity=".48"/>
+<g fill="url(#mark)"><rect x="143" y="126" width="13" height="13" rx="3"/><rect x="166" y="116" width="28" height="28" rx="5"/><rect x="205" y="101" width="19" height="19" rx="4"/><rect x="205" y="138" width="18" height="18" rx="4" opacity=".38"/></g>
+<path d="m176 130 7-5 7 5-7 7Z" fill="#008d7c" opacity=".6"/>
+
+</svg>

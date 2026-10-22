@@ -1,0 +1,16 @@
+# CShell 官网
+
+生产地址：https://shell.canp.ai/。静态站点使用现有香港服务器与 Caddy；账号 API、下载目录、管理员和 CanpAI 使用各自原有路由。
+
+## 编辑与验证
+
+- `scripts/build-portal.mjs`：首页及 18 篇使用/开发文档的内容源，生成 `index.html` 和 `docs/*.html`。
+- `theme.css`：官网与文档共用设计；`site.js`：设备选择、键盘导航与文档标题筛选。
+- 运行 `node scripts/build-portal.mjs`，再运行 `node scripts/portal-smoke.cjs`。验证使用 Playwright 和本机 Edge，临时 HTTP 服务自动关闭。
+- 下载地址在生成器和 `site.js` 中维护。新增附件先核对版本、架构、摘要及真实 URL，再更新页面；不能用开源安装包冒充 Pro。
+
+## 发布规则
+
+先备份现有 portal，在独立暂存目录解包并核对，再切换静态目录。不要覆盖管理员目录、API 服务、安装包或 CanpAI。发布后验证文档页面、下载 HEAD 与 API 健康状态。
+
+2026-10-22：Windows / Android Pro 0.8.1 account3 附件可下载；macOS / Linux 提供 GitHub 开源发行入口，Pro 包尚未发布。会员中继、应用网络代理和扩展同步等新版能力仍在联调，官网明确标记，不将服务进程启动等同于功能发布。
