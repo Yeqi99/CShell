@@ -1,7 +1,7 @@
 import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { CodingApp } from '../../src/ui/components/CodingApp';
-import { DevelopmentMarket } from '../../src/ui/components/DevelopmentMarket';
+import { AgentApplications } from '../../src/ui/components/AgentApplications';
 import type { AgentCall } from '../../src/shared/agent';
 type Bridge = {
   machineRequest?: (json: string) => void;
@@ -91,12 +91,26 @@ export class MobileCoding {
       const render = (active: boolean) =>
         root.render(
           engine === 'market'
-            ? React.createElement(DevelopmentMarket, {
+            ? React.createElement(AgentApplications, {
                 call,
-                onChanged: (apps) => {
-                  if (apps) this.changed?.(target, apps);
+                target: { id: target, name, local: false, available: true },
+                nativeCapabilities: false,
+                onDevelopmentChanged: () => {
+                  void this.call(target, 'coding.status')
+                    .then((value: any) => {
+                      const ready = (engine: string) =>
+                        !!value.engines?.some((e: any) => e.engine === engine && e.ready);
+                      return this.call(target, 'ide.status').then((ide: any) =>
+                        this.changed?.(target, {
+                          codex: ready('codex'),
+                          claude: ready('claude'),
+                          ide: !!ide.ready,
+                        }),
+                      );
+                    })
+                    .catch(() => {});
                 },
-                onOpen: (id: string) => {
+                onDevelopmentOpen: (id: string) => {
                   if (id === 'ide') {
                     this.close();
                     openIde?.();

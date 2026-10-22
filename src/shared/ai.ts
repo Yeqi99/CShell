@@ -95,7 +95,7 @@ export type AiMessage = {
   tool?: { name: string; input: string; output: string; target?: string };
 };
 export type AiThread = {
-  checkpoint?: import('../core/agent-continuity').AgentCheckpoint;
+  checkpoint?: import('./agent-continuity').AgentCheckpoint;
   contextSummary?: string;
   contextThrough?: number;
   execution?: {

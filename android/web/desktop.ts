@@ -12,7 +12,7 @@ export class MobileDesktop {
   constructor(private bridge:Bridge){
     this.root.className='mobile-desktop';this.root.hidden=true;this.root.setAttribute('aria-label','远程桌面');
     const bar=document.createElement('header');const title=document.createElement('strong');title.textContent='远程桌面';bar.append(title);
-    const close=document.createElement('button');close.textContent='断开';close.onclick=()=>this.close();bar.append(close);
+    const close=document.createElement('button');close.textContent='返回机器';close.onclick=()=>this.close();bar.append(close);
     const label=document.createElement('label');this.toggle.type='checkbox';label.append(this.toggle,'控制键鼠');bar.append(label);this.toggle.onchange=()=>{this.release();this.control=this.toggle.checked&&this.allowed;};
     const input=document.createElement('button');input.textContent='输入文字';bar.append(input);
     const text=document.createElement('textarea');text.placeholder='使用手机输入法输入文字';text.hidden=true;text.maxLength=512;text.setAttribute('aria-label','发送到远端的文字');
@@ -25,7 +25,7 @@ export class MobileDesktop {
     const presets=document.createElement('div');presets.className='desktop-presets';presets.setAttribute('aria-label','画质预设');for(const [i,name] of ['低','中','高','超高','无上限'].entries()){const b=document.createElement('button');b.textContent=name;b.title=i===4?'按网络和设备余量逐步提升，需要新版 CAgent':name+'画质';b.onclick=()=>{this.options={display:this.options.display,fps:[24,30,60,90,60][i],bitrate:[2e6,5e6,12e6,30e6,12e6][i],adaptive:true,...(i===4?{unlimited:true}:{})};this.refreshQuality();this.command({op:'quality',value:this.options});};this.presetButtons.push(b);presets.append(b);}quality.append(presets);
     for(const [key,label,divisor] of [['fps','帧率',1],['bitrate','码率 Mbps',1_000_000]] as const){const l=document.createElement('label');l.textContent=label;const field=document.createElement('input');field.type='number';field.min='1';field.value=String(this.options[key]/divisor);field.onchange=()=>{const n=Number(field.value)*divisor;if(Number.isSafeInteger(n)&&n>0&&n<=0xffffffff){this.options[key]=n;delete this.options.unlimited;this.refreshQuality();this.command({op:'quality',value:this.options});}};this.qualityFields.push(field);l.append(field);quality.append(l);}
     this.canvas.tabIndex=0;this.canvas.setAttribute('aria-label','远端画面，单指点击或拖动，长按右键，双指滚动');this.message.setAttribute('role','status');
-    this.root.append(bar,quality,this.canvas,keyboard,text,send,this.message);document.body.append(this.root);
+    const tools=document.createElement('details');tools.className='desktop-control-panel';const toolsLabel=document.createElement('summary');toolsLabel.textContent='操作与画质';tools.append(toolsLabel,label,input,quality,keyboard,text,send);this.root.append(bar,this.canvas,tools,this.message);document.body.append(this.root);
     const move=(x:number,y:number)=>{const p=videoPoint(x,y,this.canvas.getBoundingClientRect(),this.canvas.width,this.canvas.height);if(!p)return false;this.input({kind:'move',...p});return true;};
     this.touch=new DesktopTouch(v=>this.input(v),move);
     this.canvas.onpointerdown=e=>{e.preventDefault();this.canvas.focus();this.canvas.setPointerCapture(e.pointerId);if(e.pointerType==='mouse'){if(move(e.clientX,e.clientY))this.input({kind:'button',button:e.button===2?1:e.button===1?2:0,down:true});}else this.touch.down(e.pointerId,e.clientX,e.clientY);};
