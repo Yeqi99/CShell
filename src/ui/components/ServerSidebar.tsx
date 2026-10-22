@@ -61,6 +61,7 @@ export function ServerSidebar({
   const [dragging, setDragging] = useState('');
   const [drop, setDrop] = useState<{ group: string; before?: string } | null>(null);
   const pointerDrag = useRef<{id:string;x:number;y:number;active:boolean;drop?:{group:string;before?:string}} | undefined>(undefined);
+  const suppressClickUntil = useRef(0);
   const popup = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLElement | null>(null);
   const report = (e: unknown) => {
@@ -200,7 +201,7 @@ export function ServerSidebar({
     })),
   ].filter((section) => section.items.length || (!query && !section.favorite && section.id));
   return (
-    <aside className="sidebar">
+    <aside className="sidebar" aria-busy={working}>
       <div className="sidebar-search">
         <Search size={14} />
         <input
@@ -362,9 +363,12 @@ export function ServerSidebar({
                   className={`server-item ${activeProfile === profile.id ? 'active' : ''}`}
                   draggable={false}
                   data-profile={profile.id}
+                  onClickCapture={e => {if(Date.now()<suppressClickUntil.current){e.preventDefault();e.stopPropagation();}}}
+                  onDoubleClickCapture={e => {if(Date.now()<suppressClickUntil.current){e.preventDefault();e.stopPropagation();}}}
                   onPointerDown={e => {
                     if (!onMove || working || e.button !== 0 || (e.target as HTMLElement).closest('.favorite-button,.server-more')) return;
                     pointerDrag.current = { id:profile.id, x:e.clientX, y:e.clientY, active:false };
+                    ((e.target as HTMLElement).closest<HTMLElement>('.server-open') ?? e.currentTarget).setPointerCapture(e.pointerId);
                   }}
                   onPointerMove={e => {
                     const drag = pointerDrag.current; if (!drag) return;
@@ -379,6 +383,7 @@ export function ServerSidebar({
                   }}
                   onPointerUp={e => {
                     const drag=pointerDrag.current; pointerDrag.current=undefined; setDragging('');setDrop(null);
+                    if(drag?.active)suppressClickUntil.current=Date.now()+500;
                     if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId);
                     if(!drag?.active||!drag.drop||drag.drop.before===drag.id||!onMove)return;
                     e.preventDefault();setWorking(true);void onMove(drag.id,drag.drop.group,drag.drop.before).catch(report).finally(()=>setWorking(false));

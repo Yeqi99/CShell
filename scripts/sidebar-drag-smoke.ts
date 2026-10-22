@@ -26,16 +26,24 @@ async function main() {
       return;
     }
     await row('C').dragTo(row('A'));
+    await page.locator('.sidebar[aria-busy="false"]').waitFor();
     await page.waitForFunction(async () => (await window.cshell.config()).profiles[0].name === 'C', undefined, {timeout:10000});
+    await page.locator('[data-group="开发"] .server-open strong').first().filter({hasText:'C'}).waitFor();
     await row('A').dragTo(page.locator('[data-group="生产"] .group-title'));
+    await page.locator('.sidebar[aria-busy="false"]').waitFor();
     await page.waitForFunction(async () => (await window.cshell.config()).profiles.find(p => p.name === 'A')?.group === '生产', undefined, {timeout:10000});
+    await page.locator('[data-group="生产"] .server-item').waitFor();
     const before = await page.evaluate(async () => JSON.stringify((await window.cshell.config()).profiles));
     await row('B').hover(); await page.mouse.down(); await page.mouse.move(400,30,{steps:12}); await page.keyboard.press('Escape'); await page.mouse.up();
     assert.equal(await page.evaluate(async () => JSON.stringify((await window.cshell.config()).profiles)), before);
     console.log('before reload'); await page.reload({timeout:10000, waitUntil:'domcontentloaded'}); console.log('reloaded');
+    await page.getByTitle('偏好设置', { exact: true }).waitFor();
+    console.log('Reload state', await page.evaluate(async () => ({ profiles:(await window.cshell.config()).profiles.map(p=>[p.name,p.group]), text:document.querySelector('.sidebar')?.textContent })));
     await page.locator('[data-group="生产"] .server-item').waitFor();
     assert.equal(await page.locator('[data-group="开发"] .group-name').evaluate(e => getComputedStyle(e).fontSize), '16px');
     await mkdir('test-results', { recursive: true }); await page.screenshot({ path: 'test-results/sidebar-drag.png' });
+    await row('B').locator('.server-open').dblclick();
+    await page.locator('.saved-connection').getByRole('heading', {name:'B',exact:true}).waitFor();
     console.log('PASS: reorder, cross-group drop, cancelled drag unchanged, persisted reload and 16px group title');
   } finally {
     await app.evaluate(({ app }) => app.exit(0)).catch(() => {}); await app.close().catch(() => {});

@@ -10,6 +10,7 @@
 - 分组默认字号进一步提高为 16 px（仍可自定义）。tests/profile-order.test.ts 通过：顺序、编辑后顺序、跨组、凭据保留及重新加载。TypeScript/生产构建通过。scripts/sidebar-drag-smoke.ts 在真实 Electron 中通过 HTML drag 事件派发验证排序/跨组/取消/重载与字号；截图 sidebar-drag.png 已审视。
 - Playwright Windows 原生 dragTo 会阻塞，已中止独立测试进程并改为事件派发；不能把此测试冒充完整物理鼠标拖放验收，最终仍需原生交互检查。未发布，用户要求全部余项完成后统一发布仍有效。
 - 后续实际原生鼠标验证发现 HTML 拖放未触发，改成阈值 6 px 的 Pointer Capture 拖动；提示改为不挤动列表的底部浮层，移除原生 HTML 拖放分支。computer-use @oai/sky 已在独立测试窗口真实拖动 C 到 A 前及 C 到生产分组，画面和后台配置均确认成功。随后 Playwright dragTo、取消、重载回归通过；普通点击在超过阈值前不捕获指针，保留双击连接。以上新证据替代前条未验收状态。
+- 补充：首轮 Playwright 跨组重载验证曾失败，原因是大步鼠标移动跨出源行、未及时捕获指针；最终改为按下时由原连接按钮捕获，超过阈值再由行捕获，不改变普通按钮点击目标。现最终重跑 scripts/sidebar-drag-smoke.ts 已通过真实 pointer dragTo 同组/跨组、Escape 取消不改数据、重载、16 px 字号以及双击 B 仍打开原认证入口。上述“阈值前不捕获”描述由本条替代。临时诊断日志已删除。
 
 ### 字体与侧边栏（2026-10-23 用户追加）
 
