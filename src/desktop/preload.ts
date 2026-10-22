@@ -2,6 +2,9 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { Bridge, SessionEvent } from '../shared/contracts';
 const bridge: Bridge = {
   platform: process.platform,
+  networkDiagnostics: () => ipcRenderer.invoke('network:diagnostics'),
+  networkProbe: input => ipcRenderer.invoke('network:probe', input),
+  networkProbeCancel: id => ipcRenderer.invoke('network:probe-cancel', id),
   connectionImportText: text => ipcRenderer.invoke('connections:import-text', text),
   connectionImportFile: delimiter => ipcRenderer.invoke('connections:import-file', delimiter),
   connectionImportPreview: (token, options) => ipcRenderer.invoke('connections:import-preview', token, options),

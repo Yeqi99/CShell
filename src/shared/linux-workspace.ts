@@ -21,6 +21,7 @@ export interface LinuxWorkspaceBridge {
 }
 
 export const linuxWorkspaceMethods = new Set([
+  'network.probe',
   ...codingMethods,
   ...ideMethods,
   'client.status',

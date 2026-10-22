@@ -1,5 +1,6 @@
 import {LinuxWorkspaceService} from '../core/linux-workspace';
 import {registerConnectionImport} from './connection-import';
+import {registerNetworkDiagnostics} from './network-diagnostics';
 import {MachineBrowser} from './machine-browser';
 import {localViewProfiles} from '../shared/monitor-views';
 import { Diagnostics } from '../core/diagnostics';
@@ -559,6 +560,8 @@ else
       );
       registerPresetHandlers(handle, window, app.getPath('userData'), store, text);
       registerConnectionImport(handle, window, store);
+      const stopDiagnostics = registerNetworkDiagnostics(handle, store, ssh, clientProvider, connections.tools);
+      window.once('closed', stopDiagnostics);
       window.once('closed', () => {
         void disposeAi().catch((error) => console.error('AI shutdown failed', error));
       });

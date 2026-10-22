@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Globe, ArrowRight } from 'lucide-react';
 import type { NetworkRoute, NetworkRouteStatus } from '../../shared/network-route';
 import { ErrorNotice } from './ErrorNotice';
+import { NetworkDiagnostics } from './NetworkDiagnostics';
 import './network-settings.css';
 
 export function NetworkSettings() {
@@ -47,5 +48,6 @@ export function NetworkSettings() {
       <p className="network-note">应用后重新建立模型连接。代理不可用时请求会报错，不自动切回直连。系统与机器浏览器的网络设置保持独立。</p>
       <div className="network-actions"><span role="status">{saved ? '已应用，后续请求使用新出口' : ''}</span><button className="primary" type="button" onClick={() => void apply()} disabled={mode === 'proxy' && !url || mode === 'machine' && !machine}>{busy ? '正在应用…' : '应用网络设置'}</button></div>
     </fieldset>}
+    {window.cshell.networkDiagnostics && <NetworkDiagnostics/>}
   </section>;
 }
