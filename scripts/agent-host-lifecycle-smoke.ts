@@ -8,6 +8,7 @@ import { callAgent } from '../src/agent/control';
 // Keep stdin open like the native window does. A runtime shutdown must still
 // release this process; force-killing the fixture is cleanup, never success.
 const staged = resolve(process.argv[2]);
+const early = process.argv.includes('--early');
 await access(join(staged, 'agent.cjs'));
 await access(join(staged, process.platform === 'win32' ? 'node.exe' : 'node'));
 const directory = await mkdtemp(join(tmpdir(), 'cagent-host-exit-'));
@@ -38,13 +39,15 @@ try {
   for (let i = 0; i < 300; i++) {
     try {
       await callAgent('client.status', undefined, directory);
-      if (hostReady) { ready = true; break; }
+      if (hostReady || early) { ready = true; break; }
       await sleep(100);
     }
     catch { if (child.exitCode !== null) break; await sleep(100); }
   }
   if (!ready) console.error(diagnostic.replace(/https?:\/\/\S+/g, '[local URL]'));
   assert.ok(ready, 'isolated app-host must start');
+  if (early) assert.equal(hostReady, false, 'early-shutdown fixture must still be starting its UI');
+  if (!early) {
   // A second native window attaches to the same runtime. Closing its pipe
   // must release only its UI host, not the runtime owned by the first window.
   const second = spawn(join(staged, process.platform === 'win32' ? 'node.exe' : 'node'),
@@ -78,12 +81,13 @@ try {
     if (second.exitCode === null) second.kill();
     await secondExit.catch(() => {});
   }
+  }
   await callAgent('agent.shutdown', { confirm: true }, directory);
   const outcome = await Promise.race([exited.then(code => ({ code })), sleep(5000).then(() => null)]);
   if (!outcome && stages) console.error(stages);
   assert.ok(outcome, 'app-host must exit after shutdown even while its owner keeps stdin open');
   assert.equal(outcome.code, 0);
-  console.log('PASS: app-host exits after authenticated shutdown with open owner stdin');
+  console.log('PASS: app-host exits after authenticated shutdown with open owner stdin; early=' + early);
 } finally {
   child.stdin.end();
   if (child.exitCode === null) child.kill();

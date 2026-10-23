@@ -543,6 +543,9 @@ export async function createAgentRuntime(
     async startControl() {
       if (control) throw new Error('本机控制服务已运行');
       control = await startAgentControl(directory, (m, p, s) => dispatch(m, p, s, true));
+      // Discovery can be observed before filesystem protection completes.
+      // A shutdown accepted in that interval must close this late handle.
+      if (closed) { await control.close(); return; }
       await updater.initialize();
     },
     close,

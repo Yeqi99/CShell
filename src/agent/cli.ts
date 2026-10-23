@@ -72,7 +72,9 @@ async function main() {
   if(command==='app'||command==='app-host'||command==='restart-app-host'){
     let runtime:Awaited<ReturnType<typeof createAgentRuntime>>|undefined;
     let app:Awaited<ReturnType<typeof startCagentApp>>|undefined;
+    let runtimeHasClosed=false;
     const runtimeClosed=async()=>{
+      runtimeHasClosed=true;
       try{await app?.close();}
       finally{
         // Native owners keep this pipe open while the window is hidden. Once
@@ -87,7 +89,7 @@ async function main() {
       runtime=await createAgentRuntime({onClose:()=>{void runtimeClosed().catch(error=>stderr.write('CAgent 界面关闭失败：'+String(error)+'\n'));}});
       await runtime.startControl();
     }
-    try{app=await startCagentApp();if(command!=='app'){stdout.write(JSON.stringify({url:app.url})+'\n');stdin.resume();stdin.on('end',()=>{void app?.close();});}else await openCagentApp(app.url);}catch(error){await app?.close();await runtime?.close();throw error;}
+    try{if(runtimeHasClosed)return;app=await startCagentApp();if(runtimeHasClosed){await app.close();return;}if(command!=='app'){stdout.write(JSON.stringify({url:app.url})+'\n');stdin.resume();stdin.on('end',()=>{void app?.close();});}else await openCagentApp(app.url);}catch(error){await app?.close();await runtime?.close();throw error;}
     stderr.write('CAgent 本机界面已就绪；使用 cagent shutdown 退出运行时。\n');
     const stop=()=>{void app?.close().then(()=>runtime?.close());};
     process.once('SIGINT',stop);process.once('SIGTERM',stop);
