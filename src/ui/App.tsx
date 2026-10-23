@@ -1,5 +1,4 @@
 import {RdpMachineWorkspace} from './components/RdpMachineWorkspace';
-import {FilePanel} from './components/FilePanel';
 import {LinuxWorkspace} from './components/LinuxWorkspace';
 import {SavedAgentConnection} from './components/SavedAgentConnection';
 import { MonitorViews } from './components/MonitorViews';
