@@ -72,25 +72,25 @@ try {
   await c.screenshot({ path: 'test-results/client-narrow.png' });
   await client.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(560, 580));
   await w.getByRole('button', { name: '新建连接', exact: true }).first().click();
-  await w.getByRole('button', { name: 'CShell Agent', exact: true }).click();
+  await w.getByRole('button', { name: 'CAgent', exact: true }).click();
   await w.locator('.connection-metadata summary').click();
   const clientForm = w.locator('.protocol-form .client-connect-form');
   await clientForm.getByLabel('名称', { exact: true }).fill('Client 本机测试');
   await clientForm.getByLabel('分组', { exact: true }).fill('测试分组');
   await clientForm.getByLabel('收藏', { exact: true }).check();
-  await clientForm.getByRole('button', { name: '粘贴连接信息' }).click();
+  await clientForm.getByRole('button', { name: '从文本填写' }).click();
+  await clientForm.getByRole('button', { name: '导入 CAgent 配对信息' }).click();
   await clientForm.getByLabel('连接密码', { exact: true }).fill(password);
   await clientForm.getByLabel('我已核对设备身份').check();
   await w.getByRole('button', { name: '返回连接方式' }).click();
   await w.getByRole('button', { name: 'SSH 终端', exact: true }).click();
   await w.getByRole('button', { name: '返回连接方式' }).click();
-  await w.getByRole('button', { name: 'CShell Agent', exact: true }).click();
+  await w.getByRole('button', { name: 'CAgent', exact: true }).click();
   assert.equal(await clientForm.getByLabel('连接密码', { exact: true }).inputValue(), password);
   await w.screenshot({ path: 'test-results/client-new-connection.png' });
-  await clientForm.getByRole('button', { name: '验证并读取终端', exact: true }).click();
-  await clientForm.getByLabel('终端', { exact: true }).selectOption('cmd|');
-  await clientForm.getByRole('button', { name: '连接', exact: true }).click();
-  await w.locator('.session-tab').waitFor();
+  await clientForm.getByRole('button', { name: '验证并连接机器', exact: true }).click();
+  await w.locator('.linux-desktop:visible .desktop-icons').getByRole('button',{name:'终端',exact:true}).dblclick();
+  await w.locator('.machine-terminal-bar').getByRole('button',{name:/cmd/i}).click();
   // Use the visible xterm input; do not inject through a shell helper.
   const input = w.locator('.xterm-helper-textarea').first();
   await input.focus();
@@ -110,11 +110,11 @@ try {
   const editor = w.locator('.client-profile-editor');
   await editor.getByLabel('名称', { exact: true }).fill('Client 已重命名');
   await editor.getByLabel('分组', { exact: true }).fill('办公电脑');
-  await editor.getByLabel('默认终端', { exact: true }).selectOption('powershell|');
   await editor.getByRole('button', { name: '保存', exact: true }).click();
   await editor.getByText('已保存', { exact: true }).waitFor();
   await w.locator('.server-open').filter({ hasText: 'Client 已重命名' }).first().dblclick();
-  await w.waitForFunction(() => document.querySelectorAll('.session-tab').length === 2);
+  await w.locator('.machine-terminal-bar').getByRole('button',{name:/powershell/i}).click();
+  await w.waitForFunction(() => document.querySelectorAll('.machine-terminal-tabs > div').length === 2);
   const ps = w.locator('.terminal-pane.active .xterm-helper-textarea');
   await ps.focus();
   await ps.fill('Write-Output CSHELL_CLIENT_POWERSHELL');
@@ -148,7 +148,7 @@ try {
   assert.ok(!encrypted.includes('PRIVATE KEY'));
   await c.getByRole('button', { name: /已授权控制端/ }).click();
   await c.getByRole('button', { name: '撤销授权并断开' }).click();
-  await w.waitForFunction(() => document.querySelectorAll('.session-tab .dot.off').length === 2);
+  await w.locator('.machine-terminal').getByText('此终端已断开，可在上方重新打开终端。',{exact:true}).waitFor();
   await c.getByRole('button', { name: '停止服务', exact: true }).click();
   await c.locator('.client-service-card').getByText('服务已停止', { exact: true }).waitFor();
   console.log(
@@ -158,6 +158,7 @@ try {
   console.error('Client smoke failed:', error);
   for (const application of [client, control]) {
     for (const page of application.windows()) {
+      console.error('UI',await page.locator('body').innerText().catch(()=>''));
       console.error(
         await page
           .locator('[role="alert"]')

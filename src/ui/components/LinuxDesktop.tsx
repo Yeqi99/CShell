@@ -218,6 +218,15 @@ export function LinuxDesktop({
           ],
     );
   };
+  // An existing SSH session needs its terminal buffer even before the user
+  // opens the terminal app (floating views and history snapshots depend on it).
+  useEffect(() => {
+    if (!terminal) return;
+    setWindows(items => items.some(w => w.id === 'terminal') ? items : [...items, {
+      id: 'terminal', minimized: false, closed: true, maximized: false,
+      ...initialWindowBounds('terminal', size), z: 0,
+    }]);
+  }, [!!terminal]);
   useEffect(()=>{if(initialApp)open(initialApp);},[initialApp]);
   const patch = (id: string, change: Partial<WindowState>) =>
     setWindows((v) => v.map((w) => (w.id === id ? { ...w, ...change } : w)));
@@ -481,7 +490,7 @@ export function LinuxDesktop({
                 )}
                 {w.id === 'terminal' &&
                   (terminal ? (
-                    terminal(active && visible && front === w.id && !closed, look.theme)
+                    terminal(active && visible && front === w.id, look.theme)
                   ) : (
                     <button onClick={onTerminal}>打开 SSH 终端</button>
                   ))}

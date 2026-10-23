@@ -133,6 +133,7 @@ try {
   await form.getByRole('button', { name: '连接', exact: true }).click();
   await page.locator('.session-tab').waitFor();
   const firstId = await page.locator('.session-tab').getAttribute('data-session');
+  await page.locator('.linux-desktop:visible .desktop-icons').getByRole('button',{name:'终端',exact:true}).dblclick();
   const terminal = page.locator('.terminal-host:visible');
   await terminal.locator('textarea').focus();
   await page.keyboard.type('history-marker');
@@ -146,13 +147,10 @@ try {
   assert.equal(await page.locator('.disconnected-session-bar:visible').count(), 0);
   assert.equal(await page.locator('.toast').count(), 0);
   await page.locator('.session-tab').getByRole('button').first().click();
-  await page
-    .locator('.disconnected-session-bar')
-    .getByText('重新连接会新建会话，不会重发命令。')
-    .waitFor();
+  await page.getByRole('button',{name:'连接已断开，重试',exact:true}).waitFor();
   assert.equal(await page.locator('.monitor-panel:visible').count(), 0);
   await page.screenshot({ path: 'test-results/connection-disconnected-light.png' });
-  await page.getByRole('button', { name: '重新连接', exact: true }).click();
+  await page.getByRole('button', { name: '连接已断开，重试', exact: true }).click();
   await auth.getByLabel('密码', { exact: true }).fill(server.password);
   assert.equal(await page.locator('.connection-editor:visible').count(), 0);
   assert.equal(await auth.getByRole('checkbox').count(), 0);
@@ -162,6 +160,7 @@ try {
   const config = await page.evaluate(() => window.cshell.config());
   assert.equal(config.profiles.length, 1);
   assert.equal(config.savedCredentials.length, 0);
+  await page.locator(`.session-tab[data-session="${firstId}"]`).getByRole('button').first().focus();
   await page.locator(`.session-tab[data-session="${firstId}"]`).getByRole('button').first().click();
   stage('old scrollback search and theme');
   // Search retained scrollback through xterm's actual search UI.
