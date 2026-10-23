@@ -69,3 +69,11 @@ GitHub pro-v0.8.4（421868074，14 附件含校验清单）与 v0.8.4（42187227
 公网 HTTPS 从香港验证：两渠道首项均 v0.8.4，30/30 附件 HEAD 200 且 Content-Length 匹配。电脑本地直连 Cloudflare 一次连接超时；不能将服务器侧通过当成用户电脑网络已恢复。本机应用仍待安装及打开版本核验，不能声称已经升级；Android 保留系统安装确认，Mac/Linux 未实体设备验收且 macOS 未公证。
 
 长期目标仍活跃。下一步完成本机升级、官网线上体验和临时 QA 清理；随后从真实复现的问题中选至少三项有价值的改进推进下一小版本，不重复发布 0.8.4。
+
+## 本机安装完成（2026-10-23）
+
+升级前通过实际窗口确认 OSS 与 Pro 均无活跃连接，正常关闭后安装已核验的发行包。OSS 与 Pro NSIS 均退出 0，D:/Program Files/CShell/CShell.exe 和 D:/Program Files/CShell Pro/CShell Pro.exe 的 ProductVersion 均 0.8.4.0，并已重新打开。Pro 实际窗口保留 yeqi76 登录及 6 条连接，出现明确的开源配置载入提示，未执行重复导入。
+
+CAgent 安装器退出 0，原 launcher 更新到 versions/0.8.4-5a11cfee63f8e1d0/Cagent.exe；build-info.json version=0.8.4，原生窗口与该目录 node.exe 均实际运行。未修改身份、数据或权限。其 EXE ProductVersion 仍为 0.0.0.0，已列为下一版需修复的版本元数据问题，不能拿该字段冒充已通过。
+
+内核 docs/RELEASE-0.8.5-WORK.md 记录候选问题；下一版未发布。0.8.4 已完成本机安装，但长期目标仍需后续实际故障审查及官网线上体验复核。
