@@ -4,7 +4,7 @@
 
 ## 编辑与验证
 
-- `scripts/build-portal.mjs`：首页及 18 篇使用/开发文档的内容源，生成 `index.html` 和 `docs/*.html`。
+- `index.html`、`downloads.html` 和 `docs/*.html` 为内容源，直接编辑。`scripts/build-portal.mjs` 校验页面及内部链接，不再用旧版文案覆盖页面。
 - `theme.css`：官网与文档共用设计；`site.js`：设备选择、键盘导航与文档标题筛选。
 - 运行 `node scripts/build-portal.mjs`，再运行 `node scripts/portal-smoke.cjs`。验证使用 Playwright 和本机 Edge，临时 HTTP 服务自动关闭。
 - 下载地址在生成器和 `site.js` 中维护。新增附件先核对版本、架构、摘要及真实 URL，再更新页面；不能用开源安装包冒充 Pro。
