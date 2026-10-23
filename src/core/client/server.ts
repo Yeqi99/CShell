@@ -458,7 +458,7 @@ export class ClientServer {
               c.peer!.shells.includes(clientShellSchema.parse(s.shell)),
             )
           : c.peer.shells.map((shell) => ({ shell, label: shell }));
-      const permission = call.method.startsWith('browser.') ? 'allowHttp' : call.method.startsWith('hosting.')
+      const permission = call.method.startsWith('browser.') || call.method === 'network.probe' ? 'allowHttp' : call.method.startsWith('hosting.')
         ? 'allowHosting'
         : call.method.startsWith('relay.')
           ? 'allowRelay'

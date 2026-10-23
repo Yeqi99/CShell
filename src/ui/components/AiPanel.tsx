@@ -1,5 +1,6 @@
 import { ErrorNotice } from './ErrorNotice';
 import {isOfficialModel} from '../../shared/official-models';
+import { conversationHistory, conversationStatus } from '../ai-history';
 import { usePermissionNavigation } from '../permission-navigation';
 import {AiExtensionModelSelect} from './AiExtensionModelSelect';
 import { AiPermissionTree } from './AiPermissionTree';
@@ -33,7 +34,6 @@ import {PanelsTopLeft} from 'lucide-react';
 import './ai-panel.css';
 import type { Profile } from '../../shared/contracts';
 import type { AnalysisRequest } from '../text-assist';
-const locations = { workspace: '工作台', terminal: '终端', files: '文件', python: 'Python' };
 export function AiPanel({
   visible,
   sessionId,
@@ -160,6 +160,8 @@ export function AiPanel({
     setProviderId(snapshot.providers[0]?.id ?? '');
   }, [location, snapshot.providers.map((p) => p.id).join(',')]);
   const thread = snapshot.threads.find((t) => t.id === threadId);
+  const backgroundCount = snapshot.threads.filter(t => t.id !== threadId &&
+    (t.state === 'running' || t.state === 'approval')).length;
   const [insertion, setInsertion] = useState<{ id: string; text: string; threadId: string } | null>(
     null,
   );
@@ -282,6 +284,9 @@ export function AiPanel({
         <ErrorNotice title="智能体操作未完成" error={error} />
       )}
       <div className="agent-chat-page" hidden={page !== 'chat'}>
+        {backgroundCount > 0 && <button className="agent-background-tasks" onClick={() => setPage('history')}>
+          <History size={14} /><span>{backgroundCount} 个会话在后台进行</span><span>查看</span>
+        </button>}
         <AiConversation
           executionVisible={executionVisible}
           openThread={(id) => {
@@ -356,8 +361,7 @@ export function AiPanel({
           {!snapshot.threads.length && (
             <p className="ai-section-note">开始对话后，记录会保存在这里。</p>
           )}
-          {snapshot.threads
-            .filter((t) => t.title.toLowerCase().includes(historySearch.toLowerCase()))
+          {conversationHistory(snapshot.threads, historySearch)
             .map((t) => (
               <div className="agent-history-row" key={t.id}>
                 <button
@@ -369,12 +373,8 @@ export function AiPanel({
                 >
                   <strong>{t.title}</strong>
                   <small>
-                    {locations[t.location]} · {t.target ?? '仅对话'}
-                    {t.state === 'running'
-                      ? ' · 正在执行'
-                      : t.state === 'approval'
-                        ? ' · 等待审核'
-                        : ''}
+                    {t.target ?? 'CShell'}
+                    {' · ' + conversationStatus(t)}
                   </small>
                 </button>
                 <button

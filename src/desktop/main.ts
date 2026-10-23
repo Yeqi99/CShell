@@ -1,4 +1,6 @@
 import {LinuxWorkspaceService} from '../core/linux-workspace';
+import {registerConnectionImport} from './connection-import';
+import {registerNetworkDiagnostics} from './network-diagnostics';
 import {MachineBrowser} from './machine-browser';
 import {localViewProfiles} from '../shared/monitor-views';
 import { Diagnostics } from '../core/diagnostics';
@@ -577,6 +579,9 @@ else
         }:undefined),
       );
       registerPresetHandlers(handle, window, app.getPath('userData'), store, text);
+      registerConnectionImport(handle, window, store);
+      const stopDiagnostics = registerNetworkDiagnostics(handle, store, ssh, clientProvider, connections.tools);
+      window.once('closed', stopDiagnostics);
       window.once('closed', () => {
         void disposeAi().catch((error) => console.error('AI shutdown failed', error));
       });
@@ -815,6 +820,7 @@ else
         await store.deleteProfile(id);
       });
       handle('group:manage', (action) => store.manageGroup(groupActionSchema.parse(action)));
+      handle('profile:move', raw => { const input = z.object({ id: z.string().uuid(), group: z.string().max(80), before: z.string().uuid().optional() }).strict().parse(raw); return store.moveProfile(input.id, input.group, input.before); });
       handle('preferences', async (value) => {
         const preferences = preferencesSchema.parse(value);
         await store.preferences(preferences);

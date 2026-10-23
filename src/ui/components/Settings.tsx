@@ -1,5 +1,7 @@
 import { LocalEnvironmentSettings } from './LocalEnvironmentSettings';
 import { CloudSettings } from './CloudSettings';
+import { NetworkSettings } from './NetworkSettings';
+import { Globe } from 'lucide-react';
 import { Palette, Terminal, PanelsTopLeft, Blocks, ShieldCheck, Download } from 'lucide-react';
 import { UpdateSettings } from './UpdateSettings';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -33,6 +35,7 @@ export function Settings({
       ? [['local', Terminal, cn ? '本机终端' : 'Local terminal'] as const]
       : []),
     ['workspace', PanelsTopLeft, cn ? '工作区' : 'Workspace'],
+    ...(window.cshell.networkStatus ? [['network', Globe, cn ? '网络与代理' : 'Network & proxy'] as const] : []),
     ['extensions', Blocks, cn ? '扩展' : 'Extensions'],
     ['security', ShieldCheck, cn ? 'AI 与安全' : 'AI & security'],
     ['updates', Download, cn ? '关于与更新' : 'About & updates'],
@@ -119,6 +122,7 @@ export function Settings({
           <UpdateSettings english={!cn} />
         </div>
         <div hidden={category !== 'cloud'}><CloudSettings /></div>
+        {window.cshell.networkStatus && <div hidden={category !== 'network'}><NetworkSettings/></div>}
         <div hidden={category !== 'workspace'}>
           <PresetControls draft={draft} onSelect={setDraft} onError={setError} />
         </div>
@@ -169,6 +173,13 @@ export function Settings({
               </label>
             </div>
             <h2>{t('fonts')}</h2>
+            <div hidden={category !== 'appearance'}>
+              <div className="form-grid">
+                {([['uiFontSize', cn ? '界面字号' : 'Interface size', 12, 20], ['sidebarFontSize', cn ? '连接名称字号' : 'Connection name size', 12, 22], ['sidebarGroupSize', cn ? '分组标题字号' : 'Group title size', 12, 22], ['sidebarDetailSize', cn ? '地址与说明字号' : 'Address size', 11, 20]] as const).map(([key, label, min, max]) => <label key={key}>{label}<input type="number" min={min} max={max} value={draft[key]} onChange={e => setDraft(previous => ({ ...previous, [key]: Math.max(min, Math.min(max, Number(e.target.value) || min)) }))}/></label>)}
+                <label>{cn ? '侧边栏间距' : 'Sidebar spacing'}<select aria-label={cn ? '侧边栏间距' : 'Sidebar spacing'} value={draft.sidebarDensity} onChange={e => setDraft(previous => ({ ...previous, sidebarDensity: e.target.value as Preferences['sidebarDensity'] }))}><option value="compact">{cn ? '紧凑' : 'Compact'}</option><option value="comfortable">{cn ? '舒适' : 'Comfortable'}</option><option value="spacious">{cn ? '宽松' : 'Spacious'}</option></select></label>
+              </div>
+              <button type="button" onClick={() => setDraft(previous => ({ ...previous, uiFont: defaults.uiFont, uiFontAsset: null, uiFontSize: defaults.uiFontSize, sidebarFontSize: defaults.sidebarFontSize, sidebarGroupSize: defaults.sidebarGroupSize, sidebarDetailSize: defaults.sidebarDetailSize, sidebarDensity: defaults.sidebarDensity }))}>{cn ? '恢复界面字体与间距' : 'Reset interface typography'}</button>
+            </div>
             <p className="muted">
               {fontState === 'loading'
                 ? t('detectingFonts')
@@ -204,6 +215,8 @@ export function Settings({
               </div>
             </div>
             <div className="font-size-row" hidden={category !== 'terminal'}>
+              <label><input type="checkbox" checked={draft.terminalClipboardKeys} onChange={event => setDraft({ ...draft, terminalClipboardKeys: event.target.checked })}/>{cn ? 'Ctrl+C / Ctrl+V 复制粘贴（原生按键在快捷键栏）' : 'Ctrl+C / Ctrl+V copy and paste (native keys in toolbar)'}</label>
+              <label><input type="checkbox" checked={draft.terminalSemanticColors} onChange={event => setDraft({ ...draft, terminalSemanticColors: event.target.checked })}/>{cn ? '提示符与链接辅助配色' : 'Highlight prompts and links'}</label>
               <label>
                 {t('terminalLineHeight')}
                 <input
@@ -370,7 +383,7 @@ export function Settings({
           {t('cancel')}
         </button>
         <button
-          hidden={category === 'local' || category === 'cloud'}
+          hidden={category === 'local' || category === 'cloud' || category === 'network'}
           className="primary"
           form="workspace-preferences-form"
           disabled={busy || mcp.busy || (category === 'security' && !mcp.draft)}
@@ -381,3 +394,4 @@ export function Settings({
     </section>
   );
 }
+

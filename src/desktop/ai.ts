@@ -1,4 +1,6 @@
 import {TavilyExtension} from '../extensions/tavily/service';
+import {ApplicationNetworkRoute} from './network-route';
+import { AiDrafts } from '../core/ai-drafts';
 import { AiService, type AiConnectionHost } from '../core/ai';
 import {OpenCodeExtension} from '../extensions/opencode/service';
 import {pluginEnabled} from '../shared/plugins';
@@ -27,6 +29,17 @@ export async function registerAiHandlers(
   setupCloud?: (ai: AiService, openCode: OpenCodeExtension) => Promise<void>,
 ) {
   const ai = new AiService(directory, store, connections, connectHost, { http, wechat });
+  const drafts = new AiDrafts(directory, store);
+  // A damaged draft file must not prevent opening existing conversations.
+  let draftLoadError = false;
+  try { await drafts.load(); } catch { draftLoadError = true; }
+  handle('ai:drafts', () => { if (draftLoadError) throw new Error('草稿读取失败'); return drafts.snapshot(); });
+  handle('ai:draft-save', (id, text) => { if (draftLoadError) throw new Error('草稿读取失败，原文件已保留'); return drafts.save(id, text); });
+  const network = new ApplicationNetworkRoute(directory, store);
+  await network.load();
+  ai.requestTransport = network.fetch;
+  handle('network:status', () => network.status());
+  handle('network:save', input => network.save(input));
   const pending = new Map<string, AiThread>();
   let timer: ReturnType<typeof setTimeout> | undefined;
   ai.onThreadUpdate = (thread) => {
@@ -119,7 +132,7 @@ export async function registerAiHandlers(
   handle('ai:create', (location, provider, mode, session, model) =>
     ai.create(location, provider, mode, session, model),
   );
-  handle('ai:delete', (id) => ai.remove(id));
+  handle('ai:delete', async (id) => { await ai.remove(id); if (!draftLoadError) await drafts.save(id, ''); });
   handle('ai:send', (id, text) => ai.send(id, text));
   handle('ai:approve', (id, request, allow) => ai.approve(id, request, allow));
   handle('ai:stop', (id) => ai.stopAndSave(id));
@@ -133,7 +146,7 @@ export async function registerAiHandlers(
     ai.dispose();
     clearTimeout(timer);
     pending.clear();
-    disposal = Promise.all([events.close(),ai.flush(),remoteClose]).then(()=>{});
+    disposal = Promise.all([events.close(),ai.flush(),remoteClose,network.close(),drafts.snapshot()]).then(()=>{});
     return disposal;
   };
 }

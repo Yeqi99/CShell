@@ -1,0 +1,55 @@
+import { _electron as electron } from 'playwright';
+import { mkdtemp, mkdir, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import assert from 'node:assert/strict';
+async function main() {
+  const directory = await mkdtemp(join(tmpdir(), 'cshell-drag-test-'));
+  const env = { ...process.env, CSHELL_TEST_DATA: directory }; delete env.ELECTRON_RUN_AS_NODE;
+  const app = await electron.launch({ args: ['.'], env });
+  try {
+    console.log('launched'); const page = await app.firstWindow(); page.setDefaultTimeout(15000);
+    await page.getByTitle('偏好设置', { exact: true }).waitFor();
+    console.log('window ready'); await page.evaluate(async () => {
+      for (const name of ['A', 'B', 'C']) await window.cshell.saveProfile({ id: crypto.randomUUID(), name, host: name + '.example', port: 22, username: 'root', auth: 'password', group: '开发', favorite: false });
+      await window.cshell.manageGroup({ type: 'create', name: '生产' });
+    });
+    console.log('before reload'); await page.reload({timeout:10000, waitUntil:'domcontentloaded'}); console.log('reloaded');
+    const row = (name: string) => page.locator('[data-group="开发"] .server-item').filter({ has: page.getByText(name, { exact: true }) });
+    if (process.env.CSHELL_NATIVE_DRAG_TEST) {
+      await page.evaluate(() => { document.title = 'CShell — Native drag fixture'; });
+      await page.evaluate(() => { (window as any).dragEvents=[]; for(const type of ['pointerdown','pointerup','dragstart','dragover','drop','dragend'])document.addEventListener(type,event=>{(window as any).dragEvents.push([type,(event.target as HTMLElement).className]);},true); });
+      console.log('NATIVE_READY');
+      await new Promise<void>(resolve => process.stdin.once('data', () => resolve()));
+      console.log('NATIVE_RESULT', await page.evaluate(async () => (await window.cshell.config()).profiles.map(p => ({ name:p.name, group:p.group }))));
+      console.log('NATIVE_EVENTS', await page.evaluate(() => (window as any).dragEvents));
+      return;
+    }
+    await row('C').dragTo(row('A'));
+    await page.locator('.sidebar[aria-busy="false"]').waitFor();
+    await page.waitForFunction(async () => (await window.cshell.config()).profiles[0].name === 'C', undefined, {timeout:10000});
+    await page.locator('[data-group="开发"] .server-open strong').first().filter({hasText:'C'}).waitFor();
+    await row('A').dragTo(page.locator('[data-group="生产"] .group-title'));
+    await page.locator('.sidebar[aria-busy="false"]').waitFor();
+    await page.waitForFunction(async () => (await window.cshell.config()).profiles.find(p => p.name === 'A')?.group === '生产', undefined, {timeout:10000});
+    await page.locator('[data-group="生产"] .server-item').waitFor();
+    const before = await page.evaluate(async () => JSON.stringify((await window.cshell.config()).profiles));
+    await row('B').hover(); await page.mouse.down(); await page.mouse.move(400,30,{steps:12}); await page.keyboard.press('Escape'); await page.mouse.up();
+    assert.equal(await page.evaluate(async () => JSON.stringify((await window.cshell.config()).profiles)), before);
+    console.log('before reload'); await page.reload({timeout:10000, waitUntil:'domcontentloaded'}); console.log('reloaded');
+    await page.getByTitle('偏好设置', { exact: true }).waitFor();
+    console.log('Reload state', await page.evaluate(async () => ({ profiles:(await window.cshell.config()).profiles.map(p=>[p.name,p.group]), text:document.querySelector('.sidebar')?.textContent })));
+    await page.locator('[data-group="生产"] .server-item').waitFor();
+    assert.equal(await page.locator('[data-group="开发"] .group-name').evaluate(e => getComputedStyle(e).fontSize), '16px');
+    await mkdir('test-results', { recursive: true }); await page.screenshot({ path: 'test-results/sidebar-drag.png' });
+    await row('B').locator('.server-open').dblclick();
+    await page.locator('.saved-connection').getByRole('heading', {name:'B',exact:true}).waitFor();
+    console.log('PASS: reorder, cross-group drop, cancelled drag unchanged, persisted reload and 16px group title');
+  } finally {
+    await app.evaluate(({ app }) => app.exit(0)).catch(() => {}); await app.close().catch(() => {});
+    await rm(directory, { recursive: true, force: true });
+  }
+}
+main().catch(error => { console.error(error); process.exitCode = 1; });
+
+

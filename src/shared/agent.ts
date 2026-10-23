@@ -3,6 +3,7 @@ import {codingMethods} from './coding';
 import { z } from 'zod';
 export const agentMethods = [
   'network.status','network.configure',
+  'network.probe',
   ...codingMethods,
   ...ideMethods,
   'browser.status','browser.open','browser.read','browser.write','browser.close',
@@ -103,7 +104,7 @@ export interface AgentBridge {
   clientShells(deviceId: string): Promise<AgentShellOption[]>;
 }
 export const agentCapability = (method: string) =>
-  method.startsWith('browser.') ? 'http.send' : method.startsWith('hosting.')
+  method.startsWith('browser.') || method === 'network.probe' ? 'http.send' : method.startsWith('hosting.')
     ? 'agent.hosting'
     : method.startsWith('relay.')
       ? 'agent.relay'

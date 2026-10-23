@@ -181,6 +181,7 @@ export async function createAgentRuntime(
   };
   let control: Awaited<ReturnType<typeof startAgentControl>> | undefined;
   let closed = false;
+  let networkProbes = 0;
   let mutation = Promise.resolve<unknown>(undefined);
   const serialized = (action: () => Promise<unknown>) => {
     const current = mutation.then(action);
@@ -201,6 +202,12 @@ export async function createAgentRuntime(
     const admin=local || (owner!=='local' && server.managementAllowed(owner));
     if(method==='network.status')return accountNetwork.status();
     if(method==='network.configure')return accountNetwork.configure(params);
+    if (method === 'network.probe') {
+      if (!local && (owner === 'local' || !server.browserAllowed(owner))) throw new Error('未授权网络访问');
+      if (networkProbes >= 2) throw new Error('已有网络检测正在进行，请稍后再试');
+      networkProbes++;
+      try { return await probeNetwork(params, signal); } finally { networkProbes--; }
+    }
     if(method.startsWith('browser.')){if(!local&&owner==='local')throw Error('未授权');return browserNetwork.call(method,params,owner);}
     if(method.startsWith('ide.')){if(!admin)throw Error('未授权');return ide.call(method,params,owner);}
     if(method.startsWith('coding.')){if(!admin)throw Error('未授权');return ['coding.permission','coding.start','coding.configure','coding.profile.save','coding.profile.remove','coding.install'].includes(method)?serialized(()=>coding.call(method,params,owner)):coding.call(method,params,owner);}
@@ -548,3 +555,4 @@ export async function createAgentRuntime(
     directory,
   };
 }
+import { probeNetwork } from '../core/network-probe';

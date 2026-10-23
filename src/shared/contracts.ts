@@ -207,9 +207,16 @@ export const preferencesSchema = z
     locale: z.enum(['zh-CN', 'en-US']),
     theme: z.enum(['dark', 'light']),
     uiFont: z.string().max(200),
+    uiFontSize: z.number().min(12).max(20).default(15),
+    sidebarFontSize: z.number().min(12).max(22).default(15),
+    sidebarGroupSize: z.number().min(12).max(22).default(16),
+    sidebarDetailSize: z.number().min(11).max(20).default(13),
+    sidebarDensity: z.enum(['compact', 'comfortable', 'spacious']).default('comfortable'),
     terminalFont: z.string().max(200),
     fontSize: z.number().min(10).max(28),
     lineHeight: z.number().min(1).max(1.8).default(1.2),
+    terminalClipboardKeys: z.boolean().default(true),
+    terminalSemanticColors: z.boolean().default(true),
     uiFontAsset: appearanceAssetSchema.nullable().default(null),
     terminalFontAsset: appearanceAssetSchema.nullable().default(null),
     backgroundAsset: appearanceAssetSchema.nullable().default(null),
@@ -231,10 +238,17 @@ export const defaults: Preferences = {
   },
   locale: 'zh-CN',
   theme: 'light',
-  uiFont: 'Segoe UI, Microsoft YaHei UI, sans-serif',
+  uiFont: '"Segoe UI Variable", "Segoe UI", "Microsoft YaHei UI", "PingFang SC", "Noto Sans CJK SC", sans-serif',
+  uiFontSize: 15,
+  sidebarFontSize: 15,
+  sidebarGroupSize: 16,
+  sidebarDetailSize: 13,
+  sidebarDensity: 'comfortable',
   terminalFont: 'Cascadia Code, Consolas, Microsoft YaHei UI, monospace',
   fontSize: 14,
   lineHeight: 1.2,
+  terminalClipboardKeys: true,
+  terminalSemanticColors: true,
   uiFontAsset: null,
   terminalFontAsset: null,
   backgroundAsset: null,
@@ -337,6 +351,16 @@ export interface Bridge
     MonitorViewsBridge,
     ActivityBridge {
   readonly platform: string;
+  networkDiagnostics?(): Promise<import('./network-probe').NetworkDiagnostics>;
+  networkProbe?(input: { id: string; source: string; target: string }): Promise<import('./network-probe').NetworkProbeResult>;
+  networkProbeCancel?(id: string): Promise<void>;
+  connectionImportText?(text: string): Promise<import('../core/connection-import').ConnectionImportPreview>;
+  connectionImportFile?(delimiter: ',' | ';' | '\t'): Promise<import('../core/connection-import').ConnectionImportPreview | null>;
+  connectionImportPreview?(token: string, options: { mapping?: Partial<Record<import('./connection-batch').ImportColumn, number>>; username?: string }): Promise<import('../core/connection-import').ConnectionImportPreview>;
+  connectionImportApply?(token: string, rows: number[], policy: 'skip' | 'keep'): Promise<{ imported: string[]; skipped: number }>;
+  connectionImportDiscard?(token: string): Promise<void>;
+  networkStatus?(): Promise<import('./network-route').NetworkRouteStatus>;
+  networkSave?(route: import('./network-route').NetworkRoute): Promise<import('./network-route').NetworkRouteStatus>;
   reportError(error: { message: string; stack?: string }): void;
   openDiagnostics(): Promise<void>;
   setAlwaysOnTop(enabled: boolean): Promise<boolean>;
@@ -361,6 +385,9 @@ export interface Bridge
   importAppearance(kind: 'font' | 'background', token?: string): Promise<AppearanceAsset | null>;
   appearanceData(id: string): Promise<string>;
   saveProfile(profile: Profile): Promise<void>;
+  moveProfile?(id: string, group: string, before?: string): Promise<void>;
+  aiDrafts?(): Promise<Record<string, string>>;
+  aiDraftSave?(id: string, text: string): Promise<void>;
   deleteProfile(id: string): Promise<void>;
   manageGroup(action: GroupAction): Promise<void>;
   preferences(value: Preferences): Promise<void>;
@@ -412,3 +439,4 @@ declare global {
     cshell: Bridge;
   }
 }
+

@@ -2,6 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { permissionHref,parsePermissionHref,permissionNodes } from '../src/shared/permission-links';
 import { permissionLinkTool } from '../src/core/permission-link-tool';
+import {z} from 'zod';
+
+test('model receives exact permission IDs and hallucinated CPU/disk nodes are rejected',()=>{
+ const schema=z.toJSONSchema(permissionLinkTool.input) as any;
+ assert.deepEqual(schema.properties.node.enum,permissionNodes.map(n=>n.id));
+ for(const node of ['server.cpu.view','server.disk.view'])assert.equal(permissionLinkTool.input.safeParse({node}).success,false);
+ assert.equal(permissionLinkTool.input.safeParse({node:'capability/metrics.read'}).success,true);
+});
 test('permission links allow only known navigation nodes, never arbitrary URLs or operations',async()=>{
  assert.equal(parsePermissionHref(permissionHref('wechat/sendFiles'))?.label,'微信：发送文件');
  assert.equal(parsePermissionHref(permissionHref('wechat/send'))?.label,'微信：发送范围');
