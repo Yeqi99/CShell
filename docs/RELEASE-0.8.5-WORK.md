@@ -14,3 +14,9 @@
 - scripts/windows-shortcut-smoke.ps1 在隔离临时目录执行生产快捷方式逻辑，真实 .lnk 验证自有快捷方式刷新、已删除不重建、其他安装逐字节不变。静默参数保留 NoLaunch/NoShortcuts，并显式增加 RefreshExistingShortcuts；原 NoShortcuts 调用语义不变。
 - scripts/ai-exit-smoke.ts 在真实 Electron 与延迟模型服务下验证无机器连接时运行 AI 的退出提示，取消后窗口/任务继续，确认后停止并退出。运行/待授权 turns 与正在收尾的任务由后端状态判定；不扩大权限。桌面 TypeScript 与 main 构建通过，tests/ai.test.ts 回归通过。
 - 以上三项尚未打包发布；需合并 Pro 验证及完整版本收口，不能替换 0.8.4 附件。
+
+## 两版合并与持续回归
+
+内核 d42375d 的三项修复已合并 Pro，Pro TypeScript/main 构建及 ai-exit-smoke 实测通过；dfbdfc4 将退出与快捷方式真实回归加入 Windows CI 和发行工作流。Pro 合并提交 8483015、内核 dfbdfc4 已推送。未修改 0.8.4 既有标签或附件，正式版本仍 0.8.4。
+
+完整回归正在运行：内核 exec session 94423、Pro exec session 58863，日志各工作树 test-results/085-full-regression.log。已确认进程句柄存活；继续时先轮询这些句柄，不能因为暂时无输出就重复启动。当前已完成部分真实 WSL/原生终端及浏览器测试，但整套尚未结束，不能声称全部通过。
