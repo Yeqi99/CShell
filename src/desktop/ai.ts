@@ -36,7 +36,7 @@ export async function registerAiHandlers(
   handle('ai:draft-save', (id, text) => { if (draftLoadError) throw new Error('草稿读取失败，原文件已保留'); return drafts.save(id, text); });
   const network = new ApplicationNetworkRoute(directory, store);
   await network.load();
-  ai.requestTransport = network.fetch;
+  ai.requestTransport = process.versions.electron ? network.fetch : undefined;
   handle('network:status', () => network.status());
   handle('network:save', input => network.save(input));
   const pending = new Map<string, AiThread>();

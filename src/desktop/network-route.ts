@@ -1,4 +1,4 @@
-import { session, type Session } from 'electron';
+import type { Session } from 'electron';
 import { randomUUID } from 'node:crypto';
 import { readFile, writeFile, rename } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -67,6 +67,7 @@ export class ApplicationNetworkRoute {
       this.current = undefined;
     }
     if (!this.current) {
+      const { session } = await import('electron');
       const connection = session.fromPartition('cshell-api-route-' + randomUUID(), { cache: false });
       connection.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
       connection.setPermissionCheckHandler(() => false);
