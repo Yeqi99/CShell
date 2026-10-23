@@ -54,3 +54,8 @@ export function connectionsFromText(text:string):ConnectionBatchRow[]{
  }
  return blocks.map(block=>{try{return {row:block.row,connection:extractConnectionByRules(block.text,/^\s*rdp:\/\//i.test(block.text)?'cshell.rdp':'cshell.ssh')};}catch{return {row:block.row,error:'无法明确识别此连接，请检查地址、端口和分隔方式'};}});
 }
+
+export type ConnectionImportPreview = {
+  token: string; headers: string[]; mapping: Partial<Record<ImportColumn, number>>;
+  rows: { row: number; name?: string; host?: string; port?: number; username?: string; group?: string; protocol?: string; hasPassword?: boolean; duplicate?: boolean; error?: string }[];
+};

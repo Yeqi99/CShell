@@ -12,10 +12,8 @@ const optionsSchema = z.object({
   username: z.string().trim().max(128).default(''),
 }).strict();
 type Source = { text: string; kind: 'csv' | 'text'; delimiter: ',' | ';' | '\t'; expires: number; values: Map<number, { profile: Profile; password?: string }> };
-export type ConnectionImportPreview = {
-  token: string; headers: string[]; mapping: Partial<Record<ImportColumn, number>>;
-  rows: { row: number; name?: string; host?: string; port?: number; username?: string; group?: string; protocol?: string; hasPassword?: boolean; duplicate?: boolean; error?: string }[];
-};
+export type { ConnectionImportPreview } from '../shared/connection-batch';
+import type { ConnectionImportPreview } from '../shared/connection-batch';
 export class ConnectionImport {
   private sources = new Map<string, Source>();
   constructor(private store: Store, private now = Date.now) {}
