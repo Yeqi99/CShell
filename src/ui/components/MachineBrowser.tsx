@@ -384,7 +384,7 @@ export function MachineBrowser({
         </section>
       )}
       {(error || !state.connected) && (
-        <ErrorNotice title={!state.connected ? '服务器连接已断开' : '网页操作未完成'} error={!state.connected ? '服务器已断开，请重新连接；未切换本地网络' : error} />
+        <ErrorNotice retry={() => void run('open')} title={!state.connected ? '服务器连接已断开' : '网页操作未完成'} error={!state.connected ? '服务器已断开，请重新连接；未切换本地网络' : error} />
       )}
       {state.persistenceError && (
         <ErrorNotice title="浏览器资料未能保存" error={state.persistenceError} />

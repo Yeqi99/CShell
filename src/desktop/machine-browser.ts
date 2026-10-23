@@ -33,6 +33,7 @@ type Tab = {
   fullscreen?: boolean;
 };
 type Workspace = {
+  key: string;
   validate?: () => void;
   release?: () => void;
   monitor?: NodeJS.Timeout;
@@ -56,6 +57,7 @@ export class MachineBrowser {
   }
   private workspaces = new Map<string, Promise<Workspace>>();
   private owners = new Map<string, string>();
+  private resolved = new Map<string, Workspace>();
   private live = new Set<Workspace>();
   private sessions = new Set<ElectronSession>();
   constructor(
@@ -128,6 +130,12 @@ export class MachineBrowser {
     if ([...w.tabs.values()].some((t) => this.alive(t))) this.save(w);
     if (w.monitor) clearInterval(w.monitor);
     w.disposed = true;
+    w.connected = false;
+    for (const [id, current] of this.resolved) if (current === w) {
+      this.resolved.delete(id);
+      this.workspaces.delete(id);
+      if (this.owners.get(w.key) === id) this.owners.delete(w.key);
+    }
     this.live.delete(w);
     w.ses.flushStorageData();
     void w.ses.cookies.flushStore().catch(() => {});
@@ -170,8 +178,21 @@ export class MachineBrowser {
         .update(id.startsWith('ide@') ? ':ide' : '')
         .digest('hex');
       if (this.owners.has(key) && this.owners.get(key) !== id) {
-        remote?.close?.();
-        throw Error('这台机器的浏览器已在另一工作区打开，请返回该工作区');
+        const owner = this.owners.get(key)!;
+        const previous = await this.workspaces.get(owner)?.catch(() => undefined);
+        if (previous && !previous.disposed && previous.connected) {
+          try { previous.validate?.(); }
+          catch { this.dispose(previous); }
+          if (!previous.disposed) {
+            // A machine owns one local browser partition. Multiple connections
+            // in this window reuse its tabs instead of competing for a lock.
+            // The separately authenticated new transport is unused and released.
+            remote?.close?.();
+            this.resolved.set(id, previous);
+            return previous;
+          }
+        }
+        if (this.owners.get(key) === owner) this.owners.delete(key);
       }
       this.owners.set(key, id);
       const proxy = await createSshBrowserProxy((host, port, done) => {
@@ -218,6 +239,7 @@ export class MachineBrowser {
 
         ses.on('will-download', (event) => event.preventDefault());
         const w: Workspace = {
+          key,
           library,
           connectionId: id,
           tabs: new Map(),
@@ -228,6 +250,7 @@ export class MachineBrowser {
           ses,
           proxy,
         };
+        this.resolved.set(id, w);
         const allow = (contents: Electron.WebContents | null, permission: string) => {
           const t = w.tabs.get(w.selected);
           return browserPagePermission(
@@ -260,7 +283,6 @@ export class MachineBrowser {
         );
         const disconnected = () => {
           w.connected = false;
-          if (this.owners.get(key) === id) this.owners.delete(key);
           this.dispose(w);
           void ses.closeAllConnections();
         };
@@ -284,7 +306,6 @@ export class MachineBrowser {
         if (connection?.closed) {
           w.connected = false;
           this.dispose(w);
-          this.owners.delete(key);
         }
         if (w.connected && !id.startsWith('ide@')) {
           const saved = library.data.tabs.map((t) => ({ ...t })),
@@ -305,6 +326,9 @@ export class MachineBrowser {
     })();
     this.workspaces.set(id, pending);
     pending.catch(() => {
+      if (this.workspaces.get(id) !== pending) return;
+      const failed = this.resolved.get(id);
+      if (failed) this.dispose(failed);
       this.workspaces.delete(id);
       for (const [key, owner] of this.owners) if (owner === id) this.owners.delete(key);
     });
@@ -483,7 +507,7 @@ export class MachineBrowser {
       'stop',
       'bounds',
     ]).parse(action);
-    if (action === 'hide' && !this.workspaces.has(id))
+    if (['hide', 'status', 'bounds'].includes(action) && !this.workspaces.has(id))
       return { tabs: [], selected: '', connected: false };
     const w = await this.workspace(id);
     try {
@@ -495,11 +519,12 @@ export class MachineBrowser {
     }
     this.prune(w);
     if (action === 'hide') {
-      for (const t of w.tabs.values()) t.view.setVisible(false);
+      if (w.connectionId === id) for (const t of w.tabs.values()) t.view.setVisible(false);
       return this.state(w);
     }
     if (action === 'status') return this.state(w);
     if (!w.connected) throw Error('服务器连接已断开；浏览器未切换到本地网络');
+    if (!['status', 'hide', 'bounds'].includes(action)) w.connectionId = id;
     if (action === 'open' && w.tabs.size === 0) this.tab(w);
     if (action === 'new') this.tab(w);
     if (action === 'select') {
@@ -575,6 +600,10 @@ export class MachineBrowser {
           visible: z.boolean(),
         })
         .parse(value);
+      // Late hide/bounds events from an inactive alias cannot hide the browser
+      // currently presented by another workspace.
+      if (!bounds.visible && w.connectionId !== id) return this.state(w);
+      if (bounds.visible) w.connectionId = id;
       const [width, height] = this.window.getContentSize();
       for (const tab of w.tabs.values()) {
         const visible =
