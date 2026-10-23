@@ -22,7 +22,7 @@ export function IdeApp({
       const state = (await call('ide.status')) as any;
       if (!alive) return;
       if (!state.ready) throw Error('代码编辑器尚未安装完成，请在应用市场完成安装。');
-      if (!state.launchVersion) throw Error('请更新这台机器的 cagent 后重试。');
+      if (!state.launchVersion) throw Error('请更新这台机器的 CAgent 后重试。');
       const result = (await call('ide.start', { cwd: state.running?.cwd || '' })) as any;
       if (alive) setUrl(result.url);
     })().catch((e) => {

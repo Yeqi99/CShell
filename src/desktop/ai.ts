@@ -51,11 +51,12 @@ export async function registerAiHandlers(
     }, 40);
   };
   await ai.load();
-  const openCode=new OpenCodeExtension({directory:join(directory,'extensions','opencode'),enabled:()=>pluginEnabled(store.plugins(),'opencode'),encrypt:s=>store.encryptPrivate(s),decrypt:s=>store.decryptPrivate(s),saveProvider:async p=>{await ai.saveProvider(p);publish?.('ai:providers-changed');},open:async url=>(await import('electron')).shell.openExternal(url)});
+  const openCode=new OpenCodeExtension({directory:join(directory,'extensions','opencode'),enabled:()=>pluginEnabled(store.plugins(),'opencode'),encrypt:s=>store.encryptPrivate(s),decrypt:s=>store.decryptPrivate(s),saveProvider:async p=>{await ai.saveProvider(p);publish?.('ai:providers-changed');},open:async url=>(await import('electron')).shell.openExternal(url)},ai.requestTransport);
   await openCode.load();
   ai.providerExtensions.register(openCode);
   await setupCloud?.(ai, openCode, network);
-  const tavily=new TavilyExtension({directory:join(directory,'extensions','tavily'),enabled:()=>pluginEnabled(store.plugins(),'tavily'),encrypt:s=>store.encryptPrivate(s),decrypt:s=>store.decryptPrivate(s)});
+  const tavily=new TavilyExtension({directory:join(directory,'extensions','tavily'),enabled:()=>pluginEnabled(store.plugins(),'tavily'),encrypt:s=>store.encryptPrivate(s),decrypt:s=>store.decryptPrivate(s)},ai.requestTransport);
+
   await tavily.load();ai.extensionTools=()=>tavily.tools();
   handle('ai:extension-call',(id,action,input)=>id==='cshell.tavily'?tavily.call(z.string().max(80).parse(action),input):ai.providerExtensions.call(z.string().max(100).parse(id),z.string().max(80).parse(action),input));
   const bindingKey=(id:string)=>{

@@ -8,7 +8,7 @@ import {AgentAssistantSettings} from './AgentAssistantSettings';
 import {AiStreamingMarkdown} from './AiStreamingMarkdown';
 import './machine-assistant.css';
 type Task={id:string;prompt:string;answer:string;error?:string;state:string;createdAt?:string;events?:{tool:string;input:unknown;output?:string}[]};
-const states:Record<string,string>={running:'正在执行',approval:'等待在目标机器的 cagent 中确认',queued:'等待执行',completed:'已完成',failed:'执行失败',cancelled:'已停止',interrupted:'已中断'};
+const states:Record<string,string>={running:'正在执行',approval:'等待在目标机器的 CAgent 中确认',queued:'等待执行',completed:'已完成',failed:'执行失败',cancelled:'已停止',interrupted:'已中断'};
 const running=(task?:Task)=>!!task&&['running','approval','queued'].includes(task.state);
 export function AgentMachineAssistant({call,name='当前机器'}:{name?:string;call:(method:AgentCall['method'],params?:unknown)=>Promise<unknown>}){
  const [drafts,setDrafts]=useState<Record<string,string>>({}),[selected,setSelected]=useState(''),[tasks,setTasks]=useState<Task[]>([]),[error,setError]=useState(''),[refreshError,setRefreshError]=useState(''),[busy,setBusy]=useState(false),[stopping,setStopping]=useState(''),[history,setHistory]=useState(false),[settings,setSettings]=useState(false),[model,setModel]=useState<{model:string;review:boolean;keyConfigured:boolean}>(),[loaded,setLoaded]=useState(false);

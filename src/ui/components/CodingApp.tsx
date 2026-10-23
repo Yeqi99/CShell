@@ -111,7 +111,7 @@ export function CodingApp({
     } catch (e) {
       setStatus(undefined);
       setStatusError(
-        '无法读取这台机器的编程服务。请确认远端 cagent 已更新至 0.8.0 或更高版本，并已开放管理权限，然后刷新重试。',
+        '无法读取这台机器的编程服务。请确认远端 CAgent 已更新至 0.8.0 或更高版本，并已开放管理权限，然后刷新重试。',
       );
       throw e;
     } finally {

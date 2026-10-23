@@ -28,7 +28,7 @@ export function DevelopmentMarket({
     setCoding(c.status === 'fulfilled' ? c.value : undefined);
     setIde(i.status === 'fulfilled' ? i.value : undefined);
     if (c.status === 'rejected' || i.status === 'rejected')
-      throw Error('无法读取开发应用，请检查机器连接与 cagent 版本');
+      throw Error('无法读取开发应用，请检查机器连接与 CAgent 版本');
     const cs = c.value as any,
       editor = i.value as any;
     onChanged?.({
