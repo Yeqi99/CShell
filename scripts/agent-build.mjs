@@ -7,6 +7,7 @@ import { spawn } from 'node:child_process';
 import {existsSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import { preparePty } from './prepare-pty.mjs';
+import { nativeVersionSource } from './native-version.mjs';
 const require = createRequire(import.meta.url);
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const version = JSON.parse(await readFile(join(root, 'package.json'), 'utf8')).version;
@@ -87,10 +88,12 @@ if(process.platform==='win32'){
   await new Promise((done,reject)=>{const child=spawn(python,[join(root,'tools/wechat-bridge/build-cagent-runtime.py'),join(output,'wechat-runtime')],{stdio:'inherit',windowsHide:true});child.once('error',reject);child.once('exit',code=>code===0?done():reject(new Error('WeChat runtime build failed')));});
 
   const framework=join(process.env.SystemRoot||'C:\\Windows','Microsoft.NET','Framework64','v4.0.30319');
-  await new Promise((resolveBuild,reject)=>{
-    const child=spawn(join(framework,'csc.exe'),['/nologo','/target:winexe','/win32icon:'+join(root,'assets/cagent-icon.ico'),'/out:'+join(output,'Cagent.exe'),...['WindowsBase','PresentationCore','PresentationFramework'].map(name=>'/r:'+join(framework,'WPF',name+'.dll')),'/r:System.Windows.Forms.dll','/r:System.Drawing.dll','/r:System.Xaml.dll','/r:System.Web.Extensions.dll',join(root,'src/agent/native/CagentWindow.cs')],{stdio:'inherit',windowsHide:true});
+  const versionSource=join(output,'Cagent.Version.cs');
+  await writeFile(versionSource,nativeVersionSource(version));
+  try { await new Promise((resolveBuild,reject)=>{
+    const child=spawn(join(framework,'csc.exe'),['/nologo','/target:winexe','/win32icon:'+join(root,'assets/cagent-icon.ico'),'/out:'+join(output,'Cagent.exe'),...['WindowsBase','PresentationCore','PresentationFramework'].map(name=>'/r:'+join(framework,'WPF',name+'.dll')),'/r:System.Windows.Forms.dll','/r:System.Drawing.dll','/r:System.Xaml.dll','/r:System.Web.Extensions.dll',versionSource,join(root,'src/agent/native/CagentWindow.cs')],{stdio:'inherit',windowsHide:true});
     child.once('error',reject);child.once('exit',code=>code===0?resolveBuild():reject(new Error('Native cagent window build failed')));
-  });
+  }); } finally { await rm(versionSource,{force:true}); }
   await writeFile(join(output,'cagent-app.vbs'),`Set sh = CreateObject("WScript.Shell")\r\nSet fs = CreateObject("Scripting.FileSystemObject")\r\np = fs.GetParentFolderName(WScript.ScriptFullName)\r\nsh.Run Chr(34) & p & "\\Cagent.exe" & Chr(34), 1, False\r\n`);
   if(process.arch==='x64'){
     const cached=join(root,'test-results/toolchains/llvm-mingw-20261006-ucrt-x86_64/bin/x86_64-w64-mingw32-clang++.exe');
