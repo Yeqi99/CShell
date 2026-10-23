@@ -52,3 +52,11 @@ browser-ownership-smoke 在两版再次通过：同机别名复用、旧 hide �
 官网 0.8.5 下载链接、实际摘要和文件大小、版本记录已准备；20 页静态检查及 1440/390 宽度下载选择与无溢出检查通过。仅为本地待发布源码，未部署；正式官网/更新目录/本机仍 0.8.4。
 
 香港 .staging-085 为独立暂存目录，阶段性 Pro 9 项及开源 2 项已核验；COMPLETE 仅表示当前快照完成，不能作为全部发布已完成证据。发布前必须对最终 14 / 16 项清单重新完整核验。
+
+## 真实 CAgent 安装器与官网暂存
+
+两版 CAgent 0.8.5 发行 EXE 已分别用 /S 安装到 test-results/cagent-085-installed/{opensource,pro}，均退出 0。安装后读取实际 Cagent.exe：ProductName=CAgent、ProductVersion=0.8.5、FileVersion=0.8.5.0，build-info.version=0.8.5；未启动测试版、不改用户正在运行的实例。此证据覆盖 CI 实际产物，不仅是本地编译夹具。
+
+官网四个更新文件已放到香港 /opt/cshell-web-stage/release-085/portal，分别核对 SHA-256 与本地完全一致；线上 /opt/cshell-web-stage/portal 未切换。继承原站静态资源，保留定制版式。必须在最终包与目录全部验收后才部署。
+
+上传进程仍确认存活：开源 exec 5706 / PID 27568，Pro exec 55184 / PID 12656。暂未到发布状态，不能重启或重复上传仍活动的句柄。
