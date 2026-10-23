@@ -2,6 +2,13 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {planAccountImport} from '../src/core/account-import';
 const sample=()=>({format:1,store:{profiles:[{id:'p',name:'Machine'}],secrets:{p:{password:'old'}},hosts:{},groups:[],presets:[],monitorViews:[],preferences:{theme:'light'}},ai:{providers:[],habits:[],extractionProviderId:null,textProviderIds:{translate:null,compose:null}},opencode:{accounts:[]},devices:[],http:[],browser:{},assets:{},future:{preserved:true}});
+
+test('imported permission policy requires an explicit source choice',()=>{
+ const a:any=sample(),s:any=sample();a.ai.policy={application:[]};s.ai.policy={application:['connections.read']};
+ const pending=planAccountImport(a,s,{settings:true,choices:{}});
+ assert.deepEqual(pending.value.ai.policy,a.ai.policy);assert(pending.unresolved.some(c=>c.id==='ai-policy'));
+ assert.deepEqual(planAccountImport(a,s,{settings:false,choices:{'ai-policy':'source'}}).value.ai.policy,s.ai.policy);
+});
 test('connection credentials require the same explicit decision as their connection',()=>{
  const a=sample(),s=sample();s.store.secrets.p.password='new';
  const preview=planAccountImport(a,s,{settings:false,choices:{}});

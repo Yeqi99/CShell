@@ -37,6 +37,7 @@ export function planAccountImport(account:unknown,source:unknown,options:ImportO
  a.store.presets=merge('外观方案',a.store.presets,s.store.presets);
  a.store.monitorViews=merge('监控视图',a.store.monitorViews,s.store.monitorViews);
  if(options.settings){a.store.preferences=s.store.preferences;if(s.store.extensions!==undefined)a.store.extensions=s.store.extensions;}
+ if(s.ai.policy!==undefined)a.ai.policy=choose('ai-policy','智能体权限','应用权限与机器范围',a.ai.policy,s.ai.policy);
  a.ai.providers=merge('模型基座',a.ai.providers,s.ai.providers);
  a.ai.habits=merge('习惯记忆',a.ai.habits,s.ai.habits);
  if(options.settings){a.ai.extractionProviderId=s.ai.extractionProviderId;a.ai.textProviderIds=s.ai.textProviderIds;}

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { aiProviderSchema } from './ai';
+import { aiPolicySchema, aiProviderSchema } from './ai';
 import { habitsSchema } from './account-memory';
 export const sharedAiConfigSchema = z
   .object({
@@ -9,6 +9,7 @@ export const sharedAiConfigSchema = z
       .object({ translate: z.string().uuid().nullable(), compose: z.string().uuid().nullable() })
       .strict(),
     habits: habitsSchema.optional(),
+    policy: aiPolicySchema.optional(),
   })
   .strict();
 export type SharedAiConfig = z.infer<typeof sharedAiConfigSchema>;

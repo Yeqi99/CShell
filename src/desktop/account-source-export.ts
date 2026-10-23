@@ -24,7 +24,7 @@ export async function runSourceExport(){
   await bounded(join(source,'config.json')).catch(error=>{if(error.code!=='ENOENT')throw error;});
   const store=new Store(source,codec);await store.load();const configuration=await store.cloudExport();
   const rawAi=await encrypted('ai.enc',emptySharedAi());
-  const ai={providers:rawAi.providers??[],habits:rawAi.habits??[],extractionProviderId:rawAi.extractionProviderId??null,textProviderIds:rawAi.textProviderIds??{translate:null,compose:null}};
+  const ai={...(rawAi.policy?{policy:rawAi.policy}:{}),providers:rawAi.providers??[],habits:rawAi.habits??[],extractionProviderId:rawAi.extractionProviderId??null,textProviderIds:rawAi.textProviderIds??{translate:null,compose:null}};
   const extension=new OpenCodeExtension({directory:source,enabled:()=>false,...codec,saveProvider:async()=>{},open:async()=>{}});
   await bounded(join(source,'opencode.enc')).catch(error=>{if(error.code!=='ENOENT')throw error;});
   await extension.load();

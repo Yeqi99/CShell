@@ -11,6 +11,8 @@
 
 ## 当前验证
 
+- 新增权限同步修复：旧实现明确排除了 AiPolicy，现同账号云配置包含应用权限、机器范围与单机覆盖。缺失该字段的旧包保留本机策略；CAgent 仅保留 CShell 策略数据，不将其转换为受控端授权。开源/访客导入策略必须单独选择来源；多端同时改权限按整项冲突处理，不逐字段拼出更宽的权限。9 项相关测试通过，尚未将正式用户云端数据改写，需新版客户端首次同步现有本机权限。0.8.3 的严格 schema 不接受新字段，应与渠道升级协调验证。
+
 - 合并后 TypeScript 通过；Pro Vite / main 构建通过。
 - 真实 Electron account-profile-smoke、account-import-smoke --clear 通过，包含隔离、显式导入/清理和退出后访客恢复。
 - 真实 Electron network-route-smoke、connection-import-smoke 通过，包含代理失效不直连、CSV 映射及秘密不进入预览。

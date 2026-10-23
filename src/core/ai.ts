@@ -61,18 +61,19 @@ export class AiService {
   async forget(id:string){z.string().uuid().parse(id);const old=this.habits;this.habits=this.habits.filter(x=>x.id!==id);try{await this.persist();}catch(e){this.habits=old;throw e;}return this.memory();}
 
   cloudExport() {
-    return structuredClone({habits:this.habits,providers:this.providers, extractionProviderId:this.extractionProviderId, textProviderIds:this.textProviderIds});
+    return structuredClone({policy:this.policy,habits:this.habits,providers:this.providers, extractionProviderId:this.extractionProviderId, textProviderIds:this.textProviderIds});
   }
   cloudValidate(value: unknown) {
     if (this.runs.size) throw new Error('请等待智能体任务结束后恢复云端基座');
-    return z.object({habits:habitsSchema.optional(),providers:z.array(providerRecord).max(200), extractionProviderId:z.string().uuid().nullable(),
+    return z.object({policy:aiPolicySchema.optional(),habits:habitsSchema.optional(),providers:z.array(providerRecord).max(200), extractionProviderId:z.string().uuid().nullable(),
       textProviderIds:z.object({translate:z.string().uuid().nullable(),compose:z.string().uuid().nullable()}).strict()}).strict().parse(value);
   }
   async cloudImport(value: unknown) {
     const next = this.cloudValidate(value);
-    // Permissions, active threads and device-bound extension installation remain local.
+    // Active threads retain their permission ceilings; device-side grants remain local.
     this.providers = next.providers;
     if(next.habits)this.habits=next.habits;
+    if(next.policy)this.policy=next.policy;
     this.extractionProviderId = next.extractionProviderId;
     this.textProviderIds = next.textProviderIds;
     await this.persist();
