@@ -11,9 +11,9 @@ import {
 import type { Profile } from '../../shared/contracts';
 const names = {
   'http.send': '从此机器发送 HTTP 请求',
-  'agent.manage': '管理 Agent 与系统环境',
-  'agent.hosting': '管理 Agent HTTP 服务',
-  'agent.relay': '管理 Agent 中继',
+  'agent.manage': '管理 CAgent 与系统环境',
+  'agent.hosting': '管理 CAgent HTTP 服务',
+  'agent.relay': '管理 CAgent 中继',
   'metrics.read': '资源监控',
   'files.read': '读取文件',
   'files.create': '创建文件（不覆盖）',
@@ -53,7 +53,7 @@ export function AiPermissionTree({
       await window.cshell.aiPolicySave(p);
       await refresh();
       setDraft(null);
-      setFeedback('权限已保存，所有会话立即生效');
+      setFeedback('权限已保存');
     } catch (e) {
       setFailed(true);
       setFeedback(`保存失败：${(e as Error).message}。修改已保留。`);
@@ -93,6 +93,10 @@ export function AiPermissionTree({
           <h4>
             <Monitor size={15} /> CShell 本身
           </h4>
+          <div className="permission-bulk-actions" role="group" aria-label="应用权限批量选择">
+            <button type="button" onClick={() => edit({...p, application: [...aiPolicySchema.shape.application.element.options]})}>全选应用权限</button>
+            <button type="button" onClick={() => edit({...p, application: []})}>清空应用权限</button>
+          </div>
           <label data-permission-node="application/connections.read">
             <input
               type="checkbox"
@@ -163,6 +167,10 @@ export function AiPermissionTree({
           <h4>
             <Server size={15} /> 机器操作
           </h4>
+          <div className="permission-bulk-actions" role="group" aria-label="默认机器权限批量选择">
+            <button type="button" onClick={() => edit({...p, capabilities: [...aiCapabilities]})}>全选默认操作</button>
+            <button type="button" onClick={() => edit({...p, capabilities: []})}>清空默认操作</button>
+          </div>
           <div className="permission-default-tools">
             {aiCapabilities.map((c) => (
               <label key={c} data-permission-node={`capability/${c}`}>
@@ -204,6 +212,10 @@ export function AiPermissionTree({
         </section>
         <section className="permission-global-section" data-permission-node="machines/scope">
           <h4>单台机器</h4>
+          <div className="permission-bulk-actions" role="group" aria-label="机器范围批量选择">
+            <button type="button" onClick={() => edit({...p, allMachines: false, groups: [], profiles: profiles.map(m => m.id)})}>选择当前全部机器</button>
+            <button type="button" onClick={() => edit({...p, allMachines: false, groups: [], profiles: []})}>清空机器范围</button>
+          </div>
           <small>默认继承上面的操作权限；可直接为某台机器调整。</small>
           {!profiles.length && <p className="muted">尚无已保存的机器</p>}
           {profiles.map((m) => {
@@ -242,6 +254,10 @@ export function AiPermissionTree({
                   ) : (
                     <small>使用默认权限</small>
                   )}
+                </div>
+                <div className="permission-bulk-actions" role="group" aria-label={`${m.name}权限批量选择`}>
+                  <button type="button" disabled={!accessible} onClick={() => edit({...p, overrides: [...p.overrides.filter(o => o.profileId !== m.id), {profileId: m.id, capabilities: [...aiCapabilities]}]})}>全选此机器操作</button>
+                  <button type="button" disabled={!accessible} onClick={() => edit({...p, overrides: [...p.overrides.filter(o => o.profileId !== m.id), {profileId: m.id, capabilities: []}]})}>禁止此机器操作</button>
                 </div>
                 <div className="permission-default-tools">
                   {aiCapabilities.map((c) => (
