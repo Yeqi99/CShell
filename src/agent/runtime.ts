@@ -551,7 +551,10 @@ export async function createAgentRuntime(
     dispatch,
     async startControl() {
       if (control) throw new Error('本机控制服务已运行');
-      control = await startAgentControl(directory, (m, p, s) => dispatch(m, p, s, true)); await updater.initialize();
+      control = await startAgentControl(directory, (m, p, s) => dispatch(m, p, s, true));
+      // Shutdown may arrive while the discovery file is being protected.
+      if (closed) { await control.close(); return; }
+      await updater.initialize();
     },
     close,
     directory,
