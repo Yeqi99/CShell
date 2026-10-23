@@ -109,6 +109,10 @@ try {
   console.error(error); const failed=await app.firstWindow().catch(()=>undefined); await failed?.screenshot({path:'test-results/release-084-failed.png'}).catch(()=>{});
   throw error;
 } finally {
-  await app.evaluate(({app})=>app.exit(0)).catch(()=>{}); await app.close().catch(()=>{});
+  // Bound cleanup of this isolated fixture even if Electron's inspector stops responding.
+  const cleanup = setTimeout(() => app.process().kill(), 10000);
+  try {
+    await app.evaluate(({app})=>app.exit(0)).catch(()=>{}); await app.close().catch(()=>{});
+  } finally { clearTimeout(cleanup); }
   await server.close(); await rm(data,{recursive:true,force:true});
 }
