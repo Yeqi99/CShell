@@ -33,7 +33,10 @@ export class ApplicationNetworkRoute {
     const next = networkRouteSchema.parse(input);
     const task = this.queue.catch(() => {}).then(async () => {
       if (this.closed) throw new Error('网络服务已关闭');
-      if (next.mode === 'machine' && !this.machine) throw new Error('当前版本不支持机器网络出口');
+      if (next.mode === 'machine') {
+        if (!this.machine) throw new Error('当前版本不支持机器网络出口');
+        await this.machine.proxy(next.id);
+      }
       const file = join(this.directory, 'network-route.enc');
       await writeFile(file + '.tmp', await this.store.encryptPrivate(JSON.stringify(next)), { mode: 0o600 });
       await rename(file + '.tmp', file);
