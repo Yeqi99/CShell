@@ -567,7 +567,7 @@ else
         },
         http,
         wechat,
-        (ai, openCode) => registerCloudHandlers(handle, store, ai, clientProvider, http, () => {
+        (ai, openCode, network) => registerCloudHandlers(handle, store, ai, clientProvider, http, () => {
           if (!window.isDestroyed()) {
             window.webContents.send('cloud:changed');
             window.webContents.send('ai:providers-changed');
@@ -576,7 +576,7 @@ else
           profiles:accountProfiles,
           assertIdle:()=>{if(ssh.size||localTerminal.size||clientProvider.size||transfers.size||http.running)throw Error('请先关闭连接并等待传输结束，再切换账号');},
           block:(value:boolean)=>{accountTransition=value;},
-        }:undefined),
+        }:undefined, network),
       );
       registerPresetHandlers(handle, window, app.getPath('userData'), store, text);
       registerConnectionImport(handle, window, store);

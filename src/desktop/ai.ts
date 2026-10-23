@@ -26,7 +26,7 @@ export async function registerAiHandlers(
   publish?: (channel: string, value?: unknown) => void,
   http?: import('../core/http-workspaces').HttpWorkspaces,
   wechat?: import('../core/wechat').WechatService,
-  setupCloud?: (ai: AiService, openCode: OpenCodeExtension) => Promise<void>,
+  setupCloud?: (ai: AiService, openCode: OpenCodeExtension, network: ApplicationNetworkRoute) => Promise<void>,
 ) {
   const ai = new AiService(directory, store, connections, connectHost, { http, wechat });
   const drafts = new AiDrafts(directory, store);
@@ -37,7 +37,7 @@ export async function registerAiHandlers(
   handle('ai:draft-save', (id, text) => { if (draftLoadError) throw new Error('草稿读取失败，原文件已保留'); return drafts.save(id, text); });
   const network = new ApplicationNetworkRoute(directory, store);
   await network.load();
-  ai.requestTransport = network.fetch;
+  ai.requestTransport = process.versions.electron ? network.fetch : undefined;
   handle('network:status', () => network.status());
   handle('network:save', input => network.save(input));
   const pending = new Map<string, AiThread>();
@@ -54,7 +54,7 @@ export async function registerAiHandlers(
   const openCode=new OpenCodeExtension({directory:join(directory,'extensions','opencode'),enabled:()=>pluginEnabled(store.plugins(),'opencode'),encrypt:s=>store.encryptPrivate(s),decrypt:s=>store.decryptPrivate(s),saveProvider:async p=>{await ai.saveProvider(p);publish?.('ai:providers-changed');},open:async url=>(await import('electron')).shell.openExternal(url)});
   await openCode.load();
   ai.providerExtensions.register(openCode);
-  await setupCloud?.(ai, openCode);
+  await setupCloud?.(ai, openCode, network);
   const tavily=new TavilyExtension({directory:join(directory,'extensions','tavily'),enabled:()=>pluginEnabled(store.plugins(),'tavily'),encrypt:s=>store.encryptPrivate(s),decrypt:s=>store.decryptPrivate(s)});
   await tavily.load();ai.extensionTools=()=>tavily.tools();
   handle('ai:extension-call',(id,action,input)=>id==='cshell.tavily'?tavily.call(z.string().max(80).parse(action),input):ai.providerExtensions.call(z.string().max(100).parse(id),z.string().max(80).parse(action),input));

@@ -57,7 +57,7 @@ test('plugin event reaches configured AI without prior history; duplicate and re
     await wait(() => call('ai:snapshot').threads.find((t: any) => t.id === thread.id).state === 'idle');
     requests.length = 0;
     const rule = aiEventRuleSchema.parse({ id: randomUUID(), name: 'Fixture', enabled: true, source: 'wechat', eventType: 'message.received', threadId: thread.id,
-      prompt: 'Summarize this event only.', cooldownSeconds: 0, reservedTokensPerRun: 32768, maxReservedTokensPerDay: 200000 });
+      prompt: 'Summarize this event only.', cooldownSeconds: 0, reservedTokensPerRun: 65536, maxReservedTokensPerDay: 200000 });
     await call('ai:event-save', rule);
     emit('101');
     await wait(() => call('ai:events-snapshot').runs.some((r: any) => r.status === 'completed'));

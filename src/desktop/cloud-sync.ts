@@ -39,6 +39,7 @@ export async function registerCloudHandlers(
   browser: import('./machine-browser').MachineBrowser,
   openCode: import('../extensions/opencode/service').OpenCodeExtension,
   profileOptions?:{profiles:DesktopAccountProfiles;assertIdle():void;block(value:boolean):void},
+  network?: import('./network-route').ApplicationNetworkRoute,
 ) {
   const directory = app.getPath('userData');
   const assertAccountIdle=()=>{profileOptions?.assertIdle();if(ai.snapshot().threads.some(t=>t.state==='running'||t.state==='approval'||t.goal?.state==='active'))throw Error('请先停止智能体任务，再切换账号');};
@@ -136,6 +137,36 @@ export async function registerCloudHandlers(
   }
   if(profileOptions)registerAccountImports(handle,cloud,profileOptions.profiles,validate,snapshot,assertAccountIdle);
   ai.officialCredential=()=>cloud.sessionCredential();
+  if (network) {
+    const { createSshBrowserProxy } = await import('../core/ssh-browser-proxy');
+    const { agentBrowserStream } = await import('../core/agent-browser-stream');
+    const proxies = new Map<string, Awaited<ReturnType<typeof createSshBrowserProxy>>>();
+    network.machine = {
+      list: async () => client.cloudExport().filter(device => device.accountManaged).map(device => ({ id: device.deviceId, name: device.name })),
+      proxy: async id => {
+        if (!client.cloudExport().some(device => device.deviceId === id && device.accountManaged)) throw Error('账号机器不可用，未回退本机网络');
+        // The server checks current membership and device ownership, including reused proxy listeners.
+        await cloud.accountRequest('/v1/devices/lease', { deviceId: id });
+        let proxy = proxies.get(id);
+        if (!proxy) {
+          proxy = await createSshBrowserProxy((host, port, done) => {
+            void (async () => {
+              await cloud.accountRequest('/v1/devices/lease', { deviceId: id });
+              const transport = await client.browserTransport(id);
+              try {
+                const stream = await agentBrowserStream(transport.call, host, port);
+                stream.once('close', () => transport.close());
+                return stream;
+              } catch (error) { transport.close(); throw error; }
+            })().then(stream => done(null, stream), error => done(error));
+          });
+          proxies.set(id, proxy);
+        }
+        return 'socks5://127.0.0.1:' + proxy.port;
+      },
+    };
+    app.once('before-quit', () => { for (const proxy of proxies.values()) proxy.close(); proxies.clear(); });
+  }
   client.cloudLease=async id=>{const result=await cloud.accountRequest('/v1/devices/lease',{deviceId:id});return (await import('../shared/agent-relay')).agentRelayConnectionSchema.parse(result.relay);};
   handle('cloud:memory',()=>ai.memory());
   handle('cloud:remember',input=>ai.remember(input));
