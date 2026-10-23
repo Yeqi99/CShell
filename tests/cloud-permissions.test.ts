@@ -26,6 +26,13 @@ test('account policy restores exact scope and explicit denials; older payload do
   const id=randomUUID();const policy={...emptyAiPolicy(),application:['connections.read'],profiles:[id],overrides:[{profileId:id,capabilities:[]}]};
   await a.savePolicy(policy);const payload=sharedAiConfigSchema.parse(a.cloudExport());await b.cloudImport(payload);assert.deepEqual(b.snapshot().policy,policy);
   const {policy:_,...legacy}=payload;await b.cloudImport(legacy);assert.deepEqual(b.snapshot().policy,policy);
+  assert.throws(()=>b.cloudValidate({...payload,policy:{...policy,overrides:[...policy.overrides,...policy.overrides]}}),/Duplicate/);
+  const persist=(b as any).persist;
+  (b as any).persist=async()=>{throw Error('disk full');};
+  try {
+   await assert.rejects(b.cloudImport({...payload,policy:{...policy,allMachines:true}}),/disk full/);
+   assert.deepEqual(b.snapshot().policy,policy);
+  }finally{(b as any).persist=persist;}
   const loaded=await create('b');services.push(loaded);assert.deepEqual(loaded.snapshot().policy,policy);
   assert.throws(()=>b.cloudValidate({...payload,policy:{...policy,application:['invented.permission']}}));
  }finally{for(const ai of services)ai.dispose();await rm(root,{recursive:true,force:true});}

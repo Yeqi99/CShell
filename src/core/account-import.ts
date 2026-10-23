@@ -6,7 +6,7 @@ const section=record;
 const bundle=z.object({format:z.literal(1),store:section,ai:section,opencode:section.optional(),devices:z.array(record),http:z.array(record),browser:z.record(z.string(),record).optional(),assets:z.record(z.string(),z.string())}).passthrough();
 export interface ImportConflict {id:string;category:string;name:string}
 export interface ImportOptions {settings:boolean;choices:Record<string,'account'|'source'>}
-/** Operates on backend-validated portable bundles only. No permission/installation state is copied. */
+/** Operates on backend-validated portable bundles only. Policy changes require an explicit choice; device grants and installation state remain local. */
 export function planAccountImport(account:unknown,source:unknown,options:ImportOptions){
  const a=bundle.parse(structuredClone(account)),s=bundle.parse(structuredClone(source));
  const conflicts:ImportConflict[]=[];

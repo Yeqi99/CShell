@@ -65,18 +65,29 @@ export class AiService {
   }
   cloudValidate(value: unknown) {
     if (this.runs.size) throw new Error('请等待智能体任务结束后恢复云端基座');
-    return z.object({policy:aiPolicySchema.optional(),habits:habitsSchema.optional(),providers:z.array(providerRecord).max(200), extractionProviderId:z.string().uuid().nullable(),
+    const result = z.object({policy:aiPolicySchema.optional(),habits:habitsSchema.optional(),providers:z.array(providerRecord).max(200), extractionProviderId:z.string().uuid().nullable(),
       textProviderIds:z.object({translate:z.string().uuid().nullable(),compose:z.string().uuid().nullable()}).strict()}).strict().parse(value);
+    if (result.policy && new Set(result.policy.overrides.map(o => o.profileId)).size !== result.policy.overrides.length) throw new Error('Duplicate machine override');
+    return result;
   }
   async cloudImport(value: unknown) {
     const next = this.cloudValidate(value);
+    const previous = this.cloudExport();
     // Active threads retain their permission ceilings; device-side grants remain local.
     this.providers = next.providers;
     if(next.habits)this.habits=next.habits;
     if(next.policy)this.policy=next.policy;
     this.extractionProviderId = next.extractionProviderId;
     this.textProviderIds = next.textProviderIds;
-    await this.persist();
+    try { await this.persist(); }
+    catch (error) {
+      this.providers = previous.providers;
+      this.habits = previous.habits;
+      this.policy = previous.policy;
+      this.extractionProviderId = previous.extractionProviderId;
+      this.textProviderIds = previous.textProviderIds;
+      throw error;
+    }
   }
   requestTransport?: typeof fetch;
   private jobs=new AgentJobs();
