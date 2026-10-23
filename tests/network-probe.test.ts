@@ -14,6 +14,8 @@ test('TCP probe measures real handshakes without application payload and reports
   try {
     const result = await probeNetwork({ host: '127.0.0.1', port, samples: 3 }, new AbortController().signal);
     assert.equal(result.failed, 0);
+    // TCP connect can precede the server's accept callback on macOS.
+    for(let i=0;i<100 && connections<3;i++) await new Promise(resolve=>setTimeout(resolve,10));
     assert.equal(connections, 3);
     assert.equal(bytes, 0);
     assert.ok(result.minimumMs! >= 0);

@@ -72,7 +72,7 @@ try {
   await page.getByRole('button', { name: 'AI 智能体', exact: true }).click();
   const panel = page.getByRole('complementary', { name: 'AI 智能体' });
   assert.equal(await panel.locator('.agent-context select').count(), 0);
-  await panel.getByText('CShell · 未绑定机器', { exact: true }).waitFor();
+  assert.equal(await panel.getByText('CShell · 未绑定机器', { exact: true }).count(),0);
 
   await panel.getByRole('heading', { name: '连接你的 AI' }).waitFor();
   await page.screenshot({ path: 'test-results/agent-empty.png' });
@@ -94,7 +94,7 @@ try {
   await panel.getByLabel('默认：资源监控', { exact: true }).check();
   await panel.getByLabel('默认：读取文件', { exact: true }).check();
   await panel.getByRole('button', { name: '保存权限', exact: true }).click();
-  await panel.getByText('权限已保存，所有会话立即生效', { exact: true }).waitFor();
+  await panel.getByText('权限已保存', { exact: true }).waitFor();
   const savedPermissions = await page.evaluate(() => window.cshell.aiSnapshot());
   assert.ok(savedPermissions.policy.capabilities.includes('metrics.read'));
   assert.ok(savedPermissions.policy.capabilities.includes('files.read'));

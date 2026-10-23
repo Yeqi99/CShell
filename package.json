@@ -12,7 +12,7 @@
     "start": "electron .",
     "dev": "pnpm build && electron .",
     "test": "tsx --test --test-concurrency=2 tests/*.test.ts",
-    "test:desktop": "tsx scripts/smoke.ts",
+    "test:desktop": "tsx scripts/release-desktop-smoke.ts",
     "dist": "pnpm run licenses && pnpm build && electron-builder --win nsis --x64 --publish never",
     "licenses": "node scripts/licenses.mjs",
     "start:client": "electron . --client",

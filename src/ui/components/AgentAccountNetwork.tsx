@@ -31,7 +31,7 @@ export function AgentAccountNetwork({
           }
         })
         .catch(() => {
-          if (alive) setError('请确认此机器已更新 cagent，并登录 Pro 会员账号。');
+          if (alive) setError('请确认此机器已更新 CAgent，并登录 Pro 会员账号。');
         });
     void update();
     const timer = setInterval(update, 10000);
@@ -124,7 +124,7 @@ export function AgentAccountNetwork({
         <div>
           <strong>应用代理</strong>
           <p>
-            用于 cagent 浏览器、HTTP 请求，以及新开终端中支持 ALL_PROXY 的程序。已有终端、WSL
+            用于 CAgent 浏览器、HTTP 请求，以及新开终端中支持 ALL_PROXY 的程序。已有终端、WSL
             和系统其他软件保持原有网络。
           </p>
           {status?.proxy && <code>{status.proxy}</code>}

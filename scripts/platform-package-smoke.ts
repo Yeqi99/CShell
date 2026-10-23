@@ -110,6 +110,7 @@ try {
   await form.locator('.connection-secret input').fill(server.password);
   await form.getByRole('button', { name: '连接', exact: true }).click();
   await page.locator('.session-tab').waitFor();
+  await page.locator('.linux-desktop:visible .desktop-icons').getByRole('button',{name:'终端',exact:true}).dblclick();
   await page.locator('.xterm-helper-textarea').first().focus();
   const marker = 'package-' + randomUUID();
   await page.keyboard.type(marker);
@@ -119,7 +120,8 @@ try {
     await new Promise((r) => setTimeout(r, 50));
   assert.ok(server.shellInputs.join('').includes(marker), 'Packaged terminal must transmit input');
   stage('Terminal input verified; opening files');
-  await page.locator('.ssh-files-toggle').getByText('文件', { exact: true }).click();
+  await page.getByRole('button',{name:'最小化终端',exact:true}).click();
+  await page.locator('.linux-desktop:visible .desktop-icons').getByRole('button',{name:'文件',exact:true}).dblclick();
   await page.getByText('hello.txt', { exact: true }).waitFor();
   await mkdir('test-results', { recursive: true });
   await page.screenshot({ path: `test-results/package-${process.platform}-${process.arch}.png` });

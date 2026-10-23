@@ -810,7 +810,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
                   <SessionTab
                     key={tab.id}
                     {...tab}
-                    active={surface === 'terminal' && active === tab.id && !linuxModes[tab.id]}
+                    active={surface === 'terminal' && active === tab.id}
                     onSelect={() => {
                       setActive(tab.id);
                       setSurface('terminal');
