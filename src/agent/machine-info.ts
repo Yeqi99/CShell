@@ -26,7 +26,7 @@ async function collectSnapshot(signal?: AbortSignal): Promise<MachineSnapshot> {
     disks: '', processes: '', ports: '', gpu: '', errors: {},
   };
   const command = async (key: 'disks'|'processes'|'ports'|'gpu', file: string, args: string[]) => {
-    try { result[key] = (await exec(file,args,{timeout:4000,maxBuffer:256*1024,windowsHide:true,signal,encoding:'utf8'})).stdout.trim(); }
+    try { result[key] = (await exec(file,args,{timeout:10000,maxBuffer:256*1024,windowsHide:true,signal,encoding:'utf8'})).stdout.trim(); }
     catch { result.errors[key] = '系统未提供此数据、工具不可用或当前权限不足'; }
   };
   if (process.platform === 'linux') {
@@ -63,7 +63,7 @@ async function collectSnapshot(signal?: AbortSignal): Promise<MachineSnapshot> {
       ps('processes','Get-Process | Sort-Object WorkingSet64 -Descending | Select-Object -First 30 Id,ProcessName,WorkingSet64,CPU | Format-Table -AutoSize'),
       ps('ports','Get-NetTCPConnection -State Listen | Select-Object -First 100 LocalAddress,LocalPort,OwningProcess | Format-Table -AutoSize'),
       ps('gpu','Get-CimInstance Win32_VideoController | Select-Object Name,AdapterRAM,DriverVersion | Format-List'),
-      (async()=>{try{const output=await exec('powershell.exe',['-NoProfile','-NonInteractive','-Command','[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;Get-NetAdapterStatistics | Select-Object Name,ReceivedBytes,SentBytes | ConvertTo-Json -Compress'],{timeout:4000,maxBuffer:128*1024,windowsHide:true,signal,encoding:'utf8'});const data=JSON.parse(output.stdout);for(const row of Array.isArray(data)?data:[data]){const n=result.network.find(n=>n.name===row.Name);if(n&&Number.isFinite(row.ReceivedBytes)&&Number.isFinite(row.SentBytes)){n.received=row.ReceivedBytes;n.sent=row.SentBytes;}}}catch{result.errors.network='系统未提供网卡流量计数';}})(),
+      (async()=>{try{const output=await exec('powershell.exe',['-NoProfile','-NonInteractive','-Command','[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;Get-NetAdapterStatistics | Select-Object Name,ReceivedBytes,SentBytes | ConvertTo-Json -Compress'],{timeout:10000,maxBuffer:128*1024,windowsHide:true,signal,encoding:'utf8'});const data=JSON.parse(output.stdout);for(const row of Array.isArray(data)?data:[data]){const n=result.network.find(n=>n.name===row.Name);if(n&&Number.isFinite(row.ReceivedBytes)&&Number.isFinite(row.SentBytes)){n.received=row.ReceivedBytes;n.sent=row.SentBytes;}}}catch{result.errors.network='系统未提供网卡流量计数';}})(),
     ]);
   } else {
     await command('disks','df',['-h']);
