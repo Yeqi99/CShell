@@ -145,6 +145,9 @@ try {
   await page.getByRole('button', { name: '进程', exact: true }).click();
   assert.equal(await page.getByLabel('进程刷新间隔').inputValue(), '15');
   await page.screenshot({ path: 'test-results/resources-refined.png' });
+  // Test global layout on the workbench, outside the machine's app window layer.
+  await page.locator('.welcome-tab button').focus();
+  await page.locator('.welcome-tab button').click();
   // Live native drag preview describes source and insertion order; Escape cancels it.
   const grip = page.locator('[data-panel="servers"] .dock-grip');
   const g = (await grip.boundingBox())!,
