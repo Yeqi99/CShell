@@ -1,6 +1,5 @@
 import { ErrorNotice } from './ErrorNotice';
-import { MachineConnectionState } from './MachineConnectionState';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Monitor, Terminal, ChevronRight, RefreshCw } from 'lucide-react';
 import type { AgentCall } from '../../shared/agent';
 import type { LinuxWorkspacePlan } from '../../shared/linux-workspace';
@@ -16,8 +15,11 @@ export function LinuxWorkspace({
   closed,
   onTerminal,
   profileId,
-  preferences,
+  preferences, terminal, files, onRetry,
 }: {
+  terminal?: (active: boolean, theme: 'light' | 'dark') => ReactNode;
+  files?: ReactNode;
+  onRetry?: () => void;
   profileId: string;
   preferences: Preferences;
   session: string;
@@ -92,31 +94,7 @@ export function LinuxWorkspace({
     try {const result=await window.cshell.linuxWorkspaceInstall(session,plan.id);setJob(result);if(result.state==='succeeded')await inspect();}
     catch(e){setError(String(e));}finally{setBusy(false);}
   };
-  if (!ready && (closed || busy || error || job?.state === 'running' || plan?.installed)) return <div className="linux-desktop-host" hidden={!active}><MachineConnectionState name={name} phase={closed?'closed':error?'error':job?.state==='running'?'installing':plan?.installed?'connecting':'checking'} error={error} details={job?.output}
-    primary={!closed&&!busy&&job?.state!=='running'?{label:'重试连接',run:()=>void inspect()}:undefined}
-    secondary={job?.state==='running'&&!closed?{label:'取消安装',run:()=>void window.cshell.linuxWorkspaceJob(session,job.id,true).then(setJob).catch(e=>setError(String(e)))}:plan?.installed&&error&&!closed?{label:'启动 cagent',run:()=>void install()}:{label:'SSH 终端',run:onTerminal}}/></div>;
-  if (ready)
-    return (
-      <div className="linux-desktop-host" hidden={!active}>
-        <LinuxDesktop
-          name={name}
-          machine={machine}
-          target={target}
-          call={call}
-          active={active}
-          closed={closed}
-          onTerminal={onTerminal}
-          terminal={(visible, theme) => (
-            <LinuxDesktopTerminal
-              profileId={profileId}
-              preferences={{ ...preferences, theme }}
-              active={visible}
-            />
-          )}
-        />
-      </div>
-    );
-  return (
+  const setup = (
     <section className="linux-workspace" aria-label="Linux 可视化工作区" hidden={!active}>
       <header className="linux-topbar">
         <button title="工作区首页" aria-label="工作区首页" onClick={() => void inspect()}>
@@ -155,7 +133,7 @@ export function LinuxWorkspace({
           {!ready ? (
             <div className="linux-setup">
 
-              <h1>安装 cagent</h1>
+              <h1>安装 CAgent</h1>
               <p>选择这台机器上的安装位置，检查后开始安装。</p>
               {!plan?.installed && (
                 <label>
@@ -195,7 +173,7 @@ export function LinuxWorkspace({
                     disabled={busy || job?.state === 'running'}
                     onClick={() => void install()}
                   >
-                    {plan.installed ? '启动并连接 cagent' : '安装并连接 cagent'}
+                    {plan.installed ? '启动并连接 CAgent' : '安装并连接 CAgent'}
                     <ChevronRight size={16} />
                   </button>
                 </div>
@@ -223,4 +201,10 @@ export function LinuxWorkspace({
       )}
     </section>
   );
+  return <div className="linux-desktop-host" hidden={!active}>
+    <LinuxDesktop name={name} machine={ready ? {...machine, deviceId: profileId} : {deviceId:profileId, platform:plan?.platform || 'unknown', sshOnly:true}} target={target} call={call} active={active} closed={closed} onRetry={onRetry} onTerminal={onTerminal}
+      files={files} terminal={terminal || ((visible,theme)=><LinuxDesktopTerminal profileId={profileId} preferences={{...preferences,theme}} active={visible}/>)}
+      extraPanels={ready ? [] : [{id:'install-cagent',label:'安装 CAgent',content:setup}]}/>
+  </div>;
+
 }

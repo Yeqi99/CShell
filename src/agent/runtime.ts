@@ -1,5 +1,6 @@
 import {AccountNetwork} from './account-network';
 import {CagentCloud} from './cloud';
+import { machineSnapshot } from './machine-info';
 import {IdeService} from './ide';
 import {AgentBrowserNetwork} from './browser-network';
 import {CodingService} from './coding';
@@ -202,6 +203,7 @@ export async function createAgentRuntime(
     const admin=local || (owner!=='local' && server.managementAllowed(owner));
     if(method==='network.status')return accountNetwork.status();
     if(method==='network.configure')return accountNetwork.configure(params);
+    if(method==='machine.snapshot'){if(!admin)throw Error('未授权远程管理');z.object({}).strict().parse(params??{});return machineSnapshot(signal);}
     if (method === 'network.probe') {
       if (!local && (owner === 'local' || !server.browserAllowed(owner))) throw new Error('未授权网络访问');
       if (networkProbes >= 2) throw new Error('已有网络检测正在进行，请稍后再试');

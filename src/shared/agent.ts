@@ -4,6 +4,7 @@ import { z } from 'zod';
 export const agentMethods = [
   'network.status','network.configure',
   'network.probe',
+  'machine.snapshot',
   ...codingMethods,
   ...ideMethods,
   'browser.status','browser.open','browser.read','browser.write','browser.close',
