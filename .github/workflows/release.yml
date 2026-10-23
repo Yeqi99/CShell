@@ -95,6 +95,10 @@ jobs:
       - if: matrix.platform == 'win'
         run: pnpm exec tsx scripts/ai-work-smoke.ts
       - if: matrix.platform == 'win'
+        run: pnpm exec tsx scripts/ai-exit-smoke.ts
+      - if: matrix.platform == 'win'
+        run: ./scripts/windows-shortcut-smoke.ps1
+      - if: matrix.platform == 'win'
         run: pnpm exec tsx scripts/mcp-startup-smoke.ts
       - if: matrix.platform == 'win'
         run: pnpm exec tsx scripts/settings-smoke.ts

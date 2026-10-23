@@ -29,6 +29,8 @@ jobs:
       - run: pnpm exec tsx scripts/saved-connect-smoke.ts
       - run: pnpm exec tsx scripts/connection-lifecycle-smoke.ts
       - run: pnpm exec tsx scripts/ai-work-smoke.ts
+      - run: pnpm exec tsx scripts/ai-exit-smoke.ts
+      - run: ./scripts/windows-shortcut-smoke.ps1
       - run: pnpm exec tsx scripts/mcp-startup-smoke.ts
       - run: pnpm exec tsx scripts/settings-smoke.ts
       - run: pnpm exec tsx scripts/floating-smoke.ts
