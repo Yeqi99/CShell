@@ -29,7 +29,7 @@ try {
       net.fetch = async (input) => {
         const url = String(input);
         const mode = (globalThis as any).updateTestMode;
-        if (url.includes('api.github.com')) {
+        if (url.includes('api.github.com') || url.endsWith('/releases.json')) {
           await new Promise((resolve) => setTimeout(resolve, 600));
           if (mode === 'rate') return new Response('', { status: 403 });
           if (mode === 'none') return new Response('[]');
@@ -44,7 +44,7 @@ try {
                 ].map((a) => ({
                   ...a,
                   browser_download_url:
-                    'https://github.com/Yeqi99/CShell/releases/download/v9.9.9/' + a.name,
+                    'https://shell.canp.ai/downloads/opensource/v9.9.9/' + a.name,
                 })),
               },
             ]),
@@ -75,14 +75,14 @@ try {
     (globalThis as any).updateTestMode = 'rate';
   });
   await panel.getByRole('button', { name: '检查更新', exact: true }).click();
-  await panel.getByRole('alert').filter({ hasText: 'GitHub 限制了当前网络的请求' }).waitFor();
+  await panel.getByRole('alert').filter({ hasText: '香港下载服务 限制了当前网络的请求' }).waitFor();
   await mkdir('test-results', { recursive: true });
   await page.screenshot({ path: 'test-results/update-rate-limit.png' });
   assert.equal(await panel.getByRole('button', { name: '下载更新', exact: true }).count(), 0);
-  await panel.getByRole('button', { name: '打开 GitHub 下载页', exact: true }).click();
+  await panel.getByRole('button', { name: '打开下载页', exact: true }).click();
   assert.equal(
     await app.evaluate(() => (globalThis as any).openedUpdatePage),
-    'https://github.com/Yeqi99/CShell/releases',
+    'https://shell.canp.ai/',
   );
   await app.evaluate(() => {
     (globalThis as any).updateTestMode = 'none';

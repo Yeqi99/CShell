@@ -24,6 +24,10 @@ try{
  assert.equal(profile.protocol,'rdp');assert(config.savedCredentials.includes(profile.id));
  assert(!(await readFile(join(data,'config.json'),'utf8')).includes('fixture-secret-7391'));
  await p.locator('.server-open').filter({hasText:'fixture.example'}).dblclick();
+ assert.equal(await app.evaluate(()=> (globalThis as any).rdpOpened),undefined);
+ await p.locator('.linux-desktop:visible .desktop-icons').getByRole('button',{name:'远程桌面',exact:true}).dblclick();
+ await p.getByRole('button',{name:'打开远程桌面',exact:true}).click();
+
  assert.equal(await app.evaluate(()=> (globalThis as any).rdpOpened),profile.id);
  await p.reload();await p.locator('.server-open').filter({hasText:'fixture.example'}).waitFor();
  await p.getByRole('button',{name:'连接操作 · fixture.example',exact:true}).click();

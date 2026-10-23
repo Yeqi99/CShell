@@ -29,9 +29,10 @@ try {
   const id = (await page.locator('.session-tab').getAttribute('data-session'))!;
   await page.evaluate((id) => window.cshell.input(id, 'history-before-float\r\n'), id);
   await page.waitForTimeout(200);
+  await page.getByRole('button', { name: '在独立小窗打开' }).focus();
   const firstWindow = app.waitForEvent('window');
   await page.getByRole('button', { name: '在独立小窗打开' }).click();
-  const first = await firstWindow;
+  const first = await firstWindow.catch(async e => { console.log('FLOAT DIAGNOSTICS', await page.locator('body').innerText()); throw e; });
   first.on('pageerror', (e) => console.log('CHILD', e.message));
   await first.waitForTimeout(1000);
   assert.match(await first.locator('.floating-screen').innerText(), /history-before-float/);

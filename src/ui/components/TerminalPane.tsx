@@ -442,31 +442,25 @@ export function TerminalPane({
     const serializer = new SerializeAddon();
     terminal.loadAddon(serializer);
     let writtenSequence = 0;
-    const dispose = subscribeTerminal(id, (value, sequence) =>
-      terminal.write(value, () => {
+    let writes: Promise<void> = Promise.resolve();
+    const dispose = subscribeTerminal(id, (value, sequence) => {
+      if (!value) { writtenSequence = Math.max(writtenSequence, sequence); return; }
+      writes = new Promise<void>(resolve => terminal.write(value, () => {
         writtenSequence = sequence;
         void window.cshell.acknowledge(id, value.length).catch(() => {});
-      }),
-    );
-    const snapshotDispose = registerTerminalSnapshot(
-      id,
-      () =>
-        new Promise((resolve) =>
-          terminal.write('', () =>
-            resolve({
-              data: serializer.serialize(),
-              sequence: writtenSequence,
-              cols: terminal.cols,
-              rows: terminal.rows,
-              theme: Object.fromEntries(
-                Object.entries(terminal.options.theme || {}).filter(
-                  (entry): entry is [string, string] => typeof entry[1] === 'string',
-                ),
-              ),
-            }),
-          ),
-        ),
-    );
+        resolve();
+      }));
+    });
+    const snapshotDispose = registerTerminalSnapshot(id, async () => {
+      await writes;
+      return {
+        data: serializer.serialize(), sequence: writtenSequence,
+        cols: terminal.cols, rows: terminal.rows,
+        theme: Object.fromEntries(Object.entries(terminal.options.theme || {}).filter(
+          (entry): entry is [string, string] => typeof entry[1] === 'string',
+        )),
+      };
+    });
     const focusTerminal = () => {
       if (suggestionState.current.active && host.current?.clientWidth) {
         fitter.fit();

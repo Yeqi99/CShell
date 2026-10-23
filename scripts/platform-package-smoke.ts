@@ -122,7 +122,7 @@ try {
   stage('Terminal input verified; opening files');
   await page.getByRole('button',{name:'最小化终端',exact:true}).click();
   await page.locator('.linux-desktop:visible .desktop-icons').getByRole('button',{name:'文件',exact:true}).dblclick();
-  await page.getByText('hello.txt', { exact: true }).waitFor();
+  await page.locator('.linux-desktop:visible').getByText('hello.txt', { exact: true }).waitFor();
   await mkdir('test-results', { recursive: true });
   await page.screenshot({ path: `test-results/package-${process.platform}-${process.arch}.png` });
   assert.deepEqual(errors, []);
