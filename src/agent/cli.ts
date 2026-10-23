@@ -72,9 +72,19 @@ async function main() {
   if(command==='app'||command==='app-host'||command==='restart-app-host'){
     let runtime:Awaited<ReturnType<typeof createAgentRuntime>>|undefined;
     let app:Awaited<ReturnType<typeof startCagentApp>>|undefined;
+    const runtimeClosed=async()=>{
+      try{await app?.close();}
+      finally{
+        // Native owners keep this pipe open while the window is hidden. Once
+        // the authenticated runtime shutdown finishes, it must not keep an
+        // otherwise closed app-host process alive. Hiding the window does not
+        // call this callback and still preserves the background runtime.
+        if(command!=='app')stdin.destroy();
+      }
+    };
     try{await callAgent('client.status');}catch(error){
       if((error as Error).message!=='本机 Agent 未运行'&&(error as NodeJS.ErrnoException).code!=='ECONNREFUSED')throw error;
-      runtime=await createAgentRuntime({onClose:()=>{void app?.close();}});
+      runtime=await createAgentRuntime({onClose:()=>{void runtimeClosed().catch(error=>stderr.write('CAgent 界面关闭失败：'+String(error)+'\n'));}});
       await runtime.startControl();
     }
     try{app=await startCagentApp();if(command!=='app'){stdout.write(JSON.stringify({url:app.url})+'\n');stdin.resume();stdin.on('end',()=>{void app?.close();});}else await openCagentApp(app.url);}catch(error){await app?.close();await runtime?.close();throw error;}
