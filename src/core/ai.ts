@@ -296,6 +296,11 @@ export class AiService {
       threads: this.threads,
     });
   }
+  /** Includes turns waiting for approval and commands still settling after cancellation. */
+  get hasActiveWork(): boolean {
+    return this.runs.size > 0 || this.completions.size > 0 ||
+      this.threads.some(thread => this.jobs.list(thread.id).some(job => job.state === 'running'));
+  }
   private persist() {
     this.threads.forEach((t) => this.onThreadUpdate?.(t));
     const data = JSON.stringify({

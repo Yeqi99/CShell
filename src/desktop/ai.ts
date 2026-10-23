@@ -139,7 +139,7 @@ export async function registerAiHandlers(
   handle('ai:stop', (id) => ai.stopAndSave(id));
   handle('ai:mode', (id, mode) => ai.mode(id, mode));
   let disposal: Promise<void> | undefined;
-  return () => {
+  const dispose = () => {
     if (disposal) return disposal;
     ai.onThreadUpdate = undefined;
     clearInterval(revalidate);listenerAbort.abort();const remoteClose=remoteEvents.close();
@@ -150,4 +150,5 @@ export async function registerAiHandlers(
     disposal = Promise.all([events.close(),ai.flush(),remoteClose,network.close(),drafts.snapshot()]).then(()=>{});
     return disposal;
   };
+  return Object.assign(dispose, { hasActiveWork: () => ai.hasActiveWork });
 }

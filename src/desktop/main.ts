@@ -996,7 +996,7 @@ else
       window.on('close', (event) => {
         if (
           closing ||
-          (!ssh.size && !localTerminal.size && !clientProvider.size && !transfers.size && !http.running)
+          (!ssh.size && !localTerminal.size && !clientProvider.size && !transfers.size && !http.running && !disposeAi.hasActiveWork())
         )
           return;
         event.preventDefault();
@@ -1006,8 +1006,8 @@ else
           .showMessageBox(window, {
             type: 'warning',
             message: text(
-              '关闭 CShell 并断开所有会话和传输？',
-              'Close CShell and disconnect all sessions and transfers?',
+              '关闭 CShell 并停止会话、传输和智能体任务？',
+              'Close CShell and stop sessions, transfers, and agent tasks?',
             ),
             buttons: [text('取消', 'Cancel'), text('关闭', 'Close')],
             defaultId: 0,

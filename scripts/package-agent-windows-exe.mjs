@@ -35,7 +35,7 @@ Section "Install"
   System::Call 'Kernel32::SetEnvironmentVariable(t "PSModulePath", t "")'
   StrCpy $1 ""
   IfSilent 0 +2
-    StrCpy $1 "-NoLaunch -NoShortcuts"
+    StrCpy $1 "-NoLaunch -NoShortcuts -RefreshExistingShortcuts"
   nsExec::ExecToLog '\"$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe\" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"$PLUGINSDIR\\deployment\\Install-CAgent.ps1\" -Destination \"$INSTDIR\" $1'
   Pop $0
   StrCmp $0 "0" success

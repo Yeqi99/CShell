@@ -1,7 +1,8 @@
 ﻿param(
   [string]$Destination = (Join-Path $env:LOCALAPPDATA 'Programs\CAgent'),
   [switch]$NoLaunch,
-  [switch]$NoShortcuts
+  [switch]$NoShortcuts,
+  [switch]$RefreshExistingShortcuts
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -63,11 +64,16 @@ $launcher = Join-Path $root 'Open CAgent.vbs'
 NoLink $launcher
 $vbs = 'Set sh = CreateObject("WScript.Shell")' + "`r`n" + 'sh.Run Chr(34) & "' + $exe.Replace('"','""') + '" & Chr(34), 1, False' + "`r`n"
 [IO.File]::WriteAllText($launcher, $vbs, [Text.Encoding]::Unicode)
-if (-not $NoShortcuts) {
+if (-not $NoShortcuts -or $RefreshExistingShortcuts) {
   $shell = New-Object -ComObject WScript.Shell
   foreach ($folder in @([Environment]::GetFolderPath('Programs'), [Environment]::GetFolderPath('Desktop'))) {
     $shortcutPath = Join-Path $folder 'CAgent.lnk'
+    NoLink $shortcutPath
+    if ($NoShortcuts -and -not (Test-Path -LiteralPath $shortcutPath)) { continue }
     $shortcut = $shell.CreateShortcut($shortcutPath)
+    # A silent update may refresh only an existing shortcut to this installation.
+    # Do not recreate a shortcut the user removed or take over another install.
+    if ($NoShortcuts -and ($shortcut.TargetPath -ine (Join-Path $env:SystemRoot 'System32\wscript.exe') -or $shortcut.Arguments -ine ('"' + $launcher + '"'))) { continue }
     $shortcut.TargetPath = Join-Path $env:SystemRoot 'System32\wscript.exe'
     $shortcut.Arguments = '"' + $launcher + '"'
     $shortcut.WorkingDirectory = $versionRoot
