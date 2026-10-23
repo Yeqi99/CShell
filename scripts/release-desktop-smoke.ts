@@ -3,6 +3,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import { fixture } from '../tests/fixture';
 import { workspaceSmoke } from './workspace-smoke';
 import { designSmoke } from './design-smoke';
@@ -110,7 +111,13 @@ try {
   throw error;
 } finally {
   // Bound cleanup of this isolated fixture even if Electron's inspector stops responding.
-  const cleanup = setTimeout(() => app.process().kill(), 10000);
+  const fixtureProcess = app.process();
+  const cleanup = setTimeout(() => {
+    // On Windows Playwright owns a cmd wrapper; kill its fixture tree, not just the wrapper.
+    if (process.platform === 'win32' && fixtureProcess.pid)
+      execFile('taskkill', ['/PID', String(fixtureProcess.pid), '/T', '/F'], () => {});
+    else fixtureProcess.kill();
+  }, 10000);
   try {
     await app.evaluate(({app})=>app.exit(0)).catch(()=>{}); await app.close().catch(()=>{});
   } finally { clearTimeout(cleanup); }
