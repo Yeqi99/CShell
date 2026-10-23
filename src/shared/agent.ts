@@ -2,7 +2,7 @@ import {ideMethods} from './ide';
 import {codingMethods} from './coding';
 import { z } from 'zod';
 export const agentMethods = [
-  'network.probe',
+  'network.probe','machine.snapshot',
   ...codingMethods,
   ...ideMethods,
   'browser.status','browser.open','browser.read','browser.write','browser.close',

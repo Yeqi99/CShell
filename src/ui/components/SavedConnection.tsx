@@ -1,3 +1,4 @@
+import {LinuxDesktop} from './LinuxDesktop';
 import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, FileKey2, LoaderCircle } from 'lucide-react';
 import type { Credentials, Profile } from '../../shared/contracts';
@@ -69,7 +70,7 @@ export function SavedConnection({
     started.current = true;
     if (saved) void start();
   }, []);
-  return (
+  const authentication = (
     <section className="saved-connection editor-page" aria-busy={busy}>
       <h1>{profile.name}</h1>
       <p className="saved-connection-target">
@@ -144,4 +145,6 @@ export function SavedConnection({
       )}
     </section>
   );
+  return <div className="linux-desktop-host"><LinuxDesktop name={profile.name} machine={{deviceId:profile.id,platform:'unknown',sshOnly:true}} target={'pending:'+profile.id} call={async()=>{throw Error('连接尚未建立');}} active={true} closed={true} initialApp="terminal" connectionLabel={busy?'正在连接…':error?'无法连接 · 点击重试':'等待连接'} onRetry={()=>{if(!busy)void start();}} files={authentication} terminal={()=>authentication}/></div>;
+
 }

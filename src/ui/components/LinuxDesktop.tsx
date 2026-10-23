@@ -1,3 +1,4 @@
+import {MachineInformation} from './MachineInformation';
 import {IdeApp} from './IdeApp';
 import {agentRead} from '../agent-read';
 import {CodingApp} from './CodingApp';
@@ -31,6 +32,7 @@ import { TerminalPane } from './TerminalPane';
 import './linux-desktop.css';
 
 const apps = [
+  { id: 'machine-info', label: '机器信息', icon: Monitor, color: 'blue' },
   { id: 'ide', label: '代码编辑器', icon: Terminal, color: 'blue' },
   { id: 'codex', label: 'Codex', icon: Terminal, color: 'green' },
   { id: 'claude', label: 'Claude Code', icon: Terminal, color: 'amber' },
@@ -104,7 +106,12 @@ export function LinuxDesktop({
   onTerminal,
   terminal,
   extraPanels = [],
+  files, onRetry, connectionLabel, initialApp,
 }: {
+  initialApp?: string;
+  files?: ReactNode;
+  onRetry?: () => void;
+  connectionLabel?: string;
   name: string;
   machine: any;
   target: string;
@@ -117,15 +124,16 @@ export function LinuxDesktop({
 }) {
   const [installed,setInstalled]=useState<string[]>([]);
   const refreshInstalled=useCallback(async()=>{
+    if(machine.sshOnly || closed)return;
     const [c,i]=await Promise.allSettled([agentRead(()=>call('coding.status')),agentRead(()=>call('ide.status'))]);
     const ids:string[]=[];
     if(c.status==='fulfilled')for(const engine of (c.value as any)?.engines??[])if(engine.ready)ids.push(engine.engine);
     if(i.status==='fulfilled'&&(i.value as any)?.ready&&(i.value as any)?.supported)ids.push('ide');
     setInstalled(ids);
-  },[call]);
+  },[call,machine.sshOnly,closed]);
   useEffect(()=>{void refreshInstalled();},[refreshInstalled]);
   const catalog = [
-    ...apps.filter(app => ['codex','claude','ide'].includes(app.id)?installed.includes(app.id):machine.terminalOnly ? app.id === 'terminal' : machine.platform === 'android' ? app.id === 'settings' : app.id === 'browser' ? ['linux','win32','darwin'].includes(machine.platform) : app.id !== 'native' || machine.platform === 'linux'),
+    ...apps.filter(app => machine.sshOnly ? ['terminal','files'].includes(app.id) : ['codex','claude','ide'].includes(app.id)?installed.includes(app.id):machine.terminalOnly ? app.id === 'terminal' : machine.platform === 'android' ? app.id === 'settings' : app.id === 'browser' ? ['linux','win32','darwin'].includes(machine.platform) : app.id !== 'native' || machine.platform === 'linux'),
     ...extraPanels.map((p) => ({ id: p.id, label: p.label, icon: p.icon ?? Settings, color: 'slate' })),
   ];
   const [context, setContext] = useState<{id:string;x:number;y:number}>();
@@ -210,6 +218,7 @@ export function LinuxDesktop({
           ],
     );
   };
+  useEffect(()=>{if(initialApp)open(initialApp);},[initialApp]);
   const patch = (id: string, change: Partial<WindowState>) =>
     setWindows((v) => v.map((w) => (w.id === id ? { ...w, ...change } : w)));
   const front = windows.filter((w) => !w.minimized && !w.closed && catalog.some(a=>a.id===w.id)).sort((a, b) => b.z - a.z)[0]?.id;
@@ -371,7 +380,7 @@ export function LinuxDesktop({
         )}
         <div className="desktop-watermark">
           <span>{name}</span>
-          <small>{machine.platform === 'win32' ? 'Windows' : machine.platform === 'linux' ? 'Linux' : machine.platform === 'android' ? 'Android' : '设备'} · cagent</small>
+          <small>{machine.platform === 'win32' ? 'Windows' : machine.platform === 'linux' ? 'Linux' : machine.platform === 'android' ? 'Android' : '设备'} · {machine.sshOnly ? 'SSH' : 'CAgent'}</small>
         </div>
         {windows.map((w) => {
           const app = catalog.find((a) => a.id === w.id);
@@ -460,7 +469,8 @@ export function LinuxDesktop({
                     onMinimize={() => patch(w.id, { minimized: true })}
                   />
                 )}
-                {w.id === 'files' && <AgentMachineFiles target={target} call={call} />}
+                {w.id === 'files' && (files ?? (!closed && <AgentMachineFiles target={target} call={call} />))}
+                {w.id === 'machine-info' && <MachineInformation call={call} active={active && visible && front === w.id} closed={closed}/>}
                 {w.id === 'applications' && (
                   <AgentApplications
                     onDevelopmentOpen={id=>{void refreshInstalled().then(()=>open(id))}}
@@ -675,14 +685,7 @@ export function LinuxDesktop({
             </section>
           );
         })}
-        {closed && (
-          <div className="desktop-disconnected" role="status">
-            <Monitor size={30} />
-            <h2>连接已断开</h2>
-            <p>重新连接这台机器后继续工作。</p>
-            <button onClick={onTerminal}>返回 SSH</button>
-          </div>
-        )}
+
       </div>
       {menu && (
         <div className="desktop-start">
@@ -740,10 +743,10 @@ export function LinuxDesktop({
             })}
         </nav>
         <span className="desktop-taskbar-spacer" />
-        <span className="desktop-machine-name" title={machine.deviceId}>
+        <button className="desktop-machine-name" title={connectionLabel || (closed ? '无法连接，点击重试' : '网络连接正常')} onClick={onRetry} aria-label={closed ? '连接已断开，重试' : '网络连接正常'}>
           <i className={closed ? 'offline' : ''} />
-          {name}
-        </span>
+          {connectionLabel || (closed ? '无法连接' : name)}
+        </button>
         <button
           title="切换桌面明暗主题"
           aria-label="切换桌面明暗主题"

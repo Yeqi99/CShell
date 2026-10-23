@@ -1,3 +1,4 @@
+import { machineSnapshot } from './machine-info';
 import {IdeService} from './ide';
 import {AgentBrowserNetwork} from './browser-network';
 import {CodingService} from './coding';
@@ -191,6 +192,7 @@ export async function createAgentRuntime(
     if (closed) throw new Error('Agent 已关闭');
     if(method.startsWith('update.')){if(!local)throw new Error('更新只允许在本机执行');if(method==='update.settings')return updater.settings(z.object({automatic:z.boolean().optional()}).parse(params??{}).automatic);if(method==='update.check')return updater.check();if(method==='update.download')return updater.start();if(method==='update.status')return updater.status();if(method==='update.verify')return updater.verify();throw new Error('未知更新操作');}
     const admin=local || (owner!=='local' && server.managementAllowed(owner));
+    if(method==='machine.snapshot'){if(!admin)throw Error('未授权远程管理');z.object({}).strict().parse(params??{});return machineSnapshot(signal);}
     if (method === 'network.probe') {
       if (!local && (owner === 'local' || !server.browserAllowed(owner))) throw new Error('未授权网络访问');
       if (networkProbes >= 2) throw new Error('已有网络检测正在进行，请稍后再试');

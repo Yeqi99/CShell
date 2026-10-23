@@ -7,6 +7,7 @@ import type { AgentCall } from '../../shared/agent';
  * the catalog coverage test rejects newly added, unclassified RPC methods.
  */
 export const agentApiExcludedMethods = {
+  'machine.snapshot': 'Machine diagnostics use the dedicated authenticated machine workspace, not generic management.',
   'network.probe': 'Network diagnostics are exposed through the dedicated authenticated connection diagnostics UI, not generic management.',
   'ide.cancel':'IDE install cancellation is scoped to the authenticated owner.',
   'coding.install.cancel':'Installation cancellation is scoped to the authenticated owner and job.',

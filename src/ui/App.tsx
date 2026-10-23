@@ -1,3 +1,4 @@
+import {FilePanel} from './components/FilePanel';
 import {LinuxWorkspace} from './components/LinuxWorkspace';
 import {SavedAgentConnection} from './components/SavedAgentConnection';
 import { MonitorViews } from './components/MonitorViews';
@@ -244,7 +245,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
   const [linuxWorkspaces,setLinuxWorkspaces]=useState<string[]>([]);
   const [linuxModes,setLinuxModes]=useState<Record<string,boolean>>({});
   const linuxRestored=useRef(new Set<string>());
-  useEffect(()=>{for(const tab of tabs){if(tab.local||tab.client||linuxRestored.current.has(tab.id))continue;linuxRestored.current.add(tab.id);if(localStorage.getItem('cshell-linux-workspace:'+tab.profile.id)==='cagent'){setLinuxWorkspaces(v=>v.includes(tab.id)?v:[...v,tab.id]);setLinuxModes(v=>({...v,[tab.id]:true}));}}},[tabs]);
+  useEffect(()=>{for(const tab of tabs){if(tab.local||tab.client||linuxRestored.current.has(tab.id))continue;linuxRestored.current.add(tab.id);if(true){setLinuxWorkspaces(v=>v.includes(tab.id)?v:[...v,tab.id]);setLinuxModes(v=>({...v,[tab.id]:true}));}}},[tabs]);
   const [machineSessionIds,setMachineSessionIds]=useState<Record<string,string[]>>({});
   const [machineSessionCounts,setMachineSessionCounts]=useState<Record<string,number>>({});
   const [machines,setMachines]=useState<{device:ClientDevice;target:AgentTarget}[]>([]),[machineId,setMachineId]=useState('');
@@ -470,6 +471,8 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
       ...v,
       { id: result.sessionId, profile, closed: terminalClosed(result.sessionId) },
     ]);
+    setLinuxWorkspaces(v=>[...v,result.sessionId]);
+    setLinuxModes(v=>({...v,[result.sessionId]:true}));
     setActive(result.sessionId);
     setSurface('terminal');
     void refresh().catch(onError);
@@ -1203,7 +1206,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
             <WorkbenchHome config={config} active={surface === 'home' || (surface === 'terminal' && !tabs.length)} currentCount={currentSsh.length + currentDevices.length}
               onNew={() => openConnection('new')} onViews={() => { setViewsOpen(true); setSurface('views'); }} onConnect={openSaved} onCurrent={openCurrentView}/>
           </div>
-          {surface === 'terminal' && current?.closed && (
+          {surface === 'terminal' && current?.closed && !linuxModes[current.id] && (
             <div className="disconnected-session-bar" role="status">
               <span>
                 <strong>{t('disconnected')}</strong>
@@ -1244,12 +1247,12 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
               </button>
             </div>
           )}
-          {surface==='terminal'&&current&&!current.local&&!current.client&&!linuxModes[current.id]&&<div className="linux-mode-bar"><button aria-pressed={!linuxModes[current.id]} onClick={()=>{localStorage.setItem('cshell-linux-workspace:'+current.profile.id,'ssh');setLinuxModes(v=>({...v,[current.id]:false}));}}>SSH 终端</button><button disabled={current.closed} aria-pressed={!!linuxModes[current.id]} onClick={()=>{localStorage.setItem('cshell-linux-workspace:'+current.profile.id,'cagent');setLinuxWorkspaces(v=>v.includes(current.id)?v:[...v,current.id]);setLinuxModes(v=>({...v,[current.id]:true}));}}>CAgent 工作区</button><span>{current.profile.name}</span></div>}
-          {tabs.filter(tab=>linuxWorkspaces.includes(tab.id)).map(tab=><LinuxWorkspace key={tab.id} session={tab.id} profileId={tab.profile.id} preferences={preferences} name={tab.profile.name} active={surface==='terminal'&&active===tab.id&&!!linuxModes[tab.id]} closed={!!tab.closed} onTerminal={()=>setLinuxModes(v=>({...v,[tab.id]:false}))}/>)}
+
+          {tabs.filter(tab=>linuxWorkspaces.includes(tab.id)).map(tab=><LinuxWorkspace key={tab.id} session={tab.id} profileId={tab.profile.id} preferences={preferences} name={tab.profile.name} active={surface==='terminal'&&active===tab.id&&!!linuxModes[tab.id]} closed={!!tab.closed} onRetry={()=>openSaved(tab.profile)} onTerminal={()=>{}} files={<div inert={!!tab.closed} style={{height:"100%"}}><FilePanel sessionId={tab.id} transfers={transfers} onError={onError}/></div>} terminal={(visible,theme)=><TerminalPane id={tab.id} active={visible} preferences={{...preferences,theme}} closed={tab.closed} suggestionsEnabled={pluginEnabled(config.plugins,'commands')} plugins={config.plugins} textEditingSupported={true} searching={searching&&active===tab.id} onSearchClose={()=>setSearching(false)} onError={onError}/>}/>)}
           <AiExecution enabled={preferences.showAiExecution && !minimal} sessionId={current?.id} />
           {tabs.length ? (
             <div className="terminals" hidden={surface !== 'terminal'||!!linuxModes[active]}>
-              {tabs.map((tab) => (
+              {tabs.filter(tab=>!linuxWorkspaces.includes(tab.id)).map((tab) => (
                 <TerminalPane
                   key={tab.id}
                   id={tab.id}
