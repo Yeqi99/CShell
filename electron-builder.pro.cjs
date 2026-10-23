@@ -1,7 +1,7 @@
 const base = require('./package.json').build;
 module.exports = {...base, appId:'org.canpshell.pro', productName:'CShell Pro',
  extraMetadata:{name:'canpshell-pro',productName:'CShell Pro'},
- directories:{output:'release/pro-0.8.4'}, artifactName:'CShell-Pro-${version}-${os}-${arch}.${ext}',
+ directories:{output:'release/pro-0.8.5'}, artifactName:'CShell-Pro-${version}-${os}-${arch}.${ext}',
  files:[...base.files,'assets/brand/cshell-pro.png'],
  win:{...base.win,icon:'assets/brand/cshell-pro.ico'},
  mac:{...base.mac,icon:'assets/brand/cshell-pro-512.png'},
