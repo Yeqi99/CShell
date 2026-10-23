@@ -6,7 +6,7 @@ export function MachineConnectionState({name, phase, error, details, primary, se
   primary?:{label:string;run:()=>void}; secondary?:{label:string;run:()=>void};
 }) {
   const pending=['checking','connecting','installing'].includes(phase);
-  const labels={checking:'正在检查工作区',connecting:'正在连接 cagent',installing:'正在准备工作区',error:'暂时无法打开工作区',closed:'连接已断开'};
+  const labels={checking:'正在检查工作区',connecting:'正在连接 CAgent',installing:'正在准备工作区',error:'暂时无法打开工作区',closed:'连接已断开'};
   return <section className="machine-connection-state" aria-label="机器连接状态" aria-busy={pending}>
     <div className="machine-connection-card">
       <div className="machine-connection-emblem"><Monitor size={30}/></div>

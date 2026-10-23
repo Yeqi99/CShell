@@ -124,7 +124,7 @@ export function LinuxDesktop({
 }) {
   const [installed,setInstalled]=useState<string[]>([]);
   const refreshInstalled=useCallback(async()=>{
-    if(machine.sshOnly || closed)return;
+    if(machine.sshOnly || machine.desktopOnly || closed)return;
     const [c,i]=await Promise.allSettled([agentRead(()=>call('coding.status')),agentRead(()=>call('ide.status'))]);
     const ids:string[]=[];
     if(c.status==='fulfilled')for(const engine of (c.value as any)?.engines??[])if(engine.ready)ids.push(engine.engine);
@@ -133,7 +133,7 @@ export function LinuxDesktop({
   },[call,machine.sshOnly,closed]);
   useEffect(()=>{void refreshInstalled();},[refreshInstalled]);
   const catalog = [
-    ...apps.filter(app => machine.sshOnly ? ['terminal','files'].includes(app.id) : ['codex','claude','ide'].includes(app.id)?installed.includes(app.id):machine.terminalOnly ? app.id === 'terminal' : machine.platform === 'android' ? app.id === 'settings' : app.id === 'browser' ? ['linux','win32','darwin'].includes(machine.platform) : app.id !== 'native' || machine.platform === 'linux'),
+    ...apps.filter(app => machine.desktopOnly ? false : machine.sshOnly ? ['terminal','files'].includes(app.id) : ['codex','claude','ide'].includes(app.id)?installed.includes(app.id):machine.terminalOnly ? app.id === 'terminal' : machine.platform === 'android' ? app.id === 'settings' : app.id === 'browser' ? ['linux','win32','darwin'].includes(machine.platform) : app.id !== 'native' || machine.platform === 'linux'),
     ...extraPanels.map((p) => ({ id: p.id, label: p.label, icon: p.icon ?? Settings, color: 'slate' })),
   ];
   const [context, setContext] = useState<{id:string;x:number;y:number}>();
@@ -380,7 +380,7 @@ export function LinuxDesktop({
         )}
         <div className="desktop-watermark">
           <span>{name}</span>
-          <small>{machine.platform === 'win32' ? 'Windows' : machine.platform === 'linux' ? 'Linux' : machine.platform === 'android' ? 'Android' : '设备'} · {machine.sshOnly ? 'SSH' : 'CAgent'}</small>
+          <small>{machine.platform === 'win32' ? 'Windows' : machine.platform === 'linux' ? 'Linux' : machine.platform === 'android' ? 'Android' : '设备'} · {machine.protocolLabel || (machine.sshOnly ? 'SSH' : 'CAgent')}</small>
         </div>
         {windows.map((w) => {
           const app = catalog.find((a) => a.id === w.id);

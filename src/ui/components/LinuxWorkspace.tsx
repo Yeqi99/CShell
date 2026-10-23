@@ -139,7 +139,7 @@ export function LinuxWorkspace({
                 <label>
                   安装目录
                   <input
-                    aria-label="cagent 安装目录"
+                    aria-label="CAgent 安装目录"
                     placeholder="留空使用用户目录，例如 /data/cagent"
                     value={directory}
                     disabled={busy || job?.state === 'running'}

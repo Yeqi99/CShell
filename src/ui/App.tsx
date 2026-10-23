@@ -1,3 +1,4 @@
+import {RdpMachineWorkspace} from './components/RdpMachineWorkspace';
 import {FilePanel} from './components/FilePanel';
 import {LinuxWorkspace} from './components/LinuxWorkspace';
 import {SavedAgentConnection} from './components/SavedAgentConnection';
@@ -274,7 +275,6 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
   const [quickConnections, setQuickConnections] = useState<Profile[]>([]);
   const [quickId, setQuickId] = useState('');
   const openSaved = (profile: Profile) => {
-    if(profile.protocol==='rdp'){void window.cshell.openRdp(profile.id).catch(e=>{openConnection(profile);setError(e.message);});return;}
     setQuickConnections((items) =>
       items.some((item) => item.id === profile.id) ? items : [...items, profile],
     );
@@ -1060,7 +1060,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
               className="workspace-editor"
               hidden={surface !== 'quick' || quickId !== profile.id}
             >
-              {profile.protocol === 'http' ? (
+              {profile.protocol === 'rdp' ? <RdpMachineWorkspace profile={profile} profiles={config.profiles} onOpen={openSaved}/> : profile.protocol === 'http' ? (
                 <HttpWorkbench
                   profile={config.profiles.find((p) => p.id === profile.id) ?? profile}
                   enabled={pluginEnabled(config.plugins, 'http')}
