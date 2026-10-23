@@ -4,8 +4,10 @@ import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import assert from 'node:assert/strict';
+const edition = process.env.CSHELL_EDITION === 'pro' ? 'pro' : 'opensource';
+const assetName = `${edition === 'pro' ? 'CShell-Pro' : 'CShell'}-9.9.9-win-x64.exe`;
 const data = await mkdtemp(join(tmpdir(), 'cshell-update-'));
-const env = { ...process.env, CSHELL_TEST_DATA: data };
+const env = { ...process.env, CSHELL_TEST_DATA: data, CSHELL_TEST_START_GATE: '1' };
 delete env.ELECTRON_RUN_AS_NODE;
 const app = await electron.launch({
   ...(process.env.CSHELL_EXECUTABLE
@@ -15,13 +17,17 @@ const app = await electron.launch({
   timeout: 30000,
 });
 try {
+  // Attach before packaged startup creates its first window, and wait until the
+  // application is ready before replacing only the update network fixture.
+  const page = app.context().pages()[0] ?? await app.context().waitForEvent('page', { timeout: 60000 });
+  await page.waitForFunction(() => !!window.cshell);
   await app.evaluate(() => {
     (globalThis as any).__name = Object;
   });
   const content = 'harmless update fixture',
     hash = createHash('sha256').update(content).digest('hex');
   await app.evaluate(
-    ({ net, shell }, { content, hash }) => {
+    ({ net, shell }, { content, hash, edition, assetName }) => {
       (globalThis as any).updateTestMode = 'success';
       shell.openExternal = async (url) => {
         (globalThis as any).openedUpdatePage = url;
@@ -39,28 +45,26 @@ try {
                 tag_name: 'v9.9.9',
                 draft: false,
                 assets: [
-                  { name: 'CShell-9.9.9-win-x64.exe', size: content.length },
+                  { name: assetName, size: content.length },
                   { name: 'SHA256SUMS.txt', size: 100 },
                 ].map((a) => ({
                   ...a,
                   browser_download_url:
-                    'https://shell.canp.ai/downloads/opensource/v9.9.9/' + a.name,
+                    `https://shell.canp.ai/downloads/${edition}/v9.9.9/` + a.name,
                 })),
               },
             ]),
           );
         }
         if (url.endsWith('SHA256SUMS.txt'))
-          return new Response(hash + '  ./CShell-9.9.9-win-x64.exe');
+          return new Response(hash + '  ./' + assetName);
         return mode === 'download-error'
           ? new Response('', { status: 503 })
           : new Response(content);
       };
     },
-    { content, hash },
+    { content, hash, edition, assetName },
   );
-  const page = await app.firstWindow();
-  await page.waitForFunction(() => !!window.cshell);
   await page.locator('.topbar button').last().click();
   await page.getByRole('button', { name: '关于与更新', exact: true }).click();
   const panel = page.locator('.update-settings');
@@ -104,7 +108,7 @@ try {
   });
   state = await page.evaluate(() => window.cshell.downloadUpdate());
   assert.equal(state.phase, 'ready');
-  await writeFile(join(data, 'updates', 'CShell-9.9.9-win-x64.exe'), 'tampered');
+  await writeFile(join(data, 'updates', assetName), 'tampered');
   const error = await page.evaluate(() =>
     window.cshell.installUpdate().then(
       () => '',
