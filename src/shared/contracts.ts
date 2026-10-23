@@ -353,9 +353,9 @@ export interface Bridge
   networkDiagnostics?(): Promise<import('./network-probe').NetworkDiagnostics>;
   networkProbe?(input: { id: string; source: string; target: string }): Promise<import('./network-probe').NetworkProbeResult>;
   networkProbeCancel?(id: string): Promise<void>;
-  connectionImportText?(text: string): Promise<import('../core/connection-import').ConnectionImportPreview>;
-  connectionImportFile?(delimiter: ',' | ';' | '\t'): Promise<import('../core/connection-import').ConnectionImportPreview | null>;
-  connectionImportPreview?(token: string, options: { mapping?: Partial<Record<import('./connection-batch').ImportColumn, number>>; username?: string }): Promise<import('../core/connection-import').ConnectionImportPreview>;
+  connectionImportText?(text: string): Promise<import('./connection-batch').ConnectionImportPreview>;
+  connectionImportFile?(delimiter: ',' | ';' | '\t'): Promise<import('./connection-batch').ConnectionImportPreview | null>;
+  connectionImportPreview?(token: string, options: { mapping?: Partial<Record<import('./connection-batch').ImportColumn, number>>; username?: string }): Promise<import('./connection-batch').ConnectionImportPreview>;
   connectionImportApply?(token: string, rows: number[], policy: 'skip' | 'keep'): Promise<{ imported: string[]; skipped: number }>;
   connectionImportDiscard?(token: string): Promise<void>;
   networkStatus?(): Promise<import('./network-route').NetworkRouteStatus>;
