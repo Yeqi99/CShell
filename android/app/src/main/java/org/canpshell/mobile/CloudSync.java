@@ -17,6 +17,7 @@ final class CloudSync {
   private final Context context;
   private JSONObject state;
   private JSONObject membership;
+  private JSONObject accounts = new JSONObject();
   private long profileChecked;
   CloudSync(Context context) { this.context=context; }
   private SecretKey localKey()throws Exception{
@@ -34,11 +35,18 @@ final class CloudSync {
     String[] pair=raw.split(":",2);Cipher cipher=Cipher.getInstance("AES/GCM/NoPadding");
     cipher.init(Cipher.DECRYPT_MODE,localKey(),new GCMParameterSpec(128,un64(pair[0])));cipher.updateAAD(bytes("cshell-cloud-local:1"));
     state=new JSONObject(new String(cipher.doFinal(un64(pair[1])),StandardCharsets.UTF_8));
+    if(state.optInt("accountFormat")==1){accounts=state.getJSONObject("accounts");state=state.getJSONObject("active");}
   }
   private void save()throws Exception{
     Cipher cipher=Cipher.getInstance("AES/GCM/NoPadding");cipher.init(Cipher.ENCRYPT_MODE,localKey());cipher.updateAAD(bytes("cshell-cloud-local:1"));
-    String encoded=b64(cipher.getIV())+":"+b64(cipher.doFinal(bytes(state.toString())));
+    String encoded=b64(cipher.getIV())+":"+b64(cipher.doFinal(bytes(new JSONObject().put("accountFormat",1).put("active",state).put("accounts",accounts).toString())));
     if(!context.getSharedPreferences("cloud-sync",0).edit().putString("vault",encoded).commit())throw new IOException("无法保存加密同步状态");
+  }
+  synchronized String owner() throws Exception {load();return state.has("session")?state.getJSONObject("session").getString("accountId"):"guest";}
+  private void archive() throws Exception {
+    if(!state.has("session"))return;
+    JSONObject copy=new JSONObject(state.toString());copy.remove("session");copy.remove("key");
+    accounts.put(owner(),copy);
   }
   private JSONObject api(String path,JSONObject body)throws Exception{
     HttpURLConnection connection=(HttpURLConnection)new URL("https://shell.canp.ai/api/v1/"+path).openConnection();
@@ -80,7 +88,7 @@ final class CloudSync {
     }
   }
   private JSONObject status()throws Exception{
-    return new JSONObject().put("membership",state.optJSONObject("membership")).put("email",state.has("session")?state.getJSONObject("session").getString("email"):"")
+    return new JSONObject().put("owner",owner()).put("membership",state.optJSONObject("membership")).put("email",state.has("session")?state.getJSONObject("session").getString("email"):"")
       .put("unlocked",state.has("key")).put("revision",state.optLong("revision",0)).put("lastSync",state.optLong("lastSync",0));
   }
   private JSONObject publicData(JSONObject data)throws Exception{
@@ -95,6 +103,9 @@ final class CloudSync {
     return new JSONObject().put("profiles",profiles).put("models",models).put("theme",data.getJSONObject("store").getJSONObject("preferences").optString("theme","light"));
   }
   synchronized JSONObject call(JSONObject request)throws Exception{
+    try{return callInternal(request);}catch(Exception error){state=null;accounts=new JSONObject();membership=null;profileChecked=0;load();throw error;}
+  }
+  private JSONObject callInternal(JSONObject request)throws Exception{
     load();String action=request.getString("action");JSONObject result=new JSONObject();
     if(Arrays.asList("refresh","download","upload").contains(action))refreshMembership();
     if(action.equals("register")){
@@ -108,13 +119,13 @@ final class CloudSync {
       JSONObject encrypted=new JSONObject().put("format",1).put("nonce",b64(vaultNonce)).put("ciphertext",b64(CloudCipher.transform(true,raw,vaultNonce,bytes(bundle.toString()),account)));
       JSONObject session=api("auth/register",new JSONObject().put("email",request.getString("email")).put("code",request.getString("code")).put("password",password).put("accountId",account).put("keybox",new JSONObject().put("salt",b64(salt)).put("envelope",wrapped)).put("envelope",encrypted));
       if(!session.getString("accountId").equals(account))throw new IOException("注册响应不正确，请使用密码登录");
-      state=new JSONObject().put("session",session).put("key",key).put("bundle",bundle).put("revision",1).put("lastSync",System.currentTimeMillis()).put("membership",new JSONObject().put("active",false).put("expiresAt",JSONObject.NULL));profileChecked=0;save();
+      archive();state=new JSONObject().put("session",session).put("key",key).put("bundle",bundle).put("revision",1).put("lastSync",System.currentTimeMillis()).put("membership",new JSONObject().put("active",false).put("expiresAt",JSONObject.NULL));profileChecked=0;save();
       return publicData(bundle).put("status",status());
     }
     if(action.equals("code")){api("auth/code",new JSONObject().put("email",request.getString("email")));}
     else if((action.equals("login") || action.equals("password-login"))){
       JSONObject session=api("auth/"+action,new JSONObject().put("email",request.getString("email")).put(action.equals("password-login")?"password":"code",request.getString("code")));
-      if(!state.has("session")||!state.getJSONObject("session").getString("accountId").equals(session.getString("accountId")))state=new JSONObject();
+      if(!owner().equals(session.getString("accountId"))){archive();JSONObject cached=accounts.optJSONObject(session.getString("accountId"));state=cached==null?new JSONObject():new JSONObject(cached.toString());}
       membership=null;profileChecked=0;state.put("session",session);
       if(action.equals("password-login") && !session.isNull("keybox")){
         JSONObject box=session.getJSONObject("keybox"), envelope=box.getJSONObject("envelope");
@@ -126,15 +137,19 @@ final class CloudSync {
         state.put("key",new JSONObject(new String(clear,java.nio.charset.StandardCharsets.UTF_8)).getString("key"));
       }
       save();
-      if(state.has("key"))return call(new JSONObject().put("action","download"));
+      if(state.has("key")){
+        if(state.has("bundle"))return publicData(state.optJSONObject("pendingBundle")!=null?state.getJSONObject("pendingBundle"):state.getJSONObject("bundle")).put("status",status());
+        return call(new JSONObject().put("action","download"));
+      }
     }else if(action.equals("unlock")){
       JSONObject remote=api("vault",null);JSONObject data=decrypt(remote.getJSONObject("envelope"),request.getString("key"));
       state.put("key",request.getString("key"));save();
     }else if((action.equals("download")||action.equals("refresh"))){
+      if(action.equals("refresh")&&state.has("pending"))throw new IOException("未上传的更改需要确认，请选择保留此设备更改或云端更改");
       JSONObject remote=api("vault",null);state.put("lastSync",System.currentTimeMillis());if(action.equals("refresh") && remote.getLong("revision")==state.optLong("revision",0))return result.put("status",status());if(remote.getLong("revision")<state.optLong("revision",0))throw new IOException("云端版本回退");
       JSONObject data=decrypt(remote.getJSONObject("envelope"),state.getString("key"));
       if(state.has("bundle"))state.put("backup",state.getJSONObject("bundle"));
-      state.put("bundle",data).put("revision",remote.getLong("revision"));state.remove("pending");save();result=publicData(data);
+      state.put("bundle",data).put("revision",remote.getLong("revision"));state.remove("pending");state.remove("pendingBundle");save();result=publicData(data);
     }else if(action.equals("upload")){
       if(!state.has("bundle"))throw new IOException("请先从 Windows 上传，再在这里恢复云端");
       if(!state.has("pending")){
@@ -145,7 +160,7 @@ final class CloudSync {
         for(int i=0;i<input.length();i++){
           JSONObject p=input.getJSONObject(i);String id=p.getString("id");UUID.fromString(id);if(!ids.add(id))throw new IOException("重复连接");
           JSONObject old=existing.get(id),next=old==null?new JSONObject():new JSONObject(old.toString());
-          if(p.optString("protocol").equals("agent")&&old==null)throw new IOException("新增 cagent 需先在桌面端配对；本轮未上传");
+          if(p.optString("protocol").equals("agent")&&old==null)throw new IOException("新增 CAgent 需先在桌面端配对；本轮未上传");
           for(String field:Arrays.asList("id","name","host","username","group","auth"))next.put(field,p.getString(field));
           next.put("protocol",p.optString("protocol").equals("agent")?"client":"ssh").put("port",Integer.parseInt(p.getString("port"))).put("favorite",p.optBoolean("favorite"));
           if(old!=null&&(!old.optString("host").equals(next.optString("host"))||old.optInt("port")!=next.optInt("port")||!old.optString("username").equals(next.optString("username"))||!old.optString("auth").equals(next.optString("auth"))))store.getJSONObject("secrets").remove(id);
@@ -155,12 +170,12 @@ final class CloudSync {
         validate(data);state.put("pendingBundle",data).put("pending",new JSONObject().put("baseRevision",state.getLong("revision")).put("mutationId",UUID.randomUUID().toString()).put("envelope",encrypt(data)));save();
       }
       JSONObject answer=api("vault",state.getJSONObject("pending"));state.put("lastSync",System.currentTimeMillis());state.put("backup",state.getJSONObject("bundle"));state.put("bundle",state.getJSONObject("pendingBundle")).put("revision",answer.getLong("revision"));state.remove("pending");state.remove("pendingBundle");save();
-    }else if(action.equals("logout")){api("auth/logout",new JSONObject());state.remove("session");state.remove("key");state.remove("pending");state.remove("pendingBundle");save();}
+    }else if(action.equals("logout")){api("auth/logout",new JSONObject());archive();state=new JSONObject();save();}
     else if(!action.equals("status"))throw new IOException("不支持的同步操作");
     return result.put("status",status());
   }
   synchronized JSONObject cloudAgent(String profileId)throws Exception{
-    load();if(!state.has("session")||!state.has("bundle"))return null;
+    load();if(!state.has("session")||!state.has("key")||!state.has("bundle"))return null;
     JSONObject bundle=state.getJSONObject("bundle");JSONArray profiles=bundle.getJSONObject("store").getJSONArray("profiles");boolean known=false;
     for(int i=0;i<profiles.length();i++){JSONObject p=profiles.getJSONObject(i);if(p.optString("id").equals(profileId)&&p.optString("protocol").equals("client"))known=true;}
     if(!known)return null;

@@ -726,7 +726,7 @@ window.updateEvent = (json) => {
 };
 render();
 const mobileCloud=new MobileCloud(window.CShellNative,()=>({profiles,theme:dark?'dark':'light'}),data=>{
-  localStorage.setItem('profiles-before-cloud',JSON.stringify(profiles));
+  localStorage.removeItem('profiles-before-cloud');
   profiles=data.profiles;localStorage.setItem('profiles',JSON.stringify(profiles));
   dark=data.theme==='dark';localStorage.setItem('theme',dark?'dark':'light');applyTheme();render();
 });

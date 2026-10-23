@@ -51,13 +51,15 @@ final class MachineBrowser implements AutoCloseable {
   private Button button(String text,String label,Runnable run){Button b=new Button(activity);b.setText(text);b.setTextSize(17);b.setTextColor(Color.rgb(35,54,78));b.setContentDescription(label);b.setAllCaps(false);b.setMinWidth(0);b.setMinimumWidth(0);b.setPadding(dp(9),0,dp(9),0);b.setBackground(background(Color.TRANSPARENT,10));b.setOnClickListener(v->run.run());return b;}
   private void addTool(String text,String label,Runnable run){toolbar.addView(button(text,label,run),new LinearLayout.LayoutParams(0,dp(48),1));}
   void editor(boolean value){editor=value;addressRowVisibility(!value);status.setVisibility(View.VISIBLE);for(int i=0;i<toolbar.getChildCount()-1;i++)toolbar.getChildAt(i).setVisibility(value?View.GONE:View.VISIBLE);ideKeys.setVisibility(value?View.VISIBLE:View.GONE);}
+  private String owner="guest";
+  void account(String next){if(!next.equals(owner)){close();owner=next;}}
   void open(String id,String name,AgentConnection agent,String url){open(id,name,agent.browserIdentity(),agent::manage,url);}
   void open(String id,String name,String identity,MachineBrowserProxy.Rpc agent,String url){open(id,name,identity,agent,null,url);}
   void openSsh(String id,String name,String identity,com.jcraft.jsch.Session ssh,String url){open(id,name,identity,null,ssh,url);}
   private void open(String id,String name,String identity,MachineBrowserProxy.Rpc agent,com.jcraft.jsch.Session ssh,String url){
     if(!supported()){Toast.makeText(activity,"请更新 Android System WebView 以使用独立机器浏览器",Toast.LENGTH_LONG).show();return;}
-    if(target.equals(id)&&profile.equals("machine-"+identity+(editor?"-ide":""))&&ready){layout.setVisibility(View.VISIBLE);layout.bringToFront();if(current!=null)current.onResume();if(url!=null&&!url.isEmpty())navigate(url);return;}
-    closeSession();closed=false;target=id;label=name;profile="machine-"+identity+(editor?"-ide":"");
+    if(target.equals(id)&&profile.equals("machine-"+owner+"-"+identity+(editor?"-ide":""))&&ready){layout.setVisibility(View.VISIBLE);layout.bringToFront();if(current!=null)current.onResume();if(url!=null&&!url.isEmpty())navigate(url);return;}
+    closeSession();closed=false;target=id;label=name;profile="machine-"+owner+"-"+identity+(editor?"-ide":"");
     layout.setVisibility(View.VISIBLE);layout.bringToFront();status.setText("正在连接 · "+name);progress.setVisibility(View.VISIBLE);progress.setIndeterminate(true);
     final String requested=id; final long opening=generation;
     workers.execute(()->{try{MachineBrowserProxy next=ssh!=null?new MachineBrowserProxy(ssh):new MachineBrowserProxy(agent);activity.runOnUiThread(()->{

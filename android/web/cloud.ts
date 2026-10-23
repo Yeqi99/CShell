@@ -1,11 +1,24 @@
 import { defaults, profileSchema } from '../../src/shared/contracts';
-type CloudState = { email: string; unlocked: boolean; revision: number; lastSync?: number; membership?: {active: boolean; expiresAt: number | null} };
+type CloudState = { owner: string; email: string; unlocked: boolean; revision: number; lastSync?: number; membership?: {active: boolean; expiresAt: number | null} };
 export class MobileCloud {
   private pending = new Map<string,{resolve:(v:any)=>void;reject:(e:Error)=>void;timer:ReturnType<typeof setTimeout>}>();
   private state?: CloudState;
   private busy=false;
   private offline=false;
   private conflict=false;
+  private owner=localStorage.getItem('cloud-active-owner')||'';
+  private retainLocal=false;
+  private stash(){if(!this.owner)return;localStorage.setItem('cloud-workspace:'+this.owner,JSON.stringify({data:this.snapshot(),hash:localStorage.getItem('cloud-snapshot-hash')}));}
+  private adopt(state:CloudState){
+    const owner=state.owner||'guest';
+    if(!this.owner){this.owner=owner;localStorage.setItem('cloud-active-owner',owner);this.stash();return;}
+    if(this.owner===owner)return;
+    this.stash();this.owner=owner;localStorage.setItem('cloud-active-owner',owner);
+    const cached=JSON.parse(localStorage.getItem('cloud-workspace:'+owner)||'null');
+    this.restore(cached?.data||{profiles:[],theme:'light'});this.showModels([]);
+    localStorage.removeItem('cloud-snapshot-hash');if(cached?.hash)localStorage.setItem('cloud-snapshot-hash',cached.hash);
+    this.retainLocal=!!cached;this.conflict=false;
+  }
   constructor(private native:{cloudRequest?(json:string):void},private snapshot:()=>{profiles:unknown[];theme:string},private restore:(data:any)=>void) {
     const root=document.getElementById('cloud-sync')!;
     root.innerHTML=`<div id="cloud-auth"><button type="button" id="cloud-back-login" hidden>← 返回登录</button><div class="account-heading"><img src="icon.png" alt="CShell Pro" width="42" height="42"><h1 id="cloud-auth-title">登录 CShell</h1><p>在你的设备间，延续工作。</p></div>
@@ -22,7 +35,7 @@ export class MobileCloud {
     <div id="cloud-unlock" hidden><p>使用账号密码，恢复此设备上的加密配置。</p><input id="cloud-key" type="password" autocomplete="current-password" aria-label="账号密码"><button id="cloud-unlock-button">继续</button></div>
     <div id="cloud-conflict" hidden><p>两台设备同时修改了配置，请选择保留哪一份。另一份会先备份。</p><button id="cloud-download">保留云端更改</button><button id="cloud-upload">保留此设备更改</button></div>
     <div id="cloud-confirm" hidden><p id="cloud-confirm-text"></p><button id="cloud-confirm-yes">确认</button><button id="cloud-confirm-no">取消</button></div>
-    <details id="cloud-models"><summary>已同步的模型</summary><div></div></details><div class="cloud-profile-footer"><span>配置已加密保护</span><button id="cloud-logout">退出登录</button></div></div><p id="cloud-message" role="status"></p>`;
+    <section class="cloud-info"><h2>本机未登录配置</h2><p id="cloud-guest-summary"></p><div><button id="cloud-import-guest">载入连接</button><button id="cloud-clear-guest">清除未登录配置</button></div></section><details id="cloud-models"><summary>已同步的模型</summary><div></div></details><div class="cloud-profile-footer"><span>配置已加密保护</span><button id="cloud-logout">退出登录</button></div></div><p id="cloud-message" role="status"></p>`;
     const $=(id:string)=>document.getElementById(id)!;
     const input=(name:string)=>document.querySelector(`#cloud-login [name="${name}"]`) as HTMLInputElement;
     let passwordMode=true, cooldown=0, registering=false;
@@ -38,33 +51,43 @@ export class MobileCloud {
       const before=await digest();root.querySelectorAll('button').forEach(b=>b.disabled=true);
       if(action.includes('login')||action==='register')$('cloud-password-login').textContent='正在登录…';
       try{
-        const result=await this.request(action,args);this.state=result.status;this.offline=false;
-        if(result.profiles){this.restore(result);this.showModels(result.models);localStorage.setItem('cloud-snapshot-hash',await digest());}
+        this.stash();const result=await this.request(action,args);this.adopt(result.status);this.state=result.status;this.offline=false;
+        if(result.profiles){
+          const localDirty=this.retainLocal&&localStorage.getItem('cloud-snapshot-hash')!==await digest();
+          if(!localDirty||action==='download'){this.restore(result);localStorage.setItem('cloud-snapshot-hash',await digest());}
+          this.retainLocal=false;this.showModels(result.models);
+        }
         if(action==='upload')localStorage.setItem('cloud-snapshot-hash',before);
         $('cloud-message').textContent=action==='code'?'验证码已发送，请查收邮件。':'';
         if(action.includes('login')||action==='register'){input('password').value='';($('cloud-key') as HTMLInputElement).value='';}
         if(action==='code'){cooldown=60;const tick=setInterval(()=>{cooldown--;$('cloud-code').textContent=cooldown?cooldown+'s':'发送验证码';($('cloud-code') as HTMLButtonElement).disabled=cooldown>0;($('cloud-register-send') as HTMLButtonElement).disabled=cooldown>0;$('cloud-register-send').textContent=cooldown?cooldown+'s':'发送验证码';if(!cooldown)clearInterval(tick);},1000);}
       }catch(e){
         const raw=(e as Error).message;this.offline=true;
-        this.conflict=/冲突|版本.*变化|conflict/i.test(raw);
-        if(action.includes('login')||action==='register'){try{this.state=(await this.request('status',{})).status;}catch{}}
-        $('cloud-message').textContent=this.state?.email?'':/密码|验证码|频繁|邀请|邮箱|注册/.test(raw)?raw:'暂时无法连接，请检查网络后重试。';
+        this.conflict=/冲突|版本.*变化|未上传的更改|conflict/i.test(raw);
+        if(action.includes('login')||action==='register'){try{const state=(await this.request('status',{})).status;this.adopt(state);this.state=state;}catch{}}
+        $('cloud-message').textContent=/关闭连接|文件传输|关闭机器浏览器|无法保存/.test(raw)?raw:this.state?.email?'':/密码|验证码|频繁|邀请|邮箱|注册/.test(raw)?raw:'暂时无法连接，请检查网络后重试。';
       }finally{this.busy=false;root.querySelectorAll('button').forEach(b=>b.disabled=false);($('cloud-code') as HTMLButtonElement).disabled=cooldown>0;($('cloud-register-send') as HTMLButtonElement).disabled=cooldown>0;$('cloud-register-send').textContent=cooldown?cooldown+'s':'发送验证码';$('cloud-password-login').textContent=registering?'创建账号 →':'登录 →';this.render();}
     };
     $('cloud-login').onsubmit=e=>{e.preventDefault();
       if(registering){
-        try{const current=this.snapshot();const profiles=current.profiles.map((raw:any)=>profileSchema.parse({id:raw.id,protocol:raw.protocol==='agent'?'client':'ssh',name:raw.name,host:raw.host,port:Number(raw.port),username:raw.username||'agent',auth:raw.auth,group:raw.group||'',favorite:!!raw.favorite}));
+        try{const current={theme:'light'};const profiles:ReturnType<typeof profileSchema.parse>[]=[];
           const bundle={format:1,store:{profiles,groups:[...new Set(profiles.map(p=>p.group).filter(Boolean))],preferences:{...defaults,theme:current.theme},presets:[],monitorViews:[],hosts:{},secrets:{}},ai:{providers:[],extractionProviderId:null,textProviderIds:{translate:null,compose:null}},devices:[],http:[],assets:{}};
           void run('register',{email:input('email').value,code:($('cloud-register-otp') as HTMLInputElement).value,password:input('password').value,bundle});
-        }catch{$('cloud-message').textContent='请先补全本机连接信息，再创建账号。';}
+        }catch{$('cloud-message').textContent='无法创建账号，请检查填写的信息。';}
       }else void run(passwordMode?'password-login':'login',{email:input('email').value,code:input(passwordMode?'password':'code').value});};
     $('cloud-code').onclick=()=>{if(input('email').reportValidity())void run('code',{email:input('email').value});};
     $('cloud-unlock-button').onclick=()=>void run('password-login',{email:this.state?.email,code:($('cloud-key') as HTMLInputElement).value});
     let direction='';
-    const confirm=(action:string)=>{direction=action;$('cloud-confirm').hidden=false;$('cloud-confirm-text').textContent=action==='logout'?'退出后停止此设备的云同步，本机配置保留。':action==='download'?'确认使用云端配置？此设备配置会先备份。':'确认使用此设备配置？';};
+    const confirm=(action:string)=>{direction=action;$('cloud-confirm').hidden=false;$('cloud-confirm-text').textContent=action==='logout'?'退出后恢复此设备的未登录配置，账号数据单独保留。':action==='download'?'确认使用云端配置？此设备配置会先备份。':'确认使用此设备配置？';};
     $('cloud-download').onclick=()=>confirm('download');$('cloud-upload').onclick=()=>confirm('upload');$('cloud-logout').onclick=()=>confirm('logout');
-    $('cloud-confirm-no').onclick=()=>{$('cloud-confirm').hidden=true;};$('cloud-confirm-yes').onclick=()=>{$('cloud-confirm').hidden=true;this.conflict=false;void run(direction,direction==='upload'?this.snapshot():{});};
-    const autoSync=async()=>{if(this.busy||this.conflict)return;if(!this.state)await run('status');if(!this.state?.unlocked)return;const previous=localStorage.getItem('cloud-snapshot-hash');await run(previous&&previous!==await digest()?'upload':previous?'refresh':'download',this.snapshot());};
+    const guest=()=>JSON.parse(localStorage.getItem('cloud-workspace:guest')||'null');
+    $('cloud-import-guest').onclick=()=>{direction='import-guest';$('cloud-confirm').hidden=false;const rows=guest()?.data?.profiles||[];$('cloud-confirm-text').textContent=`载入 ${rows.length} 条未登录连接？同 ID 的账号连接保留，载入后自动同步。`;};
+    $('cloud-clear-guest').onclick=()=>{direction='clear-guest';$('cloud-confirm').hidden=false;$('cloud-confirm-text').textContent='清除本机未登录连接与外观配置？不删除账号或云端数据，不清除其他应用。';};
+    $('cloud-confirm-no').onclick=()=>{$('cloud-confirm').hidden=true;};$('cloud-confirm-yes').onclick=()=>{$('cloud-confirm').hidden=true;this.conflict=false;
+      if(direction==='clear-guest'){localStorage.removeItem('cloud-workspace:guest');this.render();return;}
+      if(direction==='import-guest'){const current=this.snapshot(),map=new Map(current.profiles.map((p:any)=>[p.id,p]));for(const p of guest()?.data?.profiles||[])if(!map.has(p.id)&&p.protocol!=='agent')map.set(p.id,p);this.restore({...current,profiles:[...map.values()]});this.stash();this.render();return;}
+      void run(direction,direction==='upload'?this.snapshot():{});};
+    const autoSync=async()=>{if(this.busy||this.conflict)return;if(!this.state)await run('status');if(!this.state?.unlocked)return;this.stash();const previous=localStorage.getItem('cloud-snapshot-hash');await run(previous&&previous!==await digest()?'upload':previous?'refresh':'download',this.snapshot());};
     void run('status').then(autoSync);setInterval(()=>void autoSync(),15000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)void autoSync();});window.addEventListener('online',()=>void autoSync());
   }
   private request(action: string, args: any): Promise<any> {
@@ -92,6 +115,10 @@ export class MobileCloud {
     const state=this.state;if(!state)return;
     const $=(id:string)=>document.getElementById(id)!;
     const signed=!!state.email;
+    const guest=JSON.parse(localStorage.getItem('cloud-workspace:guest')||'null');const count=guest?.data?.profiles?.length||0;
+    $('cloud-guest-summary').textContent=count?`${count} 条未登录连接，可选择载入。CAgent 连接需重新配对。`:'没有未登录连接';
+    ($('cloud-import-guest') as HTMLButtonElement).disabled=this.busy||!count||!state.unlocked;
+    ($('cloud-clear-guest') as HTMLButtonElement).disabled=this.busy||!guest;
     $('cloud-auth').hidden=signed;$('cloud-profile').hidden=!signed;
     $('cloud-account').textContent=state.email||'';$('cloud-name').textContent=state.email?.split('@')[0]||'';$('cloud-avatar').textContent=state.email?.slice(0,1).toUpperCase()||'';
     const active=!!state.membership?.active && !!state.membership.expiresAt && state.membership.expiresAt*1000>Date.now();

@@ -29,6 +29,11 @@ public class MainActivity extends Activity {
   private final ExecutorService workers = Executors.newCachedThreadPool();
   private final Map<String, Connection> connections = new ConcurrentHashMap<>();
   private volatile boolean destroyed;
+  private final Object accountGate=new Object();
+  private boolean accountSwitching;
+  private int openingConnections;
+  private String accountScope(){try{return cloud.owner();}catch(Exception error){throw new IllegalStateException("无法读取账号工作区",error);}}
+  private android.content.SharedPreferences hostStore(){return getSharedPreferences("hosts-"+accountScope(),MODE_PRIVATE);}
   private final android.content.BroadcastReceiver cagentEvents=new android.content.BroadcastReceiver(){
     @Override public void onReceive(android.content.Context context,Intent intent){event("","cagent-status",AndroidAgentService.status(MainActivity.this).toString());}
   };
@@ -101,7 +106,7 @@ public class MainActivity extends Activity {
       String fingerprint = "SHA256:" + Base64.encodeToString(MessageDigest.getInstance("SHA-256").digest(key), Base64.NO_WRAP | Base64.NO_PADDING);
       if(endpoint.startsWith("agent:")) { StringBuilder hex=new StringBuilder(); for(byte b:MessageDigest.getInstance("SHA-256").digest(key)) { if(hex.length()>0)hex.append(":");hex.append(String.format(Locale.ROOT,"%02X",b)); } fingerprint="SHA256:"+hex; }
       final String shownFingerprint=fingerprint;
-      String stored = getSharedPreferences("hosts", MODE_PRIVATE).getString(endpoint, null);
+      String stored = hostStore().getString(endpoint, null);
       if (stored != null) return stored.equals(fingerprint);
       CountDownLatch answer = new CountDownLatch(1); boolean[] approved = {false};
       runOnUiThread(() -> {
@@ -111,7 +116,7 @@ public class MainActivity extends Activity {
           .setNegativeButton("取消", (dialog, which) -> answer.countDown()).setOnCancelListener(dialog -> answer.countDown()).show();
       });
       if (!answer.await(90, TimeUnit.SECONDS) || !approved[0] || destroyed) return false;
-      synchronized(trustLock) { return valid.getAsBoolean() && getSharedPreferences("hosts", MODE_PRIVATE).edit().putString(endpoint, fingerprint).commit(); }
+      synchronized(trustLock) { return valid.getAsBoolean() && hostStore().edit().putString(endpoint, fingerprint).commit(); }
     } catch (Exception e) { return false; }
   }
   public class Bridge {
@@ -120,9 +125,12 @@ public class MainActivity extends Activity {
       if(!cloudBusy.compareAndSet(false,true))return;
       workers.execute(()->{String request="";try{
         JSONObject input=new JSONObject(json);request=input.getString("request");UUID.fromString(request);
+        boolean switching=Arrays.asList("login","password-login","register","logout").contains(input.getString("action"));
+        synchronized(accountGate){if(switching){if(!connections.isEmpty()||openingConnections>0||pendingTransfer!=null)throw new IOException("请先关闭连接并等待文件传输结束，再切换账号");accountSwitching=true;}}
+        if(switching){CountDownLatch closed=new CountDownLatch(1);runOnUiThread(()->{browser.close();closed.countDown();});if(!closed.await(5,TimeUnit.SECONDS))throw new IOException("正在关闭机器浏览器，请重试");}
         JSONObject result=cloud.call(input);event("","cloud-result",new JSONObject().put("request",request).put("result",result).toString());
       }catch(Exception error){try{event("","cloud-result",new JSONObject().put("request",request).put("error",error instanceof javax.crypto.AEADBadTagException?"恢复密钥错误或密文校验失败":error.getMessage()).toString());}catch(Exception ignored){}}
-      finally{cloudBusy.set(false);}});
+      finally{synchronized(accountGate){accountSwitching=false;}cloudBusy.set(false);}});
     }
     @JavascriptInterface public String localFilesStatus(){return localFiles.status().toString();}
     @JavascriptInterface public void localFilesChoose(){runOnUiThread(()->{if(pendingTransfer==null)localFiles.choose();});}
@@ -177,8 +185,8 @@ public class MainActivity extends Activity {
       });
     }
     @JavascriptInterface public boolean browserSupported(){return MachineBrowser.supported();}
-    @JavascriptInterface public void browserOpen(String id,String name,String url){Connection c=connections.get(id);if(c==null)return;runOnUiThread(()->{if(connections.get(id)!=c)return;browser.editor(false);if(c.bridge!=null)browser.openSsh(id,name,c.bridge.browserIdentity(),c.session,url);else if(c.agent!=null)browser.open(id,name,c.agent,url);});}
-    @JavascriptInterface public void browserOpenApp(String id,String name,String url){Connection c=connections.get(id);if(c==null)return;runOnUiThread(()->{if(connections.get(id)!=c)return;browser.editor(true);if(c.bridge!=null)browser.openSsh(id,name,c.bridge.browserIdentity(),c.session,url);else if(c.agent!=null)browser.open(id,name,c.agent,url);});}
+    @JavascriptInterface public void browserOpen(String id,String name,String url){Connection c=connections.get(id);if(c==null)return;runOnUiThread(()->{if(connections.get(id)!=c)return;browser.account(accountScope());browser.editor(false);if(c.bridge!=null)browser.openSsh(id,name,c.bridge.browserIdentity(),c.session,url);else if(c.agent!=null)browser.open(id,name,c.agent,url);});}
+    @JavascriptInterface public void browserOpenApp(String id,String name,String url){Connection c=connections.get(id);if(c==null)return;runOnUiThread(()->{if(connections.get(id)!=c)return;browser.account(accountScope());browser.editor(true);if(c.bridge!=null)browser.openSsh(id,name,c.bridge.browserIdentity(),c.session,url);else if(c.agent!=null)browser.open(id,name,c.agent,url);});}
     @JavascriptInterface public void machineRequest(String json){if(destroyed||json.length()>131072)return;workers.execute(()->{String request="",id="";try{JSONObject p=new JSONObject(json);request=p.getString("request");UUID.fromString(request);id=p.getString("session");String method=p.getString("method");if(!method.matches("^(ide|coding)\\.[a-zA-Z.]+$")&&!Arrays.asList("applications.list","applications.policy","applications.plan","applications.install","applications.status","applications.cancel","applications.configure").contains(method))throw new IOException("不支持的机器应用操作");Connection c=connections.get(id);if(c==null||(c.agent==null&&c.bridge==null))throw new IOException("机器连接已断开");Object result=c.bridge!=null?c.bridge.manage(method,p.opt("params")):c.agent.manage(method,p.opt("params"));event(id,"machine-result",new JSONObject().put("request",request).put("result",result).toString());}catch(Exception e){try{event(id,"machine-result",new JSONObject().put("request",request).put("error",e.getMessage()).toString());}catch(Exception ignored){}}});}
     @JavascriptInterface public boolean agentSupported() { return android.os.Build.VERSION.SDK_INT >= 29; }
     @JavascriptInterface public String version() { return updates.current(); }
@@ -192,7 +200,9 @@ public class MainActivity extends Activity {
     }
     @JavascriptInterface public void connect(String json) {
       if (destroyed) return;
-      try { if (json.length() > 131072) return; if ("agent".equals(new JSONObject(json).optString("protocol"))) { connectAgent(json); return; } } catch (Exception ignored) { return; }
+      JSONObject parsed;try{if(json.length()>131072)return;parsed=new JSONObject(json);}catch(Exception ignored){return;}
+      synchronized(accountGate){if(accountSwitching){event(parsed.optString("id"),"error","账号正在切换，请稍后重试");return;}openingConnections++;}
+      if("agent".equals(parsed.optString("protocol"))){connectAgent(json);return;}
       workers.execute(() -> {
         String id = ""; Connection c = new Connection();
         try {
@@ -227,7 +237,7 @@ public class MainActivity extends Activity {
             event(id, "data", Base64.encodeToString(buffer, 0, n, Base64.NO_WRAP));
           }
         } catch (Exception e) { event(id, "error", e.getMessage() == null ? "连接失败" : e.getMessage()); }
-        finally { c.close(); final String closedId=id; runOnUiThread(()->browser.disconnected(closedId)); if (!id.isEmpty()) { connections.remove(id, c); event(id, "closed", ""); } }
+        finally { synchronized(accountGate){openingConnections--;} c.close(); final String closedId=id; runOnUiThread(()->browser.disconnected(closedId)); if (!id.isEmpty()) { connections.remove(id, c); event(id, "closed", ""); } }
       });
     }
     @JavascriptInterface public void fileRequest(String json) {
@@ -266,7 +276,7 @@ public class MainActivity extends Activity {
             for(Map.Entry<String,Connection> entry:connections.entrySet()) if(endpoint.equals(entry.getValue().agentEndpoint)) {
               Connection c=entry.getValue();if(connections.remove(entry.getKey(),c)) workers.execute(c::close);
             }
-            if(!getSharedPreferences("hosts",MODE_PRIVATE).edit().remove(endpoint).commit()) {
+            if(!hostStore().edit().remove(endpoint).commit()) {
               android.widget.Toast.makeText(MainActivity.this,"清除指纹失败，请重试",android.widget.Toast.LENGTH_LONG).show();return;
             }
             }
@@ -333,6 +343,7 @@ public class MainActivity extends Activity {
         connectAgentTransport(c.agent,c,password,()->!destroyed&&connections.get(sessionId)==c);
         if(destroyed || connections.get(id)!=c)c.close();
       } catch(Exception e) { event(id,"error",e.getMessage()==null?"Agent 连接失败":e.getMessage()); c.close(); if(!id.isEmpty())connections.remove(id,c); }
+      finally{synchronized(accountGate){openingConnections--;}}
     });
   }
   private JSONObject pendingTransfer;
