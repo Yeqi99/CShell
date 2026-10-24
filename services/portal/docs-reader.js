@@ -22,6 +22,8 @@
  });
  input.addEventListener('keydown',e=>{if(e.key==='Escape'){input.value='';input.dispatchEvent(new Event('input'));}if(e.key==='ArrowDown'){const a=list.querySelector('a');if(a){e.preventDefault();a.focus();}}});
  document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();input.focus();input.select();}});
+ const initialQuery = new URLSearchParams(location.search).get('q');
+ if(initialQuery){input.value=initialQuery.slice(0,200);input.dispatchEvent(new Event('input'));}
  const headings=[...article.querySelectorAll('h2[id]')];
  if(headings.length&&!article.querySelector('.doc-task-grid')){const toc=document.createElement('nav');toc.className='doc-toc';toc.setAttribute('aria-label','本页目录');const title=document.createElement('strong');title.textContent='本页内容';toc.append(title);for(const h of headings){const a=document.createElement('a');a.href='#'+h.id;a.textContent=h.textContent;toc.append(a);}article.querySelector('h1').after(toc);}
 })();

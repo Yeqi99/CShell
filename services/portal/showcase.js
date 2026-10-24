@@ -15,6 +15,10 @@
     document.getElementById('scene-image-link').href = img.src;
     document.getElementById('scene-description').textContent = scene[2];
     document.getElementById('scene-guide').href = '/docs/' + scene[3] + '.html';
+    const titles = {windows: '机器的每一面，都在同一桌面。', linux: '从目录到终端，操作各就其位。', extensions: '工具按需加入，工作方式由你决定。'};
+    document.getElementById('scene-title').textContent = titles[tab.dataset.scene];
+    const index = tabs.indexOf(tab) + 1;
+    document.querySelector('.scene-index').replaceChildren(document.createTextNode('0' + index + ' '), Object.assign(document.createElement('span'), {textContent: '/ 03'}));
   }
   tabs.forEach((tab, index) => {
     tab.addEventListener('click', () => activate(tab));
@@ -26,4 +30,7 @@
       activate(tabs[next]); tabs[next].focus();
     });
   });
+  document.querySelectorAll('[data-platform-jump]').forEach(link => link.addEventListener('click', () => {
+    document.querySelector('[data-system="' + link.dataset.platformJump + '"]')?.click();
+  }));
 })();
