@@ -253,7 +253,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
   const [linuxWorkspaces,setLinuxWorkspaces]=useState<string[]>([]);
   const [linuxModes,setLinuxModes]=useState<Record<string,boolean>>({});
   const linuxRestored=useRef(new Set<string>());
-  useEffect(()=>{for(const tab of tabs){if(tab.local||tab.client||linuxRestored.current.has(tab.id))continue;linuxRestored.current.add(tab.id);if(true){setLinuxWorkspaces(v=>v.includes(tab.id)?v:[...v,tab.id]);setLinuxModes(v=>({...v,[tab.id]:true}));}}},[tabs]);
+  useEffect(()=>{for(const tab of tabs){if(tab.local||tab.client||linuxRestored.current.has(tab.id))continue;linuxRestored.current.add(tab.id);if(config.preferences.defaultConnectionView !== 'original'){setLinuxWorkspaces(v=>v.includes(tab.id)?v:[...v,tab.id]);setLinuxModes(v=>({...v,[tab.id]:true}));}}},[tabs]);
   const [machineSessionIds,setMachineSessionIds]=useState<Record<string,string[]>>({});
   const [machineSessionCounts,setMachineSessionCounts]=useState<Record<string,number>>({});
   const [machines,setMachines]=useState<{device:ClientDevice;target:AgentTarget}[]>([]),[machineId,setMachineId]=useState('');
@@ -281,7 +281,13 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
   };
   const [quickConnections, setQuickConnections] = useState<Profile[]>([]);
   const [quickId, setQuickId] = useState('');
-  const openSaved = (profile: Profile) => {
+  const [quickVisual, setQuickVisual] = useState<Record<string, boolean>>({});
+  const openSaved = (profile: Profile, visual = config.preferences.defaultConnectionView !== 'original') => {
+    setQuickVisual(v => ({...v, [profile.id]: visual}));
+    if (profile.protocol === 'rdp' && !visual) {
+      void window.cshell.openRdp(profile.id).catch(onError);
+      return;
+    }
     setQuickConnections((items) =>
       items.some((item) => item.id === profile.id) ? items : [...items, profile],
     );
@@ -478,8 +484,10 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
       ...v,
       { id: result.sessionId, profile, closed: terminalClosed(result.sessionId) },
     ]);
-    setLinuxWorkspaces(v=>[...v,result.sessionId]);
-    setLinuxModes(v=>({...v,[result.sessionId]:true}));
+    const visual = quickVisual[profile.id] ?? config.preferences.defaultConnectionView !== 'original';
+    if (visual) setLinuxWorkspaces(v=>[...v,result.sessionId]);
+    setLinuxModes(v=>({...v,[result.sessionId]:visual}));
+    linuxRestored.current.add(result.sessionId);
     setActive(result.sessionId);
     setSurface('terminal');
     void refresh().catch(onError);
@@ -720,6 +728,8 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
               onChange={(serverWidth) => onLayout({ ...layout, serverWidth })}
             />
             <ServerSidebar
+              preferences={config.preferences}
+              onPreferences={savePreferences}
               targets={localTargets}
               onTarget={(target) => run(openLocal(target.shell))}
               groups={config.groups}
@@ -728,6 +738,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
               online={[...tabs.filter((tab) => !tab.closed && !tab.local).map((tab) => tab.profile.id),...machines.map(m=>m.device.deviceId)]}
               onOpen={(p) => openConnection(p || 'new')}
               onConnect={openSaved}
+              onVisual={profile => openSaved(profile, true)}
               onSave={saveProfile}
               onMove={async (id, group, before) => { await window.cshell.moveProfile!(id, group, before); await refresh(); }}
               onManageGroup={async (action) => {
@@ -987,6 +998,10 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
                 </div>
               )}
             </TabStrip>
+            {surface === 'terminal' && current && !current.local && !current.client && <button className="icon" title={linuxModes[active] ? '切换到 SSH 终端' : '打开可视化桌面'} aria-label={linuxModes[active] ? '切换到 SSH 终端' : '打开可视化桌面'} onClick={() => {
+              setLinuxWorkspaces(v => v.includes(active) ? v : [...v, active]);
+              setLinuxModes(v => ({...v, [active]: !v[active]}));
+            }}>{linuxModes[active] ? <TerminalIcon size={17}/> : <LayoutDashboard size={17}/>}</button>}
             {navigator.platform.startsWith('Win') && (
               <details
                 className="local-terminal-menu"
@@ -1079,6 +1094,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
                 <SavedAgentConnection profile={profile} onConnect={openMachineDevice} onDone={()=>setQuickConnections(items=>items.filter(item=>item.id!==profile.id))}/>
               ) : (
                 <SavedConnection
+                  visual={quickVisual[profile.id] ?? config.preferences.defaultConnectionView !== 'original'}
                   profile={profile}
                   saved={config.savedCredentials.includes(profile.id)}
                   persist={config.profiles.some((p) => p.id === profile.id)}

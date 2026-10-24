@@ -124,6 +124,16 @@ export function Settings({
         <div hidden={category !== 'cloud'}><CloudSettings /></div>
         {window.cshell.networkStatus && <div hidden={category !== 'network'}><NetworkSettings/></div>}
         <div hidden={category !== 'workspace'}>
+          <section className="settings-section">
+            <h2>{cn ? '连接方式' : 'Opening connections'}</h2>
+            <label>{cn ? '默认连接视图' : 'Default connection view'}
+              <select value={draft.defaultConnectionView} onChange={e => setDraft({...draft, defaultConnectionView: e.target.value as Preferences['defaultConnectionView']})}>
+                <option value="visual">{cn ? '可视化桌面（默认）' : 'Visual desktop (default)'}</option>
+                <option value="original">{cn ? '原始连接方式' : 'Original connection'}</option>
+              </select>
+            </label>
+            <p className="muted">{cn ? '原始方式直接打开 SSH 终端或系统远程桌面。SSH 会话可随时切换到可视化桌面；已有会话保持不变。' : 'Open SSH terminals or the system RDP client directly. Switch an SSH session to its visual desktop at any time; existing sessions stay unchanged.'}</p>
+          </section>
           <PresetControls draft={draft} onSelect={setDraft} onError={setError} />
         </div>
         <div hidden={category !== 'local'}>

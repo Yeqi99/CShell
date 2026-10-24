@@ -18,13 +18,15 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import type { GroupAction, Profile } from '../../shared/contracts';
+import { defaults, type Preferences, type GroupAction, type Profile } from '../../shared/contracts';
 import { useI18n } from '../i18n';
 type Menu = { x: number; y: number } & (
-  { kind: 'server'; profile: Profile; page: 'root' | 'groups' } | { kind: 'group'; name: string }
+  { kind: 'server'; profile: Profile; page: 'root' | 'groups' } | { kind: 'group'; name: string } | { kind: 'appearance' }
 );
 export function ServerSidebar({
   profiles,
+  preferences = defaults,
+  onPreferences,
   targets = [],
   onTarget,
   groups,
@@ -32,12 +34,15 @@ export function ServerSidebar({
   online,
   onOpen,
   onConnect,
+  onVisual,
   onSave,
   onMove,
   onDelete,
   onManageGroup,
 }: {
   profiles: Profile[];
+  preferences?: Preferences;
+  onPreferences?: (preferences: Preferences) => Promise<void>;
   targets?: LocalConnectionTarget[];
   onTarget?: (target: LocalConnectionTarget) => void;
   groups: string[];
@@ -45,6 +50,7 @@ export function ServerSidebar({
   online: string[];
   onOpen: (p?: Profile) => void;
   onConnect: (p: Profile) => void;
+  onVisual?: (p: Profile) => void;
   onSave: (p: Profile) => Promise<void>;
   onMove?: (id: string, group: string, before?: string) => Promise<void>;
   onDelete: (p: Profile) => void;
@@ -119,7 +125,8 @@ export function ServerSidebar({
     target: HTMLElement,
     next:
       | Omit<Extract<Menu, { kind: 'server' }>, 'x' | 'y'>
-      | Omit<Extract<Menu, { kind: 'group' }>, 'x' | 'y'>,
+      | Omit<Extract<Menu, { kind: 'group' }>, 'x' | 'y'>
+      | Omit<Extract<Menu, { kind: 'appearance' }>, 'x' | 'y'>,
     point?: { x: number; y: number },
   ) => {
     if (menu && trigger.current === target && !point) {
@@ -131,7 +138,7 @@ export function ServerSidebar({
     setMenu({
       ...next,
       x: Math.max(8, Math.min(point?.x ?? rect.left, innerWidth - 228)),
-      y: Math.max(8, Math.min(point?.y ?? rect.bottom + 5, innerHeight - 284)),
+      y: Math.max(8, Math.min(point?.y ?? rect.bottom + 5, innerHeight - (next.kind === 'appearance' ? 390 : 284))),
     });
   };
   const beginGroup = (original?: string, move?: Profile) => {
@@ -201,7 +208,10 @@ export function ServerSidebar({
     })),
   ].filter((section) => section.items.length || (!query && !section.favorite && section.id));
   return (
-    <aside className="sidebar" aria-busy={working}>
+    <aside className="sidebar" aria-busy={working} tabIndex={0} onContextMenu={e => {
+      if (!onPreferences || e.defaultPrevented || (e.target as HTMLElement).closest('button,input,a,[data-profile-id]')) return;
+      e.preventDefault(); openMenu(e.currentTarget, {kind:'appearance'}, {x:e.clientX,y:e.clientY});
+    }} onKeyDown={e => {if(onPreferences && e.target === e.currentTarget && (e.key === 'ContextMenu' || e.shiftKey && e.key === 'F10')) {e.preventDefault();openMenu(e.currentTarget,{kind:'appearance'});}}}>
       <div className="sidebar-search">
         <Search size={14} />
         <input
@@ -479,7 +489,7 @@ export function ServerSidebar({
             ref={popup}
             className="server-context-menu"
             role="menu"
-            aria-label={t(menu.kind === 'group' ? 'manageGroup' : 'serverActions')}
+            aria-label={menu.kind === 'appearance' ? (locale === 'zh-CN' ? '侧边栏外观' : 'Sidebar appearance') : t(menu.kind === 'group' ? 'manageGroup' : 'serverActions')}
             style={{ left: menu.x, top: menu.y }}
             onKeyDown={(e) => {
               if (e.key === 'Escape') {
@@ -504,7 +514,12 @@ export function ServerSidebar({
               if (e.key === 'Tab') closeMenu();
             }}
           >
-            {menu.kind === 'group' ? (
+            {menu.kind === 'appearance' ? (<>
+              <div className="context-caption">{locale === 'zh-CN' ? '侧边栏外观' : 'Sidebar appearance'}</div>
+              {([['sidebarGroupSize', '分组字号', 'Group size', 12,22], ['sidebarFontSize','服务器字号','Server size',12,22], ['sidebarDetailSize','地址字号','Address size',11,20]] as const).map(([key,zh,en,min,max]) => <div key={key} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 10px'}}><span style={{flex:1,whiteSpace:'nowrap'}}>{locale === 'zh-CN' ? zh : en}</span><button style={{width:28,minWidth:28,flex:'0 0 28px',padding:4,justifyContent:'center'}} aria-label={`${zh}减小`} disabled={working || preferences[key] <= min} onClick={() => {setWorking(true); void onPreferences?.({...preferences,[key]:preferences[key]-1}).catch(report).finally(()=>setWorking(false));}}>−</button><output>{preferences[key]}</output><button style={{width:28,minWidth:28,flex:'0 0 28px',padding:4,justifyContent:'center'}} aria-label={`${zh}增大`} disabled={working || preferences[key] >= max} onClick={() => {setWorking(true);void onPreferences?.({...preferences,[key]:preferences[key]+1}).catch(report).finally(()=>setWorking(false));}}>+</button></div>)}
+              {(['compact','comfortable','spacious'] as const).map((density,i) => <button role="menuitemradio" aria-checked={preferences.sidebarDensity===density} key={density} disabled={working} onClick={()=>{setWorking(true);void onPreferences?.({...preferences,sidebarDensity:density}).catch(report).finally(()=>setWorking(false));}}>{locale === 'zh-CN' ? ['紧凑间距','舒适间距','宽松间距'][i] : density}{preferences.sidebarDensity===density && <Check size={14}/>}</button>)}
+              <button role="menuitem" disabled={working} onClick={()=>{setWorking(true);void onPreferences?.({...preferences,sidebarFontSize:defaults.sidebarFontSize,sidebarGroupSize:defaults.sidebarGroupSize,sidebarDetailSize:defaults.sidebarDetailSize,sidebarDensity:defaults.sidebarDensity}).catch(report).finally(()=>setWorking(false));}}>{locale === 'zh-CN' ? '恢复默认外观' : 'Reset sidebar appearance'}</button>
+            </>) : menu.kind === 'group' ? (
               <>
                 <div className="context-caption">{menu.name}</div>
                 <button role="menuitem" onClick={() => beginGroup(menu.name)}>
@@ -554,6 +569,7 @@ export function ServerSidebar({
             ) : (
               <>
                 <div className="context-caption">{menu.profile.name}</div>
+                {onVisual && menu.profile.protocol !== 'http' && <button role="menuitem" onClick={() => {onVisual(menu.profile);closeMenu();}}><Server size={14}/>{locale === 'zh-CN' ? '打开可视化桌面' : 'Open visual desktop'}</button>}
                 <button
                   role="menuitem"
                   onClick={() => {
