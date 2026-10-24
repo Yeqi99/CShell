@@ -1,3 +1,4 @@
+import { submitsComposer } from '../composer-keys';
 import { useEffect, useRef, useState } from 'react';
 import {
   Menu,
@@ -630,15 +631,13 @@ export function CodingApp({
               }}
             >
               <textarea
-                placeholder="描述任务，Ctrl+Enter 发送…"
+                placeholder="描述任务，Enter 发送，Shift+Enter 换行…"
                 aria-label="编程任务"
                 value={draft}
                 onChange={(e) => setDrafts({ ...drafts, [selected]: e.target.value })}
                 onKeyDown={(e) => {
                   if (
-                    e.ctrlKey &&
-                    e.key === 'Enter' &&
-                    !e.nativeEvent.isComposing &&
+                    submitsComposer(e) &&
                     !running &&
                     !busy &&
                     ready?.ready &&

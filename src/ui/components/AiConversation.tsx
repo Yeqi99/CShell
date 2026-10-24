@@ -1,3 +1,4 @@
+import { submitsComposer } from '../composer-keys';
 import { AiToolRecord, toolInput } from './AiToolRecord';
 import { AiTaskTree } from './AiWork';
 import { useAiDrafts } from '../ai-drafts';
@@ -293,15 +294,13 @@ export function AiConversation({
         <textarea
           ref={composer}
           aria-label="发送给智能体"
+          title="Enter 发送，Shift+Enter 换行"
           placeholder={active ? '可以先写下一个任务…' : '描述任务或提出问题…'}
           value={text}
           onChange={(e) => setDrafts((previous) => ({ ...previous, [draftId]: e.target.value }))}
           onKeyDown={(e) => {
             if (
-              e.key === 'Enter' &&
-              !e.shiftKey &&
-              !e.nativeEvent.isComposing &&
-              e.keyCode !== 229
+              submitsComposer(e)
             ) {
               e.preventDefault();
               send();

@@ -1,3 +1,4 @@
+import { submitsComposer } from '../composer-keys';
 import { ErrorNotice } from './ErrorNotice';
 import {useEffect,useState} from 'react';
 import {Bot,History,Plus,Settings,Send,Square,ArrowLeft,Server} from 'lucide-react';
@@ -32,8 +33,8 @@ export function AgentMachineAssistant({call,name='当前机器'}:{name?:string;c
      </>}
     </div>
     <form className="machine-chat-compose" onSubmit={e=>{e.preventDefault();void submit();}}>
-     <textarea aria-label="交给这台机器的任务" placeholder={selected?'补充要求，或继续这项任务…':'描述要在这台机器上完成的工作…'} value={prompt} onChange={e=>setDrafts(v=>({...v,[selected]:e.target.value}))} rows={3} onKeyDown={e=>{if(e.key==='Enter'&&e.ctrlKey&&!e.nativeEvent.isComposing){e.preventDefault();void submit();}}}/>
-     <div><button type="button" className="machine-chat-model" title="配置这台机器的模型与权限" onClick={()=>setSettings(true)}>{model?.model||'配置模型'}<span>· {model?model.review?'执行前审核':'按已授权范围执行':'读取配置'}</span></button><span className="machine-chat-spacer"/>{running(task)?<button type="button" title="停止当前任务" aria-label="停止当前任务" disabled={stopping===task!.id} onClick={()=>void stop(task!.id)}><Square size={16}/>{stopping?'停止中':'停止'}</button>:<button title="发送任务（Ctrl+Enter）" aria-label="发送任务" className="primary" disabled={busy||!prompt.trim()||tasks.some(running)}><Send size={16}/>{busy?'提交中':'发送'}</button>}</div>
+     <textarea aria-label="交给这台机器的任务" title="Enter 发送，Shift+Enter 换行" placeholder={selected?'补充要求，或继续这项任务…':'描述要在这台机器上完成的工作…'} value={prompt} onChange={e=>setDrafts(v=>({...v,[selected]:e.target.value}))} rows={3} onKeyDown={e=>{if(submitsComposer(e)){e.preventDefault();void submit();}}}/>
+     <div><button type="button" className="machine-chat-model" title="配置这台机器的模型与权限" onClick={()=>setSettings(true)}>{model?.model||'配置模型'}<span>· {model?model.review?'执行前审核':'按已授权范围执行':'读取配置'}</span></button><span className="machine-chat-spacer"/>{running(task)?<button type="button" title="停止当前任务" aria-label="停止当前任务" disabled={stopping===task!.id} onClick={()=>void stop(task!.id)}><Square size={16}/>{stopping?'停止中':'停止'}</button>:<button title="发送任务（Enter 发送，Shift+Enter 换行）" aria-label="发送任务" className="primary" disabled={busy||!prompt.trim()||tasks.some(running)}><Send size={16}/>{busy?'提交中':'发送'}</button>}</div>
      {!running(task)&&tasks.some(running)&&<small>这台机器有任务正在执行，可在任务历史中查看或停止。</small>}
     </form>
    </div>}

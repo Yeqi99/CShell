@@ -19,6 +19,8 @@ const renderTask=t=>{
 };
 async function refreshTasks(){const tasks=await api('assistant.tasks');$('history').replaceChildren();for(const t of [...tasks].reverse()){const b=text('button',t.prompt.slice(0,40));b.onclick=()=>{selected=t.id;renderTask(t);};$('history').append(b);}if(!selected&&tasks.length)selected=tasks[tasks.length-1].id;const t=tasks.find(t=>t.id===selected);if(t)renderTask(t);}
 $('resume-task').onclick=action(async()=>{if(!selected)return;const t=await api('assistant.start',{requestId:crypto.randomUUID(),resumeId:selected,prompt:$('prompt').value.trim()||'先核查检查点和实际状态，再继续未完成任务；不要重放未知结果的操作。'});selected=t.id;$('prompt').value='';await refreshTasks();});
+$('prompt').title='Enter 发送，Shift+Enter 换行';
+$('prompt').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.altKey&&!e.isComposing&&e.keyCode!==229){e.preventDefault();if(!e.repeat&&!$('send').disabled)$('send').click();}});
 $('send').onclick=action(async()=>{const prompt=$('prompt').value.trim();if(!prompt)return;if(!submission||submission.prompt!==prompt)submission={prompt,requestId:crypto.randomUUID()};const t=await api('assistant.start',submission);submission=null;selected=t.id;$('prompt').value='';await refreshTasks();});
 $('stop').onclick=action(async()=>{await api('assistant.cancel',{id:selected});await refreshTasks();});
 for(const [id,allow] of [['approve',true],['reject',false]])$(id).onclick=action(async()=>{await api('assistant.approve',{id:selected,allow});await refreshTasks();});
