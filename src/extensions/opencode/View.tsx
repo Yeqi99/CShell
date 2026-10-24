@@ -76,7 +76,7 @@ export function OpenCodeView() {
     setModel('');
     setCheck(null);
     setUsage(null);
-    void call('models', { tier })
+    void call('models', { tier, refresh: true })
       .then((m) => {
         if (active) {
           setModels(m);

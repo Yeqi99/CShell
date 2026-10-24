@@ -457,8 +457,9 @@ export class OpenCodeExtension implements AiProviderExtension {
           .parse((input as any)?.reference),
       );
       this.account(p.accountId);
+      const refresh=z.boolean().default(false).parse((input as any)?.refresh);
       const groups = await Promise.allSettled((['go', 'zen'] as const).map(async tier =>
-        (await this.models(tier)).map(m => ({
+        (await this.models(tier,refresh)).map(m => ({
           ref: `${p.accountId}/${tier}/${m.id}`,
           model: m.id, label: `${m.id} · ${tier === 'go' ? 'Go' : 'Zen'}`,
           available: m.available,
