@@ -22,3 +22,10 @@
 - CLI 保存运行时关闭状态，UI 初始化前后均检查；已经关闭的后台不会重新公布 UI 地址、恢复 stdin 或启动浏览器。
 - 两版早关闭回归通过，保持父进程 stdin 打开；仅测试清理失败时才 kill，不把强杀算作通过。CLI 及运行时改动均同步 Pro，未动账号身份或权限策略。
 - 仍属于退出生命周期这一组问题，不拆分成三个发行条目。发行前还需原生窗口及全套回归，随后选择有证据的其他缺口继续改进。
+
+## OpenCode 真实账号排查（2026-10-24）
+
+- 用户两版实际 extensions/opencode/opencode.enc 均含 default 账号且 Key 一致。此前来源读取器错误读取根目录，误判空账号；修正为与 desktop/ai.ts 一致的扩展目录，真实 Electron 来源测试通过，保留 ID/凭据、不改原文件、损坏来源拒绝。
+- Key 的官方 console/api/v2/config 返回 200。正确 inference/v1/models 和 inference/go/v1/models 均 200。此前手工探测遗漏 v1 导致 404，不是产品源码的目录接口错误，不能改坏现有地址。
+- 真实推理：Go beam-free 返回 403（This model is not available in your country）；Zen mimo-v2.6-flash-free 与 deepseek-v4.1-flash-free 返回 403，要求在官方 OpenCode 内使用。旧 longcat/minimax 免费入口不在当前返回目录。未伪造客户端身份、绕过地区限制或自动改成收费模型。
+- 等用户选择官方客户端集成或授权少量付费/Go 模型测试；未声称模型已恢复，未修改用户凭据或安装程序。
