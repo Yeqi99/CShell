@@ -1,3 +1,4 @@
+import {SharedTerminalMount, TerminalSlot} from './components/SharedTerminalMount';
 import './account.css';
 import { AccountEntry } from './components/AccountEntry';
 import { CloudSettings } from './components/CloudSettings';
@@ -1274,15 +1275,14 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
             </div>
           )}
 
-          {tabs.filter(tab=>linuxWorkspaces.includes(tab.id)).map(tab=><LinuxWorkspace key={tab.id} session={tab.id} profileId={tab.profile.id} preferences={preferences} name={tab.profile.name} active={surface==='terminal'&&active===tab.id&&!!linuxModes[tab.id]} closed={!!tab.closed} onRetry={()=>openSaved(tab.profile)} onTerminal={()=>{}} files={<div inert={!!tab.closed} style={{height:"100%"}}><ToolsPanel sessionId={tab.id} sessionName={tab.profile.name} active={surface==='terminal'&&active===tab.id&&!tab.closed} dockerEnabled={pluginEnabled(config.plugins,'docker')} transfers={transfers.filter(t=>t.sessionId===tab.id)} onError={onError}/></div>} terminal={(visible,theme)=><TerminalPane id={tab.id} active={visible} preferences={{...preferences,theme}} closed={tab.closed} suggestionsEnabled={pluginEnabled(config.plugins,'commands')} plugins={config.plugins} textEditingSupported={true} searching={searching&&active===tab.id} onSearchClose={()=>setSearching(false)} onError={onError}/>}/>)}
+          {tabs.filter(tab=>linuxWorkspaces.includes(tab.id)).map(tab=><LinuxWorkspace key={tab.id} session={tab.id} profileId={tab.profile.id} preferences={preferences} name={tab.profile.name} active={surface==='terminal'&&active===tab.id&&!!linuxModes[tab.id]} closed={!!tab.closed} onRetry={()=>openSaved(tab.profile)} onTerminal={()=>{}} files={<div inert={!!tab.closed} style={{height:"100%"}}><ToolsPanel sessionId={tab.id} sessionName={tab.profile.name} active={surface==='terminal'&&active===tab.id&&!tab.closed} dockerEnabled={pluginEnabled(config.plugins,'docker')} transfers={transfers.filter(t=>t.sessionId===tab.id)} onError={onError}/></div>} terminal={(visible)=><TerminalSlot id={tab.id} active={visible}/>}/>)}
           <AiExecution enabled={preferences.showAiExecution && !minimal} sessionId={current?.id} />
           {tabs.length ? (
             <div className="terminals" hidden={surface !== 'terminal'||!!linuxModes[active]}>
               {tabs.map((tab) => (
-                <TerminalPane
-                  key={tab.id}
+                <SharedTerminalMount key={tab.id} id={tab.id} visual={!!linuxModes[tab.id]} active={surface === 'terminal' && active === tab.id}>{visible => <TerminalPane
                   id={tab.id}
-                  active={surface === 'terminal' && active === tab.id && !linuxModes[tab.id]}
+                  active={visible}
                   pythonInterpreter={tab.python}
                   textEditingSupported={!tab.local && !tab.client}
                   plugins={tab.local || tab.client ? [] : config.plugins}
@@ -1298,7 +1298,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
                   searching={surface === 'terminal' && searching && active === tab.id}
                   onSearchClose={() => setSearching(false)}
                   onError={onError}
-                />
+                />}</SharedTerminalMount>
               ))}
             </div>
           ) : null}
