@@ -103,7 +103,7 @@ export function ServerSidebar({
     const outside = (e: PointerEvent) => {
       if (
         !popup.current?.contains(e.target as Node) &&
-        !trigger.current?.contains(e.target as Node)
+        (menu.kind === 'appearance' || !trigger.current?.contains(e.target as Node))
       )
         closeMenu();
     };
