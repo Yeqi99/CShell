@@ -71,12 +71,6 @@ jobs:
         with:
           python-version: '3.12'
           architecture: 'x64'
-      - name: Prepare pinned WeChat runtime dependencies
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          python -m pip install frida==17.24.0 pefile==2024.8.26 zstandard==0.23.0
-          "CAGENT_WECHAT_PYTHON=$((Get-Command python).Source)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - name: Build the standalone Agent without Electron
         run: node scripts/agent-build.mjs
       - name: Verify the packaged Agent with a real native terminal
