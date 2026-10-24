@@ -1,6 +1,9 @@
 (() => {
  const input=document.querySelector('#doc-search'),article=document.querySelector('.doc-content');
  if(!input||!article)return;
+ const categories=document.querySelector('.doc-categories');
+ if(categories&&matchMedia('(max-width:620px)').matches)categories.open=false;
+ for(const pre of article.querySelectorAll('pre')){const button=document.createElement('button');button.className='doc-copy';button.textContent='复制示例';button.type='button';pre.after(button);button.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(pre.textContent);button.textContent='已复制';}catch{button.textContent='未能复制，请选择文本复制';}setTimeout(()=>button.textContent='复制示例',2500);});}
  const panel=document.createElement('section');panel.className='doc-search-results';panel.hidden=true;panel.setAttribute('aria-label','文档搜索结果');
  const count=document.createElement('p');count.setAttribute('role','status');panel.append(count);
  const list=document.createElement('div');panel.append(list);input.after(panel);
@@ -20,5 +23,5 @@
  input.addEventListener('keydown',e=>{if(e.key==='Escape'){input.value='';input.dispatchEvent(new Event('input'));}if(e.key==='ArrowDown'){const a=list.querySelector('a');if(a){e.preventDefault();a.focus();}}});
  document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();input.focus();input.select();}});
  const headings=[...article.querySelectorAll('h2[id]')];
- if(headings.length){const toc=document.createElement('nav');toc.className='doc-toc';toc.setAttribute('aria-label','本页目录');const title=document.createElement('strong');title.textContent='本页内容';toc.append(title);for(const h of headings){const a=document.createElement('a');a.href='#'+h.id;a.textContent=h.textContent;toc.append(a);}article.querySelector('h1').after(toc);}
+ if(headings.length&&!article.querySelector('.doc-task-grid')){const toc=document.createElement('nav');toc.className='doc-toc';toc.setAttribute('aria-label','本页目录');const title=document.createElement('strong');title.textContent='本页内容';toc.append(title);for(const h of headings){const a=document.createElement('a');a.href='#'+h.id;a.textContent=h.textContent;toc.append(a);}article.querySelector('h1').after(toc);}
 })();
