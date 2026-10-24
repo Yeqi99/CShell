@@ -80,6 +80,7 @@ export function AgentCapabilityMarket({ target, call }: { target: AgentTarget; c
     [busy, setBusy] = useState(false),
     [error, setError] = useState('');
   const [remove, setRemove] = useState(false);
+  const [customOnly,setCustomOnly]=useState(false);
   const refresh = async () => {
     const [nextCatalog, nextInstalled] = await Promise.all([
       agentRead(()=>call('packages.catalog')),
@@ -125,6 +126,7 @@ export function AgentCapabilityMarket({ target, call }: { target: AgentTarget; c
     <section className="agent-capability-market" aria-label="能力工具包">
       <div className="agent-toolbar">
         <h3>能力工具包</h3>
+        <button onClick={()=>{setCustomOnly(!customOnly);setSelected('');}}>{customOnly?'应用市场':'自定义扩展'}</button>
         <button disabled={busy} onClick={() => void run(refresh)}>
           刷新能力包
         </button>
@@ -142,6 +144,7 @@ export function AgentCapabilityMarket({ target, call }: { target: AgentTarget; c
           />
           <div className="agent-app-grid">
             {catalog
+              .filter(p=>customOnly?p.id==='cagent.wechat':p.id!=='cagent.wechat')
               .filter((p) => (p.name + p.id).toLowerCase().includes(query.toLowerCase()))
               .map((p) => (
                 <button
@@ -170,7 +173,7 @@ export function AgentCapabilityMarket({ target, call }: { target: AgentTarget; c
           <h3>{item.name}</h3>
           <p>{item.description}</p>
           <small>
-            {item.version} · {item.source === 'bundled' ? '随 CAgent 提供' : 'GitHub'} ·{' '}
+            {item.version} · {item.id==='cagent.wechat'?'自定义扩展':item.source === 'bundled' ? '随 CAgent 提供' : 'GitHub'} ·{' '}
             {record&&record.status==='not-installed'?'已安装 · 需要修复':states[(record ?? item).status]}
           </small>
           {(record?.reason ?? item.reason) && <p>{record?.reason ?? item.reason}</p>}

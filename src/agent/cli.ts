@@ -10,6 +10,7 @@ import { startCagentApp, openCagentApp } from './app';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { spawn } from 'node:child_process';
+import {readCustomExtension,installCustomExtension} from '../core/custom-extensions';
 
 async function jsonInput() {
   if (stdin.isTTY) throw new Error('请通过标准输入提供 JSON；不要将密码写入命令参数');
@@ -55,6 +56,13 @@ async function secret(prompt: string) {
 const print = (value: unknown) => stdout.write(JSON.stringify(value, null, 2) + '\n');
 async function main() {
   const [command = 'help', method] = process.argv.slice(2);
+  if(command==='extension-import'){
+    if(!method)throw new Error('用法：cagent extension-import <文件.cshellext> [--confirm]');
+    const pack=await readCustomExtension(method);
+    if(pack.value.manifest.provider!=='wechat')throw new Error('此扩展不适用于 CAgent');
+    if(!process.argv.includes('--confirm')){print({manifest:pack.value.manifest,trusted:pack.trusted,bytes:pack.bytes,installed:false,next:'核对后添加 --confirm 导入。导入不授予微信权限，重新启动 CAgent 后单独配置。'});return;}
+    await installCustomExtension(pack);print({installed:true,restartRequired:true,permissionsGranted:false});return;
+  }
   if(command==='bridge'){startSshBridge();return;}
   if(command==='app'&&process.platform==='win32'&&existsSync(join(dirname(process.argv[1]),'Cagent.exe'))){
     const child=spawn(join(dirname(process.argv[1]),'Cagent.exe'),[],{detached:true,stdio:'ignore',windowsHide:false});

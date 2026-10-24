@@ -67,6 +67,9 @@ export function ExtensionWorkbench({
     'plugins' | 'apps' | 'environment' | 'python' | 'wsl' | 'agent' | 'wechat' | 'opencode' | 'tavily'
   >('plugins');
   const [settingsPlugin, setSettingsPlugin] = useState<string | null>(null);
+  const [importPreview,setImportPreview]=useState<Awaited<ReturnType<typeof window.cshell.pluginImportPreview>>>(null);
+  const [importNotice,setImportNotice]=useState('');
+  const [dragging,setDragging]=useState(false);
   const views = availablePluginViews(plugins);
   const permissionRequest=usePermissionNavigation();
   useEffect(()=>{if(permissionRequest?.node.page==='wechat')setSection(views.some(v=>v.id==='wechat')?'wechat':'plugins');},[permissionRequest,plugins]);
@@ -175,7 +178,7 @@ export function ExtensionWorkbench({
                       ? 'WSL Linux'
                       : section === 'agent'
                         ? 'CAgent'
-                        : section === 'tavily' ? 'Tavily 搜索' : section === 'opencode' ? 'OpenCode' : section === 'wechat' ? '微信（实验）' : 'Python'}
+                        : section === 'tavily' ? 'Tavily 搜索' : section === 'opencode' ? 'OpenCode' : section === 'wechat' ? '微信' : 'Python'}
             </h1>
             <p>
               {section === 'plugins'
@@ -218,7 +221,10 @@ export function ExtensionWorkbench({
             {error}
           </div>
         )}
-        <div hidden={section !== 'plugins'} className="plugin-market">
+        <div hidden={section !== 'plugins'} className={`plugin-market${dragging?' extension-drop-active':''}`}
+          onDragOver={e=>{if(e.dataTransfer.types.includes('Files')){e.preventDefault();e.dataTransfer.dropEffect='copy';setDragging(true);}}}
+          onDragLeave={e=>{if(!e.currentTarget.contains(e.relatedTarget as Node))setDragging(false);}}
+          onDrop={e=>{e.preventDefault();setDragging(false);if(busy)return;const files=Array.from(e.dataTransfer.files);if(files.length!==1){setError(zh?'请每次导入一个扩展包':'Import one extension at a time');return;}void run(async()=>{setImportNotice('');setImportPreview(await window.cshell.pluginImportPreview(files[0]));});}}>
           <div className="extension-toolbar">
             <div className="extension-search">
               <Search size={15} />
@@ -236,12 +242,24 @@ export function ExtensionWorkbench({
             >
               <option value="all">{zh ? '全部' : 'All'}</option>
               <option value="installed">{zh ? '已安装' : 'Installed'}</option>
+              <option value="custom">{zh ? '自定义扩展' : 'Custom extensions'}</option>
             </select>
+            <button disabled={busy} onClick={()=>void run(async()=>{setImportNotice('');setImportPreview(await window.cshell.pluginImportPreview());})}><Plus size={15}/>{zh?'导入扩展':'Import extension'}</button>
           </div>
+          <p className="custom-extension-hint">{zh?'可将 .cshellext 文件拖入此处。自定义扩展单独管理，导入后由你启用。':'Drop a .cshellext file here. Imported extensions remain disabled until you enable them.'}</p>
+          {dragging&&<div className="custom-extension-drop" role="status">{zh?'放开以预览扩展包':'Drop to preview extension'}</div>}
+          {importNotice&&<p role="status" className="custom-extension-hint">{importNotice}</p>}
+          {importPreview&&<section className="custom-extension-preview" aria-label={zh?'扩展导入预览':'Extension import preview'}>
+            <div><strong>{importPreview.manifest.name}</strong> <span>{importPreview.manifest.version}</span><p>{importPreview.manifest.description}</p></div>
+            <p>{importPreview.manifest.publisher} · {importPreview.trusted?(zh?'签名已验证':'Signature verified'):(zh?'自定义声明包 · 无可执行代码':'Custom declarative package · no executable code')}</p>
+            <p>{zh?'权限：':'Permissions: '}{importPreview.manifest.provider==='wechat'?(zh?'微信读取、发送、联系人管理均需另外授权；导入不会访问微信。':'WeChat operations require separate grants; importing does not access WeChat.'):importPreview.manifest.permissions.join(' · ')||(zh?'无':'None')}</p>
+            <div className="custom-extension-actions"><button disabled={busy} onClick={()=>setImportPreview(null)}>{zh?'取消':'Cancel'}</button><button className="primary" disabled={busy} onClick={()=>void run(async()=>{await window.cshell.pluginImportApply(importPreview.token);await onChange();setFilter('custom');setImportPreview(null);setImportNotice(zh?'已导入。请启用扩展；微信运行包首次载入需要重新打开 CShell / CAgent。':'Imported. Enable the extension; restart CShell / CAgent to load the WeChat runtime.');})}>{zh?'确认导入':'Import'}</button></div>
+          </section>}
           <div className="plugin-list">
             {manifests
               .filter(
                 (p) =>
+                  (filter==='custom' ? plugins.some(i=>i.manifest.id===p.id&&(i.source.startsWith('custom:')||p.provider==='wechat')) : p.provider!=='wechat'&&!plugins.some(i=>i.manifest.id===p.id&&i.source.startsWith('custom:'))) &&
                   (p.provider !== 'wsl' || navigator.platform.startsWith('Win')) &&
                   `${p.name} ${p.description}`.toLowerCase().includes(query.toLowerCase()) &&
                   (filter !== 'installed' || plugins.some((i) => i.manifest.id === p.id)),

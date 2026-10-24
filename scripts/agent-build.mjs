@@ -83,10 +83,6 @@ await writeFile(
 );
 await cp(join(output, launcher),join(output,process.platform==='win32'?'cagent.cmd':'cagent'));
 if(process.platform==='win32'){
-  const python=process.env.CAGENT_WECHAT_PYTHON;
-  if(!python)throw new Error('Set CAGENT_WECHAT_PYTHON to a Python 3.12 environment with the pinned WeChat dependencies');
-  await new Promise((done,reject)=>{const child=spawn(python,[join(root,'tools/wechat-bridge/build-cagent-runtime.py'),join(output,'wechat-runtime')],{stdio:'inherit',windowsHide:true});child.once('error',reject);child.once('exit',code=>code===0?done():reject(new Error('WeChat runtime build failed')));});
-
   const framework=join(process.env.SystemRoot||'C:\\Windows','Microsoft.NET','Framework64','v4.0.30319');
   const versionSource=join(output,'Cagent.Version.cs');
   await writeFile(versionSource,nativeVersionSource(version));

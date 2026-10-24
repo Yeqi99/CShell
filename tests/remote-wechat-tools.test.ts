@@ -1,3 +1,4 @@
+import {WechatService} from '../src/core/wechat';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {remoteWechatTools} from '../src/core/remote-wechat-tools';
@@ -11,7 +12,7 @@ test('remote WeChat uses the target RPC, exact schemas and trusted review; never
    {packageId:'untrusted',id:'wechat_contacts',permissions:['wechat.read'],sideEffect:false},
   ];
   throw new Error('remote offline');
- },new AbortController().signal);
+ },new AbortController().signal,async()=>({module:{WechatService} as any,runtime:'fixture'}));
  assert.deepEqual(tools.map(t=>t.name),['remote_wechat_send_text']);assert.equal(tools[0].needsReview({}),true);
  await assert.rejects(tools[0].invoke({recipient:'nickname',text:'x',idempotencyKey:'abcdefgh'},new AbortController().signal));
  assert.equal(calls.length,1);

@@ -3,7 +3,7 @@ import {IdeService} from './ide';
 import {AgentBrowserNetwork} from './browser-network';
 import {CodingService} from './coding';
 import {LinuxVisualApps} from './linux-visual-apps';
-import {createWechatCapability} from './wechat-capability';
+import {loadPrivateWechat} from '../core/custom-extensions';
 import {AgentFiles} from './files';
 import {AgentUpdater} from './update';
 import {startupState,setStartup} from './startup';
@@ -115,9 +115,14 @@ export async function createAgentRuntime(
   await applications.load();
   const desktopIdentity=server.status().deviceId;
   const desktop=await createDesktopCapability({identity:desktopIdentity,nativeExecutable:options.desktopExecutable??join(dirname(resolve(process.argv[1]??process.execPath)),'cagent-desktop.exe'),vault,authorize:owner=>server.status().deviceId===desktopIdentity&&(owner==='local'||server.managementAllowed(owner))});
-  const wechat=await createWechatCapability({directory,runtime:join(dirname(resolve(process.argv[1]??process.execPath)),'wechat-runtime'),authorize:owner=>owner==='local'||server.managementAllowed(owner)});
-  const packages=new CapabilityRuntime({directory,vault,applications,agentVersion,extraPackages:[...desktop.extraPackages,...wechat.extraPackages,...options.extraPackages??[]]});
+  const privateWechat=await loadPrivateWechat();
+  const wechat=privateWechat ? await privateWechat.module.createWechatCapability({directory,runtime:privateWechat.runtime,authorize:owner=>owner==='local'||server.managementAllowed(owner)}) : undefined;
+  const packages=new CapabilityRuntime({directory,vault,applications,agentVersion,extraPackages:[...desktop.extraPackages,...(wechat?.extraPackages??[]),...options.extraPackages??[]]});
   await packages.load();
+  if(wechat&&!(await vault.read('wechat-private-provisioned',z.boolean()))){
+    if(!packages.list().some(item=>item.id==='cagent.wechat'))await packages.install({id:'cagent.wechat',confirm:true});
+    await vault.write('wechat-private-provisioned',true);
+  }
   // Provision the Windows distribution's native desktop once, without granting access.
   // Remember the decision so an explicit uninstall remains effective on restart.
   if (desktop.extraPackages.length && !(await vault.read('desktop-builtin-provisioned', z.boolean()))) {
@@ -254,6 +259,7 @@ export async function createAgentRuntime(
       return desktop.dispatch(method,params,owner,admin);
     }
     if(method.startsWith('wechat.')){
+      if(!wechat)throw new Error('请先导入微信自定义扩展并重新启动 CAgent');
       if(!admin||(!local&&(owner==='local'||!server.managementAllowed(owner))))throw new Error('未授权管理此机器的微信');
       if(!packages.list().some(item=>item.id==='cagent.wechat'))throw new Error('请先在此机器安装微信掌控');
       if(method==='wechat.status')return wechat.service.status();
@@ -537,7 +543,7 @@ export async function createAgentRuntime(
     await control?.close();
     await mutation;
     await packages.dispose();
-    await wechat.shutdown();
+    await wechat?.shutdown();
     await desktop.shutdown();
     await applications.dispose();
     await wsl.dispose();
