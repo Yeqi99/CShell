@@ -1278,7 +1278,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
           <AiExecution enabled={preferences.showAiExecution && !minimal} sessionId={current?.id} />
           {tabs.length ? (
             <div className="terminals" hidden={surface !== 'terminal'||!!linuxModes[active]}>
-              {tabs.filter(tab=>!linuxWorkspaces.includes(tab.id)).map((tab) => (
+              {tabs.map((tab) => (
                 <TerminalPane
                   key={tab.id}
                   id={tab.id}
