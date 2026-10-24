@@ -1,0 +1,28 @@
+# CShell 使用手册
+
+按任务查找：[文档首页](https://shell.canp.ai/docs/start.html)。网页提供正文搜索、章节导航和移动端目录。以下内容由官网同一份源文档导出，开源与 Pro 的适用范围在各页明确说明。
+
+- [智能体、模型与记忆](ai.md)
+- [Android](android.md)
+- [应用配方与 CAgent 能力包](app-authoring.md)
+- [事件订阅与 MCP](automation.md)
+- [安装与使用 CAgent](cagent.md)
+- [账号、云同步与会员](cloud.md)
+- [连接、终端与文件](connections.md)
+- [机器桌面与浏览器](desktop.md)
+- [将你的功能加入 CShell](developers.md)
+- [使用扩展与应用市场](extensions.md)
+- [HTTP 请求工作区](http.md)
+- [批量导入与账号迁移](imports.md)
+- [Linux](linux.md)
+- [机器信息与磁盘诊断](machine-info.md)
+- [macOS](macos.md)
+- [网络出口与延迟诊断](network.md)
+- [OpenCode 模型与调用排查](opencode.md)
+- [制作第一份声明式扩展](plugin-authoring.md)
+- [0.8.5 · 版本与验证状态](releases.md)
+- [设置、视图与监控](settings.md)
+- [你想完成什么？](start.md)
+- [终端、复制粘贴与文件](terminal.md)
+- [按现象排查问题](troubleshooting.md)
+- [Windows](windows.md)
