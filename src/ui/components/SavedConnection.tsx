@@ -10,12 +10,14 @@ export function SavedConnection({
   profile,
   saved,
   persist = true,
+  visual = true,
   onConnect,
   onDone,
 }: {
   profile: Profile;
   saved: boolean;
   persist?: boolean;
+  visual?: boolean;
   onConnect: (
     profile: Profile,
     credentials: Credentials,
@@ -145,6 +147,7 @@ export function SavedConnection({
       )}
     </section>
   );
+  if (!visual) return authentication;
   return <div className="linux-desktop-host"><LinuxDesktop name={profile.name} machine={{deviceId:profile.id,platform:'unknown',sshOnly:true}} target={'pending:'+profile.id} call={async()=>{throw Error('连接尚未建立');}} active={true} closed={true} initialApp="terminal" connectionLabel={busy?'正在连接…':error?'无法连接 · 点击重试':'等待连接'} onRetry={()=>{if(!busy)void start();}} files={authentication} terminal={()=>authentication}/></div>;
 
 }
