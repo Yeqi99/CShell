@@ -29,3 +29,4 @@
 - Key 的官方 console/api/v2/config 返回 200。正确 inference/v1/models 和 inference/go/v1/models 均 200。此前手工探测遗漏 v1 导致 404，不是产品源码的目录接口错误，不能改坏现有地址。
 - 真实推理：Go beam-free 返回 403（This model is not available in your country）；Zen mimo-v2.6-flash-free 与 deepseek-v4.1-flash-free 返回 403，要求在官方 OpenCode 内使用。旧 longcat/minimax 免费入口不在当前返回目录。未伪造客户端身份、绕过地区限制或自动改成收费模型。
 - 等用户选择官方客户端集成或授权少量付费/Go 模型测试；未声称模型已恢复，未修改用户凭据或安装程序。
+官方客户端验证：官方 npm opencode-windows-x64 1.19.4 已核对 SHA-512，与 GitHub 最新版本一致。使用现有 Key，隔离 XDG 目录，run --pure --format json，权限全部 deny。mimo-v2.6-flash-free、glm-5.3-flash-free 均返回 HTTP 403 FreeTierError，无模型回复。未伪装客户端、绕过区域限制或启用收费模型。集成尚未交付。临时测试目录清理命令被自动审核拒绝，目录暂保留。
