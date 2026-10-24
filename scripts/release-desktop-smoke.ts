@@ -74,7 +74,7 @@ try {
   await files.getByText('upload.txt',{exact:true}).waitFor();
   assert.equal(await readFile(join(server.root,'upload.txt'),'utf8'),'release 0.8.4 upload');
   await files.getByText('release-folder',{exact:true}).dblclick();
-  await files.getByLabel('路径',{exact:true}).waitFor();
+  await page.waitForFunction(input => input?.value === '/release-folder', await files.getByLabel('路径',{exact:true}).elementHandle());
   assert.equal(await files.getByLabel('路径',{exact:true}).inputValue(),'/release-folder');
   await files.getByRole('button',{name:'关闭文件窗口',exact:true}).click();
   await desktopApp(page,'终端');
