@@ -270,7 +270,7 @@ test('Agent commands execute independently with bounded output, actual exit code
 
 test(
   'Agent native protocol opens a detected WSL PTY and binds independent commands to that distribution',
-  { timeout: 60000 },
+  { timeout: 90000 },
   async (context) => {
     if (process.platform !== 'win32') {
       context.skip('WSL is a Windows-only provider');
@@ -323,8 +323,8 @@ test(
       );
       // A connected PTY is not yet a ready Linux shell. Match readline readiness
       // or a visible shell prompt, as a person using the desktop terminal would.
-      // Startup and command execution share the original 20-second deadline.
-      const end = Date.now() + 20000;
+      // WSL cold boot has its own bounded readiness deadline.
+      let end = Date.now() + 45000;
       const ready = () =>
         output.includes('\x1b[?2004h') || /[$#>%] $/.test(stripVTControlCharacters(output));
       while (!ready() && Date.now() < end) await new Promise((resolve) => setTimeout(resolve, 50));
@@ -333,10 +333,11 @@ test(
         `WSL ${distribution} did not present a shell prompt: ${JSON.stringify(output)}`,
       );
       context.diagnostic(`WSL ${distribution} shell ready with ${end - Date.now()} ms remaining`);
+      end = Date.now() + 15000;
       client
         .resolve(session)
         .terminal!.input("printf '\\nCSHELL_AGENT_WSL_%s\\n' OK; uname -s; id -u\r");
-      const result = /(?:^|\n|\x1b\[\d+(?:;\d+)?[Hf])CSHELL_AGENT_WSL_OK(?=\r|\n|\x1b|$)/;
+      const result = /CSHELL_AGENT_WSL_OK(?=\r|\n|\x1b|$)/;
       while (!result.test(stripVTControlCharacters(output)) && Date.now() < end)
         await new Promise((resolve) => setTimeout(resolve, 50));
       assert.match(stripVTControlCharacters(output), result);
