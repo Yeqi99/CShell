@@ -6,8 +6,18 @@ const pages = ['index.html', 'downloads.html', ...(await fs.readdir(path.join(ro
 for (const name of pages) {
   const html = await fs.readFile(path.join(root, name), 'utf8');
   if (!/<html\b/i.test(html) || !/<h1\b/i.test(html)) throw new Error('Invalid portal page: ' + name);
-  for (const [, href] of html.matchAll(/href="(\/[^"#?]*\.html)(?:[?#][^"]*)?"/g)) {
-    await fs.access(path.join(root, href));
+  const ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]);
+  if(new Set(ids).size!==ids.length)throw Error('Duplicate HTML id: '+name);
+  if(name.startsWith('docs/')&&[...html.matchAll(/<h2\b([^>]*)>/g)].some(m=>!(/\bid="[^"]+"/.test(m[1]))))throw Error('Unindexed heading: '+name);
+  for (const [, href] of html.matchAll(/(?:href|src)="([^"]+)"/g)) {
+    const url=new URL(href,'https://portal.local/'+name);
+    if(url.origin!=='https://portal.local'||url.pathname.startsWith('/downloads/'))continue;
+    const target=path.join(root,url.pathname==='/'?'index.html':url.pathname);
+    await fs.access(target);
+    if(url.hash&&target.endsWith('.html')){
+      const linked=await fs.readFile(target,'utf8');
+      if(!linked.includes(`id="${decodeURIComponent(url.hash.slice(1))}"`))throw Error(`Broken chapter: ${name} -> ${href}`);
+    }
   }
 }
 console.log(`Validated ${pages.length} portal pages; deploy services/portal directly.`);

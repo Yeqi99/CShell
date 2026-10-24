@@ -1,10 +1,14 @@
-# 0.8.5 · 版本与验证状态
+# 0.8.6 · 版本与验证状态
 
 [在线阅读与全文搜索](https://shell.canp.ai/docs/releases.html)
 
 <!-- Derived from services/portal/docs/releases.html; edit the portal source then export. -->
 
 
+
+
+<h2 id="release-086">0.8.6 · 文档与可靠性</h2>
+<p>使用手册按任务整理，支持正文搜索、章节直达、移动目录与示例复制；官网重新设计。CAgent 改善退出清理和启动期间关闭的处理。OpenCode 入口自动刷新模型目录，保留已有会话的选择；服务商拒绝的免费模型仍不能保证可用。Pro 修复旧配置导入时读取 OpenCode 扩展凭据的位置。</p>
 
 
 <h2 id="section-1">0.8.5 · 升级与退出</h2>
@@ -32,7 +36,7 @@
 
 
 <h2 id="section-6">下载与校验</h2>
-<p>在 <a href="https://shell.canp.ai/downloads.html">下载中心</a> 选择产品、系统与架构。使用 <a href="https://shell.canp.ai/downloads/pro/v0.8.5/SHA256SUMS.txt">Pro 摘要清单</a> 或 <a href="https://shell.canp.ai/downloads/opensource/v0.8.5/SHA256SUMS.txt">开源版摘要清单</a> 校验安装包。移动端安装仍需系统确认；不支持新更新源的旧客户端需首次手动升级。</p>
+<p>在 <a href="https://shell.canp.ai/downloads.html">下载中心</a> 选择产品、系统与架构。使用 <a href="https://shell.canp.ai/downloads/pro/v0.8.6/SHA256SUMS.txt">Pro 摘要清单</a> 或 <a href="https://shell.canp.ai/downloads/opensource/v0.8.6/SHA256SUMS.txt">开源版摘要清单</a> 校验安装包。移动端安装仍需系统确认；不支持新更新源的旧客户端需首次手动升级。</p>
 
 
 

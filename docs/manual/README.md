@@ -20,7 +20,7 @@
 - [网络出口与延迟诊断](network.md)
 - [OpenCode 模型与调用排查](opencode.md)
 - [制作第一份声明式扩展](plugin-authoring.md)
-- [0.8.5 · 版本与验证状态](releases.md)
+- [0.8.6 · 版本与验证状态](releases.md)
 - [设置、视图与监控](settings.md)
 - [你想完成什么？](start.md)
 - [终端、复制粘贴与文件](terminal.md)
