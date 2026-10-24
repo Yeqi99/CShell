@@ -7,7 +7,7 @@ import { Diagnostics } from '../core/diagnostics';
 import { openRdpProfile, rdpProfileSchema } from '../core/rdp';
 import { installWindowPermissions } from './window-permissions';
 import { HttpWorkspaces } from '../core/http-workspaces';
-import { WechatService } from '../core/wechat';
+import { loadPrivateWechat } from '../core/custom-extensions';
 import { testStartGate } from './test-start-gate';
 import { registerAgent } from './agent';
 import { syncClientProfiles } from '../core/client/profiles';
@@ -502,12 +502,13 @@ else
         return window.isAlwaysOnTop();
       });
       const http = new HttpWorkspaces(app.getPath('userData'), store, connections.tools);
-      const wechat = new WechatService(app.getPath('userData'), store);
-      await wechat.load();
-      handle('wechat:status', () => wechat.status());
-      handle('wechat:save', config => wechat.save(config));
-      handle('wechat:stop-subscriptions', () => wechat.subscriptions.stopAll());
-      wechat.subscriptions.onEvent = notification => { if (!window.isDestroyed()) window.webContents.send('wechat:event',notification); };
+      const privateWechat = await loadPrivateWechat();
+      const wechat = privateWechat ? new privateWechat.module.WechatService(app.getPath('userData'), store, {python:join(privateWechat.runtime,'python.exe'),local:true}) : undefined;
+      await wechat?.load();
+      handle('wechat:status', () => {if(!wechat)throw new Error('请导入微信自定义扩展并重新打开 CShell');return wechat.status();});
+      handle('wechat:save', config => {if(!wechat)throw new Error('请导入微信自定义扩展并重新打开 CShell');return wechat.save(config);});
+      handle('wechat:stop-subscriptions', () => wechat?.subscriptions.stopAll());
+      if(wechat) wechat.subscriptions.onEvent = notification => { if (!window.isDestroyed()) window.webContents.send('wechat:event',notification); };
       await http.load();
       http.onChanged = id => { if (!window.isDestroyed()) window.webContents.send('http:changed', id); };
       handle('http:create', (name, group) => http.create(name, group));
@@ -1030,7 +1031,7 @@ else
       app.on('will-quit', (event) => {
         if (!flushed) {
           event.preventDefault();
-          flushing ??= wechat.subscriptions.stopAll().catch(error => console.error('WeChat listener shutdown unconfirmed',error)).then(() => disposeAi())
+          flushing ??= (wechat?.subscriptions.stopAll() ?? Promise.resolve()).catch(error => console.error('WeChat listener shutdown unconfirmed',error)).then(() => disposeAi())
             .catch((error) => console.error('AI shutdown failed', error))
             .then(() => machineBrowser.flush())
             .then(() => activity.flush())

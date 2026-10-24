@@ -27,7 +27,7 @@ export class WechatService {
   private busy=false;
   private revision=0;
   readonly subscriptions:WechatSubscriptions;
-  constructor(private directory:string,private store:Pick<Store,'plugins'>,private options:{python?:string;enabled?:()=>boolean}={}){this.subscriptions=new WechatSubscriptions(join(directory,'wechat-subscriptions'),(this.options.python??join(process.env.LOCALAPPDATA??'','CShell','tools','wechat-bridge','venv','Scripts','python.exe')));}
+  constructor(private directory:string,private store:Pick<Store,'plugins'>,private options:{python?:string;local?:boolean;enabled?:()=>boolean}={}){this.subscriptions=new WechatSubscriptions(join(directory,'wechat-subscriptions'),(this.options.python??join(process.env.LOCALAPPDATA??'','CShell','tools','wechat-bridge','venv','Scripts','python.exe')));}
   private isEnabled(){return this.options.enabled?.()??pluginEnabled(this.store.plugins(),'wechat');}
   configured(){return this.config.enabled&&this.config.experimental&&!!this.binding;}
   async ready(){
@@ -45,7 +45,7 @@ export class WechatService {
     await this.subscriptions.stopAll();
     let binding:unknown=null;
     if(config.enabled){
-      if(!config.experimental||!config.pid)throw new Error('请选择微信进程并确认实验风险');
+      if(!config.experimental||!config.pid)throw new Error('请选择微信进程并确认控制授权');
       const data=await this.run({method:'discover'},new AbortController().signal);
       binding=data.processes.find((p:any)=>p.pid===config.pid)?.binding;
       if(!binding)throw new Error('找不到此版本的微信进程，请刷新');
@@ -61,7 +61,7 @@ export class WechatService {
       invoke:async(args,signal)=>JSON.stringify(await this.invoke(method,args,signal)),
     });
     return [
-      ...(!this.options.python?[
+      ...((this.options.local||!this.options.python)?[
         tool('wechat_payment_parse','payment_parse','wechat.read',paymentInputs.payment_parse,'Parse one supplied WeChat payment XML on THIS computer. No scanning, network request or claim. Returns validated card metadata; unknown red-packet amount stays null.'),
         tool('wechat_transfer_receive','transfer_receive','wechat.payments.receive',paymentInputs.transfer_receive,'Accept one explicitly identified transfer on THIS computer. Requires the separately installed atomic payment adapter and a verified current WeChat instance. Requires independent receiveTransfers grant and original peer history permission. Revalidates account, original message and amount. Real financial action; do not retry unknown outcomes. Does not scan, auto-claim or send acknowledgment.',true),
         tool('wechat_red_packet_receive','red_packet_receive','wechat.payments.receive',paymentInputs.red_packet_receive,'Claim one explicitly identified red packet on THIS computer. Requires the separately installed atomic payment adapter and a verified current WeChat instance. Requires independent receiveRedPackets grant and original peer history permission. Real financial action; do not retry unknown outcomes. Does not scan, auto-claim or send acknowledgment.',true),
@@ -108,7 +108,7 @@ export class WechatService {
   private async invoke(method:string,args:any,signal:AbortSignal,persistentGuard:()=>boolean=()=>true){
     this.requirePlugin();if(method==='status')return this.status();
     if(isPaymentMethod(method)){
-      if(this.options.python)throw new Error('此收款工具仅支持 CShell 本机，尚未封装为远端 CAgent 能力');
+      if(this.options.python&&!this.options.local)throw new Error('此收款工具仅支持 CShell 本机，尚未封装为远端 CAgent 能力');
       args=paymentInputs[method].parse(args);
     }
     const permitted=(targets:string[],binding:unknown)=>this.config.enabled&&this.config.experimental&&this.isEnabled()&&JSON.stringify(binding)===JSON.stringify(this.binding)&&targets.every(id=>this.config.receive.includes('*')||this.config.receive.includes(id));

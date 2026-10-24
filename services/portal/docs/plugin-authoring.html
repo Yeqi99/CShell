@@ -35,4 +35,13 @@
 </ul>
 <h2 id="section-5">5. 加入官方目录</h2>
 <p>通过 Pull Request 提交功能说明、固定下载地址、清单和验证结果。官方目录位于 marketplace/plugins.json，由 scripts/marketplace.ts 生成。官方内置 Provider 不能被第三方清单借用。</p>
-<p><a href="https://github.com/Yeqi99/CShell/blob/main/docs/PLUGINS.md">完整插件协议</a> · <a href="https://github.com/Yeqi99/CShell/blob/main/scripts/package-plugin.ts">校验脚本</a></p><div class="doc-bottom"><a href="/docs/start.html">← 文档首页</a> · <a href="https://github.com/Yeqi99/CShell/issues">反馈文档问题 ↗</a></div></article></main><footer><span>CShell / CanpShell · MIT 开源核心</span><div><a href="/docs/releases.html">版本状态</a><a href="https://github.com/Yeqi99/CShell/issues">问题反馈 ↗</a><a href="/docs/developers.html">开发者</a></div></footer></body></html>
+<p><a href="https://github.com/Yeqi99/CShell/blob/main/docs/PLUGINS.md">完整插件协议</a> · <a href="https://github.com/Yeqi99/CShell/blob/main/scripts/package-plugin.ts">校验脚本</a></p><div class="doc-bottom"><a href="/docs/start.html">← 文档首页</a> · <a href="https://github.com/Yeqi99/CShell/issues">反馈文档问题 ↗</a></div><h2 id="local-package">本地扩展文件格式</h2><p>不发布到市场，也可以将命令扩展保存为 <code>.cshellext</code> 文件，由使用者导入或拖入。文件为 UTF-8 JSON；可 gzip 压缩同一内容。保留 <code>cshell.*</code> 命名空间，使用自己的发布者前缀。</p><pre><code>{
+  "format": "cshell-extension-1",
+  "manifest": {
+    "protocol": 1, "id": "example.commands", "version": "1.0.0",
+    "name": "我的命令", "description": "常用命令", "publisher": "Example",
+    "provider": "snippets", "permissions": ["terminal.input"],
+    "commands": [{"label": "磁盘空间", "text": "df -h"}]
+  },
+  "files": []
+}</code></pre><p>命令不能含换行或控制字符，不自动执行。导入与启用是两个步骤。当前普通外部包仅支持此声明式贡献；带原生运行时的包必须有受信任发布者签名，不能通过声明权限绕过校验。</p></article></main><footer><span>CShell / CanpShell · MIT 开源核心</span><div><a href="/docs/releases.html">版本状态</a><a href="https://github.com/Yeqi99/CShell/issues">问题反馈 ↗</a><a href="/docs/developers.html">开发者</a></div></footer></body></html>

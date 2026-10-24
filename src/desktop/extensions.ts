@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+import { readCustomExtension, installCustomExtension } from '../core/custom-extensions';
 import type { ConnectionManager } from '../core/connections/manager';
 import { dialog, shell, type BrowserWindow } from 'electron';
 import { z } from 'zod';
@@ -77,6 +79,24 @@ export function registerExtensionHandlers(
   handle('python:save', (id, path, code, revision) => {
     requirePlugin('python');
     return files.save(connected(id), path, code, revision);
+  });
+  const pendingImports=new Map<string,{pack:Awaited<ReturnType<typeof readCustomExtension>>;expires:number}>();
+  handle('plugins:import-preview',async (path?:unknown)=>{
+    let selected:string;
+    if(path===undefined){const result=await dialog.showOpenDialog(window,{properties:['openFile'],filters:[{name:'CShell 自定义扩展',extensions:['cshellext']}]});if(result.canceled)return null;selected=result.filePaths[0];}
+    else selected=z.string().min(1).max(32767).parse(path);
+    const pack=await readCustomExtension(selected),token=randomUUID();
+    pendingImports.clear();pendingImports.set(token,{pack,expires:Date.now()+300000});
+    setTimeout(()=>pendingImports.delete(token),300000).unref();
+    return {token,manifest:pack.value.manifest,trusted:pack.trusted,bytes:pack.bytes};
+  });
+  handle('plugins:import-apply',async (input:unknown)=>{
+    const token=z.string().uuid().parse(input),pending=pendingImports.get(token);pendingImports.delete(token);
+    if(!pending||pending.expires<Date.now())throw new Error('导入预览已过期，请重新选择扩展包');
+    const existing=store.plugins().find(p=>p.manifest.id===pending.pack.value.manifest.id);
+    if(existing?.enabled)throw new Error('请先停用此扩展，再导入更新，已有配置会保留');
+    const manifest=await installCustomExtension(pending.pack);
+    await store.setPlugins([...store.plugins().filter(p=>p.manifest.id!==manifest.id),{manifest,enabled:false,source:'custom:'+pending.pack.sha256}]);
   });
   handle('plugins:list', () => store.plugins());
   handle('plugins:install', (id) => plugins.install(pluginId.parse(id)));

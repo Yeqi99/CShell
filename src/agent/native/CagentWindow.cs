@@ -100,7 +100,7 @@ public class CagentWindow : Window {
     p.Children.Add(Text("更新来自香港下载服务。安装包通过校验后才会安装，正在运行的连接不会因后台下载而中断。",12));panelStatus.Text="正在检查香港更新服务…";
     var info=D(await Api("update.check"));panelStatus.Text="";p.Children.Add(Text("当前版本 "+S(info,"current")));
     if(!B(info,"available")){p.Children.Add(Text("暂无可安装的新版 Windows 安装包。"));ActionButton(p,"重新检查",Updates);return;}
-    p.Children.Add(Text("可用版本 "+S(info,"version")));p.Children.Add(Text("下载并校验后打开安装向导。安装将退出 CAgent 并断开连接，请先结束正在运行的任务。",12));
+    p.Children.Add(Text("可用版本 "+S(info,"version")));p.Children.Add(Text("下载校验后自动安装并重新打开 CAgent。安装会结束当前连接与任务，请先保存工作。",12));
     bool downloading=false;ActionButton(p,"下载并安装",async()=>{if(downloading)return;downloading=true;try{await Api("update.download");Dictionary<string,object> d;do{d=D(await Api("update.status"));panelStatus.Text="下载中："+S(d,"bytes")+" / "+S(d,"total")+" 字节";if(S(d,"phase")=="downloading")await Task.Delay(750);}while(S(d,"phase")=="downloading");if(S(d,"phase")!="ready")throw new Exception(S(d,"error"));d=D(await Api("update.verify"));panelStatus.Text="校验通过，正在保存并更新…";await Api("agent.shutdown",Obj("confirm",true));Process.Start(new ProcessStartInfo(S(d,"path"),"/S /RESTART /D="+InstallationRoot()){UseShellExecute=true});updateLaunched=true;exiting=true;Close();}finally{downloading=false;}});
   }
   string InstallationRoot(){var current=new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);return current.Parent!=null&&current.Parent.Name=="versions"&&current.Parent.Parent!=null?current.Parent.Parent.FullName:current.FullName.TrimEnd(Path.DirectorySeparatorChar);}

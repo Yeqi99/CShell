@@ -13,13 +13,13 @@ export function WechatPlugin({api=window.cshell,remote=false}:{api?:Pick<typeof 
   const ids=(text:string)=>[...new Set(text.split(/[\s,，]+/).filter(Boolean))];
   async function save(){setBusy(true);try{await api.wechatSave(parseWechatConfig({...draft,send:ids(send),sendBlocked:ids(sendBlocked),receive:ids(receive),history:ids(history),remarks:ids(remarks)}));setMessage('已保存。智能体调用还需开启对应的微信能力权限。');}catch(e){setMessage(String(e));}finally{setBusy(false);}}
   return <section className="wechat-plugin" style={{maxWidth:720,padding:20,display:'grid',gap:14}}>
-    <p>{remote?'控制当前连接的 CAgent 机器上的微信，不访问控制端微信。':'仅控制此电脑当前登录的微信，与智能体绑定的远端机器无关。'}实验适配可能导致微信崩溃；历史读取目前覆盖本地 message_0.db；其他分片和已删除消息不保证可用。</p>
+    <p>{remote?'控制当前连接的 CAgent 机器上的微信，不访问控制端微信。':'仅控制此电脑当前登录的微信，与智能体绑定的远端机器无关。'}版本适配不匹配可能导致微信崩溃；历史读取目前覆盖本地 message_0.db；其他分片和已删除消息不保证可用。</p>
     <div><span>消息订阅：{subscriptions.filter(s=>s.state==='listening').length} 个运行中</span> <button disabled={busy} onClick={()=>void api.wechatStopSubscriptions().then(()=>refresh()).catch(e=>setMessage(String(e)))}>停止监听</button></div>
     <small>可在智能体中请求持续监听。默认持续 1 小时，最多 24 小时；退出托管程序或撤销接收权限后停止。订阅不会自动回复消息。</small>
     <fieldset disabled={busy} style={{display:'contents'}}>
     <label data-permission-node="wechat/pid">微信进程 <select aria-label="微信进程" value={draft.pid??''} onChange={e=>setDraft({...draft,pid:e.target.value?Number(e.target.value):null})} disabled={busy}><option value="">请选择</option>{processes.map(p=><option key={p.pid} value={p.pid}>微信 {p.version} · PID {p.pid}</option>)}</select></label>
     <button disabled={busy} onClick={()=>void refresh()}>刷新进程</button>
-    <label data-permission-node="wechat/experimental" style={{display:"flex",flexDirection:"row",alignItems:"center",gap:8}}><input type="checkbox" checked={draft.experimental} onChange={e=>setDraft({...draft,experimental:e.target.checked})}/>我了解崩溃风险，允许本机实验控制</label>
+    <label data-permission-node="wechat/experimental" style={{display:"flex",flexDirection:"row",alignItems:"center",gap:8}}><input type="checkbox" checked={draft.experimental} onChange={e=>setDraft({...draft,experimental:e.target.checked})}/>我了解崩溃风险，允许本机控制</label>
     <label data-permission-node="wechat/enabled" style={{display:"flex",flexDirection:"row",alignItems:"center",gap:8}}><input type="checkbox" checked={draft.enabled} onChange={e=>setDraft({...draft,enabled:e.target.checked})}/>启用微信控制</label>
     <label data-permission-node="wechat/readContacts" style={{display:"flex",flexDirection:"row",alignItems:"center",gap:8}}><input type="checkbox" checked={draft.readContacts} onChange={e=>setDraft({...draft,readContacts:e.target.checked})}/>允许分页读取通讯录记录（含群及非好友记录）</label>
     <label data-permission-node="wechat/readMoments" style={{display:"flex",flexDirection:"row",alignItems:"center",gap:8}}><input type="checkbox" checked={draft.readMoments} onChange={e=>setDraft({...draft,readMoments:e.target.checked})}/>允许读取朋友圈本地缓存（记录增量变化，不刷新或发布）</label>

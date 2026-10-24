@@ -720,7 +720,7 @@ window.updateEvent = (json) => {
   ($('check-update') as HTMLButtonElement).disabled = state.busy === true;
   $('install-update').hidden = !state.available;
   ($('install-update') as HTMLButtonElement).disabled = state.busy === true;
-  $('install-update').textContent = state.ready ? '安装更新' : '下载更新';
+  $('install-update').textContent = state.ready ? '继续安装' : '立即更新';
   $('update-progress').hidden = typeof state.progress !== 'number';
   ($('update-progress') as HTMLProgressElement).value = state.progress || 0;
 };

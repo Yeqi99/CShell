@@ -1,3 +1,4 @@
+import { wechatManifest } from '../src/extensions/wechat/manifest';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -29,7 +30,7 @@ test('plugin event reaches configured AI without prior history; duplicate and re
   });
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   let permitted = true;
-  const definitions = new WechatService(directory, { plugins: () => builtinPlugins.map(manifest => ({manifest, enabled:true, source:'builtin'})) } as any).tools();
+  const definitions = new WechatService(directory, { plugins: () => [...builtinPlugins,wechatManifest].map(manifest => ({manifest, enabled:true, source:'builtin'})) } as any).tools();
   const wechat: any = {
     tools: () => definitions.length ? definitions.map(tool => ({...tool, invoke: async () => '{}'})) : [{ name: 'wechat_events', capability: 'wechat.read', description: 'Read messages', input: z.object({}), needsReview: () => false, invoke: async () => '{}' }],
     eventSource: () => ({ id: 'wechat', name: 'WeChat fixture', eventTypes: [{ id: 'message.received', name: 'Message' }], available: true }),

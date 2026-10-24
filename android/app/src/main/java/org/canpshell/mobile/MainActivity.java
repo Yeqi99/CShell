@@ -97,7 +97,7 @@ public class MainActivity extends Activity {
   }
   private void event(String id, String type, String value) {
     if (destroyed) return;
-    runOnUiThread(() -> { if (!destroyed) web.evaluateJavascript("window.receive(" + JSONObject.quote(id) + "," + JSONObject.quote(type) + "," + JSONObject.quote(value) + ")", null); });
+    runOnUiThread(() -> { if (!destroyed) web.evaluateJavascript("if(typeof window.receive==='function')window.receive(" + JSONObject.quote(id) + "," + JSONObject.quote(type) + "," + JSONObject.quote(value) + ")", null); });
   }
   private boolean trust(String endpoint, byte[] key) { return trust(endpoint,key,()->!destroyed); }
   private boolean trust(String endpoint, byte[] key, java.util.function.BooleanSupplier valid) {

@@ -4,14 +4,14 @@ import { mkdtemp,rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { WechatService } from '../src/core/wechat';
-import { builtinPlugins } from '../src/shared/plugins';
+import { wechatManifest } from '../src/extensions/wechat/manifest';
 import { aiPolicySchema,emptyAiPolicy } from '../src/shared/ai';
 import type { Store } from '../src/core/store';
 
 test('Moments requires independent grant and compatible runtime before native access',async()=>{
   if(process.platform!=='win32')return;
   const directory=await mkdtemp(join(tmpdir(),'cshell-moments-'));
-  const manifest=builtinPlugins.find(p=>p.id==='cshell.wechat')!;
+  const manifest=wechatManifest;
   const service=new WechatService(directory,{plugins:()=>[{manifest,enabled:true,source:'bundled'}]} as unknown as Store);
   const calls:string[]=[];let compatible=false;
   (service as any).run=async(r:any)=>{calls.push(r.method);return {processes:[{pid:42,binding:{pid:42}}],readProtocolVersion:2,momentsProtocolVersion:compatible?1:undefined};};
@@ -35,7 +35,7 @@ test('WeChat grants are independent and disabled by default',()=>{
 test('Active reads reject an older runtime before requesting native data',async()=>{
   if(process.platform!=='win32')return;
   const directory=await mkdtemp(join(tmpdir(),'cshell-wechat-runtime-'));
-  const manifest=builtinPlugins.find(p=>p.id==='cshell.wechat')!;
+  const manifest=wechatManifest;
   const store={plugins:()=>[{manifest,enabled:true,source:'bundled'}]} as unknown as Store;
   const service=new WechatService(directory,store);const methods:string[]=[];
   (service as any).run=async(request:any)=>{methods.push(request.method);return {processes:[{pid:42,binding:{pid:42}}]};};
@@ -50,7 +50,7 @@ test('Active reads reject an older runtime before requesting native data',async(
 test('WeChat plugin gates tools and exact recipient allowlists before subprocess',async()=>{
   const directory=await mkdtemp(join(tmpdir(),'cshell-wechat-test-'));
   let enabled=false;
-  const manifest=builtinPlugins.find(p=>p.id==='cshell.wechat')!;
+  const manifest=wechatManifest;
   const store={plugins:()=>[{manifest,enabled,source:'bundled'}]} as unknown as Store;
   const service=new WechatService(directory,store);
   let calls=0;
@@ -83,7 +83,7 @@ test('WeChat plugin gates tools and exact recipient allowlists before subprocess
 test('Wildcard sending respects deny precedence, exact IDs, persistence and independent scopes',async()=>{
   if(process.platform!=='win32')return;
   const directory=await mkdtemp(join(tmpdir(),'cshell-wechat-wildcard-'));
-  const manifest=builtinPlugins.find(p=>p.id==='cshell.wechat')!;
+  const manifest=wechatManifest;
   const store={plugins:()=>[{manifest,enabled:true,source:'bundled'}]} as unknown as Store;
   let calls=0;
   const service=new WechatService(directory,store);
@@ -121,7 +121,7 @@ test('Wildcard sending respects deny precedence, exact IDs, persistence and inde
 test('Receive, history and remarks wildcard grants persist but operations require concrete targets',async()=>{
   if(process.platform!=='win32')return;
   const directory=await mkdtemp(join(tmpdir(),'cshell-wechat-all-scopes-'));
-  const manifest=builtinPlugins.find(p=>p.id==='cshell.wechat')!;
+  const manifest=wechatManifest;
   const store={plugins:()=>[{manifest,enabled:true,source:'bundled'}]} as unknown as Store;
   const service=new WechatService(directory,store);let calls=0;
   (service as any).run=async()=>{calls++;return {readProtocolVersion:2,processes:[{pid:42,binding:{pid:42}}]};};
@@ -157,7 +157,7 @@ test('Receive, history and remarks wildcard grants persist but operations requir
 test('Subscriptions require exact receive scope and keep checking capability revocation',async()=>{
  if(process.platform!=='win32')return;
  const directory=await mkdtemp(join(tmpdir(),'cshell-subscription-test-'));
- const manifest=builtinPlugins.find(p=>p.id==='cshell.wechat')!;
+ const manifest=wechatManifest;
  let enabled=true,capability=true,guard:(()=>boolean)|undefined,stops=0;
  const store={plugins:()=>[{manifest,enabled,source:'bundled'}]} as unknown as Store;
  const service=new WechatService(directory,store);
@@ -179,7 +179,7 @@ test('Subscriptions require exact receive scope and keep checking capability rev
 test('Recent conversations require an independent grant and a compatible toolkit',async()=>{
  if(process.platform!=='win32')return;
  const directory=await mkdtemp(join(tmpdir(),'cshell-recent-test-'));
- const manifest=builtinPlugins.find(p=>p.id==='cshell.wechat')!;
+ const manifest=wechatManifest;
  const store={plugins:()=>[{manifest,enabled:true,source:'bundled'}]} as unknown as Store;
  const service=new WechatService(directory,store);let compatible=false;const methods:string[]=[];
  (service as any).run=async(request:any)=>{methods.push(request.method);return {readProtocolVersion:2,conversationsProtocolVersion:compatible?1:undefined,processes:[{pid:42,binding:{pid:42}}],items:[]};};
@@ -197,7 +197,7 @@ test('Recent conversations require an independent grant and a compatible toolkit
 test('Moments publishing is default denied independently from chat send and read',async()=>{
  if(process.platform!=='win32')return;
  const directory=await mkdtemp(join(tmpdir(),'cshell-publish-test-'));
- const manifest=builtinPlugins.find(p=>p.id==='cshell.wechat')!;
+ const manifest=wechatManifest;
  const store={plugins:()=>[{manifest,enabled:true,source:'bundled'}]} as unknown as Store;
  const service=new WechatService(directory,store);let compatible=false;const methods:string[]=[];
  (service as any).run=async(request:any)=>{methods.push(request.method);return {readProtocolVersion:2,momentsPublishProtocolVersion:compatible?1:undefined,processes:[{pid:42,binding:{pid:42}}]};};

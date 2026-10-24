@@ -5,7 +5,7 @@ import type { InstalledPlugin } from '../../shared/plugins';
 export const pluginViews = [
   { pluginId:'cshell.tavily',id:'tavily',title:'Tavily 搜索',titleEn:'Tavily Search' },
   { pluginId:'cshell.opencode',id:'opencode',title:'OpenCode',titleEn:'OpenCode' },
-  { pluginId: 'cshell.wechat', id: 'wechat', title: '微信（实验）', titleEn: 'WeChat (experimental)' },
+  { pluginId: 'cshell.wechat', id: 'wechat', title: '微信', titleEn: 'WeChat' },
   { pluginId: 'cshell.agent', id: 'agent', title: 'CAgent', titleEn: 'CAgent' },
   { pluginId: 'cshell.wsl', id: 'wsl', title: 'WSL Linux', titleEn: 'WSL Linux' },
   { pluginId: 'cshell.conda', id: 'environment', title: 'Anaconda', titleEn: 'Anaconda' },

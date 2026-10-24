@@ -77,7 +77,7 @@ export class PluginService {
     });
   }
   async catalog(url: string, signal?: AbortSignal) {
-    const entries = catalogSchema.parse(JSON.parse(await httpsText(url, 512_000, signal))).plugins;
+    const entries = catalogSchema.parse(JSON.parse(await httpsText(url, 512_000, signal))).plugins.filter(entry=>entry.manifest.provider!=='wechat');
     if (
       new Set(entries.map((e) => e.manifest.id)).size !== entries.length ||
       entries.some(
