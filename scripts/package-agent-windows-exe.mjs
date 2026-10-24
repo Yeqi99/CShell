@@ -10,6 +10,7 @@ if(manifest.platform!=='win32'||manifest.arch!=='x64'||!/^\d+\.\d+\.\d+$/.test(m
 const quote=s=>s.replaceAll('$','$$').replaceAll('"','$\\"');
 const source=`Unicode true
 !include "MUI2.nsh"
+!include "FileFunc.nsh"
 Name "CAgent"
 Icon "${quote(resolve('assets/cagent-icon.ico'))}"
 OutFile "${quote(output)}"
@@ -36,6 +37,11 @@ Section "Install"
   StrCpy $1 ""
   IfSilent 0 +2
     StrCpy $1 "-NoLaunch -NoShortcuts -RefreshExistingShortcuts"
+  \${GetParameters} $2
+  ClearErrors
+  \${GetOptions} $2 "/RESTART" $3
+  IfErrors +2 0
+    StrCpy $1 "-NoShortcuts -RefreshExistingShortcuts"
   nsExec::ExecToLog '\"$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe\" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"$PLUGINSDIR\\deployment\\Install-CAgent.ps1\" -Destination \"$INSTDIR\" $1'
   Pop $0
   StrCmp $0 "0" success

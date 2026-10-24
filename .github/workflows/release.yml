@@ -123,6 +123,9 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - if: matrix.platform == 'mac'
+        name: Verify in-place DMG update
+        run: pnpm exec tsx scripts/mac-update-smoke.ts
+      - if: matrix.platform == 'mac'
         name: Verify CAgent desktop viewer on macOS
         run: |
           pnpm exec playwright install chromium

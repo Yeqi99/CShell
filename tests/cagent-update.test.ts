@@ -49,3 +49,12 @@ test('closing updater cancels streaming download without exposing installer',{sk
   await assert.rejects(readFile(join(directory,'updates',release.assets[0].name)),{code:'ENOENT'});
  }finally{updater.close();globalThis.fetch=original;await rm(directory,{recursive:true,force:true});}
 });
+
+test('Unix CAgent update channels select only the exact operating system and architecture',()=>{
+ const name='CAgent-0.8.7-linux-arm64.tar.gz';
+ const unix={assets:[{name,browser_download_url:'https://shell.canp.ai/downloads/pro/v0.8.7/'+name,digest,size:data.length}]};
+ assert.equal(selectUpdate([unix],'0.8.6','arm64','linux')?.version,'0.8.7');
+ assert.equal(selectUpdate([unix],'0.8.6','x64','linux'),undefined);
+ assert.equal(selectUpdate([unix],'0.8.6','arm64','darwin'),undefined);
+ assert.equal(selectUpdate([unix],'0.8.6','arm64','win32'),undefined);
+});

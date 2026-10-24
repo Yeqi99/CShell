@@ -74,7 +74,7 @@ try {
     await panel.getByRole('button', { name: '正在检查…', exact: true }).isDisabled(),
     true,
   );
-  await panel.getByRole('button', { name: '下载更新', exact: true }).waitFor();
+  await panel.getByRole('button', { name: '立即更新', exact: true }).waitFor();
   await app.evaluate(() => {
     (globalThis as any).updateTestMode = 'rate';
   });
@@ -82,8 +82,8 @@ try {
   await panel.getByRole('alert').filter({ hasText: '香港下载服务 限制了当前网络的请求' }).waitFor();
   await mkdir('test-results', { recursive: true });
   await page.screenshot({ path: 'test-results/update-rate-limit.png' });
-  assert.equal(await panel.getByRole('button', { name: '下载更新', exact: true }).count(), 0);
-  await panel.getByRole('button', { name: '打开下载页', exact: true }).click();
+  assert.equal(await panel.getByRole('button', { name: '立即更新', exact: true }).count(), 0);
+  await panel.getByRole('button', { name: '其他设备下载', exact: true }).click();
   assert.equal(
     await app.evaluate(() => (globalThis as any).openedUpdatePage),
     'https://shell.canp.ai/',
@@ -101,8 +101,8 @@ try {
   await app.evaluate(() => {
     (globalThis as any).updateTestMode = 'download-error';
   });
-  await panel.getByRole('button', { name: '下载更新', exact: true }).click();
-  await panel.getByRole('button', { name: '重新下载', exact: true }).waitFor();
+  await panel.getByRole('button', { name: '立即更新', exact: true }).click();
+  await panel.getByRole('button', { name: '重试更新', exact: true }).waitFor();
   await app.evaluate(() => {
     (globalThis as any).updateTestMode = 'success';
   });

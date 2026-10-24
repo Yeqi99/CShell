@@ -49,6 +49,7 @@ jobs:
         run: |
           python -m pip install frida==17.24.0 pefile==2024.8.26 zstandard==0.23.0
           "CAGENT_WECHAT_PYTHON=$((Get-Command python).Source)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - run: pnpm exec tsx --test tests/cagent-update.test.ts tests/posix-agent-update.test.ts
       - name: Build standalone CAgent on the native architecture
         run: node scripts/agent-build.mjs
       - name: Archive, install or extract, and verify real packaged PTY
