@@ -1,6 +1,6 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>制作第一份扩展 · CShell</title><meta name="description" content="制作第一份扩展：CShell 与 CAgent 使用和开发说明。"><link rel="icon" href="/icon.svg"><link rel="stylesheet" href="/theme.css"><link rel="stylesheet" href="/workbench.css"><script src="/site.js" defer></script></head><body><header><a class="brand" href="/"><img src="/icon.svg" alt="">CShell</a><nav aria-label="主导航"><a href="/#editions">产品版本</a><a href="/#download">下载</a><a href="/docs/start.html">文档</a><a href="https://github.com/Yeqi99/CShell">GitHub ↗</a></nav></header><main class="docs-layout"><aside class="docs-nav" aria-label="文档导航"><label for="doc-search" class="eyebrow">文档中心</label><input id="doc-search" type="search" placeholder="搜索文档标题" autocomplete="off"><p id="search-empty" hidden>没有匹配的标题。</p><div class="nav-group">入门</div><a class="doc-link" href="/docs/start.html" >开始使用</a><a class="doc-link" href="/docs/releases.html" >版本与验证状态</a><a class="doc-link" href="/docs/cagent.html" >安装与使用 CAgent</a><div class="nav-group">功能</div><a class="doc-link" href="/docs/connections.html" >连接、终端与文件</a><a class="doc-link" href="/docs/desktop.html" >机器桌面与浏览器</a><a class="doc-link" href="/docs/ai.html" >智能体、模型与记忆</a><a class="doc-link" href="/docs/cloud.html" >账号、云同步与会员</a><a class="doc-link" href="/docs/extensions.html" >使用扩展与应用市场</a><a class="doc-link" href="/docs/http.html" >HTTP 请求工作区</a><a class="doc-link" href="/docs/settings.html" >设置、视图与监控</a><a class="doc-link" href="/docs/automation.html" >事件订阅与 MCP</a><div class="nav-group">平台</div><a class="doc-link" href="/docs/windows.html" >Windows</a><a class="doc-link" href="/docs/macos.html" >macOS</a><a class="doc-link" href="/docs/linux.html" >Linux</a><a class="doc-link" href="/docs/android.html" >Android</a><div class="nav-group">开发者</div><a class="doc-link" href="/docs/developers.html" >开发者接入路线</a><a class="doc-link" href="/docs/plugin-authoring.html" aria-current="page">制作第一份扩展</a><a class="doc-link" href="/docs/app-authoring.html" >应用配方与能力包</a></aside><article class="doc-content"><div class="doc-topline">文档 / 开发者 · 2026-10-22</div><h1>制作第一份声明式扩展</h1>
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>制作第一份扩展 · CShell</title><meta name="description" content="制作第一份扩展：CShell 与 CAgent 使用和开发说明。"><link rel="icon" href="/icon.svg"><link rel="stylesheet" href="/theme.css"><link rel="stylesheet" href="/workbench.css"><script src="/site.js" defer></script><link rel="stylesheet" href="/docs-reader.css"><script src="/docs-reader.js" defer></script></head><body><header><a class="brand" href="/"><img src="/icon.svg" alt="">CShell</a><nav aria-label="主导航"><a href="/#editions">产品版本</a><a href="/#download">下载</a><a href="/docs/start.html">文档</a><a href="https://github.com/Yeqi99/CShell">GitHub ↗</a></nav></header><main class="docs-layout"><aside class="docs-nav" aria-label="文档导航"><label for="doc-search" class="eyebrow">文档中心</label><input id="doc-search" type="search" placeholder="搜索功能、操作或报错" autocomplete="off"><p id="search-empty" hidden>没有找到相关内容，试试“代理”“导入”或“权限”。</p><div class="nav-group">入门</div><a class="doc-link" href="/docs/start.html" >开始使用</a><a class="doc-link" href="/docs/releases.html" >版本与验证状态</a><a class="doc-link" href="/docs/cagent.html" >安装与使用 CAgent</a><div class="nav-group">功能</div><a class="doc-link" href="/docs/connections.html" >连接、终端与文件</a><a class="doc-link" href="/docs/desktop.html" >机器桌面与浏览器</a><a class="doc-link" href="/docs/ai.html" >智能体、模型与记忆</a><a class="doc-link" href="/docs/cloud.html" >账号、云同步与会员</a><a class="doc-link" href="/docs/extensions.html" >使用扩展与应用市场</a><a class="doc-link" href="/docs/http.html" >HTTP 请求工作区</a><a class="doc-link" href="/docs/settings.html" >设置、视图与监控</a><a class="doc-link" href="/docs/automation.html" >事件订阅与 MCP</a><div class="nav-group">平台</div><a class="doc-link" href="/docs/windows.html" >Windows</a><a class="doc-link" href="/docs/macos.html" >macOS</a><a class="doc-link" href="/docs/linux.html" >Linux</a><a class="doc-link" href="/docs/android.html" >Android</a><div class="nav-group">开发者</div><a class="doc-link" href="/docs/developers.html" >开发者接入路线</a><a class="doc-link" href="/docs/plugin-authoring.html" aria-current="page">制作第一份扩展</a><a class="doc-link" href="/docs/app-authoring.html" >应用配方与能力包</a></aside><article class="doc-content"><div class="doc-topline">文档 / 开发者 · 2026-10-22</div><h1>制作第一份声明式扩展</h1>
 <p>目标：提供两个只读运维命令候选。此扩展不会自动连接机器或执行命令。</p>
-<h2>1. 编写清单</h2>
+<h2 id="section-1">1. 编写清单</h2>
 <p>保存为 operations.json：</p>
 <pre><code class="language-json">{
   &quot;protocol&quot;: 1,
@@ -18,21 +18,21 @@
 }
 </code></pre>
 <p>ID 使用自己的命名空间，不能占用 cshell.*。provider 只能是 snippets，权限只能声明 terminal.input。命令需要由用户确认执行，示例命令适用于具备相应工具的 Linux 目标。</p>
-<h2>2. 校验并生成目录</h2>
+<h2 id="section-2">2. 校验并生成目录</h2>
 <p>在仓库安装开发依赖后运行下列命令。将 YOUR_NAME / YOUR_REPO 替换成自己的仓库，并先准备不可变的版本标签。</p>
 <pre><code class="language-sh">pnpm exec tsx scripts/package-plugin.ts operations.json https://raw.githubusercontent.com/YOUR_NAME/YOUR_REPO/v1.0.0/operations.json catalog.json
 </code></pre>
 <p>脚本使用 src/shared/plugins.ts 校验协议，再为原始 UTF-8 文件计算 SHA-256。输出文件必须尚不存在，以免误覆盖已发布目录。生成结构为 protocol + plugins 数组，每项包含完整 manifest、url 与 sha256。</p>
-<h2>3. 发布与安装</h2>
+<h2 id="section-3">3. 发布与安装</h2>
 <p>将原始包和生成的 catalog.json 提交到 GitHub。下载地址应使用固定版本标签的 HTTPS URL，不能依赖会随时变化的文件。修改包内容后重新生成摘要并发布新版本。</p>
 <p>在 CShell 插件市场使用外部目录入口加载目录，检查来源后安装、启用。目录读取失败、重定向、超大响应、摘要不符或目录清单与包清单不一致都会被拒绝。</p>
-<h2>4. 验证行为</h2>
+<h2 id="section-4">4. 验证行为</h2>
 <ul>
 <li>插件启用后显示候选；选中仅补全，不发送 Enter。</li>
 <li>停用后不再贡献候选，不中断已有终端。</li>
 <li>修改一个字节后旧摘要应被拒绝。</li>
 <li>测试密码提示、断开和全屏程序，不向错误上下文填入内容。</li>
 </ul>
-<h2>5. 加入官方目录</h2>
+<h2 id="section-5">5. 加入官方目录</h2>
 <p>通过 Pull Request 提交功能说明、固定下载地址、清单和验证结果。官方目录位于 marketplace/plugins.json，由 scripts/marketplace.ts 生成。官方内置 Provider 不能被第三方清单借用。</p>
 <p><a href="https://github.com/Yeqi99/CShell/blob/main/docs/PLUGINS.md">完整插件协议</a> · <a href="https://github.com/Yeqi99/CShell/blob/main/scripts/package-plugin.ts">校验脚本</a></p><div class="doc-bottom"><a href="/docs/start.html">← 文档首页</a> · <a href="https://github.com/Yeqi99/CShell/issues">反馈文档问题 ↗</a></div></article></main><footer><span>CShell / CanpShell · MIT 开源核心</span><div><a href="/docs/releases.html">版本状态</a><a href="https://github.com/Yeqi99/CShell/issues">问题反馈 ↗</a><a href="/docs/developers.html">开发者</a></div></footer></body></html>

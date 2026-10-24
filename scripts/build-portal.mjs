@@ -11,3 +11,15 @@ for (const name of pages) {
   }
 }
 console.log(`Validated ${pages.length} portal pages; deploy services/portal directly.`);
+// Search data is derived from the same editable articles, never maintained separately.
+const plain = value => value.replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, ' ').trim();
+const sections=[];
+for(const name of pages.filter(p=>p.startsWith('docs/'))){
+ const html=await fs.readFile(path.join(root,name),'utf8');
+ const article=/<article[^>]*>([\s\S]*?)<\/article>/.exec(html)?.[1];
+ if(!article)throw Error('Missing article: '+name);
+ const title=plain(/<h1[^>]*>([\s\S]*?)<\/h1>/.exec(article)?.[1]??'');
+ for(const m of article.matchAll(/<h2[^>]*id="([^"]+)"[^>]*>([\s\S]*?)<\/h2>([\s\S]*?)(?=<h2|$)/g))sections.push({title,heading:plain(m[2]),text:plain(m[3]),url:'/'+name+'#'+m[1]});
+}
+await fs.writeFile(path.join(root,'docs-index.json'),JSON.stringify(sections));
+console.log(`Indexed ${sections.length} documentation sections.`);
