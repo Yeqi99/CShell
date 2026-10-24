@@ -78,7 +78,7 @@ export function UpdateSettings({ english }: { english: boolean }) {
       {window.cshell.updateAutomatic && <label className="check"><input type="checkbox" checked={state?.automatic!==false} disabled={!state||pending} onChange={e=>void run(()=>window.cshell.updateAutomatic!(e.target.checked))}/>{t('自动检查并下载更新（安装前保留当前工作）','Automatically check and download updates')}</label>}
       <p className="muted">
         {t('当前版本', 'Current version')} {state?.current || '…'} ·{' '}
-        {t('包含预览版', 'Includes previews')}
+        {t('香港更新源', 'Hong Kong update service')}
       </p>
       <p role="status">
         {state ? labels[state.phase] : '…'}
@@ -103,12 +103,12 @@ export function UpdateSettings({ english }: { english: boolean }) {
             type="button"
             className="primary"
             disabled={!!busy}
-            onClick={() => void run(() => window.cshell.downloadUpdate(), 'downloading')}
+            onClick={() => void run(async () => { const result = await window.cshell.downloadUpdate(); if (result.phase === 'ready') await window.cshell.installUpdate(); }, 'downloading')}
           >
             <Download size={14} />
             {state.retry === 'download'
-              ? t('重新下载', 'Retry download')
-              : t('下载更新', 'Download update')}
+              ? t('重试更新', 'Retry update')
+              : t('立即更新', 'Update now')}
           </button>
         )}
         {state?.phase === 'ready' && (
@@ -118,23 +118,21 @@ export function UpdateSettings({ english }: { english: boolean }) {
             disabled={!!busy}
             onClick={() => void run(() => window.cshell.installUpdate())}
           >
-            {state.platform === 'linux'
-              ? t('打开安装包位置', 'Show package')
-              : t('安装更新', 'Install update')}
+            {t('安装并重新打开', 'Install and reopen')}
           </button>
         )}
         <button
           type="button"
           onClick={() => void window.cshell.openUpdatePage().catch((e) => setError(e.message))}
         >
-          {t('打开下载页', 'Open downloads')}
+          {t('其他设备下载', 'Downloads for other devices')}
         </button>
       </div>
       <p className="muted">
         {state?.platform === 'linux'
           ? t(
-              'Linux 下载 AppImage；保留原文件后替换并授予执行权限。',
-              'Linux downloads an AppImage. Replace the previous file and allow execution.',
+              'AppImage 更新会保留旧程序，保存工作后自动替换并重新打开。',
+              'AppImage updates keep the previous program, replace it and reopen after saving work.',
             )
           : t(
               '安装通过系统安装程序完成，请先保存工作。',

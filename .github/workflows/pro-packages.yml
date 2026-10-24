@@ -31,9 +31,12 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: node scripts/prepare-pty.mjs
       - run: pnpm exec tsc --noEmit
-      - run: pnpm exec tsx --test tests/cloud-merge.test.ts tests/cloud-sync.test.ts tests/agent-relay.test.ts
+      - run: pnpm exec tsx --test tests/cloud-merge.test.ts tests/cloud-sync.test.ts tests/agent-relay.test.ts tests/updates.test.ts tests/portable-update.test.ts tests/posix-agent-update.test.ts
       - run: pnpm exec vite build && node scripts/build.mjs
       - run: pnpm exec electron-builder --config electron-builder.pro.cjs --${{ matrix.platform }} --${{ matrix.arch }} --publish never
+      - if: matrix.platform == 'mac'
+        name: Verify in-place DMG update
+        run: pnpm exec tsx scripts/mac-update-smoke.ts
       - uses: actions/upload-artifact@v4
         with:
           name: pro-${{ matrix.platform }}-${{ matrix.arch }}

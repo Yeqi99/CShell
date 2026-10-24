@@ -438,7 +438,7 @@ public class MainActivity extends Activity {
     unregisterReceiver(cagentEvents);
     web.removeJavascriptInterface("CShellNative"); web.destroy(); super.onDestroy();
   }
-  @Override protected void onResume(){super.onResume();if(web!=null)event("","cagent-status",AndroidAgentService.status(this).toString());}
+  @Override protected void onResume(){super.onResume();if(updates!=null)updates.resume();if(web!=null)event("","cagent-status",AndroidAgentService.status(this).toString());}
   @Override protected void onPause(){super.onPause();for(Connection c:connections.values()){synchronized(c){if(c.desktop!=null)c.desktop.close();c.desktop=null;}}}
   private void navigateBack() {
     if(browser!=null&&browser.back())return;

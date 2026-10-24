@@ -1,9 +1,12 @@
 import {agentDownloads,type AgentDownload} from '../shared/agent-downloads';
 import { isPro } from '../shared/edition';
-import { app, shell, dialog, net, type BrowserWindow } from 'electron';
+import { app, shell, net, type BrowserWindow } from 'electron';
 import { mkdir, open, rename, rm, readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
+import type { EventEmitter } from 'node:events';
+import { spawn } from 'node:child_process';
+import { prepareAppImageUpdate, prepareMacUpdate } from './portable-update';
 import {
   checksumFor,
   compareVersion,
@@ -23,7 +26,7 @@ export function registerUpdateHandlers(
   let release: UpdateRelease | undefined,
     file = '',
     expected = '',
-    busy = false;
+    busy = false, queued = false;
   const request = async (url: string, timeout = 30000) => {
     // Follow the OS proxy configuration, like the user's browser.
     const response = await net.fetch(url, {
@@ -168,30 +171,59 @@ export function registerUpdateHandlers(
           .digest('hex') !== expected
       )
         throw new Error('Update file changed; download again');
-      const zh = app.getLocale().startsWith('zh');
-      const answer = await dialog.showMessageBox(window, {
-        type: 'question',
-        message: zh ? '打开更新安装包？' : 'Open update package?',
-        detail: zh
-          ? '请先保存工作并结束远程任务。安装时可能需要关闭 CShell。'
-          : 'Save your work and finish remote tasks first. Installation may require closing CShell.',
-        buttons: zh ? ['稍后', '打开安装包'] : ['Later', 'Open package'],
-        defaultId: 0,
-        cancelId: 0,
-      });
-      if (answer.response !== 1) return;
-      if (process.platform === 'linux') {
-        shell.showItemInFolder(file);
+      if (process.platform === 'win32') {
+        // The normal window close guard protects sessions; will-quit flushes
+        // histories before the installer is launched from the final quit event.
+        const launch = () => {
+          const installer = spawn(file, ['/S', '--force-run', '/D=' + dirname(app.getPath('exe'))], {
+            detached: true, stdio: 'ignore', windowsHide: true, windowsVerbatimArguments: true,
+          });
+          installer.on('error', error => console.error('Update installer failed to start', error));
+          installer.unref();
+        };
+        app.once('quit', launch);
+        queued = true;
+        (window as EventEmitter).once('update-close-cancelled', () => { app.removeListener('quit', launch); queued = false; busy = false; });
+        app.quit();
         return;
       }
-      const error = await shell.openPath(file);
-      if (error) throw new Error(error);
+      if (process.platform === 'linux') {
+        const target = process.env.APPIMAGE || '';
+        const staged = await prepareAppImageUpdate(file, target);
+        const launch = () => {
+          try {
+            staged.commit();
+            const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE; delete env.APPIMAGE; delete env.APPDIR;
+            const child = spawn(target, [], { detached: true, stdio: 'ignore', env });
+            child.on('error', error => console.error('Updated application could not restart', error)); child.unref();
+          } catch (error) { console.error('Application update failed; previous executable retained', error); }
+        };
+        app.once('quit', launch); queued = true;
+        (window as EventEmitter).once('update-close-cancelled', () => {
+          app.removeListener('quit', launch); queued = false; busy = false; void staged.cancel();
+        });
+        app.quit(); return;
+      }
+      if (process.platform === 'darwin') {
+        const staged = await prepareMacUpdate(file, app.getPath('exe'), release!.version);
+        const launch = () => {
+          try {
+            staged.commit();
+            const child = spawn('/usr/bin/open', ['-n', staged.target], { detached: true, stdio: 'ignore' });
+            child.on('error', error => console.error('Updated application could not restart', error)); child.unref();
+          } catch (error) { console.error('Application update failed; previous application retained', error); }
+        };
+        app.once('quit', launch); queued = true;
+        (window as EventEmitter).once('update-close-cancelled', () => { app.removeListener('quit', launch); queued = false; busy = false; void staged.cancel(); });
+        app.quit(); return;
+      }
+      throw Error('当前平台尚不支持应用内安装');
     } catch (e) {
       file = '';
       fail(e, 'download');
       throw e;
     } finally {
-      busy = false;
+      busy = queued;
     }
   });
 }

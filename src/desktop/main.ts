@@ -1018,6 +1018,8 @@ else
             if (result.response === 1) {
               closing = true;
               window.close();
+            } else {
+              window.emit('update-close-cancelled');
             }
           });
       });

@@ -16,12 +16,13 @@ import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 
-/** GitHub-only update source; the WebView cannot choose URLs or executable files. */
+/** Hong Kong update source; the WebView cannot choose URLs or executable files. */
 final class AppUpdates {
   private final Activity activity;
   private final ExecutorService worker;
   private final Consumer<String> emit;
   private volatile boolean busy;
+  private boolean waitingInstallPermission;
   private String url, sums, name, version, readyHash;
   private long size;
   private File ready;
@@ -65,13 +66,14 @@ final class AppUpdates {
     if(busy)return;busy=true;ready=null;readyHash=null;url=null;sums=null;name=null;version=null;state("正在检查更新…",false,-1);
     worker.execute(()->{
       try{
-        JSONArray list=new JSONArray(text("https://shell.canp.ai/downloads/pro/releases.json",2000000));
+        String channel=activity.getPackageName().endsWith(".pro")?"pro":"opensource";
+        JSONArray list=new JSONArray(text("https://shell.canp.ai/downloads/"+channel+"/releases.json",2000000));
         String best=current();boolean compatible=false;
         String selectedUrl=null,selectedSums=null,selectedName=null,selectedVersion=null;long selectedSize=0;
         for(int i=0;i<list.length();i++){
           JSONObject r=list.getJSONObject(i);String tag=r.optString("tag_name");
           if(r.optBoolean("draft")||!tag.matches("v[0-9]+\\.[0-9]+\\.[0-9]+"))continue;
-          String expected=(activity.getPackageName().endsWith(".pro")?"CShell-Pro-":"CShell-")+tag.substring(1)+(activity.getPackageName().endsWith(".pro")?"-android.apk":"-android-test.apk"),base="https://shell.canp.ai/downloads/pro/"+tag+"/";
+          String expected=(activity.getPackageName().endsWith(".pro")?"CShell-Pro-":"CShell-")+tag.substring(1)+(activity.getPackageName().endsWith(".pro")?"-android.apk":"-android-test.apk"),base="https://shell.canp.ai/downloads/"+channel+"/"+tag+"/";
           JSONObject apk=null,checksum=null;JSONArray assets=r.getJSONArray("assets");
           for(int j=0;j<assets.length();j++){JSONObject a=assets.getJSONObject(j);if(expected.equals(a.optString("name")))apk=a;if("SHA256SUMS.txt".equals(a.optString("name")))checksum=a;}
           if(apk==null||checksum==null)continue;
@@ -106,13 +108,13 @@ final class AppUpdates {
         }finally{c.disconnect();}
         StringBuilder actual=new StringBuilder();for(byte b:digest.digest())actual.append(String.format(Locale.ROOT,"%02x",b));
         if(done!=size||!hash.equalsIgnoreCase(actual.toString()))throw new IOException("SHA256 校验失败");
-        verifyPackage(file);ready=file;readyHash=hash;busy=false;state("下载已校验，点击安装更新。安装将结束当前会话。",true,100);
+        verifyPackage(file);ready=file;readyHash=hash;busy=false;state("下载已校验，正在打开系统安装程序…",true,100);launch();
       }catch(Exception e){file.delete();ready=null;readyHash=null;busy=false;state("更新失败："+errorMessage(e),true,-1);}
     });
   }
   private String errorMessage(Exception e) {
-    if(e instanceof java.net.SocketTimeoutException)return "连接 GitHub 超时，请检查网络后重试或打开下载页";
-    if(e instanceof java.net.UnknownHostException || e instanceof java.net.ConnectException)return "无法连接 GitHub，请检查网络后重试或打开下载页";
+    if(e instanceof java.net.SocketTimeoutException)return "连接香港更新服务超时，请检查网络后重试或打开下载页";
+    if(e instanceof java.net.UnknownHostException || e instanceof java.net.ConnectException)return "无法连接香港更新服务，请检查网络后重试或打开下载页";
     return e.getMessage()==null?"更新失败，请重试":e.getMessage();
   }
   @SuppressWarnings("deprecation")
@@ -127,7 +129,13 @@ final class AppUpdates {
     if(next<=current)throw new IOException("安装包版本未递增");
     android.content.pm.Signature[] a=Build.VERSION.SDK_INT>=28?downloaded.signingInfo.getApkContentsSigners():downloaded.signatures;
     android.content.pm.Signature[] b=Build.VERSION.SDK_INT>=28?installed.signingInfo.getApkContentsSigners():installed.signatures;
-    if(!Arrays.equals(a,b))throw new IOException("此预览版签名与已安装版本不同，无法覆盖更新。请从 GitHub 手动安装；卸载会清除本地配置");
+    if(!Arrays.equals(a,b))throw new IOException("安装包签名与当前应用不同，已停止更新以保护本地数据。请联系支持，不要卸载当前应用");
+  }
+  void resume() {
+    if(!waitingInstallPermission)return;
+    waitingInstallPermission=false;
+    if(activity.getPackageManager().canRequestPackageInstalls() && ready!=null)launch();
+    else state("未获得安装权限，可以稍后重试。",true,-1);
   }
   private void launch() {
     busy=true;state("正在核对安装包…",true,-1);
@@ -143,7 +151,8 @@ final class AppUpdates {
         busy=false;
         try{
         if(!activity.getPackageManager().canRequestPackageInstalls()){
-          state("请允许 CShell 安装更新，返回后再次点击安装。",true,-1);
+          waitingInstallPermission=true;
+          state("请允许 CShell 安装更新，返回后会继续安装。",true,-1);
           activity.startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,Uri.parse("package:"+activity.getPackageName())));return;
         }
         Uri uri=FileProvider.getUriForFile(activity,activity.getPackageName()+".updates",ready);

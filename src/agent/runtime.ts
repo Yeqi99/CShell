@@ -189,6 +189,19 @@ export async function createAgentRuntime(
     mutation = current.catch(() => {});
     return current;
   };
+  let installingUpdate = false;
+  async function installRuntimeUpdate(params: unknown) {
+    z.object({ confirm: z.literal(true) }).strict().parse(params);
+    if (installingUpdate) throw Error('正在安装更新');
+    installingUpdate = true;
+    try {
+      const plan = await updater.prepareInstall();
+      setTimeout(() => { void close().then(() => plan.commit()).catch(async error => {
+        await plan.cancel(); console.error('CAgent update failed', error);
+      }); }, 250);
+      return { installing: true };
+    } catch (error) { installingUpdate = false; throw error; }
+  }
   async function dispatch(
     method: string,
     params: unknown,
@@ -199,7 +212,7 @@ export async function createAgentRuntime(
     signal.throwIfAborted();
     if (closed) throw new Error('Agent 已关闭');
     if(method.startsWith('account.')){if(!local)throw Error('账号操作仅允许本机执行');return account.call(method,params);}
-    if(method.startsWith('update.')){if(!local)throw new Error('更新只允许在本机执行');if(method==='update.settings')return updater.settings(z.object({automatic:z.boolean().optional()}).parse(params??{}).automatic);if(method==='update.check')return updater.check();if(method==='update.download')return updater.start();if(method==='update.status')return updater.status();if(method==='update.verify')return updater.verify();throw new Error('未知更新操作');}
+    if(method.startsWith('update.')){if(!local)throw new Error('更新只允许在本机执行');if(method==='update.settings')return updater.settings(z.object({automatic:z.boolean().optional()}).parse(params??{}).automatic);if(method==='update.check')return updater.check();if(method==='update.download')return updater.start();if(method==='update.status')return updater.status();if(method==='update.verify')return updater.verify();if(method==='update.install')return installRuntimeUpdate(params);throw new Error('未知更新操作');}
     const admin=local || (owner!=='local' && server.managementAllowed(owner));
     if(method==='network.status')return accountNetwork.status();
     if(method==='network.configure')return accountNetwork.configure(params);
@@ -346,7 +359,7 @@ export async function createAgentRuntime(
     return serialized(async () => {
       signal.throwIfAborted();
       if (closed) throw new Error('Agent 已关闭');
-    if(method.startsWith('update.')){if(!local)throw new Error('更新只允许在本机执行');if(method==='update.settings')return updater.settings(z.object({automatic:z.boolean().optional()}).parse(params??{}).automatic);if(method==='update.check')return updater.check();if(method==='update.download')return updater.start();if(method==='update.status')return updater.status();if(method==='update.verify')return updater.verify();throw new Error('未知更新操作');}
+    if(method.startsWith('update.')){if(!local)throw new Error('更新只允许在本机执行');if(method==='update.settings')return updater.settings(z.object({automatic:z.boolean().optional()}).parse(params??{}).automatic);if(method==='update.check')return updater.check();if(method==='update.download')return updater.start();if(method==='update.status')return updater.status();if(method==='update.verify')return updater.verify();if(method==='update.install')return installRuntimeUpdate(params);throw new Error('未知更新操作');}
       if (method === 'applications.configure') {
         if (!admin) throw new Error('未授权管理应用安装');
         const result = await applications.configure(params);
