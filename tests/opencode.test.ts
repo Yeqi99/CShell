@@ -530,3 +530,18 @@ test('normalized streaming exposes first text before upstream completion',async(
   assert.equal((await completion).content,'first');
  }finally{clearTimeout(timeout)}
 });
+
+test('explicit catalog refresh loads both tiers and removes retired models without inference',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'opencode-refresh-'));let revision=0,requests=0;
+ const e=new OpenCodeExtension({directory,enabled:()=>true,encrypt:async s=>s,decrypt:async s=>s,saveProvider:async()=>{throw Error('refresh must not save models')},open:async()=>{}},async(url,init)=>{
+  assert.notEqual(init?.method,'POST');assert.ok(String(url).endsWith('/v1/models'));requests++;
+  return Response.json({data:[{id:revision?'glm-5.3':'beam-free'}]});
+ });
+ try{
+  await e.load();await e.call('save',{key:'fixture'});
+  const first=await e.call('choices',{reference:'default/go/beam-free'});
+  assert.equal(first.length,2);revision=1;
+  const current=await e.call('choices',{reference:'default/go/beam-free',refresh:true});
+  assert.equal(requests,4);assert.deepEqual(current.map((m:any)=>m.ref),['default/go/glm-5.3','default/zen/glm-5.3']);
+ }finally{await rm(directory,{recursive:true,force:true})}
+});

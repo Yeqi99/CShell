@@ -104,13 +104,13 @@ export function AiConversation({
   useEffect(()=>{
     let alive=true;setChosenModel('');setModelChoices([]);setModelsError('');
     setModelsLoading(!!provider?.extension && !thread);
-    if(provider?.extension && !thread)void window.cshell.aiExtensionCall(provider.extension.id,'choices',{reference:provider.extension.model}).then(v=>{
+    if(provider?.extension && !thread)void window.cshell.aiExtensionCall(provider.extension.id,'choices',{reference:provider.extension.model,refresh:true}).then(v=>{
       if(!alive)return;
       if(!Array.isArray(v))throw Error('模型目录不可用');
       const choices=v as typeof modelChoices;
       setModelChoices(choices);
       const ref=provider.extension!.model;
-      setChosenModel(choices.find(c=>c.ref===ref)?.ref ?? choices.find(c=>c.ref===`default/${ref}`)?.ref ?? choices.find(c=>c.available)?.ref ?? '');
+      setChosenModel(choices.find(c=>c.ref===ref)?.ref ?? choices.find(c=>c.ref===`default/${ref}`)?.ref ?? '');
     }).catch(e=>{if(alive)setModelsError(String(e.message??e))}).finally(()=>{if(alive)setModelsLoading(false)});
     return()=>{alive=false};
   },[provider?.id,provider?.extension?.model,thread?.id]);
