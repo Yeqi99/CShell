@@ -30,6 +30,7 @@ export function MonitorPanel({
   sessionId?: string;
   active?: boolean;
 }) {
+  const [category, setCategory] = useState('cpu');
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [history, setHistory] = useState<number[]>([]);
   const [expanded, setExpanded] = useState(true);
@@ -56,14 +57,14 @@ export function MonitorPanel({
         if (!disposed) {
           missedCpu = next.cpu === null ? missedCpu + 1 : 0;
           setCpuUnavailable(missedCpu >= 3);
-          setMetrics(next);
+          setMetrics(next.error ? null : next);
           setFailed(Boolean(next.error));
           if (next.cpu !== null) setHistory((h) => [...h, next.cpu!].slice(-30));
           else setHistory([]);
         }
       } catch {
         if (!disposed) {
-          setFailed(true);
+          setFailed(true); setMetrics(null); setHistory([]);
         }
       } finally {
         if (!disposed) {
@@ -111,6 +112,12 @@ export function MonitorPanel({
       </header>
       {expanded && (
         <div className="resource-rows">
+          <div className="resource-categories" role="group" aria-label={locale === 'zh-CN' ? '机器信息分类' : 'Machine information categories'}>
+            {['cpu', 'memory', 'disk', 'gpu', 'processes', 'network'].map((key, i) => <button key={key} aria-pressed={category === key} onClick={() => setCategory(key)}>{(locale === 'zh-CN' ? ['CPU', '内存', '硬盘', 'GPU', '进程', '网络'] : ['CPU', 'Memory', 'Disks', 'GPU', 'Processes', 'Network'])[i]}</button>)}
+          </div>
+          {failed && <p role="status">{t('unavailable')}</p>}
+          <div hidden={category !== 'cpu'}>
+          <p className="resource-cpu-model">{metrics?.cpuModel || (locale === 'zh-CN' ? 'CPU 型号暂不可用' : 'CPU model unavailable')}</p>
           <div className="resource-row metric-cpu" data-tooltip={t('cpuMetricHint')} tabIndex={0}>
             <span className="resource-name">
               <Cpu size={13} />
@@ -139,13 +146,14 @@ export function MonitorPanel({
               </svg>
             )}
           </div>
+          </div>
           {(['memory', 'disk'] as const).filter(key => key !== 'disk' || !metrics?.disks?.length).map((key) => {
             const Icon = key === 'memory' ? Database : HardDrive;
             const used = key === 'memory' ? metrics?.memoryUsed : metrics?.diskUsed;
             const total = key === 'memory' ? metrics?.memoryTotal : metrics?.diskTotal;
             return (
               <div
-                className={'resource-row metric-' + key}
+                hidden={category !== key} className={'resource-row metric-' + key}
                 key={key}
                 data-tooltip={t(key === 'memory' ? 'memoryMetricHint' : 'diskMetricHint')}
                 tabIndex={0}
@@ -173,6 +181,7 @@ export function MonitorPanel({
               </div>
             );
           })}
+          <div hidden={category !== 'disk'}>
           {metrics?.disks?.map(disk => <div className="resource-row metric-disk" key={disk.device} title={`${disk.device} · ${disk.mount}`}>
             <span className="resource-name"><HardDrive size={13}/>{disk.mount}</span>
             <span className="resource-detail">{capacity(disk.used, locale)} / {capacity(disk.total, locale)}</span>
@@ -184,6 +193,7 @@ export function MonitorPanel({
             <span className="resource-detail">{locale === 'zh-CN' ? '磁盘容量' : 'Disk capacity'}</span>
             <strong>{capacity(drive.size, locale)}</strong>
           </div>)}
+          </div><div hidden={category !== 'network'}>
           <div className="resource-row metric-latency">
             <span className="resource-name">
               <Activity size={13} />
@@ -192,7 +202,7 @@ export function MonitorPanel({
             <span className="resource-detail">SSH RTT</span>
             <strong>{metrics ? metrics.latency + ' ms' : '—'}</strong>
           </div>
-          <ResourceDetails key={sessionId} sessionId={sessionId} />
+          </div><ResourceDetails key={sessionId} sessionId={sessionId} mode={category === 'gpu' || category === 'processes' ? category : null} />
         </div>
       )}
     </section>
