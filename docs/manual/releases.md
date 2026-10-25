@@ -7,9 +7,10 @@
 
 
 
-<h2 id="release-0810">0.8.10 · 同步与多面板体验（准备中）</h2>
-<p><strong>正在开发与验证，尚未发布。</strong>官网当前正式下载与应用更新源仍为 0.8.9，不使用开发包替换已发布附件。</p>
-<ul><li>Pro 保留按 ID 合并的列表排序；Android 保存未使用的 FTP / SFTP 连接位置与未知云字段。</li><li>Tavily 账号和 Key 纳入加密同步与确认导入，付费许可和扩展授权留在本机；空字段、明确删除与失败回滚分别处理。</li><li>补齐机器桌面背景、主题、命名方案和图片的同步，排除运行窗口与原生临时状态。新增可选段要求新版桌面，旧版不认识时拒绝恢复并保留云数据。</li><li>SSH 文件与信息面板可与智能体共存；模型菜单补齐键盘与窄宽定位，命令台异步结果不抢焦点，OpenCode 默认值按钮改为「设为默认模型」。</li></ul><p>具体范围见<a href="https://shell.canp.ai/docs/cloud.html#sync-0810">同步说明</a>、<a href="https://shell.canp.ai/docs/terminal.html#ssh-panels-0810">SSH 面板</a>和<a href="https://shell.canp.ai/docs/ai.html#model-menu-0810">模型菜单</a>。最终测试、包与渠道核验仍在进行，不把本地渲染基准当作用户网络延迟已经解决。</p>
+<h2 id="release-0810">0.8.10 · 同步与多面板体验</h2>
+<p><strong>0.8.10 已发布。</strong>开源版、Pro 与 CAgent 的最终安装包已核验，官网与香港更新渠道同步提供。升级保留已有账号、连接与密钥；各平台验收范围和限制见对应发行记录。</p>
+<ul><li>Pro 保留按 ID 合并的列表排序；Android 保存未使用的 FTP / SFTP 连接位置与未知云字段。</li><li>Tavily 账号和 Key 纳入加密同步与确认导入，付费许可和扩展授权留在本机；空字段、明确删除与失败回滚分别处理。</li><li>补齐机器桌面背景、主题、命名方案和图片的同步，排除运行窗口与原生临时状态。新增可选段要求新版桌面，旧版不认识时拒绝恢复并保留云数据。</li><li>SSH 文件与信息面板可与智能体共存；模型菜单补齐键盘与窄宽定位，命令台异步结果不抢焦点，OpenCode 默认值按钮改为「设为默认模型」。</li></ul><p>具体范围见<a href="https://shell.canp.ai/docs/cloud.html#sync-0810">同步说明</a>、<a href="https://shell.canp.ai/docs/terminal.html#ssh-panels-0810">SSH 面板</a>和<a href="https://shell.canp.ai/docs/ai.html#model-menu-0810">模型菜单</a>。安装包与渠道已核验；本地渲染基准不代表用户网络延迟已经解决。</p>
+<p>SSH 连接建立后禁用客户端 Nagle 小包合并等待。真实 Pro 0.8.10 包本地 DOM p95：原生 20.7 ms、可视化 19.7 ms；保留同一 PTY，观测没有长任务。网络 RTT 仍存在，<a href="https://shell.canp.ai/docs/terminal.html#ssh-transport-0810">查看测试范围</a>。</p>
 
 
 <h2 id="release-089">0.8.9 · 文件连接与统一工作台</h2>
@@ -50,7 +51,7 @@
 
 
 <h2 id="section-6">下载与校验</h2>
-<p>在 <a href="https://shell.canp.ai/downloads.html">下载中心</a> 选择产品、系统与架构。使用 <a href="https://shell.canp.ai/downloads/pro/v0.8.9/SHA256SUMS.txt">Pro 摘要清单</a> 或 <a href="https://github.com/Yeqi99/CShell/releases/download/v0.8.9/SHA256SUMS.txt">开源版摘要清单</a> 校验安装包。移动端安装仍需系统确认；不支持新更新源的旧客户端需首次手动升级。</p>
+<p>在 <a href="https://shell.canp.ai/downloads.html">下载中心</a> 选择产品、系统与架构。使用 <a href="https://shell.canp.ai/downloads/pro/v0.8.10/SHA256SUMS.txt">Pro 摘要清单</a> 或 <a href="https://github.com/Yeqi99/CShell/releases/download/v0.8.9/SHA256SUMS.txt">开源版摘要清单</a> 校验安装包。移动端安装仍需系统确认；不支持新更新源的旧客户端需首次手动升级。</p>
 
 
 
