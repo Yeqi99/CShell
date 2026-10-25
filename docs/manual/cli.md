@@ -50,5 +50,5 @@ help &lt;browser_open 对应的能力ID&gt;
 <p>另见 <a href="https://github.com/Yeqi99/CShell/blob/main/docs/API.md">API 契约与错误语义</a>、<a href="https://github.com/Yeqi99/CShell/blob/main/docs/MCP.md">MCP 接入</a>。</p>
 
 
-<h2 id="focus-0810">0.8.10 准备中：异步执行不抢输入焦点</h2>
+<h2 id="focus-0810">0.8.10：异步执行不抢输入焦点</h2>
 <p>命令台正在读取目录或执行命令时，可以切换到其他输入框继续工作。后台结果返回后显示在原命令台，不强制把焦点拉回。切换视图仍保留草稿与结果，未知结果的写入不自动重放。</p>
