@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react';
-import { ChevronDown, ChevronRight, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import type { HardwareInfo, ProcessSnapshot } from '../../shared/resources';
 import { useI18n } from '../i18n';
 
-export function ResourceDetails({ sessionId }: { sessionId: string }) {
+export function ResourceDetails({ sessionId, mode }: { sessionId: string; mode: 'gpu' | 'processes' | null }) {
   const { locale } = useI18n();
   const cn = locale === 'zh-CN';
   const [hardware, setHardware] = useState<HardwareInfo | null>(null);
   const [gpuError, setGpuError] = useState(false);
   const [gpuRetry, setGpuRetry] = useState(0);
-  const [open, setOpen] = useState(false);
+  const open = mode === 'processes';
   const [snapshot, setSnapshot] = useState<ProcessSnapshot | null>(null);
   const [refresh, setRefresh] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -24,7 +24,9 @@ export function ResourceDetails({ sessionId }: { sessionId: string }) {
     }
   });
   useEffect(() => {
+    if (mode !== 'gpu') return;
     let disposed = false;
+    setHardware(null);
     setGpuError(false);
     void window.cshell.resourceHardware(sessionId).then(
       (value) => {
@@ -37,7 +39,7 @@ export function ResourceDetails({ sessionId }: { sessionId: string }) {
     return () => {
       disposed = true;
     };
-  }, [sessionId, gpuRetry]);
+  }, [sessionId, gpuRetry, mode]);
   useEffect(() => {
     if (!open) return;
     let disposed = false;
@@ -51,7 +53,7 @@ export function ResourceDetails({ sessionId }: { sessionId: string }) {
           setError('');
         }
       } catch {
-        if (!disposed) setError(cn ? '获取失败，可重试' : 'Request failed. Retry.');
+        if (!disposed) { setSnapshot(null); setError(cn ? '获取失败，可重试' : 'Request failed. Retry.'); }
       } finally {
         if (!disposed) {
           setBusy(false);
@@ -70,8 +72,8 @@ export function ResourceDetails({ sessionId }: { sessionId: string }) {
       `${row.pid} ${row.user} ${row.command}`.toLowerCase().includes(query.toLowerCase()),
     ) || [];
   return (
-    <div className="resource-details">
-      <div className="gpu-inventory">
+    <div className="resource-details" hidden={!mode}>
+      <div className="gpu-inventory" hidden={mode !== 'gpu'}>
         <span>GPU</span>
         {hardware?.gpus.length ? (
           <div>
@@ -101,11 +103,8 @@ export function ResourceDetails({ sessionId }: { sessionId: string }) {
           <RefreshCw size={12} />
         </button>
       </div>
-      <div className="process-heading">
-        <button className="resource-toggle" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
-          {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}{' '}
-          {cn ? '进程' : 'Processes'}
-        </button>
+      <div className="process-heading" hidden={!open}>
+        <strong style={{marginRight: 'auto'}}>{cn ? '进程' : 'Processes'}</strong>
         {open && (
           <>
             <select
