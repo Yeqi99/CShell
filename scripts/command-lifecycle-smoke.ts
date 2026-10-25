@@ -50,5 +50,12 @@ try{
  console.log('Checking late command connect cleanup and cancellation');
  await page.evaluate(()=>{(window as any).hold=true;(window as any).mount('console');});await input.fill('connect 11111111-1111-4111-8111-111111111111');await input.press('Enter');await page.waitForFunction(()=>(window as any).held.length===1);await page.evaluate(()=>{(window as any).mount('none');});await page.waitForFunction(()=>!document.querySelector('.command-console'));await page.evaluate(()=>{(window as any).held.shift()();});await page.waitForFunction(()=>(window as any).disconnectedIds.length===6);
  await page.evaluate(()=>{(window as any).mount('console');});await input.fill('call slow {}');await input.press('Enter');await page.waitForFunction(()=>(window as any).held.length===1);await page.evaluate(()=>{(window as any).mount('none');});await page.waitForFunction(()=>(window as any).cancelled.length===1);await page.evaluate(()=>{(window as any).held.shift()();});
+ console.log('Checking delayed command does not steal another pane focus');
+ await page.evaluate(()=>{(window as any).mount('console');const other=document.createElement('textarea');other.setAttribute('aria-label','Other pane draft');document.body.append(other);});
+ await input.fill('call slow {}');await input.press('Enter');await page.waitForFunction(()=>(window as any).held.length===1);
+ const other=page.getByRole('textbox',{name:'Other pane draft'});await other.fill('Keep writing here');await page.evaluate(()=>{(window as any).held.shift()();});await page.getByRole('log').getByText('完成',{exact:true}).waitFor();
+ assert(await other.evaluate(el=>el===document.activeElement),'Delayed completion must preserve focus in another pane');assert.equal(await other.inputValue(),'Keep writing here');
+ await input.fill('call slow {}');await input.press('Enter');await page.waitForFunction(()=>(window as any).held.length===1);await page.evaluate(()=>{(window as any).setActive(false);});await other.focus();await page.evaluate(()=>{(window as any).held.shift()();});await page.waitForFunction(()=>!document.querySelector('.command-wait'));
+ assert(await other.evaluate(el=>el===document.activeElement),'Inactive console must not focus after completion');
  assert.deepEqual(errors,[]);console.log('Command lifecycle: pending connect cleanup, close ownership, no replay, target/identity draft isolation passed');
 }finally{await browser.close();await new Promise<void>(resolve=>server.close(()=>resolve()));await rm(directory,{recursive:true,force:true});}

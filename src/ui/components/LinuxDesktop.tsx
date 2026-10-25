@@ -150,13 +150,44 @@ export function LinuxDesktop({
   const dismissContext = () => {setContext(undefined);contextSource.current?.focus();};
   useEffect(()=>{if(context)contextMenu.current?.querySelector<HTMLButtonElement>('button')?.focus();},[context]);
   const key = 'cshell-linux-desktop:' + machine.deviceId;
-  const [look, setLook] = useState<Look>(() => {
+  const [look, setLookState] = useState<Look>(() => {
     try {
       return validLook(JSON.parse(localStorage.getItem(key) || 'null'));
     } catch {
       return initialLook;
     }
   });
+  const lookValue=useRef(look),lookReady=useRef(false),lookWrite=useRef<Promise<unknown>>(Promise.resolve()),lookEdit=useRef(0);
+  const [lookLoadAttempt,setLookLoadAttempt]=useState(0);
+  lookValue.current=look;
+  const setLook=(value:Look|((previous:Look)=>Look))=>{
+    if(window.cshell.desktopLookSave&&!lookReady.current){setError('正在读取桌面外观，请稍候');return;}
+    const next=validLook(typeof value==='function'?value(lookValue.current):value);lookEdit.current++;lookValue.current=next;setLookState(next);
+    try{localStorage.setItem(key,JSON.stringify(next));}catch{setError('外观未能保存');}
+    if(window.cshell.desktopLookSave){const id=machine.deviceId;lookWrite.current=lookWrite.current.catch(()=>{}).then(()=>window.cshell.desktopLookSave!(id,JSON.stringify(next)===JSON.stringify(initialLook)?null:next)).catch(e=>{setError(String(e));});}
+  };
+  useEffect(()=>{
+    let alive=true;lookReady.current=false;
+    const load=async(migrate=false)=>{
+      const generation=lookEdit.current;
+      try{
+        let legacy:Look|undefined;
+        if(migrate){try{legacy=validLook(JSON.parse(localStorage.getItem(key)||'null'));}catch{}}
+        if(window.cshell.desktopLookGet){
+          let value:Look|null;
+          try{value=await window.cshell.desktopLookGet(machine.deviceId,legacy);}
+          catch(e){if(legacy===undefined)throw e;value=await window.cshell.desktopLookGet(machine.deviceId);}
+          if(!alive||generation!==lookEdit.current)return;
+          const next=value??initialLook;lookValue.current=next;setLookState(next);
+          try{localStorage.setItem(key,JSON.stringify(next));}catch{setError('桌面外观已保存；本机显示缓存暂不可写');}
+        }
+        if(alive)lookReady.current=true;
+      }catch(e){if(alive)setError(String(e));}
+    };
+    void load(true);
+    const stop=window.cshell.onDesktopLookChanged?.(()=>{void lookWrite.current.then(()=>load());});
+    return()=>{alive=false;stop?.();};
+  },[key,machine.deviceId,lookLoadAttempt]);
   const [windows, setWindows] = useState<WindowState[]>(()=>{try{const saved=JSON.parse(localStorage.getItem(key+':windows')||'[]');return Array.isArray(saved)?saved.filter(w=>(apps.some(a=>a.id===w.id)||extraPanels.some(a=>a.id===w.id))&&['x','y','w','h','z'].every(k=>Number.isFinite(w[k]))&&w.w>0&&w.h>0).slice(0,16).map((w,i)=>({...w,minimized:!!w.minimized,closed:!!w.closed,maximized:!!w.maximized,z:i+1})):[];}catch{return [];}}),
     [menu, setMenu] = useState(false),
     [settingsTab, setSettingsTab] = useState('appearance'),
@@ -190,13 +221,6 @@ export function LinuxDesktop({
       try { localStorage.setItem(key + ':windows', JSON.stringify(finalWindows)); } catch { /* The workspace is already unmounting. */ }
     }
   }, [key]);
-  useEffect(() => {
-    try {
-      localStorage.setItem(key, JSON.stringify(look));
-    } catch {
-      setError('外观未能保存，请使用较小的背景图片');
-    }
-  }, [key, look]);
   useEffect(() => {
     const timer = setInterval(() => setClock(new Date()), 30000);
     return () => clearInterval(timer);
@@ -598,8 +622,8 @@ export function LinuxDesktop({
                             </button>
                           </div>
                           <h3>外观方案</h3>
-                          <label>
-                            方案名称
+                          <label className="desktop-look-name">
+                            <span>方案名称</span>
                             <input
                               aria-label="方案名称"
                               maxLength={50}
@@ -634,7 +658,10 @@ export function LinuxDesktop({
                               />
                             </label>
                           </div>
-                          <small>自动保存到此设备的桌面；方案只包含外观。</small>
+                          <div className="desktop-look-footer">
+                            <button className="desktop-look-reset" onClick={()=>setLook(initialLook)}>恢复默认外观</button>
+                            <small>外观自动保存；Pro 登录后随账号同步。窗口位置只保留在本机。</small>
+                          </div>
                         </>
                       )}
                       {settingsTab === 'display' && (
@@ -679,7 +706,7 @@ export function LinuxDesktop({
                           {onTerminal && <button onClick={onTerminal}>进入 SSH 终端</button>}
                         </>
                       )}
-                      {error && <p role="alert">{error}</p>}
+                      {error && <p role="alert">{error}{!lookReady.current&&<button onClick={()=>{setError('');setLookLoadAttempt(v=>v+1);}}>重新读取外观</button>}</p>}
                     </div>
                   </div>
                 )}

@@ -454,6 +454,12 @@
   gap: 12px;
   font-size: 12px;
 }
+.desktop-settings .desktop-look-name { flex-wrap: wrap; gap: 8px 12px; }
+.desktop-look-name > span { white-space: nowrap; flex: 0 0 auto; }
+.desktop-settings .desktop-look-name > input { flex: 1 1 180px; width: auto; max-width: 100%; }
+.desktop-look-footer { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 16px; }
+.desktop-settings .desktop-look-reset { background: transparent; color: var(--muted); }
+.desktop-settings .desktop-look-footer > small { display: block; margin: 0; line-height: 1.6; }
 .desktop-settings input {
   background: var(--bg);
   color: var(--text);

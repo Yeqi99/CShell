@@ -2,6 +2,9 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { Bridge, SessionEvent } from '../shared/contracts';
 const bridge: Bridge = {
   platform: process.platform,
+  desktopLookGet:(id,legacy)=>ipcRenderer.invoke('desktop-look:get',id,legacy),
+  desktopLookSave:(id,value)=>ipcRenderer.invoke('desktop-look:save',id,value),
+  onDesktopLookChanged:listener=>{const fn=()=>listener();ipcRenderer.on('desktop-look:changed',fn);return()=>ipcRenderer.removeListener('desktop-look:changed',fn);},
   networkDiagnostics: () => ipcRenderer.invoke('network:diagnostics'),
   networkProbe: input => ipcRenderer.invoke('network:probe', input),
   networkProbeCancel: id => ipcRenderer.invoke('network:probe-cancel', id),

@@ -376,6 +376,9 @@ export interface Bridge
   connectionImportApply?(token: string, rows: number[], policy: 'skip' | 'keep'): Promise<{ imported: string[]; skipped: number }>;
   connectionImportDiscard?(token: string): Promise<void>;
   networkStatus?(): Promise<import('./network-route').NetworkRouteStatus>;
+  desktopLookGet?(id:string,legacy?:import('./desktop-look').DesktopLook):Promise<import('./desktop-look').DesktopLook|null>;
+  desktopLookSave?(id:string,value:import('./desktop-look').DesktopLook|null):Promise<import('./desktop-look').DesktopLook|null>;
+  onDesktopLookChanged?(listener:()=>void):()=>void;
   networkSave?(route: import('./network-route').NetworkRoute): Promise<import('./network-route').NetworkRouteStatus>;
   reportError(error: { message: string; stack?: string }): void;
   openDiagnostics(): Promise<void>;

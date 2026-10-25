@@ -48,3 +48,7 @@ help &lt;browser_open 对应的能力ID&gt;
 <p>安装并启用扩展后，只有已完成加载且明确授权的工具会出现在当前目录。清单、schema、摘要、包版本和实际执行入口必须一致。取消授权、禁用或卸载会撤销后续调用，不能用缓存的工具名继续执行。</p>
 <p>声明式扩展与独立进程扩展的接口见 <a href="https://github.com/Yeqi99/CShell/blob/main/docs/CUSTOM-EXTENSIONS.md">自定义扩展</a>。所有入口共用执行边界，不能靠 CLI 或 MCP 绕过目标范围、审核、输入输出校验或能力授权。</p>
 <p>另见 <a href="https://github.com/Yeqi99/CShell/blob/main/docs/API.md">API 契约与错误语义</a>、<a href="https://github.com/Yeqi99/CShell/blob/main/docs/MCP.md">MCP 接入</a>。</p>
+
+
+<h2 id="focus-0810">0.8.10 准备中：异步执行不抢输入焦点</h2>
+<p>命令台正在读取目录或执行命令时，可以切换到其他输入框继续工作。后台结果返回后显示在原命令台，不强制把焦点拉回。切换视图仍保留草稿与结果，未知结果的写入不自动重放。</p>

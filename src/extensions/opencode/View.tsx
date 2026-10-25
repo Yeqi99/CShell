@@ -385,7 +385,7 @@ export function OpenCodeView() {
               })
             }
           >
-            接入此账号
+            设为默认模型
           </button>
           <button
             disabled={busy || !model || !account}

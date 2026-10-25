@@ -189,6 +189,26 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
   }, [minimal]);
   const [pinned, setPinned] = useState(false);
   const [aiVisible, setAiVisible] = useState(false);
+  const workspaceElement = useRef<HTMLDivElement>(null);
+  const [toolSpace, setToolSpace] = useState(window.innerWidth);
+  useEffect(() => {
+    const workspace = workspaceElement.current;
+    if (!workspace) return;
+    const measure = () => {
+      const occupied = Array.from(workspace.children).filter(element =>
+        element.matches('[data-panel="servers"], .ai-panel-slot') && !(element as HTMLElement).hidden,
+      ).reduce((width, element) => width + element.getBoundingClientRect().width, 0);
+      setToolSpace(workspace.clientWidth - occupied);
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(workspace);
+    for (const element of Array.from(workspace.children)) {
+      if (element.matches('[data-panel="servers"], .ai-panel-slot')) observer.observe(element);
+    }
+    measure();
+    return () => observer.disconnect();
+  });
+  const toolsNeedRoom = aiVisible && !minimal && toolSpace < 580;
   useEffect(() => {
     const open = () => {
       setAiVisible(true);
@@ -468,7 +488,10 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
       }),
     [],
   );
-  const showTools = !current?.profile || isFileConnection(current.profile) ? false : surface === 'terminal' && !linuxModes[active] && right && !!current && !current.closed && !current.local && !current.client;
+  const nativeSsh = !!current?.profile && !isFileConnection(current.profile) && surface === 'terminal' && !linuxModes[active] && !current.closed && !current.local && !current.client;
+  const showTools = nativeSsh && right && !toolsNeedRoom;
+  const toolsLabel = config.preferences.locale === 'zh-CN' ? '文件与机器信息' : 'Files & machine info';
+  const toolsHint = toolsNeedRoom ? (config.preferences.locale === 'zh-CN' ? '展开将收起智能体，会话保留' : 'Open tools and collapse agent; conversations stay running') : 'Ctrl+Shift+E';
   const saveProfile = async (p: Profile) => {
     await window.cshell.saveProfile(p);
     setTabs((items) =>
@@ -600,6 +623,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
   const openFiles = () => {
     if (!current || current.closed || current.local || current.client || isFileConnection(current.profile)) return;
     onLayout({...layout, fileVisible: true});
+    if (toolsNeedRoom) setAiVisible(false);
     setFileReveal(value => ({id: current.id, revision: value.revision + 1}));
   };
   const commands: WorkbenchCommand[] = [
@@ -704,6 +728,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
       {palette && <CommandPicker commands={commands} onClose={() => setPalette(false)} />}
 
       <div
+        ref={workspaceElement}
         className={`workspace dock-workspace ${left ? '' : 'hide-left'} ${showTools ? '' : 'hide-right'}`}
         {...docking.events}
       >
@@ -1058,12 +1083,15 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
             </button>
             <button
               className="workbench-tool ssh-files-toggle"
-              hidden={!current || current.closed || !!current.local || !!current.client || isFileConnection(current.profile)}
-              aria-label={t('files')}
-              title={`${t('files')} (Ctrl+Shift+E)`}
+              hidden={!nativeSsh}
+              aria-label={toolsLabel}
+              aria-expanded={showTools}
+              aria-controls="ssh-machine-tools"
+              aria-description={toolsHint}
+              title={`${toolsLabel} · ${toolsHint}`}
               onClick={openFiles}
             >
-              <Files size={15} /><span>{t('files')}</span>
+              <Files size={15} /><span>{toolsLabel}</span><span aria-hidden="true">{showTools ? '▾' : '▸'}</span>
             </button>
           </div>
           {wslSetupTarget && (
@@ -1321,8 +1349,9 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
           <div
             className="dock-side"
             hidden={!showTools}
+            id="ssh-machine-tools"
             data-panel="files"
-            style={{ order: layout.order.indexOf('files'), width: layout.fileWidth }}
+            style={{ order: layout.order.indexOf('files'), width: Math.max(240, Math.min(layout.fileWidth, toolSpace - 320)) }}
           >
             <PanelResizer
               panel="files"

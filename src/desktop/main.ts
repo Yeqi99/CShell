@@ -73,6 +73,7 @@ import { remotePath } from '../core/paths';
 import { McpService } from '../core/mcp';
 import { registerPresetHandlers } from './presets';
 import { registerAppearanceHandlers } from './appearance';
+import { DesktopLooks } from '../core/desktop-looks';
 import { registerFileHandlers } from './file-handlers';
 import { ResourceInspection } from '../core/resource-inspection';
 
@@ -460,6 +461,10 @@ else
         );
         return { sessionId, name: clientProvider.resolve(sessionId).target.label };
       });
+      const desktopLooks=new DesktopLooks(app.getPath('userData'),store,()=>{if(!window.isDestroyed())window.webContents.send('desktop-look:changed');});
+      await desktopLooks.load();
+      handle('desktop-look:get',(id,legacy)=>desktopLooks.get(id,legacy));
+      handle('desktop-look:save',(id,value)=>desktopLooks.save(id,value));
       registerAppearanceHandlers(handle, window, app.getPath('userData'), consume, text);
       registerUpdateHandlers(handle, window);
       registerActivity(handle, window, activity);
