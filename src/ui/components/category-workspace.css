@@ -1,0 +1,133 @@
+/* Respond to the space left beside other panes, not the desktop window width. */
+.workspace-category-container {
+  container: category-workspace / inline-size;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.workspace-category-container .extension-nav,
+.workspace-category-container .settings-nav {
+  min-width: 0;
+  overflow: auto;
+}
+.workspace-category-container .extension-nav > button,
+.workspace-category-container .settings-nav > button {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.workspace-category-container .extension-nav > button svg,
+.workspace-category-container .settings-nav > button svg {
+  flex-shrink: 0;
+}
+.workspace-category-container .extension-workbench[data-section] .plugin-list {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
+}
+.workspace-category-container .extension-toolbar {
+  flex-wrap: wrap;
+}
+.workspace-category-container .extension-search {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+.workspace-category-container .extension-toolbar > button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.workspace-category-container .extension-server {
+  min-width: 0;
+  max-width: 100%;
+}
+.workspace-category-container .extension-server select {
+  max-width: 100%;
+}
+@container category-workspace (max-width: 720px) {
+  .workspace-category-container .extension-workbench[data-section] {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .workspace-category-container .preferences-page.categorized-settings {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+  .workspace-category-container .extension-workbench[data-section] .extension-nav,
+  .workspace-category-container .settings-nav {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    grid-row: 1;
+    padding: 10px 12px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+    overscroll-behavior-inline: contain;
+  }
+  .workspace-category-container .extension-workbench[data-section] .extension-nav h2,
+  .workspace-category-container .settings-nav h2 {
+    display: none;
+  }
+  .workspace-category-container .extension-workbench[data-section] .extension-nav > button,
+  .workspace-category-container .settings-nav > button {
+    width: auto;
+    margin: 0;
+    padding: 8px 10px;
+    gap: 7px;
+    font-size: calc(var(--ui-font-size, 15px) * 12 / 13);
+  }
+  .workspace-category-container .extension-workbench[data-section] .extension-main,
+  .workspace-category-container .settings-content {
+    padding: 18px 16px;
+    min-height: 0;
+  }
+  .workspace-category-container .extension-heading {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .workspace-category-container .extension-workbench[data-section='apps'] .application-market {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 110px minmax(0, 1fr);
+    gap: 12px;
+  }
+  .workspace-category-container .extension-workbench[data-section] .application-list {
+    grid-column: 1;
+    grid-row: 2;
+    flex-direction: row;
+  }
+  .workspace-category-container .extension-workbench[data-section] .application-list > button {
+    width: 160px;
+  }
+  .workspace-category-container .extension-workbench[data-section] .application-detail {
+    grid-column: 1;
+    grid-row: 3;
+    border-left: 0;
+    border-top: 1px solid var(--border);
+    padding: 14px 0;
+  }
+  .workspace-category-container .settings-savebar {
+    grid-column: 1;
+    padding: 10px 16px;
+    flex-wrap: wrap;
+  }
+}
+@container category-workspace (max-width: 460px) {
+  .workspace-category-container .settings-content .form-grid,
+  .workspace-category-container .settings-content .background-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .workspace-category-container .settings-savebar > span:not(:empty) {
+    flex-basis: 100%;
+  }
+  .workspace-category-container .settings-savebar > button:first-of-type {
+    margin-left: auto;
+  }
+  .workspace-category-container .application-toolbar {
+    flex-wrap: wrap;
+  }
+  .workspace-category-container .application-toolbar label {
+    min-width: 0;
+    flex: 1 1 180px;
+  }
+}

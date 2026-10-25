@@ -1,3 +1,4 @@
+import type {CommandBridge} from './command-console';
 import type {LinuxWorkspaceBridge} from './linux-workspace';
 import type { CloudBridge } from './cloud-sync';
 import type {MachineBrowserBridge} from './machine-browser';
@@ -29,9 +30,10 @@ const text = z.string().trim().min(1).max(255);
 export const profileSchema = z
   .object({
     id: z.string().uuid(),
-    protocol: z.enum(['ssh', 'client', 'http', 'rdp']).optional(),
+    protocol: z.enum(['ssh', 'client', 'http', 'rdp', 'sftp', 'ftp', 'ftps']).optional(),
     clientShell: clientShellSchema.optional(),
     clientDistribution: z.string().min(1).max(100).optional(),
+    defaultConnectionView: z.enum(['visual', 'original']).optional(),
     name: text,
     host: z.string().trim().max(8192),
     port: z.number().int().min(0).max(65535),
@@ -42,6 +44,8 @@ export const profileSchema = z
   })
   .strict()
   .superRefine((p, ctx) => {
+    if ((p.protocol === 'ftp' || p.protocol === 'ftps') && p.auth !== 'password')
+      ctx.addIssue({ code: 'custom', message: 'FTP uses password authentication' });
     if (p.protocol === 'http') {
       if (
         p.host ||
@@ -101,6 +105,10 @@ export const apiCapabilitySchema = z.enum([
   'http.use',
   'http.send',
   'http.send.local',
+  'browser.read',
+  'browser.control',
+  'desktop.view',
+  'desktop.control',
   'environments.read',
   'environments.manage',
   'applications.read',
@@ -204,17 +212,19 @@ export const preferencesSchema = z
       fileWidth: 340,
       agentWidth: 500,
     }),
-    defaultConnectionView: z.enum(['visual', 'original']).default('visual'),
+    defaultConnectionView: z.enum(['visual', 'original']).default('original'),
+    defaultConnectionViewExplicit: z.boolean().optional(),
+    workbenchView: z.enum(['overview', 'command', 'visual']).default('overview'),
     locale: z.enum(['zh-CN', 'en-US']),
     theme: z.enum(['dark', 'light']),
     uiFont: z.string().max(200),
-    uiFontSize: z.number().min(12).max(20).default(15),
-    sidebarFontSize: z.number().min(12).max(22).default(13),
-    sidebarGroupSize: z.number().min(12).max(22).default(15),
-    sidebarDetailSize: z.number().min(11).max(20).default(13),
+    uiFontSize: z.number().min(9).max(20).default(14),
+    sidebarFontSize: z.number().min(8).max(22).default(12),
+    sidebarGroupSize: z.number().min(8).max(22).default(14),
+    sidebarDetailSize: z.number().min(8).max(20).default(12),
     sidebarDensity: z.enum(['compact', 'comfortable', 'spacious']).default('comfortable'),
     terminalFont: z.string().max(200),
-    fontSize: z.number().min(10).max(28),
+    fontSize: z.number().min(8).max(28),
     lineHeight: z.number().min(1).max(1.8).default(1.2),
     terminalClipboardKeys: z.boolean().default(true),
     terminalSemanticColors: z.boolean().default(true),
@@ -226,7 +236,10 @@ export const preferencesSchema = z
     backgroundFit: z.enum(['cover', 'contain']).default('cover'),
     showAiExecution: z.boolean().default(true),
   })
-  .strict();
+  .strict()
+  .overwrite(preferences => preferences.defaultConnectionView === 'visual' && !preferences.defaultConnectionViewExplicit
+    ? { ...preferences, defaultConnectionView: 'original' as const }
+    : preferences);
 export type Preferences = z.infer<typeof preferencesSchema>;
 export const defaults: Preferences = {
   layout: {
@@ -237,14 +250,16 @@ export const defaults: Preferences = {
     fileWidth: 340,
     agentWidth: 500,
   },
-  defaultConnectionView: 'visual',
+  defaultConnectionView: 'original',
+  defaultConnectionViewExplicit: false,
+  workbenchView: 'overview',
   locale: 'zh-CN',
   theme: 'light',
   uiFont: '"Segoe UI Variable", "Segoe UI", "Microsoft YaHei UI", "PingFang SC", "Noto Sans CJK SC", sans-serif',
-  uiFontSize: 15,
-  sidebarFontSize: 13,
-  sidebarGroupSize: 15,
-  sidebarDetailSize: 13,
+  uiFontSize: 14,
+  sidebarFontSize: 12,
+  sidebarGroupSize: 14,
+  sidebarDetailSize: 12,
   sidebarDensity: 'comfortable',
   terminalFont: 'Cascadia Code, Consolas, Microsoft YaHei UI, monospace',
   fontSize: 14,
@@ -339,7 +354,7 @@ export type SessionEvent =
   | { type: 'closed'; sessionId: string; error?: string }
   | { type: 'transfer'; transfer: Transfer };
 export interface Bridge
-  extends CloudBridge, LinuxWorkspaceBridge, MachineBrowserBridge,
+  extends CommandBridge, CloudBridge, LinuxWorkspaceBridge, MachineBrowserBridge,
     AgentBridge,
     DesktopViewBridge,
     HttpBridge,

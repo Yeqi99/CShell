@@ -1,5 +1,5 @@
 import { createHash, verify, randomUUID } from 'node:crypto';
-import { readFile, writeFile, mkdir, rename, rm, stat } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, rename, rm, stat, readdir, lstat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { createRequire } from 'node:module';
@@ -7,6 +7,9 @@ import { gunzipSync } from 'node:zlib';
 import { z } from 'zod';
 import { pluginManifestSchema } from '../shared/plugins';
 import { customExtensionKey } from '../shared/custom-extension-key';
+import { createBundledCapabilityEntry } from '../agent/capability-catalog';
+import { ProcessCapabilityAdapter } from '../agent/process-capability';
+import { verifyCapabilityFiles } from '../agent/capability-packages';
 
 const digest = (bytes: Buffer | string) => createHash('sha256').update(bytes).digest('hex');
 const pathSchema = z.string().max(240).refine(value => /^[A-Za-z0-9_. /-]+$/.test(value) && value.split('/').every(part => part && part !== '.' && part !== '..' && !/[. ]$/.test(part) && !/^(con|prn|aux|nul|com\d|lpt\d)(\.|$)/i.test(part)));
@@ -29,8 +32,35 @@ export function parseCustomExtension(text:string){
   const trusted=!!value.signature&&verify(null,Buffer.from(signed),customExtensionKey,Buffer.from(value.signature,'base64'));
   if(value.manifest.provider==='wechat'){
     if(!trusted||value.manifest.id!=='cshell.wechat'||!files.has('adapter.cjs')||!files.has('runtime/python.exe'))throw new Error('微信扩展需要完整且签名有效的独立安装包');
-  }else if(value.manifest.provider!=='snippets'||value.manifest.id.startsWith('cshell.')||value.files.length||value.manifest.permissions.some(p=>p!=='terminal.input'))throw new Error('此扩展类型尚不支持外部加载');
+  }else if(value.manifest.provider==='process'){
+    const capability=value.manifest.capability;
+    if(value.manifest.id.startsWith('cshell.')||value.manifest.id.startsWith('cagent.')||!capability?.process||capability.id!==value.manifest.id||capability.adapterId!==value.manifest.id||capability.version!==value.manifest.version||value.manifest.commands.length||value.manifest.permissions.length!==1||value.manifest.permissions[0]!=='remote.execute')throw new Error('独立进程扩展清单不匹配');
+    if(value.signature&&!trusted)throw new Error('扩展签名无效');
+    if(total>16*1024*1024||Buffer.byteLength(JSON.stringify(capability))>1024*1024||capability.files.length!==value.files.length)throw new Error('独立进程扩展文件过大或不匹配');
+    for(const file of capability.files){const item=value.files.find(item=>item.path===file.path),bytes=files.get(file.path.toLowerCase());if(!item||!bytes||item.sha256!==file.sha256||bytes.length!==file.bytes)throw new Error('能力清单文件摘要不匹配');}
+  }else if(value.manifest.provider!=='snippets'||value.manifest.capability||value.manifest.id.startsWith('cshell.')||value.files.length||value.manifest.permissions.some(p=>p!=='terminal.input'))throw new Error('此扩展类型尚不支持外部加载');
   return {value,trusted,bytes:total,sha256:digest(text)};
+}
+/** Reads declarations and verifies bytes only. No extension code executes during discovery. */
+export async function loadProcessExtensions(root=customExtensionRoot(), onInvalid?: (id: string) => void) {
+  let directories;try{directories=await readdir(root,{withFileTypes:true});}catch(error){if((error as NodeJS.ErrnoException).code==='ENOENT')return [];throw error;}
+  const result=[];
+  for(const directory of directories){
+    if(!directory.isDirectory()||directory.isSymbolicLink()||!/^[a-z][a-z0-9-]*\.[a-z][a-z0-9-]*$/.test(directory.name)||directory.name.startsWith('cshell.')||directory.name.startsWith('cagent.'))continue;
+    try {
+    const base=join(root,directory.name),pointer=join(base,'current.json');
+    let current;try{if((await lstat(pointer)).isSymbolicLink())throw new Error('Extension pointer cannot be a symlink');current=JSON.parse(await readFile(pointer,'utf8'));}catch(error){if((error as NodeJS.ErrnoException).code==='ENOENT')continue;throw error;}
+    const installed=join(base,z.string().uuid().parse(current.directory));
+    if((await lstat(installed)).isSymbolicLink()||(await lstat(join(installed,'package.cshellext'))).isSymbolicLink())throw new Error('Extension package cannot be a symlink');
+    const pack=await readCustomExtension(join(installed,'package.cshellext'));
+    if(pack.value.manifest.provider!=='process')continue;
+    const manifest=pack.value.manifest.capability!;
+    if(manifest.id!==directory.name)throw new Error('Installed extension identity mismatch');
+    await verifyCapabilityFiles(installed,manifest);
+    result.push({entry:createBundledCapabilityEntry(manifest,Object.fromEntries(pack.value.files.map(file=>[file.path,Buffer.from(file.data,'base64')]))),adapter:new ProcessCapabilityAdapter(manifest),manifest:pack.value.manifest,digest:pack.sha256,installToken:current.directory as string});
+    } catch { onInvalid?.(directory.name); }
+  }
+  return result;
 }
 export async function readCustomExtension(path:string){
   if(!path.toLowerCase().endsWith('.cshellext'))throw new Error('请选择 .cshellext 扩展包');

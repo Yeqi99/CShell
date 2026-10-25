@@ -22,6 +22,7 @@ export class IdeService {
     { child: ChildProcess; url: string; password: string; cwd: string }
   >();
   private installing = false;
+  get activity(){return this.processes.size + (this.installing?1:0);}
   private installAbort?:AbortController;
   private installOwner='';
   private installError = '';

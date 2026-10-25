@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { agentCapabilityManifestSchema } from './agent-capability-packages';
 
 export const pluginId = z
   .string()
@@ -27,6 +28,7 @@ export const pluginManifestSchema = z
       'wechat',
       'opencode',
       'tavily',
+      'process',
     ]),
     permissions: z
       .array(z.enum(['terminal.input', 'remote.read', 'remote.execute', 'remote.forward']))
@@ -46,6 +48,7 @@ export const pluginManifestSchema = z
       )
       .max(200)
       .default([]),
+    capability: agentCapabilityManifestSchema.optional(),
   })
   .strict();
 export type PluginManifest = z.infer<typeof pluginManifestSchema>;
@@ -275,6 +278,8 @@ export interface ExtensionBridge {
   pluginDownload(entry: CatalogEntry): Promise<void>;
   pluginImportPreview(file?: File): Promise<{token:string;manifest:PluginManifest;trusted:boolean;bytes:number} | null>;
   pluginImportApply(token:string): Promise<void>;
+  pluginProcessStatus(): Promise<(import('./agent-capability-packages').CapabilityPackageView & { enabled: boolean })[]>;
+  pluginProcessAuthorize(id: string, allowed: boolean): Promise<(import('./agent-capability-packages').CapabilityPackageView & { enabled: boolean })[]>;
   environments(sessionId: string): Promise<EnvironmentSnapshot>;
   environmentAction(sessionId: string, action: EnvironmentAction): Promise<RemoteJob>;
   environmentTerminal(

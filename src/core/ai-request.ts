@@ -28,6 +28,7 @@ export async function requestAiReply(
     const response = await transport(url, { ...init, signal: combined });
     if (!response.ok) {
       await response.body?.cancel();
+      if([400,413,415,422].includes(response.status)&&typeof init.body==='string'&&init.body.includes('"image_url"'))throw Error(`当前模型服务未接受图片输入（HTTP ${response.status}）。图片能力或大小可能不受支持；可改用 browser_snapshot 读取页面，或切换明确支持图片的模型。工具操作没有重放。`);
       const hint = response.status===401 ? '模型登录已失效，请重新登录或检查 API Key'
         :response.status===403 ? '当前账号无权使用此模型，请检查基座权限'
         :response.status===429 ? '模型请求较多或额度已用完，请稍后重试或切换模型'

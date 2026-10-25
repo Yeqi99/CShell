@@ -2,6 +2,7 @@ import { executeHttp } from '../http-transport';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { profileSchema, type Profile } from '../../shared/contracts';
+import { profileProvider } from '../../shared/file-connections';
 import type { SshService, Session } from '../ssh';
 import { RemoteJobs } from '../remote-jobs';
 import { remotePath, remoteFileConflict } from '../paths';
@@ -17,11 +18,11 @@ import { inspectSftpTree, mutateSftpTree, treeInspectInput, treeInspectOutput, t
 import { commandNeedsReview } from './policy';
 import { ConnectionRegistry } from './registry';
 import { ConnectionManager, type ManagedProvider } from './manager';
-import type { ProviderConnection, ConnectionTool } from './contracts';
+import type { ProviderConnection, ConnectionTool, ConnectionTarget, ResourceScope } from './contracts';
 
 export const sshIdentity = (p: Profile) =>
   createHash('sha256')
-    .update(JSON.stringify([p.host, p.port, p.username]))
+    .update(JSON.stringify(p.protocol === 'sftp' ? ['sftp', p.host, p.port, p.username] : [p.host, p.port, p.username]))
     .digest('hex');
 const commandInput = z
   .object({
@@ -43,7 +44,7 @@ const commandInput = z
   .strict();
 const pathInput = z.object({ path: z.string().max(4096).transform(remotePath) }).strict();
 export class SshConnectionProvider implements ManagedProvider {
-  readonly id = 'cshell.ssh';
+  readonly id: string;
   readonly configuration = profileSchema;
   async connect(
     configuration: unknown,
@@ -61,7 +62,7 @@ export class SshConnectionProvider implements ManagedProvider {
       .strict()
       .parse(credentials);
     const checked = profileSchema.parse(configuration);
-    if (checked.protocol && checked.protocol !== 'ssh') throw new Error('Not an SSH target');
+    if (profileProvider(checked) !== this.id) throw new Error('Wrong connection provider');
     if (!checked.host || !checked.username || !checked.port)
       throw new Error('SSH target incomplete');
     const result = await this.ssh.connect(
@@ -80,7 +81,7 @@ export class SshConnectionProvider implements ManagedProvider {
     this.ssh.disconnect(id);
   }
   readonly version = '0.1.0';
-  readonly capabilities = [
+  readonly capabilities: string[] = [
     'commands.execute',
     'files.read',
     'files.create',
@@ -102,12 +103,16 @@ export class SshConnectionProvider implements ManagedProvider {
   constructor(
     private ssh: SshService,
     private extensions?: (id: string) => readonly ConnectionTool[],
+    fileOnly = false,
   ) {
+    this.id = fileOnly ? 'cshell.sftp' : 'cshell.ssh';
+    if (fileOnly) this.capabilities = this.capabilities.filter(c => c.startsWith('files.') || c.startsWith('directories.'));
     this.jobs = new RemoteJobs(ssh);
   }
   resolve(id: string): ProviderConnection {
     const session = this.ssh.get(id),
       existing = this.connections.get(session);
+    if (profileProvider(session.profile) !== this.id) throw new Error('Connection belongs to another provider');
     if (existing) return existing;
     const directoryPages = new DirectoryPages();
     const tools: ConnectionTool[] = [
@@ -315,9 +320,11 @@ export class SshConnectionProvider implements ManagedProvider {
       },
     ];
     const p = session.profile;
-    const extensions = this.extensions;
+    const fileOnly = this.id === 'cshell.sftp';
+    const extensions = fileOnly ? undefined : this.extensions;
+    const availableTools = fileOnly ? tools.filter(t => t.capability.startsWith('files.') || t.capability.startsWith('directories.')) : tools;
     const connection: ProviderConnection = {
-      http: (request, signal) =>
+      http: fileOnly ? undefined : (request, signal) =>
         executeHttp(
           request,
           signal,
@@ -344,9 +351,9 @@ export class SshConnectionProvider implements ManagedProvider {
         label: p.name + ' · ' + p.username + '@' + p.host + ':' + p.port,
       }),
       get tools() {
-        return [...tools, ...(extensions?.(id) ?? [])];
+        return [...availableTools, ...(extensions?.(id) ?? [])];
       },
-      terminal: Object.freeze({
+      terminal: fileOnly ? undefined : Object.freeze({
         input: (data: string) => this.ssh.input(id, data),
         resize: (cols: number, rows: number) => this.ssh.resize(id, cols, rows),
         acknowledge: (count: number) => this.ssh.acknowledge(id, count),
@@ -362,15 +369,17 @@ export function createSshManager(
   ssh: SshService,
   profiles: () => Profile[],
   extensions?: (id: string) => readonly ConnectionTool[],
+  otherScope?: (target: ConnectionTarget) => ResourceScope | undefined,
 ) {
   const registry = new ConnectionRegistry((target) => {
-    if (target.providerId !== 'cshell.ssh') return;
+    if (target.providerId !== 'cshell.ssh' && target.providerId !== 'cshell.sftp') return otherScope?.(target);
     const profile = profiles().find((p) => p.id === target.resourceId);
-    if (!profile || sshIdentity(profile) !== target.identity) return;
+    if (!profile || !['ssh','sftp'].includes(profile.protocol ?? 'ssh') || profileProvider(profile) !== target.providerId || sshIdentity(profile) !== target.identity) return;
     return { id: profile.id, group: profile.group };
   });
   const manager = new ConnectionManager(registry);
   manager.register(new SshConnectionProvider(ssh, extensions));
+  manager.register(new SshConnectionProvider(ssh, undefined, true));
   return manager;
 }
 

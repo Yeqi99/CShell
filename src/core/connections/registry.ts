@@ -24,6 +24,8 @@ export class ConnectionRegistry {
   private generations = new Map<string, number>();
   private generation = 0;
   private registrations = new Map<string, symbol>();
+  private toolSources = new Map<string, { capabilities: ReadonlySet<string>; tools: (id: string, connection: ProviderConnection) => readonly ConnectionTool[] }>();
+  private toolSourceGeneration = 0;
   constructor(
     private scopeFor: (target: ConnectionTarget) => ResourceScope | undefined,
     /** Legacy session-ID routing; new resource records must bind their provider explicitly. */
@@ -42,6 +44,27 @@ export class ConnectionRegistry {
   unregister(id: string) {
     this.providers.delete(id);
     this.registrations.delete(id);
+  }
+  /** Trusted composition-root contributions; never accepts code or grants from a renderer. */
+  registerToolSource(id: string, capabilities: readonly string[], tools: (id: string, connection: ProviderConnection) => readonly ConnectionTool[]) {
+    providerId.parse(id);
+    if (this.toolSources.has(id)) throw new Error('Tool source already registered');
+    capabilities.forEach(value => capability.parse(value));
+    const source = { capabilities: new Set(capabilities), tools };
+    this.toolSources.set(id, source); this.toolSourceGeneration++;
+    return () => {
+      if (this.toolSources.get(id) === source) { this.toolSources.delete(id); this.toolSourceGeneration++; }
+    };
+  }
+  private allTools(id: string, connection: ProviderConnection) {
+    const result = [...connection.tools], names = new Set(result.map(tool => tool.name));
+    for (const source of this.toolSources.values()) for (const tool of source.tools(id, connection)) {
+      z.string().regex(/^[a-z][a-z0-9_]{0,63}$/).parse(tool.name);
+      if (names.has(tool.name) || !source.capabilities.has(tool.capability)) throw new Error('Invalid contributed tool declaration');
+      names.add(tool.name); result.push(tool);
+      if (result.length > 256) throw new Error('Too many connection tools');
+    }
+    return result;
   }
   bind(connectionId: string, provider: string) {
     if (!this.providers.has(provider)) throw new Error('Unknown provider');
@@ -131,14 +154,15 @@ export class ConnectionRegistry {
     return this.scopeFor(this.describe(id));
   }
   tools(id: string): readonly ConnectionTool[] {
-    return this.connection(id).tools;
+    return this.allTools(id, this.connection(id));
   }
   prepare(id: string, name: string, input: unknown): PreparedTool {
     const connection = this.connection(id),
       target = JSON.stringify(connection.target);
     const generation = this.generations.get(id),
       registration = this.registrations.get(connection.target.providerId);
-    const tool = connection.tools.find((t) => t.name === name);
+    const toolSourceGeneration = this.toolSourceGeneration;
+    const tool = this.allTools(id, connection).find((t) => t.name === name);
     if (!tool) throw new Error('Unknown tool on this connection');
     const args = structuredClone(tool.input.parse(input));
     freeze(args);
@@ -154,19 +178,24 @@ export class ConnectionRegistry {
         if (used) throw new Error('Invocation already consumed');
         used = true;
         signal.throwIfAborted();
+        const guard=()=>{
+        signal.throwIfAborted();
         const current = this.connection(id);
         if (
           this.generations.get(id) !== generation ||
           this.registrations.get(connection.target.providerId) !== registration ||
           current !== connection ||
           JSON.stringify(current.target) !== target ||
-          !current.tools.includes(tool)
+          this.toolSourceGeneration !== toolSourceGeneration ||
+          !this.allTools(id, current).includes(tool)
         )
           throw new Error('Connection or capability changed; approval expired');
         if (!authorize()) throw new Error('Capability or resource scope revoked');
         signal.throwIfAborted();
+        };
+        guard();
         // No retry: a remote timeout may have happened after a side effect.
-        const result = await tool.invoke(args, signal, output);
+        const result = await tool.invoke(args, signal, output, guard);
         if (tool.jsonOutput) {
           try {
             tool.jsonOutput.parse(JSON.parse(result));

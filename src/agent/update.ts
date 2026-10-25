@@ -1,8 +1,8 @@
 import {prepareAgentReplacement} from './posix-update';
+import {prepareWindowsAgentReplacement} from './windows-update';
 import {updateRequest} from './update-request';
 import {mkdir,writeFile,rename,rm,readFile} from 'node:fs/promises';
-import {join,dirname,basename} from 'node:path';
-import {spawn} from 'node:child_process';
+import {join} from 'node:path';
 import {createHash} from 'node:crypto';
 import {trustedDownload} from '../shared/download-source';
 export function newer(a:string,b:string){const x=a.split('.').map(Number),y=b.split('.').map(Number);for(let i=0;i<3;i++){if(x[i]!==y[i])return x[i]>y[i];}return false;}
@@ -23,22 +23,20 @@ export class AgentUpdater{
  private lifetime=new AbortController();
  private assertOpen(){this.lifetime.signal.throwIfAborted();}
  private automatic=true;private timer:ReturnType<typeof setInterval>|undefined;private checking=false;
+ private failedVersion?:{version:string;retryAt:number};
  constructor(private directory:string,private version:string,private request:typeof updateRequest=updateRequest){}
- async initialize(){try{const saved=JSON.parse(await readFile(join(this.directory,'update-settings.json'),'utf8'));this.automatic=saved.automatic!==false;}catch{}if(this.lifetime.signal.aborted)return;if(['win32','linux','darwin'].includes(process.platform)){this.timer=setInterval(()=>void this.tick(),6*60*60*1000);this.timer.unref();void this.tick();}}
+ async initialize(){try{const saved=JSON.parse(await readFile(join(this.directory,'update-settings.json'),'utf8'));this.automatic=saved.automatic!==false;}catch{}try{const result=JSON.parse(await readFile(join(this.directory,'update-result.json'),'utf8'));if(['rollback-pending','rolled-back'].includes(result.state)&&/^\d+\.\d+\.\d+$/.test(result.version)&&Number.isFinite(result.at))this.failedVersion={version:result.version,retryAt:result.at+6*60*60*1000};}catch{}if(this.lifetime.signal.aborted)return;if(['win32','linux','darwin'].includes(process.platform)){this.timer=setInterval(()=>void this.tick(),6*60*60*1000);this.timer.unref();void this.tick();}}
  close(){if(this.timer)clearInterval(this.timer);this.timer=undefined;this.lifetime.abort(new Error('更新服务已关闭'));}
  async settings(automatic?:boolean){this.assertOpen();if(automatic!==undefined){this.automatic=automatic;await mkdir(this.directory,{recursive:true});const path=join(this.directory,'update-settings.json');await writeFile(path+'.tmp',JSON.stringify({automatic}));await rename(path+'.tmp',path);if(automatic)void this.tick();}return {automatic:this.automatic,supported:['win32','linux','darwin'].includes(process.platform)};}
- private async tick(){if(this.lifetime.signal.aborted||!this.automatic||this.checking||['ready','downloading'].includes(this.state.phase))return;this.checking=true;try{const result=await this.check();if(result.available&&this.automatic)this.start();}catch(e){if(!this.lifetime.signal.aborted)this.state={phase:'failed',error:e instanceof Error?e.message:String(e)};}finally{this.checking=false;}}
+ private async tick(){if(this.lifetime.signal.aborted||!this.automatic||this.checking||['ready','downloading'].includes(this.state.phase))return;this.checking=true;try{const result=await this.check();if(result.available&&this.automatic){if(this.failedVersion&&this.failedVersion.version===result.version&&Date.now()<this.failedVersion.retryAt)this.state={phase:'deferred',version:result.version,retryAt:this.failedVersion.retryAt,error:'此版本上次启动未通过核验，已保留原后台，稍后再自动检查'};else this.start();}}catch(e){if(!this.lifetime.signal.aborted)this.state={phase:'failed',error:e instanceof Error?e.message:String(e)};}finally{this.checking=false;}}
  async check(){this.assertOpen();if(!['win32','linux','darwin'].includes(process.platform))throw new Error('当前平台没有更新安装包');const r=await this.request('https://shell.canp.ai/downloads/pro/releases.json',{headers:{Accept:'application/json'},signal:AbortSignal.any([this.lifetime.signal,AbortSignal.timeout(15000)])});if(!r.ok)throw new Error('检查更新失败：香港更新服务 HTTP '+r.status);const releases=await r.json();this.assertOpen();if(!Array.isArray(releases))throw new Error('更新目录格式不正确');this.candidate=selectUpdate(releases,this.version,process.arch,process.platform);return {current:this.version,available:!!this.candidate,version:this.candidate?.version};}
- async prepareInstall(){
+ async prepareInstall(identity?:string){
   await this.verify();
+  if(!identity)throw Error('缺少更新目标身份');
   if(process.platform==='win32'){
-   const runtime=dirname(process.execPath),parent=dirname(runtime);
-   const installed=JSON.parse(await readFile(join(runtime,'build-info.json'),'utf8'));
-   if(installed.platform!=='win32'||installed.electron!==false)throw Error('当前安装身份无法验证');
-   const target=basename(parent)==='versions'?dirname(parent):runtime,installer=this.verified!.path;
-   return {cancel:async()=>{},commit(){const child=spawn(installer,['/S','/RESTART','/D='+target],{detached:true,stdio:'ignore',windowsHide:true,windowsVerbatimArguments:true});child.on('error',error=>console.error('CAgent installer failed',error));child.unref();}};
+   return prepareWindowsAgentReplacement(this.verified!.path,this.state.version,this.directory,identity);
   }
-  return prepareAgentReplacement(this.verified!.path,this.state.version,this.directory);
+  return prepareAgentReplacement(this.verified!.path,this.state.version,this.directory,identity);
  }
  status(){return {...this.state,automatic:this.automatic};}
  async verify(){if(this.state.phase!=='ready'||!this.verified||createHash('sha256').update(await readFile(this.verified.path)).digest('hex')!==this.verified.digest)throw Error('更新文件已改变，请重新下载');return this.status();}

@@ -29,6 +29,7 @@ import type { ProviderConnection } from '../connections/contracts';
 import { ClientVault, fingerprint, type ClientIdentity } from './identity';
 import { frames, send, textChunks } from './wire';
 import { ManagementQueue } from './management-queue';
+import { remoteProcessTools } from '../remote-process-tools';
 const deviceSchema = clientInvitationSchema
   .omit({ token: true, expires: true })
   .extend({ relay: agentRelayConnectionSchema.optional(),accountManaged:z.boolean().optional(),accountPassword:clientPasswordSchema.optional() });
@@ -496,6 +497,14 @@ export class ClientProvider implements ManagedProvider {
           }
         })();
       };
+      // Custom tools run on the native CAgent host, never a selected WSL environment.
+      let processTools: import('../connections/contracts').ConnectionTool[] = [];
+      if(config.shell!=='wsl'&&auth.capabilities.includes('agent.manage')&&auth.capabilities.includes('commands.execute')) {
+        try { processTools=await remoteProcessTools((call,abort)=>this.call(device.deviceId,call,abort),AbortSignal.any([signal,AbortSignal.timeout(3000)])); }
+        catch { /* Older agents or unavailable metadata contribute no executable tools. */ }
+      }
+      signal.throwIfAborted();
+      if(channel.socket.destroyed)throw new Error('Client disconnected');
       const connection: ProviderConnection = {
         target: {
           providerId: this.id,
@@ -529,6 +538,7 @@ export class ClientProvider implements ManagedProvider {
             : undefined,
         agent: (call, abort) => this.call(device.deviceId, call, abort),
         tools: [
+          ...processTools,
           ...(auth.capabilities.includes('commands.execute')
             ? [
                 {

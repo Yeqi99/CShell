@@ -9,6 +9,8 @@ import { RefreshCw, Package, Terminal, Globe, Code, Search } from 'lucide-react'
 import './agent-applications.css';
 import { DevelopmentMarket } from './DevelopmentMarket';
 import { agentRead } from '../agent-read';
+import { agentCapabilityError, agentCompatibilityNotice } from '../../shared/agent-compatibility';
+import { SshApplicationMarket } from './SshApplicationMarket';
 
 export function AgentApplications({
   target,
@@ -40,25 +42,32 @@ export function AgentApplications({
   const [wslOpen, setWslOpen] = useState(false);
   const [query, setQuery] = useState(''),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState('');
+    [error, setError] = useState(''), [compatibility,setCompatibility]=useState('');
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
     setError('');
     try {
       await fn();
     } catch (e) {
-      setError((e as Error).message);
+      setError(agentCapabilityError(e));
     } finally {
       setBusy(false);
     }
   };
   const refresh = async () => {
-    setCatalog(appCatalogSchema.parse(await agentRead(() => call('applications.list'))));
-    {
-      const p = appPolicySchema.parse(await agentRead(() => call('applications.policy')));
+    const results = await Promise.allSettled([
+      agentRead(() => call('applications.list')).then(v=>appCatalogSchema.parse(v)),
+      agentRead(() => call('applications.policy')).then(v=>appPolicySchema.parse(v)),
+    ]);
+    setCatalog(results[0].status==='fulfilled'?results[0].value:undefined);
+    if(results[1].status==='fulfilled') {
+      const p = results[1].value;
       setPolicy(p);
       setControllers(p.controllers.join('\n'));
-    }
+    } else setPolicy(undefined);
+    const failures=results.filter(r=>r.status==='rejected').map(r=>agentCapabilityError(r.reason));
+    setCompatibility(failures.includes(agentCompatibilityNotice)?agentCompatibilityNotice:'');
+    setError([...new Set(failures.filter(message=>message!==agentCompatibilityNotice))].join(' '));
   };
   useEffect(() => {
     void run(refresh);
@@ -95,6 +104,7 @@ export function AgentApplications({
         </p>
       </header>
       <div hidden={detail}>
+        {target.id.startsWith('ssh:')&&<SshApplicationMarket key={target.id} sessionId={target.id.slice(4)} name={target.name}/>}
         <DevelopmentMarket
           call={call}
           onOpen={onDevelopmentOpen}
@@ -113,9 +123,10 @@ export function AgentApplications({
       {error && (
         <ErrorNotice title="应用操作未完成" error={error} />
       )}
+      {compatibility&&<p role="status">{compatibility}</p>}
       {busy && <p role="status">正在处理应用操作…</p>}
       <div className="machine-app-catalog">
-        {policy && !detail && (
+        {policy && !detail && !target.id.startsWith('ssh:') && (
           <details className="machine-app-permissions">
             <summary>应用安装权限</summary>
             <label>

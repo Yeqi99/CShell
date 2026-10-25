@@ -1,0 +1,31 @@
+.rdp-install-guide {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 680px;
+  padding: 24px clamp(16px, 4%, 32px);
+  margin: 0 auto;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.65;
+}
+.rdp-install-guide > header { display: flex; align-items: flex-start; gap: 14px; }
+.rdp-install-guide h2 { margin: 0; font-size: 20px; line-height: 1.4; }
+.rdp-install-guide header p { margin: 6px 0 0; overflow-wrap: anywhere; }
+.rdp-install-guide header span:not(.rdp-install-icon) { color: var(--muted); }
+.rdp-install-icon { display: grid; place-items: center; flex: 0 0 44px; height: 44px; border-radius: 12px; background: color-mix(in srgb, var(--accent) 10%, var(--panel)); color: var(--accent); }
+.rdp-install-intro { color: var(--muted); margin: 16px 0 24px; }
+.rdp-install-steps { list-style: none; counter-reset: installation; padding: 0; margin: 0; }
+.rdp-install-steps > li { display: flex; gap: 14px; counter-increment: installation; margin-bottom: 22px; }
+.rdp-install-steps > li::before { content: counter(installation); flex: 0 0 27px; height: 27px; border-radius: 50%; background: var(--hover); color: var(--accent); display: grid; place-items: center; font-size: 12px; font-weight: 600; }
+.rdp-install-steps > li > div { min-width: 0; flex: 1; }
+.rdp-install-steps h3 { font-size: 14px; margin: 1px 0 5px; }
+.rdp-install-steps p { margin: 5px 0 10px; }
+.rdp-install-guide button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 34px; padding: 7px 12px; border: 1px solid var(--border); border-radius: 7px; color: var(--text); background: var(--panel); font: inherit; font-size: 13px; }
+.rdp-install-guide button svg { flex-shrink: 0; }
+.rdp-install-guide button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.rdp-install-guide button:disabled { opacity: .6; }
+.rdp-install-download { display: flex; align-items: flex-start; flex-direction: column; gap: 10px; padding: 12px; border-radius: 9px; background: var(--hover); margin: 12px 0 7px; }
+.rdp-install-download code { overflow-wrap: anywhere; font-size: 12px; user-select: text; }
+.rdp-install-guide .rdp-install-link { border: 0; background: transparent; color: var(--accent); padding-left: 0; }
+.rdp-install-guide .rdp-install-note { color: var(--muted); font-size: 12px; }
+.rdp-install-status { color: var(--accent); }

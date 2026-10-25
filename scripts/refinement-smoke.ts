@@ -126,7 +126,12 @@ try {
   await form.getByLabel('用户名').fill('tester');
   await form.locator('.connection-secret input').fill(server.password);
   await form.getByRole('button', { name: '连接', exact: true }).click();
+  await page.locator('.terminals:visible .xterm-helper-textarea:visible').waitFor();
+  assert.equal(await page.locator('.linux-desktop:visible').count(),0);
+  assert.equal((await page.evaluate(()=>window.cshell.config())).preferences.defaultConnectionView,'original');
+  const shellCount=server.shellRequests();await page.getByRole('button',{name:'打开可视化桌面',exact:true}).click();
   await page.locator('.linux-desktop:visible .desktop-icons').getByRole('button',{name:'文件',exact:true}).dblclick();
+  assert.equal(server.shellRequests(),shellCount);
   await page.locator('.metric-cpu strong').getByText('10%', { exact: true }).waitFor();
   const before = await page.locator('.compact-monitor').boundingBox();
   await page.locator('.compact-monitor > header').getByRole('button', { name: '重试' }).click();

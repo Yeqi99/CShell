@@ -5,7 +5,7 @@ import {IdeService} from './ide';
 import {AgentBrowserNetwork} from './browser-network';
 import {CodingService} from './coding';
 import {LinuxVisualApps} from './linux-visual-apps';
-import {loadPrivateWechat} from '../core/custom-extensions';
+import {loadPrivateWechat,loadProcessExtensions} from '../core/custom-extensions';
 import {AgentFiles} from './files';
 import {AgentUpdater} from './update';
 import {startupState,setStartup} from './startup';
@@ -32,6 +32,8 @@ import { CagentAssistant } from './assistant';
 import { CapabilityRuntime } from './capability-runtime';
 import { createDesktopCapability } from './desktop-capability';
 import { version as agentVersion } from '../../package.json';
+import { agentMethods } from '../shared/agent';
+import { SafeAgentUpdate } from './safe-update';
 
 const legacySchema = z
   .object({
@@ -81,6 +83,11 @@ async function finishLegacyImport(vault: ClientVault, input: z.infer<typeof lega
 export async function createAgentRuntime(
   options: { directory?: string; terminal?: AgentTerminalProvider; onClose?:()=>void; desktopExecutable?:string; extraPackages?:ConstructorParameters<typeof CapabilityRuntime>[0]['extraPackages'] } = {},
 ) {
+  let updateCommitToken=process.env.CSHELL_AGENT_UPDATE_COMMIT;
+  delete process.env.CSHELL_AGENT_UPDATE_COMMIT;
+  if(updateCommitToken&&!/^[a-f0-9]{64}$/.test(updateCommitToken))throw Error('更新启动凭据无效');
+  let updateAdmissionClosed=!!updateCommitToken;
+  let activeDispatches=0, queuedMutations=0;
   const files=new AgentFiles();
   const visual=new LinuxVisualApps();
   const directory = options.directory ?? agentDirectory(); const updater=new AgentUpdater(directory,agentVersion);
@@ -100,6 +107,7 @@ export async function createAgentRuntime(
   }
   let server: ClientServer;
   const terminal = options.terminal ?? new AgentTerminalProvider((event) => server.event(event));
+  terminal.setUpdateGuard(()=>updateAdmissionClosed);
   const shells = async () =>
     (await terminal.shells()).map((s) => ({
       shell: s.environment === 'wsl' ? 'wsl' : s.id,
@@ -109,7 +117,7 @@ export async function createAgentRuntime(
   server = new ClientServer(vault, terminal, {
     http:(request,signal)=>accountNetwork.http(request,signal),
     manage: (method, params, signal, owner) => dispatch(method, params, signal, false, owner),
-    desktopStream: (socket,owner) => desktop.service.acceptAuthenticated(socket,owner),
+    desktopStream: async (socket,owner) => {if(updateAdmissionClosed){socket.destroy();return;}await desktop.service.acceptAuthenticated(socket,owner);},
     shells,
     execute: (input, signal) => terminal.execute(input, signal),
   });
@@ -118,11 +126,23 @@ export async function createAgentRuntime(
     server.managementAllowed(owner));
   await applications.load();
   const desktopIdentity=server.status().deviceId;
-  const desktop=await createDesktopCapability({identity:desktopIdentity,nativeExecutable:options.desktopExecutable??join(dirname(resolve(process.argv[1]??process.execPath)),'cagent-desktop.exe'),vault,authorize:owner=>server.status().deviceId===desktopIdentity&&(owner==='local'||server.managementAllowed(owner))});
+  const desktop=await createDesktopCapability({identity:desktopIdentity,nativeExecutable:options.desktopExecutable??join(dirname(resolve(process.argv[1]??process.execPath)),'cagent-desktop.exe'),vault,authorize:owner=>!updateAdmissionClosed&&server.status().deviceId===desktopIdentity&&(owner==='local'||server.managementAllowed(owner))});
   const privateWechat=await loadPrivateWechat();
   const wechat=privateWechat ? await privateWechat.module.createWechatCapability({directory,runtime:privateWechat.runtime,authorize:owner=>owner==='local'||server.managementAllowed(owner)}) : undefined;
-  const packages=new CapabilityRuntime({directory,vault,applications,agentVersion,extraPackages:[...desktop.extraPackages,...(wechat?.extraPackages??[]),...options.extraPackages??[]]});
+  const customProcesses=await loadProcessExtensions(undefined,id=>process.stderr.write(`CAgent: custom extension ${id} failed verification; reinstall its package.\n`));
+  const packages=new CapabilityRuntime({directory,vault,applications,agentVersion,extraPackages:[...desktop.extraPackages,...(wechat?.extraPackages??[]),...customProcesses,...options.extraPackages??[]]});
   await packages.load();
+  const processProvisioned=await vault.read('process-provisioned',z.record(z.string(),z.string()))??{};
+  for(const pack of customProcesses){
+    // Import stages bytes; separate grants are required. Do not undo explicit uninstalls.
+    const token=`${pack.entry.manifestSha256}:${pack.installToken}`;
+    if(processProvisioned[pack.entry.id]!==token){
+      if(packages.list().some(item=>item.id===pack.entry.id))await packages.grant({id:pack.entry.id,permissions:[]});
+      await packages.install({id:pack.entry.id,confirm:true});
+      processProvisioned[pack.entry.id]=token;
+    }
+  }
+  await vault.write('process-provisioned',processProvisioned);
   if(wechat&&!(await vault.read('wechat-private-provisioned',z.boolean()))){
     if(!packages.list().some(item=>item.id==='cagent.wechat'))await packages.install({id:'cagent.wechat',confirm:true});
     await vault.write('wechat-private-provisioned',true);
@@ -157,7 +177,7 @@ export async function createAgentRuntime(
   const coding=new CodingService(vault,directory,owner=>owner==='local'||(server.managementAllowed(owner)&&server.status().peers.some(p=>p.fingerprint===owner&&p.shells.some(s=>server.status().allowedShells?.includes(s)))));
   await coding.load();
   const ide=new IdeService(vault,directory,owner=>owner==='local'||server.managementAllowed(owner));await ide.load();
-  const accountNetwork=new AccountNetwork(account,new ClientVault(join(directory,'account-network'),codec));await accountNetwork.load();terminal.networkEnvironment=()=>accountNetwork.environment();
+  const accountNetwork=new AccountNetwork(account,new ClientVault(join(directory,'account-network'),codec));accountNetwork.setUpdateGuard(()=>updateAdmissionClosed);await accountNetwork.load();terminal.networkEnvironment=()=>accountNetwork.environment();
   const browserNetwork=new AgentBrowserNetwork(owner=>owner==='local'||server.browserAllowed(owner),(host,port)=>accountNetwork.open(host,port));
   const hosting = new HostingService(join(directory, 'hosting'));
   await hosting.load();
@@ -165,8 +185,16 @@ export async function createAgentRuntime(
   await relay.load();
   const reverseRelay = new AgentReverseRelayService({ vault });
   await reverseRelay.load();
+  const resumeUpdateServices=async()=>{
+    const resume=await vault.read('update-resume-services',z.object({relay:z.boolean(),reverse:z.boolean()}).strict().nullable());
+    if(!resume)return;
+    if(resume.relay)await relay.start();
+    if(resume.reverse)await reverseRelay.start();
+    await vault.write('update-resume-services',null);
+  };
+  if(!updateCommitToken)await resumeUpdateServices().catch(()=>{});
   const accountReverse=new AgentReverseRelayService({vault:new ClientVault(join(directory,'account-transport'),codec)});await accountReverse.load();let accountRelayStamp='';
-  account.setTransport({deviceId:()=>server.status().deviceId,enroll:async()=>{let state=server.status();if(!state.passwordConfigured){await server.setAccess({password:randomBytes(32).toString('hex'),shells:[...new Set((await shells()).map(s=>s.shell))],allowManage:true,allowHttp:true,allowHosting:true,allowRelay:true});state=server.status();}if(!state.running)await server.start({bind:'127.0.0.1',port:state.port??22443});const info=JSON.parse(server.connectionInfo('127.0.0.1'));return {deviceId:info.deviceId,name:info.name,certificate:info.certificate,accountPassword:await server.revealPassword()};},start:async relay=>{const stamp=JSON.stringify(relay);if(accountRelayStamp===stamp&&accountReverse.status().running)return;await accountReverse.configure({enabled:true,relay,localHost:'127.0.0.1',localPort:server.status().port});await accountReverse.start();accountRelayStamp=stamp;},stop:async()=>{await accountReverse.stop();}});await account.load();
+  account.setUpdateGuard(()=>updateAdmissionClosed);account.setTransport({deviceId:()=>server.status().deviceId,enroll:async()=>{let state=server.status();if(!state.passwordConfigured){await server.setAccess({password:randomBytes(32).toString('hex'),shells:[...new Set((await shells()).map(s=>s.shell))],allowManage:true,allowHttp:true,allowHosting:true,allowRelay:true});state=server.status();}if(!state.running)await server.start({bind:'127.0.0.1',port:state.port??22443});const info=JSON.parse(server.connectionInfo('127.0.0.1'));return {deviceId:info.deviceId,name:info.name,certificate:info.certificate,accountPassword:await server.revealPassword()};},start:async relay=>{const stamp=JSON.stringify(relay);if(accountRelayStamp===stamp&&accountReverse.status().running)return;await accountReverse.configure({enabled:true,relay,localHost:'127.0.0.1',localPort:server.status().port});await accountReverse.start();accountRelayStamp=stamp;},stop:async()=>{await accountReverse.stop();}});await account.load();
   const wsl = new AgentWslService(vault);
   await wsl.load();
   const wslNetwork = new WslNetworkSettings();
@@ -190,24 +218,40 @@ export async function createAgentRuntime(
   let networkProbes = 0;
   let mutation = Promise.resolve<unknown>(undefined);
   const serialized = (action: () => Promise<unknown>) => {
+    queuedMutations++;
     const current = mutation.then(action);
-    mutation = current.catch(() => {});
+    mutation = current.finally(()=>queuedMutations--).catch(() => {});
     return current;
   };
-  let installingUpdate = false;
+  const updateActivity=()=>({
+    operations:activeDispatches,mutations:queuedMutations,terminals:terminal.activity,
+    assistant:assistant.activity,coding:coding.activity,ide:ide.activity,applications:applications.activity,
+    uploads:files.activity,browser:browserNetwork.activity,visual:visual.activity,desktop:desktop.service.activity,
+    capabilities:packages.activity,wsl:wsl.activity,hosting:hosting.list().filter(s=>s.running).length,
+    relay:relay.status().activeConnections,reverseRelay:reverseRelay.status().activeConnections,
+    // An external extension does not expose a provable idle contract yet.
+    externalExtensions:wechat?1:0,
+    account:account.activity,accountNetwork:accountNetwork.activity,accountRelay:accountReverse.status().activeConnections,
+    peers:server.status().peers.reduce((sum,peer)=>sum+peer.connected,0),
+  });
+  const safeUpdate=new SafeAgentUpdate({available:()=>updater.status(),activity:updateActivity,
+    prepare:()=>updater.prepareInstall(server.status().deviceId),admission:value=>{updateAdmissionClosed=value;},shutdown:async()=>{await vault.write('update-resume-services',{relay:relay.status().running,reverse:reverseRelay.status().running});await close();}});
   async function installRuntimeUpdate(params: unknown) {
     z.object({ confirm: z.literal(true) }).strict().parse(params);
-    if (installingUpdate) throw Error('正在安装更新');
-    installingUpdate = true;
-    try {
-      const plan = await updater.prepareInstall();
-      setTimeout(() => { void close().then(() => plan.commit()).catch(async error => {
-        await plan.cancel(); console.error('CAgent update failed', error);
-      }); }, 250);
-      return { installing: true };
-    } catch (error) { installingUpdate = false; throw error; }
+    await updater.verify();
+    setTimeout(()=>void safeUpdate.request(),250).unref();
+    return { queued:true,installing:false,protocol:1,message:'更新已准备，将在当前任务结束并空闲后自动完成。' };
   }
   async function dispatch(
+    method: string,params: unknown,signal = new AbortController().signal,local = true,owner = 'local',
+  ): Promise<unknown> {
+    if(closed)throw Error('Agent 已关闭');
+    if(updateAdmissionClosed&&!['client.status','update.status','update.commit','agent.shutdown'].includes(method))throw Error('CAgent 正在完成更新，请稍后重试');
+    const tracked=!['client.status','update.status','update.install','update.commit','update.check','update.download','update.settings','update.verify','agent.shutdown'].includes(method);
+    if(tracked)activeDispatches++;
+    try{return await dispatchOperation(method,params,signal,local,owner);}finally{if(tracked)activeDispatches--;}
+  }
+  async function dispatchOperation(
     method: string,
     params: unknown,
     signal = new AbortController().signal,
@@ -217,7 +261,24 @@ export async function createAgentRuntime(
     signal.throwIfAborted();
     if (closed) throw new Error('Agent 已关闭');
     if(method.startsWith('account.')){if(!local)throw Error('账号操作仅允许本机执行');return account.call(method,params);}
-    if(method.startsWith('update.')){if(!local)throw new Error('更新只允许在本机执行');if(method==='update.settings')return updater.settings(z.object({automatic:z.boolean().optional()}).parse(params??{}).automatic);if(method==='update.check')return updater.check();if(method==='update.download')return updater.start();if(method==='update.status')return updater.status();if(method==='update.verify')return updater.verify();if(method==='update.install')return installRuntimeUpdate(params);throw new Error('未知更新操作');}
+    if(method.startsWith('update.')){
+      if(!local)throw new Error('更新只允许在本机执行');
+      if(method==='update.commit'){
+        const input=z.object({token:z.string().regex(/^[a-f0-9]{64}$/)}).strict().parse(params);
+        if(!updateCommitToken||input.token!==updateCommitToken)throw Error('更新启动凭据不匹配');
+        await resumeUpdateServices();
+        updateCommitToken=undefined;updateAdmissionClosed=false;
+        if(updateCommitDeadline)clearTimeout(updateCommitDeadline);
+        safeUpdate.start();return{committed:true,deviceId:server.status().deviceId,agentVersion};
+      }
+      if(method==='update.settings')return updater.settings(z.object({automatic:z.boolean().optional()}).parse(params??{}).automatic);
+      if(method==='update.check')return updater.check();
+      if(method==='update.download')return updater.start();
+      if(method==='update.status')return {...updater.status(),coordination:safeUpdate.status()};
+      if(method==='update.verify')return updater.verify();
+      if(method==='update.install')return installRuntimeUpdate(params);
+      throw new Error('未知更新操作');
+    }
     const admin=local || (owner!=='local' && server.managementAllowed(owner));
     if(method==='network.status')return accountNetwork.status();
     if(method==='network.configure')return accountNetwork.configure(params);
@@ -313,6 +374,7 @@ export async function createAgentRuntime(
     if (method === 'client.status')
       return {
         ...server.status(),
+        agentVersion,methods:[...agentMethods],updateProtocol:1,updatePendingCommit:!!updateCommitToken,activity:updateActivity(),
         canImportLegacy: local && canImportLegacy,
         platform: process.platform,
         interfaces: [
@@ -365,7 +427,6 @@ export async function createAgentRuntime(
     return serialized(async () => {
       signal.throwIfAborted();
       if (closed) throw new Error('Agent 已关闭');
-    if(method.startsWith('update.')){if(!local)throw new Error('更新只允许在本机执行');if(method==='update.settings')return updater.settings(z.object({automatic:z.boolean().optional()}).parse(params??{}).automatic);if(method==='update.check')return updater.check();if(method==='update.download')return updater.start();if(method==='update.status')return updater.status();if(method==='update.verify')return updater.verify();if(method==='update.install')return installRuntimeUpdate(params);throw new Error('未知更新操作');}
       if (method === 'applications.configure') {
         if (!admin) throw new Error('未授权管理应用安装');
         const result = await applications.configure(params);
@@ -538,31 +599,21 @@ export async function createAgentRuntime(
       throw new Error('不支持的 Agent 管理操作');
     });
   }
+  let updateCommitDeadline:ReturnType<typeof setTimeout>|undefined;
   async function close() {
     if (closed) return;
-    closed = true; updater.close();
-    await visual.dispose();
-    await files.close();
-    await accountNetwork.close();
-    browserNetwork.close();
-    await coding.close();
-    ide.close();
-    await account.close();
-    await assistant.close();
-    await control?.close();
-    await mutation;
-    await packages.dispose();
-    await wechat?.shutdown();
-    await desktop.shutdown();
-    await applications.dispose();
-    await wsl.dispose();
-    await hosting.dispose();
-    await reverseRelay.stop();
-    await relay.stop();
-    await server.stop();
-    await terminal.dispose();
-    await vault.flush();
-    options.onClose?.();
+    closed = true;
+    if(updateCommitDeadline)clearTimeout(updateCommitDeadline);
+    safeUpdate.close();
+    updater.close();
+    const failures:unknown[]=[];
+    // A failed optional service must not leave the authenticated control socket
+    // or listener half alive when an update needs to restore the old runtime.
+    for(const stop of [()=>visual.dispose(),()=>files.close(),()=>accountNetwork.close(),()=>account.close(),()=>accountReverse.stop(),()=>browserNetwork.close(),()=>coding.close(),()=>ide.close(),
+      ()=>assistant.close(),()=>control?.close(),()=>mutation,()=>packages.dispose(),()=>wechat?.shutdown(),()=>desktop.shutdown(),
+      ()=>applications.dispose(),()=>wsl.dispose(),()=>hosting.dispose(),()=>reverseRelay.stop(),()=>relay.stop(),()=>server.stop(),
+      ()=>terminal.dispose(),()=>vault.flush(),()=>options.onClose?.()])try{await stop();}catch(error){failures.push(error);}
+    if(failures.length)throw new AggregateError(failures,'部分后台服务清理失败');
   }
   return {
     server,
@@ -574,6 +625,8 @@ export async function createAgentRuntime(
       // Shutdown may arrive while the discovery file is being protected.
       if (closed) { await control.close(); return; }
       await updater.initialize();
+      if(!updateCommitToken)safeUpdate.start();
+      else updateCommitDeadline=setTimeout(()=>void close().catch(()=>{}),60000);
     },
     close,
     directory,

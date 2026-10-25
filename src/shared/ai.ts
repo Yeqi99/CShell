@@ -6,6 +6,10 @@ export const aiCapabilities = [
   'files.create',
   'commands.execute',
   'http.send',
+  'browser.read',
+  'browser.control',
+  'desktop.view',
+  'desktop.control',
   'agent.manage',
   'agent.hosting',
   'agent.relay',
@@ -92,7 +96,7 @@ export type AiMessage = {
   content: string;
   time: number;
   eventGenerated?: boolean;
-  tool?: { name: string; input: string; output: string; target?: string };
+  tool?: { name: string; input: string; output: string; target?: string; image?: import('./ai-images').AiImageReference; imageRejected?: boolean };
 };
 export type AiThread = {
   checkpoint?: import('./agent-continuity').AgentCheckpoint;

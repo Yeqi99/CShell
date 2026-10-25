@@ -9,6 +9,13 @@ const relativeFile = z.string().min(1).max(240).refine(value => {
   return value.split('/').every(part => part !== '' && part !== '.' && part !== '..' && !/[. ]$/.test(part) && !/^(con|prn|aux|nul|com[0-9]|lpt[0-9])(?:\.|$)/i.test(part));
 }, 'Expected a portable package-relative file path');
 const schema = z.object({ type: z.literal('object'), properties: z.record(z.string(), z.unknown()).default({}), required: z.array(z.string()).max(100).optional(), additionalProperties: z.boolean().optional() }).passthrough();
+/** Executed only by a host-created adapter. This is process isolation, not an OS sandbox. */
+export const capabilityProcessSchema = z.object({
+  protocol: z.literal('node-json-stdio-1'), entry: relativeFile,
+  timeoutMs: z.number().int().min(100).max(120000).default(30000),
+  maxOutputBytes: z.number().int().min(1024).max(1048576).default(262144),
+  maxConcurrency: z.number().int().min(1).max(4).default(1),
+}).strict();
 export const agentCapabilityManifestSchema = z.object({
   protocol: z.literal(1), id: name, name: z.string().min(1).max(80), version,
   license: z.literal('MIT'), description: z.string().max(1000),
@@ -23,6 +30,7 @@ export const agentCapabilityManifestSchema = z.object({
     agentVersion: capabilityVersionRangeSchema,
   }).strict(),
   adapterId: name,
+  process: capabilityProcessSchema.optional(),
   systemApplication: z.object({ id: name, version: capabilityVersionRangeSchema }).strict().optional(),
   files: z.array(z.object({ path: relativeFile, sha256: z.string().regex(/^[a-f0-9]{64}$/), bytes: z.number().int().min(0).max(2 ** 31) }).strict()).min(1).max(128),
   permissions: z.array(name).max(64),
@@ -34,6 +42,10 @@ export const agentCapabilityManifestSchema = z.object({
   const duplicate = (values: string[]) => new Set(values).size !== values.length;
   if (duplicate(manifest.files.map(file => file.path.toLowerCase())) || duplicate(manifest.permissions) || duplicate(manifest.tools.map(tool => tool.id)) || duplicate(manifest.events.map(event => event.id))) ctx.addIssue({ code: 'custom', message: 'Duplicate file, permission, tool or event ID' });
   for (const capability of [...manifest.tools, ...manifest.events]) if (capability.permissions.some(permission => !manifest.permissions.includes(permission))) ctx.addIssue({ code: 'custom', message: 'Capability references an undeclared permission' });
+  if (manifest.process) {
+    if (!/\.(?:cjs|mjs|js)$/.test(manifest.process.entry) || !manifest.files.some(file => file.path === manifest.process!.entry)) ctx.addIssue({ code: 'custom', path: ['process', 'entry'], message: 'Process entry must be a declared JavaScript file' });
+    if (manifest.events.length || manifest.tools.some(tool => !tool.permissions.includes('extension.execute')) || !manifest.permissions.includes('extension.execute')) ctx.addIssue({ code: 'custom', message: 'Process tools require explicit extension.execute authorization; process events are unsupported' });
+  }
 });
 export type AgentCapabilityManifest = z.infer<typeof agentCapabilityManifestSchema>;
 export type CapabilityPackageStatus = 'not-installed' | 'not-configured' | 'authorization-required' | 'available' | 'incompatible' | 'fault';

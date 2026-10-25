@@ -97,6 +97,20 @@ export function registerExtensionHandlers(
     if(existing?.enabled)throw new Error('请先停用此扩展，再导入更新，已有配置会保留');
     const manifest=await installCustomExtension(pending.pack);
     await store.setPlugins([...store.plugins().filter(p=>p.manifest.id!==manifest.id),{manifest,enabled:false,source:'custom:'+pending.pack.sha256}]);
+    await services?.processExtensions?.refresh();
+  });
+  handle('plugins:process-status', () => services?.processExtensions?.list() ?? []);
+  handle('plugins:process-authorize', async (id: unknown, allowed: unknown) => {
+    const value=pluginId.parse(id),grant=z.boolean().parse(allowed),plugin=store.plugins().find(item=>item.manifest.id===value);
+    if(!plugin?.enabled||plugin.manifest.provider!=='process'||!plugin.manifest.capability||!services?.processExtensions)throw new Error('请选择已启用的独立进程扩展');
+    if(grant){
+      const zh=store.snapshot().preferences.locale==='zh-CN';
+      const result=await dialog.showMessageBox(window,{type:'warning',message:zh?`允许 ${plugin.manifest.name} 在此电脑运行？`:`Allow ${plugin.manifest.name} to run on this computer?`,detail:zh?'扩展以当前系统用户身份执行代码，可访问该用户的文件与网络。独立进程不等于安全沙箱。请仅授权可信来源；安装和启用均不会自动授权。': 'The extension runs as your OS user and can access that user’s files and network. A separate process is not a security sandbox. Installation and enabling do not grant execution permission.',buttons:[zh?'取消':'Cancel',zh?'授权运行':'Allow execution'],defaultId:0,cancelId:0});
+      if(result.response!==1)return services.processExtensions.list();
+      // Recheck the installed identity after the asynchronous approval.
+      if(JSON.stringify(store.plugins().find(item=>item.manifest.id===value))!==JSON.stringify(plugin))throw new Error('扩展状态已变化，请重新打开授权');
+    }
+    return services.processExtensions.authorize(value,grant?plugin.manifest.capability.permissions:[]);
   });
   handle('plugins:list', () => store.plugins());
   handle('plugins:install', (id) => plugins.install(pluginId.parse(id)));
@@ -105,13 +119,13 @@ export function registerExtensionHandlers(
     z.boolean().parse(enabled);
     if (!enabled) await beforeDisable?.(id);
     if (!enabled && id === 'cshell.conda') environments.stopAllJupyter();
-    return plugins.toggle(id, enabled);
+    await plugins.toggle(id, enabled); await services?.processExtensions?.refresh();
   });
   handle('plugins:remove', async (id) => {
     pluginId.parse(id);
     await beforeDisable?.(id);
     if (id === 'cshell.conda') environments.stopAllJupyter();
-    return plugins.remove(id);
+    await plugins.remove(id); await services?.processExtensions?.refresh();
   });
   handle('plugins:source', () => store.pluginSource());
   handle('plugins:catalog', (url) => plugins.catalog(z.string().max(2048).parse(url)));

@@ -3,7 +3,7 @@ import { PythonEditor } from './PythonEditor';
 import { pluginEnabled } from '../../shared/plugins';
 import './text-file-editor.css';
 
-export function TextFileEditor({ sessionId, path, realtime = false }: { sessionId: string; path: string; realtime?: boolean }) {
+export function TextFileEditor({ sessionId, path, realtime = false, closed = false, disableEnvironment = false }: { sessionId: string; path: string; realtime?: boolean; closed?: boolean; disableEnvironment?: boolean }) {
   const [mode, setMode] = useState<'text' | 'shell' | 'python'>(/\.(sh|bash|zsh)$/.test(path) ? 'shell' : 'text');
   const [enabled, setEnabled] = useState(false);
   const [interpreters, setInterpreters] = useState<string[]>([]);
@@ -15,6 +15,7 @@ export function TextFileEditor({ sessionId, path, realtime = false }: { sessionI
     if (event.type === 'closed' && event.sessionId === sessionId) setConnected(false);
   }), [sessionId]);
   useEffect(() => {
+    if (disableEnvironment || closed) { setEnabled(false); return; }
     let cancelled = false;
     void window.cshell.plugins().then(async plugins => {
       if (cancelled) return;
@@ -29,7 +30,7 @@ export function TextFileEditor({ sessionId, path, realtime = false }: { sessionI
       setPython(choices.find(p => p.startsWith(directory + '/.venv/')) || choices.find(p => /\/(?:\.venv|venv|env)\/bin\/python$/.test(p)) || snapshot.python || choices[0] || '');
     }).catch(e => { if (!cancelled) setError(String(e)); });
     return () => { cancelled = true; };
-  }, [sessionId, path]);
+  }, [sessionId, path, disableEnvironment, closed]);
   return <section className={'text-file-editor' + (expanded ? ' expanded' : '')}>
     <div className="text-editor-options">
       <button onClick={() => setExpanded(value => !value)}>{expanded ? '还原编辑区' : '展开编辑区'}</button>
@@ -42,7 +43,7 @@ export function TextFileEditor({ sessionId, path, realtime = false }: { sessionI
       </select></label>}
     </div>
     {error && <p role="alert">{error}</p>}
-    <PythonEditor sessionId={sessionId} path={path} python={mode === 'python' ? python : ''} connected={connected}
+    <PythonEditor sessionId={sessionId} path={path} python={!disableEnvironment && mode === 'python' ? python : ''} connected={connected && !closed}
       textFile initialRealtime={realtime} languageMode={mode} onDependency={() => window.dispatchEvent(new Event('cshell:open-extensions'))}/>
   </section>;
 }

@@ -1,0 +1,137 @@
+.agent-model-menu-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  color: inherit;
+  font-size: inherit;
+  text-align: left;
+}
+.agent-model-menu-trigger span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agent-model-menu-trigger svg {
+  flex: none;
+  transform: rotate(90deg);
+}
+.agent-model-menu {
+  position: fixed;
+  z-index: 1200;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 16px 48px #0b20352b;
+  font-size: 13px;
+}
+.agent-model-menu header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.agent-model-menu header strong {
+  flex: 1;
+}
+.agent-model-menu-list {
+  overflow: auto;
+  min-height: 0;
+  padding: 6px;
+}
+.agent-model-menu-list > button,
+.agent-model-menu-list section > button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  border-radius: 8px;
+}
+.agent-model-menu-list button:hover {
+  background: var(--hover);
+}
+.agent-model-menu-list button span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.agent-model-menu-list b {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.agent-model-menu small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.agent-model-menu-list h4 {
+  margin: 8px 10px 4px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+.agent-model-menu p {
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 8px 10px;
+  color: var(--muted);
+}
+.agent-model-menu-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 12px 4px;
+  color: var(--muted);
+}
+.agent-model-menu-search input {
+  width: 100%;
+  min-width: 0;
+  font: inherit;
+  border: 0;
+  background: transparent;
+  outline: none;
+  color: var(--text);
+}
+.agent-model-menu footer {
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 5px;
+}
+.agent-model-menu footer button {
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 3px 0;
+  color: var(--accent);
+  font: inherit;
+}
+.agent-model-menu-error {
+  color: var(--danger) !important;
+  max-height: 80px;
+  overflow: auto;
+}
+.agent-model-menu button:focus-visible,
+.agent-model-menu-trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.agent-model-menu-list section + section {
+  border-top: 1px solid var(--border);
+  margin-top: 6px;
+  padding-top: 4px;
+}

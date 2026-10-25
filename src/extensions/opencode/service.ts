@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import { z } from 'zod';
 import type { AiProviderExtension } from '../../core/ai-extension';
 import { readAiResponse } from '../../core/ai-response';
+import type { OfficialTransport } from './official-runtime';
 import { family, encodeRequest, normalizeResponse } from './protocol';
 const idSchema = z.string().regex(/^[A-Za-z0-9_-]{1,80}$/);
 const workspaceSchema = z
@@ -25,7 +26,7 @@ const legacySchema = z.object({
   key: z.string().max(16000).default(''),
   workspace: workspaceSchema,
 });
-const modelSchema = z.object({ id: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/) });
+const modelSchema = z.object({ id: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/), modalities:z.object({input:z.array(z.string().max(40)).max(16).optional()}).optional(),input_modalities:z.array(z.string().max(40)).max(16).optional() });
 const tierSchema = z.enum(['go', 'zen']);
 export function quotaWindows(raw: any) {
   return [
@@ -53,8 +54,8 @@ export function quotaWindows(raw: any) {
 export class OpenCodeExtension implements AiProviderExtension {
   readonly id = 'cshell.opencode';
   private config: z.infer<typeof configSchema> = { accounts: [] };
-  private cache = new Map<string, { at: number; models: { id: string; available: boolean }[] }>();
-  private modelRequests = new Map<string, Promise<{ id: string; available: boolean }[]>>();
+  private cache = new Map<string, { at: number; models: { id: string; available: boolean; imageInput?:boolean }[] }>();
+  private modelRequests = new Map<string, Promise<{ id: string; available: boolean; imageInput?:boolean }[]>>();
   private catalogFailures = new Set<string>();
   private catalogEpoch = 0;
   private rejectedModels = new Map<string, string>();
@@ -76,6 +77,8 @@ export class OpenCodeExtension implements AiProviderExtension {
   constructor(
     private host: {
       directory: string;
+      official?: OfficialTransport;
+      officialStatus?: () => {kind:'official';version:string;platformSupported:boolean;active:number};
       enabled: () => boolean;
       encrypt: (s: string) => Promise<string>;
       decrypt: (s: string) => Promise<string>;
@@ -289,7 +292,7 @@ export class OpenCodeExtension implements AiProviderExtension {
       .parse(await this.json(this.url(tier, 'v1/models')));
     const models = [...new Set(data.data.map((m) => m.id))]
       .sort()
-      .map((id) => ({ id, available: !!family(id) }));
+      .map((id) => {const entry=data.data.find(m=>m.id===id),modalities=entry?.modalities?.input??entry?.input_modalities;return { id, available: !!this.host.official || !!family(id),...(modalities?{imageInput:modalities.includes('image')}:{}) };});
     if (epoch !== this.catalogEpoch) throw Error('OpenCode 账号已同步，请重新加载模型目录');
     this.cache.set(tier, { at: Date.now(), models });
     const recovered = this.catalogFailures.delete(tier);
@@ -423,6 +426,7 @@ export class OpenCodeExtension implements AiProviderExtension {
     if (action === 'status') {
       const a = this.config.accounts.find((a) => a.id === 'default');
       return {
+        runtime: this.host.officialStatus?.() ?? {kind:'http'},
         hasKey: this.config.accounts.length > 0,
         workspace: a?.workspace ?? '',
         accounts: this.config.accounts.map(({ id, name, workspace, refreshToken, providerId }) => ({
@@ -484,6 +488,26 @@ export class OpenCodeExtension implements AiProviderExtension {
       const p = z.object({ tier: tierSchema, refresh: z.boolean().default(false) }).parse(input);
       return this.models(p.tier, p.refresh);
     }
+    if(action==='picker'){
+      const refresh=z.boolean().default(true).parse((input as any)?.refresh);
+      const accounts=[...this.config.accounts];
+      if(accounts.length)await Promise.allSettled((['go','zen'] as const).map(tier=>this.models(tier,refresh)));
+      // Discovery never creates providers or performs paid inference. An account
+      // must authenticate before its public catalog is offered for selection.
+      const results:any[]=new Array(accounts.length);let next=0;
+      await Promise.all(Array.from({length:Math.min(4,accounts.length)},async()=>{
+        for(;;){const index=next++;if(index>=accounts.length)return;const account=accounts[index];
+          const entry={id:account.id,name:account.name,providerId:account.providerId};
+          try{const key=await this.credential(account.id);await this.json('https://opencode.ai/console/api/v2/config',key);
+            if(this.account(account.id).key!==key)throw Error('账号已变化，请刷新模型');
+            const catalog=await this.call('catalog',{reference:`${account.id}/go/placeholder`,refresh:false});
+            results[index]={...entry,choices:catalog.choices,reason:catalog.choices.length?'':'模型目录暂不可用，请刷新重试'};
+          }catch(error){results[index]={...entry,choices:[],reason:/账号已变化|账号未配置/.test(String(error))?'账号已变化，请刷新模型':'暂时无法确认账号或模型目录，请检查网络、Key 或套餐后重试'};}
+        }
+      }));
+      // A cloud/account replacement during discovery must not expose stale rows.
+      return {accounts:results.filter((entry,index)=>this.config.accounts.some(a=>a.id===entry.id&&a.key===accounts[index].key)),checkedAt:Date.now()};
+    }
     if (action === 'choices' || action === 'catalog') {
       const p = this.reference(
         z
@@ -537,7 +561,7 @@ export class OpenCodeExtension implements AiProviderExtension {
         .object({
           id: idSchema.default('default'),
           tier: tierSchema,
-          model: modelSchema.shape.id.optional(),
+          model: modelSchema.shape.id,
         })
         .parse(input);
       const key = await this.credential(p.id);
@@ -545,12 +569,11 @@ export class OpenCodeExtension implements AiProviderExtension {
       await this.json('https://opencode.ai/console/api/v2/config', key);
       if (this.account(p.id).key !== key) throw Error('账号已变化，请重新检测');
       const models = await this.models(p.tier, true);
-      const model = p.model ?? models.find((m) => m.available)?.id;
-      if (!model) throw Error('当前目录没有可检测的模型');
+      const model = p.model;
       const provider = await this.resolve(`${p.id}/${p.tier}/${model}`, 'configuration-probe');
       const started = Date.now();
       const response = await provider.transport(provider.url, {
-        signal: AbortSignal.timeout(20000),
+        signal: AbortSignal.timeout(this.host.official ? 180000 : 20000),
         body: JSON.stringify({
           model,
           stream: false,
@@ -666,7 +689,7 @@ export class OpenCodeExtension implements AiProviderExtension {
             : kind === 'anthropic'
               ? 'anthropic/v1/messages'
               : `google/v1beta/models/${encodeURIComponent(model)}:${b.stream ? 'streamGenerateContent?alt=sse' : 'generateContent'}`;
-      const response = await this.network(this.url(tier, suffix), {
+      const response = this.host.official ? await this.host.official({tier, model, key, body:b, signal:init?.signal ?? undefined, guard:()=>{this.check();if(this.account(accountId).key!==key)throw Error('OpenCode 账号凭据已变化');}}) : await this.network(this.url(tier, suffix), {
         method: 'POST',
         redirect: 'error',
         signal: init?.signal,
@@ -706,8 +729,8 @@ export class OpenCodeExtension implements AiProviderExtension {
         throw Error(`OpenCode HTTP ${response.status}：${reason}`);
       }
       if (response.ok && this.rejectedModels.delete(ref)) this.host.changed?.();
-      return normalizeResponse(response, kind, !!b.stream);
+      return this.host.official ? response : normalizeResponse(response, kind, !!b.stream);
     };
-    return { url: 'https://model-extension.invalid', model, key: '', transport };
+    return { url: 'https://model-extension.invalid', model, key: '', transport, imageInput:listed.imageInput };
   }
 }

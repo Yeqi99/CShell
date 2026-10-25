@@ -4,6 +4,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 const exec = promisify(execFile);
 export type MachineSnapshot = {
+  source?: 'ssh';
   at: number; hostname: string; platform: string; release: string; arch: string; uptime: number;
   cpu: { model: string; mhz: number; user: number; sys: number; idle: number; total: number }[];
   memory: { total: number; free: number; available: number; cached?: number; buffers?: number; swapTotal?: number; swapFree?: number };

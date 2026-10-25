@@ -22,6 +22,14 @@ export class AccountNetwork {
   private timer?: NodeJS.Timeout;
   private pending = Promise.resolve();
   private closed = false;
+  private streams=new Set<Duplex>();
+  private opening=0;
+  private refreshing=0;
+  private updateGuard=()=>false;
+  setUpdateGuard(guard:()=>boolean){this.updateGuard=guard;}
+  get activity(){return this.streams.size+this.opening+this.refreshing;}
+  private admit(){if(this.closed||this.updateGuard())throw Error('CAgent 正在完成更新，请稍后重试');}
+  private track(stream:Duplex){this.streams.add(stream);stream.once('close',()=>this.streams.delete(stream));return stream;}
   constructor(
     private cloud: CagentCloud,
     private vault: ClientVault,
@@ -49,8 +57,10 @@ export class AccountNetwork {
     });
   }
   private refresh() {
+    if(this.closed||this.updateGuard())return this.pending;
     this.pending = this.pending.then(async () => {
-      if (this.closed) return;
+      if (this.closed||this.updateGuard()) return;
+      this.refreshing++;
       try {
         const result = await this.cloud.sync.accountRequest('/v1/network');
         const next =
@@ -76,7 +86,7 @@ export class AccountNetwork {
         this.transport?.close();
         this.transport = undefined;
         this.error = e instanceof Error ? e.message : '出口连接不可用';
-      }
+      }finally{this.refreshing--;}
     });
     return this.pending;
   }
@@ -115,11 +125,15 @@ export class AccountNetwork {
     };
   }
   private async forward(host: string, port: number): Promise<Duplex> {
+    this.admit();this.opening++;
+    try{return await this.forwardNow(host,port);}finally{this.opening--;}
+  }
+  private async forwardNow(host: string, port: number): Promise<Duplex> {
     if (!this.target || !this.ready) throw Error('所选网络出口不可用，已阻止回退本机网络');
     if (!this.transport) this.transport = await this.client.browserTransport(this.target);
     try {
       this.transport.validate();
-      return await agentBrowserStream(this.transport.call, host, port);
+      return this.track(await agentBrowserStream(this.transport.call, host, port));
     } catch (e) {
       this.transport.close();
       this.transport = undefined;
@@ -127,9 +141,10 @@ export class AccountNetwork {
     }
   }
   async open(host: string, port: number): Promise<Duplex> {
+    this.admit();
     if (this.target) return this.forward(host, port);
     return new Promise((resolve, reject) => {
-      const socket = connect({ host, port });
+      const socket = connect({ host, port });this.track(socket);
       const timer = setTimeout(() => socket.destroy(Error('连接超时')), 15000);
       socket.once('error', reject);
       socket.once('connect', () => {
@@ -140,12 +155,17 @@ export class AccountNetwork {
     });
   }
   async http(request: HttpWireRequest, signal: AbortSignal) {
+    this.admit();this.opening++;
+    try{return await this.httpNow(request,signal);}finally{this.opening--;}
+  }
+  private async httpNow(request: HttpWireRequest, signal: AbortSignal) {
     if (!this.target) return executeHttp(request, signal, undefined, 65536);
     if (!this.ready) throw Error('网络出口不可用，已阻止回退本机网络');
     return this.client.accountHttp(this.target, request, signal);
   }
   async close() {
     this.closed = true;
+    for(const stream of this.streams)stream.destroy();this.streams.clear();
     if (this.timer) clearInterval(this.timer);
     this.transport?.close();
     this.proxy?.close();

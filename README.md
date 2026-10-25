@@ -70,7 +70,7 @@ CShell 把远程机器变成可操作的工作区：连接后，从机器桌面�
 | 连接与机器管理 | [连接](docs/CONNECTION-PROVIDERS.md) · [CAgent](docs/CAGENT.md) |
 | 工作区 | [多机器视图](docs/MONITOR-VIEWS.md) · [文件编辑](docs/TEXT-EDITOR.md) |
 | 智能体 | [模型与任务](docs/AI.md) · [事件规则](docs/AI-EVENTS.md) · [OpenCode](docs/OPENCODE-EXTENSION.md) · [Tavily](docs/TAVILY-EXTENSION.md) |
-| 扩展与集成 | [插件](docs/PLUGINS.md) · [HTTP API](docs/API.md) · [MCP](docs/MCP.md) |
+| 扩展与集成 | [插件](docs/PLUGINS.md) · [HTTP API](docs/API.md) · [MCP](docs/MCP.md) · [命令台与 CLI](docs/CLI.md) |
 | 平台与构建 | [平台能力](docs/PLATFORMS.md) · [Android](android/README.md) · [依赖](docs/DEPENDENCIES.md) |
 
 详细技术文档目前主要使用中文；本页提供中文、英文和日文版本。

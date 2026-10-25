@@ -55,7 +55,9 @@ export async function protectPath(path: string, directory = false) {
     sid = stdout.match(/S-1-\d+(?:-\d+)+/)?.[0];
     if (!sid) throw new Error('无法核实本机用户身份');
   }
-  const script = `$ErrorActionPreference='Stop';[Console]::InputEncoding=[Text.UTF8Encoding]::new($false);[Console]::Out.WriteLine('CSHELL_ACL_START');$p=[Console]::In.ReadToEnd();$sid=[Security.Principal.SecurityIdentifier]::new('${sid}');$acl=[Security.AccessControl.${directory ? 'DirectorySecurity' : 'FileSecurity'}]::new();$acl.SetOwner($sid);$acl.SetAccessRuleProtection($true,$false);$acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($sid,[Security.AccessControl.FileSystemRights]::FullControl,${directory ? "[Security.AccessControl.InheritanceFlags]'ContainerInherit,ObjectInherit'" : '[Security.AccessControl.InheritanceFlags]::None'},[Security.AccessControl.PropagationFlags]::None,[Security.AccessControl.AccessControlType]::Allow));Set-Acl -LiteralPath $p -AclObject $acl;[Console]::Out.WriteLine('CSHELL_ACL_DONE')`;
+  // Apply the same protected owner-only descriptor through .NET directly.
+  // Set-Acl adds PowerShell provider/module startup to every private file write.
+  const script = `$ErrorActionPreference='Stop';[Console]::InputEncoding=[Text.UTF8Encoding]::new($false);[Console]::Out.WriteLine('CSHELL_ACL_START');$p=[Console]::In.ReadToEnd();$sid=[Security.Principal.SecurityIdentifier]::new('${sid}');$acl=[Security.AccessControl.${directory ? 'DirectorySecurity' : 'FileSecurity'}]::new();$acl.SetOwner($sid);$acl.SetAccessRuleProtection($true,$false);$acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($sid,[Security.AccessControl.FileSystemRights]::FullControl,${directory ? "[Security.AccessControl.InheritanceFlags]'ContainerInherit,ObjectInherit'" : '[Security.AccessControl.InheritanceFlags]::None'},[Security.AccessControl.PropagationFlags]::None,[Security.AccessControl.AccessControlType]::Allow));[IO.${directory ? 'Directory' : 'File'}]::SetAccessControl($p,$acl);[Console]::Out.WriteLine('CSHELL_ACL_DONE')`;
   await new Promise<void>((resolve, reject) => {
     const started = performance.now();
     let timedOut = false;

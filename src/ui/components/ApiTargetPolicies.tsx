@@ -17,6 +17,10 @@ export function ApiTargetPolicies({
   const { locale } = useI18n();
   const cn = locale === 'zh-CN';
   const labels: Record<string, string> = {
+    'browser.read': '读取浏览器页面与截图',
+    'browser.control': '操作浏览器（包括已登录网站）',
+    'desktop.view': '查看远程桌面',
+    'desktop.control': '远程桌面键鼠输入',
     'environments.read': '读取环境',
     'environments.manage': '修改环境',
     'applications.read': '应用安装计划',

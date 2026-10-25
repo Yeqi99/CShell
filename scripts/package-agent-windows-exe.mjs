@@ -42,6 +42,10 @@ Section "Install"
   \${GetOptions} $2 "/RESTART" $3
   IfErrors +2 0
     StrCpy $1 "-NoShortcuts -RefreshExistingShortcuts"
+  ClearErrors
+  \${GetOptions} $2 "/PREPARE" $3
+  IfErrors +2 0
+    StrCpy $1 "-NoLaunch -NoShortcuts -PrepareOnly"
   nsExec::ExecToLog '\"$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe\" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"$PLUGINSDIR\\deployment\\Install-CAgent.ps1\" -Destination \"$INSTDIR\" $1'
   Pop $0
   StrCmp $0 "0" success

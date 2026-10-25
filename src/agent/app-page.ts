@@ -64,13 +64,12 @@ $('check-app-update').onclick=action(async()=>{
  $('install-app-update').hidden=!result.available;
 });
 $('install-app-update').onclick=action(async()=>{
- if(!confirm('更新将保存记录并结束当前连接和任务，是否继续？'))return;
  const button=$('install-app-update');button.disabled=true;
  try{
   await api('update.download');let status;
   do{status=await api('update.status');$('app-update-status').textContent='下载并校验：'+(status.bytes||0)+' / '+(status.total||0)+' 字节';if(status.phase==='downloading')await new Promise(r=>setTimeout(r,700));}while(status.phase==='downloading');
   if(status.phase!=='ready')throw Error(status.error||'下载未完成');
-  await api('update.install',{confirm:true});$('app-update-status').textContent='正在更新，应用将重新打开。';
+  const result=await api('update.install',{confirm:true});$('app-update-status').textContent=result.message||'更新已准备，将在当前任务结束并空闲后自动完成。';
  }finally{button.disabled=false;}
 });
 Promise.all([settings(),refreshTasks(),apps(),machine(),api('applications.policy').then(p=>$('install-enabled').checked=p.enabled)]).catch(error);

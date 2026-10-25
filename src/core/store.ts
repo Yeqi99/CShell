@@ -300,7 +300,7 @@ export class Store {
       const ids = new Set(this.data.profiles.map(p => p.id));
       const accepted: typeof prepared = [];
       for (const value of prepared) {
-        if (!['ssh', 'rdp'].includes(value.profile.protocol ?? 'ssh')) throw new Error('此类型不能批量导入');
+        if (!['ssh', 'rdp', 'sftp', 'ftp', 'ftps'].includes(value.profile.protocol ?? 'ssh')) throw new Error('此类型不能批量导入');
         if (ids.has(value.profile.id)) throw new Error('连接标识已存在，请重新预览');
         ids.add(value.profile.id);
         const key = endpoint(value.profile);

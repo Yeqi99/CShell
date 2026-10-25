@@ -123,6 +123,7 @@ export class AgentApplicationService {
     stop: (reason: string) => void;
   };
   private writes = Promise.resolve();
+  get activity(){return this.planning.size+(this.active?1:0);}
   constructor(
     private vault: ClientVault,
     private permitted: (owner: string) => boolean,

@@ -18,7 +18,6 @@ test('download verifies bytes before exposing installer and rejects corruption',
  try{const updater=new AgentUpdater(directory,'0.6.19',globalThis.fetch);await updater.check();updater.start();while(updater.status().phase==='downloading')await new Promise(r=>setTimeout(r,10));assert.equal(updater.status().phase,'ready');assert.deepEqual(await readFile(updater.status().path),data);await updater.verify();await writeFile(updater.status().path,'tampered');await assert.rejects(()=>updater.verify(),/更新文件已改变/);corrupt=true;updater.start();while(updater.status().phase==='downloading')await new Promise(r=>setTimeout(r,10));assert.equal(updater.status().phase,'failed');assert.equal(updater.status().path,undefined);}finally{globalThis.fetch=original;await rm(directory,{recursive:true,force:true});}
 });
 
-
 test('closing updater aborts pending check and rejects subsequent work',{skip:process.platform!=='win32'},async()=>{
  const directory=await mkdtemp(join(tmpdir(),'cagent-update-close-')),original=globalThis.fetch;
  let signal:AbortSignal|undefined;
@@ -58,4 +57,21 @@ test('Unix CAgent update channels select only the exact operating system and arc
  assert.equal(selectUpdate([unix],'0.8.6','x64','linux'),undefined);
  assert.equal(selectUpdate([unix],'0.8.6','arm64','darwin'),undefined);
  assert.equal(selectUpdate([unix],'0.8.6','arm64','win32'),undefined);
+});
+
+test('automatic updates cool down a rolled-back version while explicit retry and a newer release remain available',{skip:process.platform!=='win32'||process.arch!=='x64'},async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'cagent-update-cooldown-'));
+ let downloads=0,currentRelease=release;
+ const request=(async(url:any)=>{if(String(url).endsWith('releases.json'))return new Response(JSON.stringify([currentRelease]));downloads++;return new Response(data);}) as typeof fetch;
+ const waitFor=async(updater:AgentUpdater,phase:string)=>{for(let i=0;i<200&&updater.status().phase!==phase;i++)await new Promise(r=>setTimeout(r,10));assert.equal(updater.status().phase,phase);};
+ let updater:AgentUpdater|undefined;
+ try{
+  await writeFile(join(directory,'update-result.json'),JSON.stringify({version:'0.6.20',state:'rollback-pending',at:Date.now()}));
+  updater=new AgentUpdater(directory,'0.6.19',request);await updater.initialize();await waitFor(updater,'deferred');assert.equal(downloads,0);assert.ok(updater.status().retryAt>Date.now());
+  await updater.check();updater.start();await waitFor(updater,'ready');assert.equal(downloads,1);updater.close();
+  currentRelease={assets:[{...release.assets[0],name:'CAgent-Setup-0.6.21-win-x64.exe',browser_download_url:'https://shell.canp.ai/downloads/opensource/v0.6.21/CAgent-Setup-0.6.21-win-x64.exe'}]};
+  updater=new AgentUpdater(directory,'0.6.19',request);await updater.initialize();await waitFor(updater,'ready');assert.equal(updater.status().version,'0.6.21');assert.equal(downloads,2);updater.close();
+  currentRelease=release;await writeFile(join(directory,'update-result.json'),JSON.stringify({version:'0.6.20',state:'rolled-back',at:Date.now()-7*60*60*1000}));
+  updater=new AgentUpdater(directory,'0.6.19',request);await updater.initialize();await waitFor(updater,'ready');assert.equal(downloads,3);
+ }finally{updater?.close();await rm(directory,{recursive:true,force:true});}
 });

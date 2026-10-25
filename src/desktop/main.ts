@@ -1,7 +1,15 @@
+import {ftpTransfers} from './ftp-transfers';
+import {FtpConnectionProvider,ftpIdentity} from '../core/connections/ftp-provider';
+import {FtpService} from '../core/ftp';
+import {profileProvider} from '../shared/file-connections';
+import {registerCommandConsole} from './command-console';
+import {runCli} from '../cli/main';
 import {LinuxWorkspaceService} from '../core/linux-workspace';
 import {registerConnectionImport} from './connection-import';
 import {registerNetworkDiagnostics} from './network-diagnostics';
 import {MachineBrowser} from './machine-browser';
+import { visualToolSource } from '../core/visual-tools';
+import { visualCapabilities } from '../shared/visual-tools';
 import {localViewProfiles} from '../shared/monitor-views';
 import { Diagnostics } from '../core/diagnostics';
 import { openRdpProfile, rdpProfileSchema } from '../core/rdp';
@@ -16,6 +24,7 @@ import { wslAccountStatus, initializeWslAccount } from './wsl-account';
 import { startClientApplication, clientCodec } from './client-app';
 import { ClientProvider } from '../core/client/provider';
 import { ClientVault } from '../core/client/identity';
+import { ProcessExtensions } from '../core/process-extensions';
 import { registerCloudHandlers } from './cloud-sync';
 import { DesktopAccountProfiles } from '../core/desktop-account-profiles';
 import { clientShellSchema } from '../shared/client';
@@ -85,8 +94,9 @@ if(isPro && !clientMode){app.setName(productName);app.setPath('userData',join(ap
 if (clientMode) app.setPath('userData', join(app.getPath('appData'), 'CShell Client'));
 if (process.env.CSHELL_TEST_DATA) app.setPath('userData', process.env.CSHELL_TEST_DATA);
 // Keep the single-instance lock at the installation's root, not at an account profile.
-const hasLock = app.requestSingleInstanceLock();
-const accountProfiles=isPro&&!clientMode?new DesktopAccountProfiles(app.getPath('userData')):undefined;
+const cliIndex = process.argv.indexOf('--cli');
+const hasLock = cliIndex < 0 && app.requestSingleInstanceLock();
+const accountProfiles=cliIndex<0&&isPro&&!clientMode?new DesktopAccountProfiles(app.getPath('userData')):undefined;
 if(accountProfiles)app.setPath('userData',accountProfiles.bootDirectory());
 if(accountProfiles||process.env.CSHELL_TEST_DATA)app.setPath('sessionData',app.getPath('userData'));
 let accountTransition=false;
@@ -116,7 +126,8 @@ const revealWindow = () => {
   window.focus();
 };
 if (hasLock) app.on('second-instance', revealWindow);
-if (!hasLock) app.quit();
+if (cliIndex >= 0) void runCli(process.argv.slice(cliIndex + 1)).then(code => app.exit(code));
+else if (!hasLock) app.quit();
 else
   app
     .whenReady()
@@ -246,8 +257,19 @@ else
         await store.trust(endpoint, fingerprint);
         return true;
       });
-      const extensionServices = createExtensionServices(ssh, store, async id => { if (id === 'cshell.http') http.dispose(); });
-      connections = createSshManager(ssh, () => store.snapshot().profiles, extensionServices.tools);
+      const processExtensions = new ProcessExtensions({ directory: join(app.getPath('userData'), 'process-extensions'), vault: new ClientVault(join(app.getPath('userData'), 'process-extensions'), clientCodec), version: app.getVersion(), plugins: () => store.plugins(), changed: () => extensionServices.refreshProcessTools() });
+      const extensionServices = createExtensionServices(ssh, store, async id => { if (id === 'cshell.http') http.dispose(); }, processExtensions);
+      await processExtensions.refresh();
+      window.once('closed', () => { void processExtensions.dispose(); });
+      const ftp = new FtpService(emit);
+      connections = createSshManager(ssh, () => store.snapshot().profiles, extensionServices.tools, target => {
+        if(target.providerId!=='cshell.ftp')return;
+        const profile=store.snapshot().profiles.find(p=>p.id===target.resourceId);
+        if(!profile||!['ftp','ftps'].includes(profile.protocol??'')||ftpIdentity(profile as typeof profile & {protocol:'ftp'|'ftps'})!==target.identity)return;
+        return {id:profile.id,group:profile.group};
+      });
+      connections.register(new FtpConnectionProvider(ftp));
+
       const attempts = new ConnectionAttempts((id) => connections!.disconnect(id));
       window.webContents.on('render-process-gone', () => attempts.dispose());
       window.webContents.on('did-start-loading', () => attempts.dispose());
@@ -292,6 +314,7 @@ else
             })
           ).response === 1,
       );
+      const ftpFiles=ftpTransfers(ftp,transfers);
       const grants = new Map<string, { path: string; expires: number }>();
       const grant = (path: string) => {
         for (const [key, value] of grants) if (value.expires < Date.now()) grants.delete(key);
@@ -405,9 +428,10 @@ else
         }), mode);
       });
       handle('views:close', id => monitorWindows.close(idSchema.parse(id)));
-      handle('client:download-page', () =>
-        shell.openExternal('https://shell.canp.ai/'),
-      );
+      handle('client:download-page', (raw?: unknown) => {
+        const platform = z.enum(['windows']).optional().parse(raw);
+        return shell.openExternal('https://shell.canp.ai/downloads.html?product=cagent' + (platform ? '&system=windows' : ''));
+      });
       handle('client:probe', (endpoint) => clientProvider.probe(endpoint));
       handle('client:password-pair', async (info, password) => {
         const device = await clientProvider.pairPassword(info, password);
@@ -532,6 +556,10 @@ else
         monitorWindows.publish('desktop:view-event', event);
       }, linuxWorkspace);
       machineBrowser.setAgentTransport(agent.browserTarget);
+      connections.tools.registerToolSource('cshell.visual',visualCapabilities,visualToolSource({
+        browser:(id,action,input,signal,guard)=>machineBrowser.automation(connections.tools.describe(id).providerId==='cshell.client'?'agent-session:'+id:id,action,input,signal,guard),
+        desktop:(id,action,input,signal,guard)=>agent.desktopTool(id,action,input,signal,guard),
+      }));
       const disposeAi = await registerAiHandlers(
         handle,
         app.getPath('userData'),
@@ -554,7 +582,7 @@ else
             );
           signal.throwIfAborted();
           if (!authorize()) throw new Error('Machine connection permission revoked');
-          const sessionId = await connections!.connect('cshell.ssh', profile, secret, signal);
+          const sessionId = await connections!.connect(profileProvider(profile), profile, secret, signal);
           if (signal.aborted || !authorize() || window.isDestroyed()) {
             await connections!.disconnect(sessionId);
             throw new Error('Connection cancelled or permission revoked');
@@ -575,9 +603,10 @@ else
           }
         }, machineBrowser, openCode, accountProfiles?{
           profiles:accountProfiles,
-          assertIdle:()=>{if(ssh.size||localTerminal.size||clientProvider.size||transfers.size||http.running)throw Error('请先关闭连接并等待传输结束，再切换账号');},
+          assertIdle:()=>{if(ssh.size||ftp.size||localTerminal.size||clientProvider.size||transfers.size||http.running)throw Error('请先关闭连接并等待传输结束，再切换账号');},
           block:(value:boolean)=>{accountTransition=value;},
         }:undefined, network),
+        () => processExtensions.applicationTools(),
       );
       registerPresetHandlers(handle, window, app.getPath('userData'), store, text);
       registerConnectionImport(handle, window, store);
@@ -635,12 +664,12 @@ else
                 signal,
                 ready,
               );
-            if (!store.host(`${profile.host.toLowerCase()}:${profile.port}`))
+            if ((!profile.protocol || ['ssh','sftp'].includes(profile.protocol)) && !store.host(`${profile.host.toLowerCase()}:${profile.port}`))
               throw new Error('Verify this SSH host identity in CShell before API access.');
             const secret = await store.secret(profile.id);
             if (!secret) throw new Error('Save credentials in CShell before API access.');
             signal.throwIfAborted();
-            return connections!.connect('cshell.ssh', profile, secret, signal, ready);
+            return connections!.connect(profileProvider(profile), profile, secret, signal, ready);
           },
         },
       );
@@ -669,6 +698,8 @@ else
         clipboard.writeText(await mcp!.accessToken(clientId)),
       );
       handle('mcp:rotate-token', (clientId) => serialMcp(() => mcp!.rotateToken(clientId)));
+      const disposeCommandConsole = registerCommandConsole(handle, () => mcp!);
+      app.once('before-quit', disposeCommandConsole);
       await mcp.start();
       registerExtensionHandlers(handle, window, store, ssh, connections, async id => {
         if (id === 'cshell.http') http.dispose();
@@ -860,7 +891,7 @@ else
           if (profile.auth === 'key' && !secret.privateKey) throw new Error('Select a private key');
           signal.throwIfAborted();
           const connected = {
-            sessionId: await connections!.connect('cshell.ssh', profile, secret, signal),
+            sessionId: await connections!.connect(profileProvider(profile), profile, secret, signal),
           };
           try {
             signal.throwIfAborted();
@@ -889,7 +920,7 @@ else
           signal.throwIfAborted();
           return connections!
             .connect(
-              'cshell.ssh',
+              profileProvider(profile),
               profile,
               profile.auth === 'key'
                 ? { privateKey, passphrase: credentials.passphrase }
@@ -951,7 +982,8 @@ else
           });
           if (result.response !== 1) return;
         }
-        await ssh.action(id, action, path, destination);
+        if(ftp.has(id))await ftpFiles.action(id,action,path,destination);
+        else await ssh.action(id, action, path, destination);
       });
       ipcMain.on('drop:register', (event, path) => {
         try {
@@ -964,7 +996,7 @@ else
       handle('upload', async (id, path, tokens) => {
         idSchema.parse(id);
         remotePath(pathSchema.parse(path));
-        ssh.get(id);
+        if(!ftp.has(id))ssh.get(id);
         const paths = tokens
           ? z.array(idSchema).max(1000).parse(tokens).map(consume)
           : (
@@ -973,18 +1005,21 @@ else
                 properties: ['openFile', 'multiSelections'],
               })
             ).filePaths;
-        for (const source of paths) transfers.enqueue(id, 'upload', source, path);
+        if(ftp.has(id))ftpFiles.upload(id,paths,path);
+        else for (const source of paths) transfers.enqueue(id, 'upload', source, path);
       });
       handle('download', async (id, paths) => {
         idSchema.parse(id);
         z.array(pathSchema).min(1).max(1000).parse(paths);
-        ssh.get(id);
+        if(!ftp.has(id))ssh.get(id);
         const result = await dialog.showOpenDialog(window, {
           title: text('选择下载目录', 'Choose download folder'),
           properties: ['openDirectory', 'createDirectory'],
         });
-        if (!result.canceled)
-          for (const path of paths) transfers.enqueue(id, 'download', path, result.filePaths[0]);
+        if (!result.canceled) {
+          if(ftp.has(id))ftpFiles.download(id,paths,result.filePaths[0]);
+          else for (const path of paths) transfers.enqueue(id, 'download', path, result.filePaths[0]);
+        }
       });
       handle('transfer:cancel', (id) => transfers.cancel(idSchema.parse(id)));
       handle('monitor', (id) => ssh.monitor(idSchema.parse(id)));
@@ -997,7 +1032,7 @@ else
       window.on('close', (event) => {
         if (
           closing ||
-          (!ssh.size && !localTerminal.size && !clientProvider.size && !transfers.size && !http.running && !disposeAi.hasActiveWork())
+          (!ssh.size && !ftp.size && !localTerminal.size && !clientProvider.size && !transfers.size && !http.running && !disposeAi.hasActiveWork())
         )
           return;
         event.preventDefault();
@@ -1053,6 +1088,7 @@ else
         transfers.dispose();
         clientProvider.dispose();
         localTerminal.dispose();
+        ftp.dispose();
         ssh.dispose();
       });
       await window.loadURL(entry);

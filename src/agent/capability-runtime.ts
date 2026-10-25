@@ -4,7 +4,7 @@ import { rm } from 'node:fs/promises';
 import type { ClientVault } from '../core/client/identity';
 import type { AgentApplicationService } from './applications';
 import { CapabilityPackages, parseCapabilityManifest } from './capability-packages';
-import { capabilityCatalog, type CapabilityCatalogEntry } from './capability-catalog';
+import { capabilityCatalog, capabilityDigest, type CapabilityCatalogEntry } from './capability-catalog';
 import { capabilityInstallInput, stageCapabilityBundle } from './capability-installer';
 import type { AgentCapabilityManifest, CapabilityPackageRecord } from '../shared/agent-capability-packages';
 
@@ -14,7 +14,7 @@ export interface TrustedCapabilityAdapter {
   register?(root:string,grants:readonly string[]):Promise<void>;
   quiesce?():Promise<void>;stop?():Promise<void>;unregister?():Promise<void>;
 }
-export type RuntimeCapabilityTool = AgentCapabilityManifest['tools'][number] & {packageId:string;toolId:string};
+export type RuntimeCapabilityTool = AgentCapabilityManifest['tools'][number] & {packageId:string;toolId:string;process?:true;packageDigest?:string};
 const idInput=z.object({id:z.string().min(1).max(100)}).strict();
 const invokeInput=z.object({packageId:z.string().min(1).max(100),toolId:z.string().min(1).max(100),args:z.unknown()}).strict();
 export class CapabilityRuntime {
@@ -23,6 +23,7 @@ export class CapabilityRuntime {
   private adapters=new Map<string,TrustedCapabilityAdapter>();
   private registered=new Map<string,{manifest:AgentCapabilityManifest;grants:readonly string[]}>();
   private active=new Map<string,Set<{controller:AbortController;done:Promise<void>}>>();
+  get activity(){return [...this.active.values()].reduce((sum,items)=>sum+items.size,0);}
   private roots=new Map<string,string>();
   private installedManifestDigests=new Map<string,string>();
   private mutation:Promise<unknown>=Promise.resolve();
@@ -112,7 +113,7 @@ export class CapabilityRuntime {
   // managed root, and never turn optional retirement into a startup failure.
   private async cleanupRetiredRoot(root:string){try{await this.removeRoot(root);}catch{process.stderr.write('CAgent: retired capability files retained; active package is unchanged.\n');}}
   private async removeRoot(root:string){const parent=join(this.options.directory,'capability-packages'),within=relative(parent,root);if(!within||within.startsWith('..')||isAbsolute(within)||!/^package-[^/\\]+$/.test(within))throw new Error('Refusing to remove an unmanaged package path');await rm(root,{recursive:true,force:true});}
-  tools():RuntimeCapabilityTool[]{return [...this.registered.values()].flatMap(({manifest,grants})=>manifest.tools.filter(tool=>tool.permissions.every(permission=>grants.includes(permission))).map(tool=>({...structuredClone(tool),packageId:manifest.id,toolId:tool.id})));}
+  tools():RuntimeCapabilityTool[]{return [...this.registered.values()].flatMap(({manifest,grants})=>manifest.tools.filter(tool=>tool.permissions.every(permission=>grants.includes(permission))).map(tool=>({...structuredClone(tool),packageId:manifest.id,toolId:tool.id,...(manifest.process?{process:true as const,packageDigest:capabilityDigest(JSON.stringify(manifest)),sideEffect:true}:{})})));}
   async invoke(input:unknown,owner:string,signal:AbortSignal){
     if(this.closing)throw new Error('Capability runtime closing');signal.throwIfAborted();
     const {packageId,toolId,args}=invokeInput.parse(input),record=this.registered.get(packageId),tool=record?.manifest.tools.find(tool=>tool.id===toolId);

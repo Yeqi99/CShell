@@ -33,13 +33,12 @@ try {
   await page.getByText(/此模型已不在 OpenCode 当前目录/).first().waitFor();
   assert.equal(await page.getByLabel('扩展模型',{exact:true}).inputValue(),'default/go/longcat-flash-free');
   assert.equal(await page.getByLabel('扩展模型',{exact:true}).locator('option[value="default/go/longcat-flash-free"]').evaluate((el:HTMLOptionElement)=>el.disabled),true);
-  assert.equal(await page.getByLabel('账号模型').inputValue(),'');
   await page.locator('textarea').fill('你好');
   assert.equal(await page.getByRole('button',{name:'发送',exact:true}).isDisabled(),true);
   await mkdir('test-results',{recursive:true});
   await page.screenshot({path:'test-results/opencode-catalog-unavailable.png',fullPage:true});
   assert.equal(await page.evaluate(()=>(window as any).created.length),0);
-  await page.getByLabel('账号模型').selectOption('default/go/beam-free');
+  await page.getByLabel('扩展模型',{exact:true}).selectOption('default/go/beam-free');
   assert.equal(await page.getByRole('button',{name:'发送',exact:true}).isEnabled(),true);
   await page.getByRole('button',{name:'发送',exact:true}).click();
   await page.waitForFunction(()=>(window as any).created.length===1);
@@ -50,7 +49,7 @@ try {
   await page.evaluate(()=>{(window as any).offline=false});
   await page.getByRole('button',{name:'刷新模型目录'}).click();
   await page.getByLabel('扩展模型',{exact:true}).selectOption('default/go/beam-free');
-  await page.waitForFunction(()=>(document.querySelector('select[aria-label="账号模型"]') as HTMLSelectElement)?.value==='default/go/beam-free');
+  await page.getByRole('button',{name:'AI 基座与模型'}).waitFor();
   assert.equal(await page.getByLabel('扩展模型',{exact:true}).locator('option:checked').isDisabled(),false);
   await page.setViewportSize({width:390,height:900});
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);

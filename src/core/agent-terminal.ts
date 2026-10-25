@@ -142,6 +142,12 @@ export class AgentTerminalProvider implements ManagedProvider {
   readonly capabilities = ['terminal.interactive'];
   readonly configuration = terminalConfig;
   private closing = new Set<Promise<void>>();
+  private opening = 0;
+  private executing = 0;
+  private updateGuard = () => false;
+  setUpdateGuard(guard: () => boolean) { this.updateGuard = guard; }
+  get activity() { return this.sessions.size + this.opening + this.executing + this.closing.size; }
+  private admit() { if (this.updateGuard()) throw new Error('CAgent 正在完成更新，请重新连接'); }
   private sessions = new Map<
     string,
     {
@@ -161,6 +167,11 @@ export class AgentTerminalProvider implements ManagedProvider {
     return this.detect();
   }
   async execute(input: unknown, signal: AbortSignal, output?: (text:string)=>void) {
+    this.admit(); this.executing++;
+    try { return await this.executeNow(input, signal, output); }
+    finally { this.executing--; }
+  }
+  private async executeNow(input: unknown, signal: AbortSignal, output?: (text:string)=>void) {
     const request = z
       .object({
         shell: z.enum(['cmd', 'powershell', 'bash', 'zsh', 'sh', 'wsl']),
@@ -263,6 +274,11 @@ export class AgentTerminalProvider implements ManagedProvider {
     });
   }
   async connect(value: unknown, _credentials: unknown, signal: AbortSignal) {
+    this.admit(); this.opening++;
+    try { return await this.connectNow(value, signal); }
+    finally { this.opening--; }
+  }
+  private async connectNow(value: unknown, signal: AbortSignal) {
     const input = terminalConfig.parse(value);
     const id =
       typeof input === 'string'

@@ -306,6 +306,12 @@
     "repository": "wooorm/bail"
   },
   {
+    "name": "basic-ftp",
+    "version": "6.2.3",
+    "license": "MIT",
+    "repository": "https://github.com/patrickjuchli/basic-ftp.git"
+  },
+  {
     "name": "bcrypt-pbkdf",
     "version": "1.0.2",
     "license": "BSD-3-Clause",

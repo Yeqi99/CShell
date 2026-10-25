@@ -12,14 +12,17 @@ import {
   Monitor,
   Terminal,
   ShieldCheck,
+  FolderKey,
+  FolderSync,
 } from 'lucide-react';
 import type { Profile } from '../../shared/contracts';
 import './connection-entry.css';
-type ConnectionKind = 'ssh' | 'rdp' | 'client' | 'http';
+type ConnectionKind = 'ssh' | 'rdp' | 'client' | 'http' | 'sftp' | 'ftp' | 'ftps';
 export function ConnectionEntry({
   onSaved,
   profiles,
   http,
+  fileConnections,
   onConnect,
   targets = [],
   onTarget,
@@ -29,6 +32,7 @@ export function ConnectionEntry({
 }: {
   onSaved: () => Promise<void>;
   http?: ReactNode;
+  fileConnections?: Partial<Record<'sftp' | 'ftp' | 'ftps', ReactNode>>;
   onClient: ClientConnected;
   onLocal: (shell: LocalShell) => Promise<void>;
   profiles: Profile[];
@@ -79,6 +83,11 @@ export function ConnectionEntry({
       description: cn ? '连接运行独立 Agent 的电脑' : 'Access a computer running CAgent',
       icon: ShieldCheck,
     },
+    ...(fileConnections ? [
+      { id: 'sftp' as const, title: 'SFTP', description: cn ? 'SSH 加密文件传输' : 'Encrypted file transfer over SSH', icon: FolderKey },
+      { id: 'ftps' as const, title: 'FTPS', description: cn ? 'TLS 加密的 FTP 文件传输' : 'FTP file transfer secured by TLS', icon: FolderKey },
+      { id: 'ftp' as const, title: 'FTP', description: cn ? '传统文件服务器 · 不加密' : 'Legacy file servers · unencrypted', icon: FolderSync },
+    ] : []),
   ];
   const selected = kinds.find((item) => item.id === kind);
   const matches = profiles.filter((p) =>
@@ -201,6 +210,7 @@ export function ConnectionEntry({
         <div className="protocol-form">
           <div hidden={kind !== 'http'}>{visited.includes('http') && http}</div>
           <div hidden={kind !== 'ssh'}>{visited.includes('ssh') && children}</div>
+          {(['sftp', 'ftp', 'ftps'] as const).map(protocol => <div key={protocol} hidden={kind !== protocol}>{visited.includes(protocol) && fileConnections?.[protocol]}</div>)}
           <div className="client-page protocol-client" hidden={kind !== 'client'}>
             {visited.includes('client') && <ClientConnectForm onConnect={onClient} />}
           </div>

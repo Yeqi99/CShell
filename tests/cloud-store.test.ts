@@ -26,6 +26,7 @@ test('cloud export/import carries credentials but never transfers MCP grants or 
       auth: 'password',
       group: 'Servers',
       favorite: true,
+      defaultConnectionView: 'visual',
     });
     await a.setSecret(id, { password: 'test-secret' });
     await a.setMcpToken('local-only-token');
@@ -33,6 +34,7 @@ test('cloud export/import carries credentials but never transfers MCP grants or 
     const portable = await a.cloudExport();
     assert(!JSON.stringify(portable).includes('local-only-token'));
     await b.cloudImport(portable);
+    assert.equal(b.snapshot().profiles[0].defaultConnectionView, 'visual');
     assert.equal((await b.secret(id))?.password, 'test-secret');
     assert.equal(b.mcpSettings().enabled, false);
     assert.equal(b.mcpSettings().allowCommands, false);
@@ -45,4 +47,4 @@ test('cloud export/import carries credentials but never transfers MCP grants or 
   }
 });
 
-test('connection view and sidebar preferences survive cloud restore and local reload',async()=>{const root=await mkdtemp(join(tmpdir(),'view-sync-'));try{const a=new Store(join(root,'a'),codec),b=new Store(join(root,'b'),codec);await a.load();await b.load();await a.preferences({...a.snapshot().preferences,defaultConnectionView:'original',sidebarFontSize:14,sidebarGroupSize:17});await b.cloudImport(await a.cloudExport());const reloaded=new Store(join(root,'b'),codec);await reloaded.load();assert.equal(reloaded.snapshot().preferences.defaultConnectionView,'original');assert.equal(reloaded.snapshot().preferences.sidebarFontSize,14);assert.equal(reloaded.snapshot().preferences.sidebarGroupSize,17);}finally{await rm(root,{recursive:true,force:true});}});
+test('connection view and sidebar preferences survive cloud restore and local reload',async()=>{const root=await mkdtemp(join(tmpdir(),'view-sync-'));try{const a=new Store(join(root,'a'),codec),b=new Store(join(root,'b'),codec);await a.load();await b.load();await a.preferences({...a.snapshot().preferences,defaultConnectionView:'visual',defaultConnectionViewExplicit:true,sidebarFontSize:14,sidebarGroupSize:17});await b.cloudImport(await a.cloudExport());const reloaded=new Store(join(root,'b'),codec);await reloaded.load();assert.equal(reloaded.snapshot().preferences.defaultConnectionView,'visual');assert.equal(reloaded.snapshot().preferences.sidebarFontSize,14);assert.equal(reloaded.snapshot().preferences.sidebarGroupSize,17);}finally{await rm(root,{recursive:true,force:true});}});

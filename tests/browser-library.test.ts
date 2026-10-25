@@ -46,6 +46,7 @@ test('browser handles self-closing WebContents and restores after disconnect and
           b.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({
             contents: `
    import {EventEmitter} from 'node:events';
+   export class BrowserWindow {}
    export const app={getPath:()=>${JSON.stringify(directory)}};
    export const safeStorage={isEncryptionAvailable:()=>true,encryptString:s=>Buffer.from(s).reverse(),decryptString:b=>Buffer.from(b).reverse().toString()};
    class Contents extends EventEmitter {url='about:blank';zoom=1;dead=false;navigationHistory={canGoBack:()=>false,canGoForward:()=>false};isFocused(){return true}isDestroyed(){return this.dead}getURL(){return this.url}getTitle(){if(this.dead)throw Error('destroyed');return this.url}getZoomFactor(){return this.zoom}setZoomFactor(z){this.zoom=z}isLoading(){return false}setWebRTCIPHandlingPolicy(){}setWindowOpenHandler(handler){this.popupHandler=handler}async loadURL(url){this.url=url;this.emit('did-navigate');this.emit('page-title-updated')}close(){this.dead=true;this.emit('destroyed')} }

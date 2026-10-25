@@ -41,6 +41,10 @@ export class PythonFiles {
     const path = this.path(input),
       key = `${sessionId}:${path}`;
     const sftp = await this.ssh.sftp(sessionId);
+    // ssh2 1.17 validates this same advertised VERSION extension before sending
+    // an atomic replacement. Reject before creating any temporary remote file.
+    if ((sftp as unknown as { _extensions?: Record<string,string> })._extensions?.['posix-rename@openssh.com'] !== '1')
+      throw new Error('服务器不支持安全的原子替换，原文件未修改。请下载后编辑并另存为新文件，或由管理员启用 OpenSSH 原子重命名支持。');
     if (PythonFiles.writes.has(key)) throw new Error('A save is already in progress');
     z.string().max(1_000_000).parse(code);
     z.string()

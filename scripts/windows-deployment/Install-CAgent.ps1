@@ -2,7 +2,8 @@
   [string]$Destination = (Join-Path $env:LOCALAPPDATA 'Programs\CAgent'),
   [switch]$NoLaunch,
   [switch]$NoShortcuts,
-  [switch]$RefreshExistingShortcuts
+  [switch]$RefreshExistingShortcuts,
+  [switch]$PrepareOnly
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -60,6 +61,17 @@ foreach ($file in $manifest.files) {
 }
 $exe = Join-Path $versionRoot 'Cagent.exe'
 if (-not (Test-Path -LiteralPath $exe)) { throw 'Native CAgent launcher missing' }
+if ($PrepareOnly) {
+  # The running daemon owns the later admission barrier and authenticated
+  # handoff. Preparation never changes launchers, shortcuts or live processes.
+  $receipt = Join-Path $root 'prepared-update.json'
+  NoLink $receipt
+  $temporaryReceipt = $receipt + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
+  [IO.File]::WriteAllText($temporaryReceipt, (@{ format = 1; version = $manifest.version; installId = $manifest.installId; path = $versionRoot } | ConvertTo-Json -Compress), (New-Object Text.UTF8Encoding($false)))
+  Move-Item -LiteralPath $temporaryReceipt -Destination $receipt -Force
+  @{ prepared = $true; version = $manifest.version; path = $versionRoot } | ConvertTo-Json -Compress
+  return
+}
 $launcher = Join-Path $root 'Open CAgent.vbs'
 NoLink $launcher
 $vbs = 'Set sh = CreateObject("WScript.Shell")' + "`r`n" + 'sh.Run Chr(34) & "' + $exe.Replace('"','""') + '" & Chr(34), 1, False' + "`r`n"

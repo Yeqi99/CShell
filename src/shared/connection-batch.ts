@@ -32,11 +32,11 @@ export function connectionsFromCsv(table:ReturnType<typeof readConnectionCsv>,ma
   try{
    if(cells.length!==table.headers.length)throw Error('列数与表头不一致');
    const get=(key:ImportColumn)=>mapping[key]===undefined?'':cells[mapping[key]!]??'';
-   const protocol=get('protocol').trim().toLowerCase()||'ssh';if(!['ssh','rdp'].includes(protocol))throw Error('此连接类型不支持批量导入');
+   const protocol=get('protocol').trim().toLowerCase()||'ssh';if(!['ssh','rdp','sftp','ftp','ftps'].includes(protocol))throw Error('此连接类型不支持批量导入');
    const port=get('port').trim();if(port&&!/^\d+$/.test(port))throw Error('端口必须是数字');
-   const fields:Record<string,unknown>={host:get('host').trim(),port:port?Number(port):protocol==='ssh'?22:3389};
+   const fields:Record<string,unknown>={host:get('host').trim(),port:port?Number(port):protocol==='rdp'?3389:['ftp','ftps'].includes(protocol)?21:22};
    for(const key of ['name','username','password'] as const){const value=get(key);if(value)fields[key]=key==='password'?value:value.trim();}
-   const parsed=extractedConnectionSchema.safeParse({providerId:protocol==='ssh'?'cshell.ssh':'cshell.rdp',fields});if(!parsed.success)throw Error('地址、端口或字段格式不正确');
+   const parsed=extractedConnectionSchema.safeParse({providerId:'cshell.'+protocol,fields});if(!parsed.success)throw Error('地址、端口或字段格式不正确');
    const group=get('group').trim();if(group.length>80)throw Error('分组名称过长');
    return {row,connection:parsed.data,group};
   }catch(e){return {row,error:(e as Error).message};}
@@ -48,11 +48,17 @@ export function connectionsFromText(text:string):ConnectionBatchRow[]{
  const lines=text.replace(/\r\n?/g,'\n').split('\n');
  for(let i=0;i<lines.length;i++){
   const line=lines[i];if(!line.trim())continue;
-  const start=/^\s*(?:ssh\s|ssh:\/\/|rdp:\/\/|(?:主机地址|服务器地址|主机|host|hostname|ip)\s*[:：=])/i.test(line);
+  const start=/^\s*(?:ssh\s|(?:ssh|rdp|sftp|ftp|ftps):\/\/|(?:主机地址|服务器地址|主机|host|hostname|ip)\s*[:：=])/i.test(line);
   if(start||!blocks.length)blocks.push({row:i+1,text:line});else blocks[blocks.length-1].text+='\n'+line;
   if(blocks.length>5000)throw Error('一次最多导入 5000 条连接');
  }
- return blocks.map(block=>{try{return {row:block.row,connection:extractConnectionByRules(block.text,/^\s*rdp:\/\//i.test(block.text)?'cshell.rdp':'cshell.ssh')};}catch{return {row:block.row,error:'无法明确识别此连接，请检查地址、端口和分隔方式'};}});
+ return blocks.map(block=>{try{
+  if(/^\s*(?:sftp|ftp|ftps):\/\//i.test(block.text)){
+   const url=new URL(block.text.trim());if(url.search||url.hash||(url.pathname&&url.pathname!=='/'))throw Error('Only connection endpoints can be imported');
+   const protocol=url.protocol.slice(0,-1).toLowerCase();if(!['sftp','ftp','ftps'].includes(protocol))throw Error('Unsupported protocol');
+   return {row:block.row,connection:extractedConnectionSchema.parse({providerId:'cshell.'+protocol,fields:{host:url.hostname.replace(/^\[|\]$/g,''),port:url.port?Number(url.port):protocol==='sftp'?22:21,...(url.username?{username:decodeURIComponent(url.username)}:{}),...(url.password?{password:decodeURIComponent(url.password)}:{})}})};
+  }
+  return {row:block.row,connection:extractConnectionByRules(block.text,/^\s*rdp:\/\//i.test(block.text)?'cshell.rdp':'cshell.ssh')};}catch{return {row:block.row,error:'无法明确识别此连接，请检查地址、端口和分隔方式'};}});
 }
 
 export type ConnectionImportPreview = {

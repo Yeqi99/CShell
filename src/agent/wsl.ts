@@ -45,6 +45,7 @@ export class AgentWslService {
   private installation?: Installation;
   private process?: ChildProcess;
   private accountBusy = false;
+  get activity(){return (this.process?1:0)+(this.accountBusy?1:0)+(this.installation?.state==='running'?1:0);}
   constructor(private vault: ClientVault) {}
   async load() {
     this.installation = await this.vault.read('wsl-installation', stateSchema);

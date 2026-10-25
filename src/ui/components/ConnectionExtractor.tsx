@@ -65,6 +65,9 @@ export function ConnectionExtractor({
                 'cshell.rdp': 'RDP',
                 'cshell.client': 'Agent',
                 'cshell.http': 'HTTP',
+                'cshell.sftp': 'SFTP',
+                'cshell.ftp': 'FTP',
+                'cshell.ftps': 'FTPS',
               }[providerId] +
               '\n' +
               text,

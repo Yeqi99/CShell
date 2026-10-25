@@ -25,5 +25,11 @@
  const initialQuery = new URLSearchParams(location.search).get('q');
  if(initialQuery){input.value=initialQuery.slice(0,200);input.dispatchEvent(new Event('input'));}
  const headings=[...article.querySelectorAll('h2[id]')];
- if(headings.length&&!article.querySelector('.doc-task-grid')){const toc=document.createElement('nav');toc.className='doc-toc';toc.setAttribute('aria-label','本页目录');const title=document.createElement('strong');title.textContent='本页内容';toc.append(title);for(const h of headings){const a=document.createElement('a');a.href='#'+h.id;a.textContent=h.textContent;toc.append(a);}article.querySelector('h1').after(toc);}
+ if(headings.length&&!article.querySelector('.doc-task-grid')){const toc=document.createElement('details');toc.className='doc-toc';toc.open=!matchMedia('(max-width:620px)').matches;const title=document.createElement('summary');title.textContent='本页内容 · '+headings.length+' 节';toc.append(title);const nav=document.createElement('nav');nav.setAttribute('aria-label','本页目录');for(const h of headings){const a=document.createElement('a');a.href='#'+h.id;a.textContent=h.textContent;nav.append(a);}toc.append(nav);article.querySelector('h1').after(toc);}
+ // Resolve reader links after dynamic navigation is inserted. Focus follows the
+ // selected section, so keyboard and mobile readers arrive at the actual answer.
+ const focusSection=hash=>{let id;try{id=decodeURIComponent(hash.slice(1));}catch{return false;}const target=document.getElementById(id);if(!target||!article.contains(target))return false;target.tabIndex=-1;target.focus({preventScroll:true});target.scrollIntoView({behavior:'instant',block:'start'});return true;};
+ document.addEventListener('click',event=>{const link=event.target.closest?.('.doc-toc a,.doc-search-results a');if(!link||event.button!==0||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;const target=new URL(link.href);if(target.origin!==location.origin||target.pathname!==location.pathname||!target.hash)return;event.preventDefault();if(link.closest('.doc-search-results')){input.value='';sequence++;panel.hidden=true;list.replaceChildren();}if(matchMedia('(max-width:620px)').matches){const toc=article.querySelector('.doc-toc');if(toc)toc.open=false;}history.pushState(null,'',target.pathname+target.search+target.hash);focusSection(target.hash);});
+ if(location.hash)requestAnimationFrame(()=>focusSection(location.hash));
+ addEventListener('hashchange',()=>focusSection(location.hash));
 })();

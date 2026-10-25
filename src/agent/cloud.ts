@@ -31,12 +31,15 @@ export class CagentCloud {
   private emptyBundle(){return {format:1,store:{profiles:[],groups:[],preferences:defaults,presets:[],monitorViews:[],hosts:{},secrets:{}},ai:emptySharedAi(),devices:[],http:[],assets:{}};}
   private timer?: NodeJS.Timeout;
   private ticking = false;
+  get activity(){return this.ticking?1:0;}
+  private updateGuard=()=>false;
+  setUpdateGuard(guard:()=>boolean){this.updateGuard=guard;}
   private pending: Promise<void> = Promise.resolve();
   private paused = false;
   private closed = false;
   private transportError: string | undefined;
   private tick() {
-    if (this.ticking || this.paused || this.closed) return this.pending;
+    if (this.ticking || this.paused || this.closed || this.updateGuard()) return this.pending;
     this.pending = this.runTick();
     return this.pending;
   }

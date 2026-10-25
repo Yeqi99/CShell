@@ -1,5 +1,5 @@
 import type { LocalConnectionTarget } from '../../shared/local-terminal';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   ArrowLeft,
@@ -19,6 +19,7 @@ import {
   X,
 } from 'lucide-react';
 import { defaults, type Preferences, type GroupAction, type Profile } from '../../shared/contracts';
+import { connectionUsesVisual } from '../../shared/connection-view';
 import { useI18n } from '../i18n';
 type Menu = { x: number; y: number } & (
   { kind: 'server'; profile: Profile; page: 'root' | 'groups' } | { kind: 'group'; name: string } | { kind: 'appearance' }
@@ -59,6 +60,7 @@ export function ServerSidebar({
   const { t, locale } = useI18n();
   const [query, setQuery] = useState('');
   const [menu, setMenu] = useState<Menu | null>(null);
+  const [appearanceExpanded, setAppearanceExpanded] = useState(false);
   const [collapsed, setCollapsed] = useState<string[]>([]);
   const [editor, setEditor] = useState<{ original?: string; move?: Profile } | null>(null);
   const [name, setName] = useState('');
@@ -95,6 +97,7 @@ export function ServerSidebar({
           trigger.current?.focus();
       });
   };
+  useLayoutEffect(()=>{if(!menu||!popup.current)return;const rect=popup.current.getBoundingClientRect();const y=Math.max(8,Math.min(menu.y,innerHeight-rect.height-8));if(y!==menu.y)setMenu({...menu,y});},[menu,appearanceExpanded]);
   useEffect(() => {
     if (!menu) return;
     const focus = requestAnimationFrame(() =>
@@ -134,11 +137,12 @@ export function ServerSidebar({
       return;
     }
     trigger.current = target;
+    if(next.kind==='appearance')setAppearanceExpanded(false);
     const rect = target.getBoundingClientRect();
     setMenu({
       ...next,
       x: Math.max(8, Math.min(point?.x ?? rect.left, innerWidth - 228)),
-      y: Math.max(8, Math.min(point?.y ?? rect.bottom + 5, innerHeight - (next.kind === 'appearance' ? 390 : 284))),
+      y: Math.max(8, Math.min(point?.y ?? rect.bottom + 5, innerHeight - (next.kind === 'appearance' ? 44 : 320))),
     });
   };
   const beginGroup = (original?: string, move?: Profile) => {
@@ -490,7 +494,7 @@ export function ServerSidebar({
             className="server-context-menu"
             role="menu"
             aria-label={menu.kind === 'appearance' ? (locale === 'zh-CN' ? '侧边栏外观' : 'Sidebar appearance') : t(menu.kind === 'group' ? 'manageGroup' : 'serverActions')}
-            style={{ left: menu.x, top: menu.y }}
+            style={{ left: menu.x, top: menu.y, maxHeight: 'calc(100vh - 16px)', overflowY: 'auto' }}
             onKeyDown={(e) => {
               if (e.key === 'Escape') {
                 e.preventDefault();
@@ -501,7 +505,7 @@ export function ServerSidebar({
                 e.preventDefault();
                 const items = [
                   ...e.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'),
-                ];
+                ].filter(button=>button.offsetParent!==null);
                 const current = items.indexOf(document.activeElement as HTMLButtonElement);
                 items[
                   e.key === 'Home'
@@ -515,10 +519,12 @@ export function ServerSidebar({
             }}
           >
             {menu.kind === 'appearance' ? (<>
-              <div className="context-caption">{locale === 'zh-CN' ? '侧边栏外观' : 'Sidebar appearance'}</div>
-              {([['sidebarGroupSize', '分组字号', 'Group size', 12,22], ['sidebarFontSize','服务器字号','Server size',12,22], ['sidebarDetailSize','地址字号','Address size',11,20]] as const).map(([key,zh,en,min,max]) => <div key={key} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 10px'}}><span style={{flex:1,whiteSpace:'nowrap'}}>{locale === 'zh-CN' ? zh : en}</span><button style={{width:28,minWidth:28,flex:'0 0 28px',padding:4,justifyContent:'center'}} aria-label={`${zh}减小`} disabled={working || preferences[key] <= min} onClick={() => {setWorking(true); void onPreferences?.({...preferences,[key]:preferences[key]-1}).catch(report).finally(()=>setWorking(false));}}>−</button><output>{preferences[key]}</output><button style={{width:28,minWidth:28,flex:'0 0 28px',padding:4,justifyContent:'center'}} aria-label={`${zh}增大`} disabled={working || preferences[key] >= max} onClick={() => {setWorking(true);void onPreferences?.({...preferences,[key]:preferences[key]+1}).catch(report).finally(()=>setWorking(false));}}>+</button></div>)}
+              <button role="menuitem" aria-expanded={appearanceExpanded} onClick={()=>setAppearanceExpanded(value=>!value)}>{appearanceExpanded?<ChevronDown size={14}/>:<ChevronRight size={14}/>} {locale==='zh-CN'?'外观设置':'Appearance settings'}</button>
+              <div hidden={!appearanceExpanded}>
+              {([['sidebarGroupSize', '分组字号', 'Group size', 8,22], ['sidebarFontSize','服务器字号','Server size',8,22], ['sidebarDetailSize','地址字号','Address size',8,20]] as const).map(([key,zh,en,min,max]) => <div key={key} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 10px'}}><span style={{flex:1,whiteSpace:'nowrap'}}>{locale === 'zh-CN' ? zh : en}</span><button style={{width:28,minWidth:28,flex:'0 0 28px',padding:4,justifyContent:'center'}} aria-label={locale==='zh-CN'?`${zh}减小`:`Decrease ${en.toLowerCase()}`} disabled={working || preferences[key] <= min} onClick={() => {setWorking(true); void onPreferences?.({...preferences,[key]:preferences[key]-1}).catch(report).finally(()=>setWorking(false));}}>−</button><output>{preferences[key]}</output><button style={{width:28,minWidth:28,flex:'0 0 28px',padding:4,justifyContent:'center'}} aria-label={locale==='zh-CN'?`${zh}增大`:`Increase ${en.toLowerCase()}`} disabled={working || preferences[key] >= max} onClick={() => {setWorking(true);void onPreferences?.({...preferences,[key]:preferences[key]+1}).catch(report).finally(()=>setWorking(false));}}>+</button></div>)}
               {(['compact','comfortable','spacious'] as const).map((density,i) => <button role="menuitemradio" aria-checked={preferences.sidebarDensity===density} key={density} disabled={working} onClick={()=>{setWorking(true);void onPreferences?.({...preferences,sidebarDensity:density}).catch(report).finally(()=>setWorking(false));}}>{locale === 'zh-CN' ? ['紧凑间距','舒适间距','宽松间距'][i] : density}{preferences.sidebarDensity===density && <Check size={14}/>}</button>)}
               <button role="menuitem" disabled={working} onClick={()=>{setWorking(true);void onPreferences?.({...preferences,sidebarFontSize:defaults.sidebarFontSize,sidebarGroupSize:defaults.sidebarGroupSize,sidebarDetailSize:defaults.sidebarDetailSize,sidebarDensity:defaults.sidebarDensity}).catch(report).finally(()=>setWorking(false));}}>{locale === 'zh-CN' ? '恢复默认外观' : 'Reset sidebar appearance'}</button>
+              </div>
             </>) : menu.kind === 'group' ? (
               <>
                 <div className="context-caption">{menu.name}</div>
@@ -569,7 +575,8 @@ export function ServerSidebar({
             ) : (
               <>
                 <div className="context-caption">{menu.profile.name}</div>
-                {onVisual && menu.profile.protocol !== 'http' && <button role="menuitem" onClick={() => {onVisual(menu.profile);closeMenu();}}><Server size={14}/>{locale === 'zh-CN' ? '打开可视化桌面' : 'Open visual desktop'}</button>}
+                {onVisual && !['http','ftp','ftps','sftp'].includes(menu.profile.protocol??'ssh') && <button role="menuitem" onClick={() => {onVisual(menu.profile);closeMenu();}}><Server size={14}/>{locale === 'zh-CN' ? '打开可视化桌面' : 'Open visual desktop'}</button>}
+                {['ssh','rdp'].includes(menu.profile.protocol??'ssh')&&<button role="menuitemcheckbox" aria-checked={connectionUsesVisual(menu.profile,preferences)} disabled={working} onClick={()=>{setWorking(true);const current=profiles.find(item=>item.id===menu.profile.id)??menu.profile;void onSave({...current,defaultConnectionView:connectionUsesVisual(current,preferences)?'original':'visual'}).then(()=>closeMenu()).catch(report).finally(()=>setWorking(false));}}><span style={{width:14,display:'flex'}}>{connectionUsesVisual(menu.profile,preferences)&&<Check size={14}/>}</span>{locale==='zh-CN'?'默认以可视化打开':'Open in visual mode by default'}</button>}
                 <button
                   role="menuitem"
                   onClick={() => {

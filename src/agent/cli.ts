@@ -59,8 +59,8 @@ async function main() {
   if(command==='extension-import'){
     if(!method)throw new Error('用法：cagent extension-import <文件.cshellext> [--confirm]');
     const pack=await readCustomExtension(method);
-    if(pack.value.manifest.provider!=='wechat')throw new Error('此扩展不适用于 CAgent');
-    if(!process.argv.includes('--confirm')){print({manifest:pack.value.manifest,trusted:pack.trusted,bytes:pack.bytes,installed:false,next:'核对后添加 --confirm 导入。导入不授予微信权限，重新启动 CAgent 后单独配置。'});return;}
+    if(!['wechat','process'].includes(pack.value.manifest.provider))throw new Error('此扩展不适用于 CAgent');
+    if(!process.argv.includes('--confirm')){print({manifest:pack.value.manifest,trusted:pack.trusted,bytes:pack.bytes,installed:false,next:'核对后添加 --confirm 导入。导入不授予执行权限，重新启动 CAgent 后单独授权；独立进程不是系统权限沙箱。'});return;}
     await installCustomExtension(pack);print({installed:true,restartRequired:true,permissionsGranted:false});return;
   }
   if(command==='bridge'){startSshBridge();return;}

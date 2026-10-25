@@ -19,3 +19,5 @@ await build({
 });
 
 await build({entryPoints:["src/agent/cli.ts"],outfile:"dist/agent/agent.cjs",bundle:true,platform:"node",format:"cjs",target:"node22",external:["node-pty"]});
+
+await build({entryPoints:['src/cli/entry.ts'],outfile:'dist/cli/cshell.mjs',bundle:true,platform:'node',format:'esm',target:'node22'});

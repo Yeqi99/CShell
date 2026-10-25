@@ -14,6 +14,7 @@ export class AgentFiles {
  private fs=new LocalFiles();
  private roots?:Promise<{root:string;label:string}[]>;
  private uploads=new Map<string,Upload>();
+ get activity(){return this.uploads.size;}
  private timer=setInterval(()=>void this.expire(),60_000).unref();
  private async expire(){for(const [id,u] of this.uploads)if(!u.busy&&u.expires<Date.now()){this.uploads.delete(id);await unlink(u.temporary).catch(()=>{});}}
  async close(){clearInterval(this.timer);for(const u of this.uploads.values())await unlink(u.temporary).catch(()=>{});this.uploads.clear();}

@@ -10,6 +10,7 @@ import { useI18n } from '../i18n';
 import { PresetControls } from './PresetControls';
 import { McpSettings, useMcpSettings } from './McpSettings';
 import { FontPicker } from './FontPicker';
+import './category-workspace.css';
 export function Settings({
   value,
   onSave,
@@ -97,11 +98,13 @@ export function Settings({
     }
   };
   return (
-    <section
+    <div className="workspace-category-container"><section
       className="editor-page preferences-page categorized-settings"
       aria-label={t('settingsTitle')}
     >
-      <nav className="settings-nav" aria-label={cn ? '设置分类' : 'Settings categories'}>
+      <nav className="settings-nav" aria-label={cn ? '设置分类' : 'Settings categories'} onFocus={event => {
+        if (event.target instanceof HTMLButtonElement) event.target.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
+      }}>
         <h2>{t('settingsTitle')}</h2>
         {categories.map(([id, Icon, label]) => (
           <button
@@ -127,9 +130,9 @@ export function Settings({
           <section className="settings-section">
             <h2>{cn ? '连接方式' : 'Opening connections'}</h2>
             <label>{cn ? '默认连接视图' : 'Default connection view'}
-              <select value={draft.defaultConnectionView} onChange={e => setDraft({...draft, defaultConnectionView: e.target.value as Preferences['defaultConnectionView']})}>
-                <option value="visual">{cn ? '可视化桌面（默认）' : 'Visual desktop (default)'}</option>
-                <option value="original">{cn ? '原始连接方式' : 'Original connection'}</option>
+              <select value={draft.defaultConnectionView} onChange={e => setDraft({...draft, defaultConnectionView: e.target.value as Preferences['defaultConnectionView'],defaultConnectionViewExplicit:true})}>
+                <option value="original">{cn ? '原始连接方式（默认）' : 'Original connection (default)'}</option>
+                <option value="visual">{cn ? '可视化桌面' : 'Visual desktop'}</option>
               </select>
             </label>
             <p className="muted">{cn ? '原始方式直接打开 SSH 终端或系统远程桌面。SSH 会话可随时切换到可视化桌面；已有会话保持不变。' : 'Open SSH terminals or the system RDP client directly. Switch an SSH session to its visual desktop at any time; existing sessions stay unchanged.'}</p>
@@ -185,7 +188,7 @@ export function Settings({
             <h2>{t('fonts')}</h2>
             <div hidden={category !== 'appearance'}>
               <div className="form-grid">
-                {([['uiFontSize', cn ? '界面字号' : 'Interface size', 12, 20], ['sidebarFontSize', cn ? '连接名称字号' : 'Connection name size', 12, 22], ['sidebarGroupSize', cn ? '分组标题字号' : 'Group title size', 12, 22], ['sidebarDetailSize', cn ? '地址与说明字号' : 'Address size', 11, 20]] as const).map(([key, label, min, max]) => <label key={key}>{label}<input type="number" min={min} max={max} value={draft[key]} onChange={e => setDraft(previous => ({ ...previous, [key]: Math.max(min, Math.min(max, Number(e.target.value) || min)) }))}/></label>)}
+                {([['uiFontSize', cn ? '界面字号' : 'Interface size', 9, 20], ['sidebarFontSize', cn ? '连接名称字号' : 'Connection name size', 8, 22], ['sidebarGroupSize', cn ? '分组标题字号' : 'Group title size', 8, 22], ['sidebarDetailSize', cn ? '地址与说明字号' : 'Address size', 8, 20]] as const).map(([key, label, min, max]) => <label key={key}>{label}<input type="number" min={min} max={max} value={draft[key]} onChange={e => setDraft(previous => ({ ...previous, [key]: Math.max(min, Math.min(max, Number(e.target.value) || min)) }))}/></label>)}
                 <label>{cn ? '侧边栏间距' : 'Sidebar spacing'}<select aria-label={cn ? '侧边栏间距' : 'Sidebar spacing'} value={draft.sidebarDensity} onChange={e => setDraft(previous => ({ ...previous, sidebarDensity: e.target.value as Preferences['sidebarDensity'] }))}><option value="compact">{cn ? '紧凑' : 'Compact'}</option><option value="comfortable">{cn ? '舒适' : 'Comfortable'}</option><option value="spacious">{cn ? '宽松' : 'Spacious'}</option></select></label>
               </div>
               <button type="button" onClick={() => setDraft(previous => ({ ...previous, uiFont: defaults.uiFont, uiFontAsset: null, uiFontSize: defaults.uiFontSize, sidebarFontSize: defaults.sidebarFontSize, sidebarGroupSize: defaults.sidebarGroupSize, sidebarDetailSize: defaults.sidebarDetailSize, sidebarDensity: defaults.sidebarDensity }))}>{cn ? '恢复界面字体与间距' : 'Reset interface typography'}</button>
@@ -247,13 +250,13 @@ export function Settings({
                 {t('fontSize')}
                 <input
                   type="number"
-                  min={10}
+                  min={8}
                   max={28}
                   value={draft.fontSize}
                   onChange={(e) =>
                     setDraft({
                       ...draft,
-                      fontSize: Math.max(10, Math.min(28, Number(e.target.value))),
+                      fontSize: Math.max(8, Math.min(28, Number(e.target.value))),
                     })
                   }
                 />
@@ -401,7 +404,7 @@ export function Settings({
           {t('save')}
         </button>
       </footer>
-    </section>
+    </section></div>
   );
 }
 

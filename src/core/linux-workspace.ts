@@ -10,6 +10,9 @@ import {
 } from './linux-workspace-install';
 import { agentCallSchema, type AgentCall } from '../shared/agent';
 import type { LinuxWorkspacePlan } from '../shared/linux-workspace';
+import { linuxCompatibilityBridgeCommand } from './linux-workspace-compat';
+import { linuxMachineSnapshotCommand } from './linux-machine-snapshot';
+import { isUnsupportedAgentMethod, agentCompatibilityNotice } from '../shared/agent-compatibility';
 
 export const linuxWorkspaceLauncher = '"$HOME/.local/share/cagent/cshell/current/cagent"';
 import { linuxWorkspaceMethods } from '../shared/linux-workspace';
@@ -29,7 +32,7 @@ export class LinuxWorkspaceService {
     const pending = new Promise<{
       request: (call: AgentCall, signal?: AbortSignal) => Promise<unknown>;
     }>((resolve, reject) => {
-      this.ssh.get(session).client.exec(linuxWorkspaceLauncher + ' bridge', (error, channel) => {
+      this.ssh.get(session).client.exec(linuxCompatibilityBridgeCommand, (error, channel) => {
         if (error) {
           reject(error);
           return;
@@ -41,6 +44,8 @@ export class LinuxWorkspaceService {
         >();
         const fail = () => {
           this.bridges.delete(session);
+          this.capabilities.delete(session);
+          this.unsupported.delete(session);
           for (const p of requests.values()) {
             p.finish();
             p.reject(new Error('CAgent 通道已断开；操作未重放'));
@@ -118,6 +123,9 @@ export class LinuxWorkspaceService {
     return pending;
   }
   private plans = new Map<string, { session: string; expires: number; plan: LinuxWorkspacePlan }>();
+  private capabilities = new Map<string, { at: number; value: Promise<{ methods?: string[]; agentVersion?: string }> }>();
+  private unsupported = new Map<string, Map<string, number>>();
+  private collecting = new Set<string>();
   constructor(
     private ssh: SshService,
     private payload: string,
@@ -222,7 +230,46 @@ df -hP "$parent" | tail -n 1`,
   async call(session: string, raw: AgentCall, signal?: AbortSignal) {
     const call = agentCallSchema.parse(raw);
     if (!linuxWorkspaceMethods.has(call.method)) throw new Error('此操作未在 SSH 工作区开放');
-    return (await this.bridge(session)).request(call, signal);
+    const bridge = await this.bridge(session);
+    if (call.method === 'client.status') return bridge.request(call, signal);
+    let state = this.capabilities.get(session);
+    if (!state || Date.now() - state.at > 30000) {
+      const value = bridge.request({ method: 'client.status' }).then((status: any) => ({
+        methods: Array.isArray(status?.methods) && status.methods.every((m: unknown) => typeof m === 'string') ? status.methods as string[] : undefined,
+        agentVersion: typeof status?.agentVersion === 'string' ? status.agentVersion : undefined,
+      }));
+      state = { at: Date.now(), value };
+      this.capabilities.set(session, state);
+      void value.catch(() => this.capabilities.delete(session));
+    }
+    const capabilities = await state.value;
+    signal?.throwIfAborted();
+    const missing = capabilities.methods ? !capabilities.methods.includes(call.method) :
+      Date.now() - (this.unsupported.get(session)?.get(call.method) ?? 0) < 30000;
+    if (!missing) {
+      try { return await bridge.request(call, signal); }
+      catch (error) {
+        if (!isUnsupportedAgentMethod(error)) throw error;
+        const methods = this.unsupported.get(session) ?? new Map<string, number>();
+        methods.set(call.method, Date.now());
+        this.unsupported.set(session, methods);
+      }
+    }
+    // A denied or uncertain operation never arrives here. These are reads of the
+    // same authenticated SSH user's machine, not impersonated Agent privileges.
+    if (call.method === 'machine.snapshot') {
+      if (call.params !== undefined && (!call.params || typeof call.params !== 'object' || Array.isArray(call.params) || Object.keys(call.params).length)) throw Error('机器信息参数无效');
+      if (this.collecting.has(session)) throw Error('机器信息采集正在进行');
+      this.collecting.add(session);
+      try {
+        const snapshot = JSON.parse(await this.jobs.exec(session, linuxMachineSnapshotCommand, undefined, 12000, undefined, signal));
+        if (snapshot.platform !== 'linux' || !Array.isArray(snapshot.cpu) || !Number.isFinite(snapshot.memory?.total) || !Number.isFinite(snapshot.at)) throw Error('机器信息响应无效');
+        return snapshot;
+      } finally { this.collecting.delete(session); }
+    }
+    if (call.method === 'coding.status' || call.method === 'ide.status')
+      return { supported: false, compatibility: agentCompatibilityNotice };
+    throw Error(agentCompatibilityNotice);
   }
   job(session: string, id: string, cancel = false) {
     this.ssh.get(session);

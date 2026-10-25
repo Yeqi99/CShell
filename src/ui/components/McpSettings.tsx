@@ -108,7 +108,7 @@ export function McpSettings({
           <p className="muted">{t('mcpScope')}</p>
           <div className="mcp-profiles">
             {profiles
-              .filter((p) => !p.protocol || ['ssh', 'client', 'http'].includes(p.protocol))
+              .filter((p) => !p.protocol || ['ssh', 'sftp', 'ftp', 'ftps', 'client', 'http'].includes(p.protocol))
               .map((profile) => (
                 <label className="checkbox" key={profile.id}>
                   <input
@@ -188,6 +188,10 @@ export function McpSettings({
                   'Input to API terminal (can execute commands)',
                 ],
                 ['metrics.read', '资源指标', 'Resource metrics'],
+                ['browser.read', '读取浏览器页面与截图', 'Read browser pages and screenshots'],
+                ['browser.control', '操作浏览器（包括已登录网站）', 'Control browser (including signed-in sites)'],
+                ['desktop.view', '查看远程桌面与截图', 'View remote desktop and screenshots'],
+                ['desktop.control', '远程桌面键鼠输入', 'Remote desktop input'],
                 ['agent.manage', 'Agent 管理', 'Agent management'],
                 ['agent.hosting', 'HTTP 服务托管', 'HTTP hosting'],
                 ['agent.relay', 'Agent 中继', 'Agent relay'],
@@ -353,7 +357,7 @@ export function McpSettings({
                 </label>
                 <div className="mcp-profiles">
                   {profiles
-                    .filter((p) => !p.protocol || ['ssh', 'client', 'http'].includes(p.protocol))
+                    .filter((p) => !p.protocol || ['ssh', 'sftp', 'ftp', 'ftps', 'client', 'http'].includes(p.protocol))
                     .map((p) => (
                       <label className="checkbox" key={p.id}>
                         <input
@@ -397,6 +401,10 @@ export function McpSettings({
                       'Input to API terminal (can execute commands)',
                     ],
                     ['metrics.read', '资源指标', 'Resource metrics'],
+                ['browser.read', '读取浏览器页面与截图', 'Read browser pages and screenshots'],
+                ['browser.control', '操作浏览器（包括已登录网站）', 'Control browser (including signed-in sites)'],
+                ['desktop.view', '查看远程桌面与截图', 'View remote desktop and screenshots'],
+                ['desktop.control', '远程桌面键鼠输入', 'Remote desktop input'],
                     ['agent.manage', 'Agent 管理', 'Agent management'],
                     ['agent.hosting', 'HTTP 服务托管', 'HTTP hosting'],
                     ['agent.relay', 'Agent 中继', 'Agent relay'],

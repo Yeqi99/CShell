@@ -6,6 +6,7 @@ import type { FileEntry, Metrics, Profile, SessionEvent } from '../shared/contra
 import { childPath, remotePath } from './paths';
 import { metricsCommand, parseMetrics, type CpuSample } from './metrics';
 import { CONNECTION_CANCELLED, CONNECTION_TIMEOUT } from '../shared/connection-errors';
+import {sftpClientFacade} from './sftp-client';
 
 export interface Session {
   profile: Profile;
@@ -42,7 +43,7 @@ export class SshService {
     ready?: (id: string) => void,
   ) {
     signal?.throwIfAborted();
-    if (profile.protocol && profile.protocol !== 'ssh') throw new Error('This connection cannot use SSH');
+    if (profile.protocol && profile.protocol !== 'ssh' && profile.protocol !== 'sftp') throw new Error('This connection cannot use SSH');
     const client = new ssh2.Client();
     const session: Session = {
       profile: { ...profile },
@@ -113,6 +114,16 @@ export class SshService {
         });
       });
       controller.signal.throwIfAborted();
+      if (profile.protocol === 'sftp') {
+        // A file-only SSH server can deny shell/exec entirely. Open only its SFTP subsystem.
+        await this.sftp(session.id);
+        controller.signal.throwIfAborted();
+        session.client=sftpClientFacade(client);
+        ready?.(session.id);
+        established = true;
+        session.sftp!.once('close', () => close('SFTP connection closed'));
+        return { sessionId: session.id };
+      }
       session.shell = await new Promise<ClientChannel>((resolve, reject) => {
         rejectPending = reject;
         client.shell({ term: 'xterm-256color', cols: 100, rows: 30 }, (error, stream) => {
@@ -163,6 +174,7 @@ export class SshService {
   ) {
     signal?.throwIfAborted();
     const parent = this.get(parentId);
+    if (parent.profile.protocol === 'sftp') throw new Error('SFTP connections do not provide a terminal');
     const stream = await new Promise<ClientChannel>((resolve, reject) => {
       const aborted = () => reject(signal?.reason);
       signal?.addEventListener('abort', aborted, { once: true });
@@ -356,6 +368,7 @@ export class SshService {
     });
   }
   async monitor(id: string): Promise<Metrics> {
+    if (this.get(id).profile.protocol === 'sftp') throw new Error('SFTP connections do not provide machine metrics');
     const session = this.get(id);
     if (session.monitoring) throw new Error('Monitoring request already running');
     session.monitoring = true;

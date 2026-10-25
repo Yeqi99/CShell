@@ -22,6 +22,8 @@ import type { DesktopViewEvent } from '../shared/desktop-view';
 import { connectDesktop } from '../core/desktop-client';
 import { DesktopTargets } from '../core/desktop-targets';
 import { desktopViewStartSchema } from '../shared/desktop-view';
+import { DesktopAutomation } from '../core/desktop-automation';
+import { decodeDesktopFrame } from './desktop-frame-decoder';
 
 
 export async function registerAgent(
@@ -44,8 +46,9 @@ export async function registerAgent(
       .activeTargets()
       .find((t) => t.sessionId === target && t.providerId === 'cshell.client');
   const targets = new DesktopTargets({ active: activeTarget, devices: () => provider.list() });
+  const toolListeners=new Set<(event:DesktopViewEvent)=>void>(),toolViews=new Set<string>();
   const views = new DesktopViews({
-    publish,
+    publish:event=>{for(const listener of toolListeners)listener(event);if(!toolViews.has(event.id))publish(event);},
     onStopped: (id) => targets.release(id),
     authorize: (target) => {
       if(target==='local')guard();
@@ -264,7 +267,18 @@ export async function registerAgent(
       guard();
       return callAgent('client.' + name, params, directory);
     });
+  const desktopTools=new DesktopAutomation({
+    validate:key=>{registry.describe(key);checkTarget(key);},
+    start:async input=>{toolViews.add(input.id);try{targets.bind(input.id,input.target);return await views.start(input);}catch(error){targets.release(input.id);toolViews.delete(input.id);throw error;}},
+    stop:async id=>{try{await views.stop(id);}finally{toolViews.delete(id);targets.release(id);}},
+    input:(id,input,generation)=>views.input(id,input,generation),release:(id,generation)=>views.release(id,generation),
+    ack:(id,sequence,decoded,decodeMs,generation)=>views.ack(id,sequence,decoded,decodeMs,generation),
+    subscribe:listener=>{toolListeners.add(listener);return()=>{toolListeners.delete(listener);};},
+    status:async(key,signal)=>{const raw=await registry.agent(key)({method:'desktop.status'},signal);return z.object({enabled:z.boolean(),viewAllowed:z.boolean(),controlAllowed:z.boolean(),busy:z.boolean(),implementation:z.string().max(100).optional(),lastFailure:z.string().max(2000).optional()}).parse(raw);},
+    decode:decodeDesktopFrame,
+  });
   return {
+    desktopTool:(key:string,action:string,input:unknown,signal:AbortSignal,authorize?:()=>void)=>desktopTools.invoke(key,action,input,signal,authorize),
     stopTarget,
     browserTarget: async(key:string)=>{
       if(key==='local'){guard();const s=await callAgent('client.status',undefined,directory) as {deviceId:string};return {key:'agent:'+s.deviceId,call:(method:string,params?:unknown)=>{guard();return callAgent(method,params,directory);},validate:guard};}

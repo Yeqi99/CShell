@@ -30,11 +30,15 @@ export function FilePanel({
   sessionId,
   transfers,
   localRoot,
+  closed = false,
+  disableEnvironment = false,
 }: {
   sessionId: string;
   transfers: Transfer[];
   onError: (e: unknown) => void;
   localRoot?: string;
+  closed?: boolean;
+  disableEnvironment?: boolean;
 }) {
   const { t, locale } = useI18n();
   const [editors, setEditors] = useState<string[]>([]);
@@ -78,6 +82,7 @@ export function FilePanel({
     );
   const load = useCallback(
     async (next: string) => {
+      if (closed) return;
       const request = ++sequence.current;
       setBusy(true);
       setError('');
@@ -101,7 +106,7 @@ export function FilePanel({
         if (request === sequence.current) setBusy(false);
       }
     },
-    [sessionId, localRoot],
+    [sessionId, localRoot, closed],
   );
   useEffect(() => {
     void load('.');
@@ -548,6 +553,6 @@ export function FilePanel({
         </section>
       )}
     </div>
-    {editors.map(file => <div className="text-file-slot" hidden={activeEditor !== file} key={file}><Suspense fallback={<p role="status">正在打开编辑器…</p>}><TextFileEditor sessionId={sessionId} path={file}/></Suspense></div>)}
+    {editors.map(file => <div className="text-file-slot" hidden={activeEditor !== file} key={file}><Suspense fallback={<p role="status">正在打开编辑器…</p>}><TextFileEditor sessionId={sessionId} path={file} closed={closed} disableEnvironment={disableEnvironment}/></Suspense></div>)}
   </>);
 }

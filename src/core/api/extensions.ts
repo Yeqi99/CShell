@@ -22,15 +22,17 @@ import { DockerService } from '../docker';
 import { dockerActionSchema, dockerId } from '../../shared/docker';
 import { PluginService } from '../plugins';
 import { pluginId } from '../../shared/plugins';
+import type { ProcessExtensions } from '../process-extensions';
 
 /** Shared by desktop handlers and the provider registry; no IPC forwarding or separate job store. */
 export function createExtensionServices(
   ssh: SshService,
   store: Store,
   beforeDisable?: (id: string) => Promise<void>,
+  processExtensions?: ProcessExtensions,
 ) {
   const plugins = new PluginService(store);
-  const applicationTools: readonly ConnectionTool[] = [
+  const applicationTools: ConnectionTool[] = [
     {
       name: 'plugin_catalog',
       capability: 'plugins.manage',
@@ -120,10 +122,13 @@ export function createExtensionServices(
         if (a.action === 'install') await plugins.install(a.id, beforeWrite);
         else if (a.action === 'remove') await plugins.remove(a.id, beforeWrite);
         else await plugins.toggle(a.id, a.action === 'enable', beforeWrite);
+        await processExtensions?.refresh();
         return JSON.stringify({ id: a.id, action: a.action, applied: true });
       },
     },
   ];
+  const builtinToolCount = applicationTools.length;
+  const refreshProcessTools = () => applicationTools.splice(builtinToolCount, applicationTools.length - builtinToolCount, ...(processExtensions?.applicationTools() ?? []));
   const jobs = new RemoteJobs(ssh);
   const environments = new EnvironmentService(ssh, jobs);
   const apps = new ApplicationService(jobs);
@@ -386,6 +391,6 @@ export function createExtensionServices(
         (!t.name.startsWith('docker_') || store.snapshot().tools.dockerEnabled),
     );
   };
-  return { jobs, environments, apps, files, docker, tools, plugins, applicationTools };
+  return { jobs, environments, apps, files, docker, tools, plugins, applicationTools, processExtensions, refreshProcessTools };
 }
 export type ExtensionServices = ReturnType<typeof createExtensionServices>;

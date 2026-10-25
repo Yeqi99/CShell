@@ -9,19 +9,34 @@ export function family(model:string):Family|null {
   if(/^(deepseek-|glm-|kimi-|minimax-|mimo-|qwen.*max|longcat-|step-|hy\d|beam-|space-|nemotron-|big-pickle|gpt-oss)/.test(model))return 'chat';
   return null;
 }
+function contentParts(content:any,kind:Family){
+  if(typeof content==='string')return content?[{type:'text',text:content}]:[];
+  if(!Array.isArray(content))return [];
+  return content.map(part=>{
+    if(part.type==='text'&&typeof part.text==='string')return part;
+    if(part.type!=='image_url'||typeof part.image_url?.url!=='string')throw Error('模型输入内容格式不受支持');
+    const match=/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/]+={0,2})$/.exec(part.image_url.url);
+    if(!match||match[2].length>2800000)throw Error('仅接受有界的本地图像数据，不让模型服务抓取任意图片地址');
+    if(kind==='responses')return {type:'input_image',image_url:part.image_url.url,detail:part.image_url.detail??'auto'};
+    if(kind==='anthropic')return {type:'image',source:{type:'base64',media_type:match[1],data:match[2]}};
+    if(kind==='google')return {inlineData:{mimeType:match[1],data:match[2]}};
+    return part;
+  });
+}
+function contentFor(content:any,kind:Family){return contentParts(content,kind).map(part=>part.type==='text'?(kind==='responses'?{type:'input_text',text:part.text}:kind==='google'?{text:part.text}:part):part);}
 export function encodeRequest(kind:Family,b:any){
   if(kind==='chat')return b;
   const tools=b.tools??[],messages=b.messages??[];
   if(kind==='responses')return {model:b.model,stream:b.stream,store:false,...(b.max_tokens?{max_output_tokens:b.max_tokens}:{}),
     input:messages.flatMap((m:any)=>m.role==='tool'?[{type:'function_call_output',call_id:m.tool_call_id,output:m.content}]:[
-      ...(m.content?[{role:m.role,content:m.content}]:[]),...(m.tool_calls??[]).map((c:any)=>({type:'function_call',call_id:c.id,name:c.function.name,arguments:c.function.arguments}))]),
+      ...(m.content?[{role:m.role,content:Array.isArray(m.content)?contentFor(m.content,kind):m.content}]:[]),...(m.tool_calls??[]).map((c:any)=>({type:'function_call',call_id:c.id,name:c.function.name,arguments:c.function.arguments}))]),
     ...(tools.length?{tools:tools.map((t:any)=>({type:'function',...t.function})),tool_choice:'auto'}:{})};
   if(kind==='anthropic'){
     const converted:any[]=[];
     for(const m of messages.filter((m:any)=>m.role!=='system')){
       const role=m.role==='assistant'?'assistant':'user';
       const content=m.role==='tool'?[{type:'tool_result',tool_use_id:m.tool_call_id,content:m.content}]:[
-        ...(m.content?[{type:'text',text:m.content}]:[]),...(m.tool_calls??[]).map((c:any)=>({type:'tool_use',id:c.id,name:c.function.name,input:JSON.parse(c.function.arguments)}))];
+        ...contentFor(m.content,kind),...(m.tool_calls??[]).map((c:any)=>({type:'tool_use',id:c.id,name:c.function.name,input:JSON.parse(c.function.arguments)}))];
       if(!content.length)continue;
       if(converted.at(-1)?.role===role)converted.at(-1).content.push(...content);else converted.push({role,content});
     }
@@ -32,7 +47,7 @@ export function encodeRequest(kind:Family,b:any){
   for(const m of messages)for(const c of m.tool_calls??[])names.set(c.id,c.function.name);
   return {systemInstruction:{parts:messages.filter((m:any)=>m.role==='system').map((m:any)=>({text:m.content}))},
     contents:messages.filter((m:any)=>m.role!=='system').map((m:any)=>({role:m.role==='assistant'?'model':'user',parts:m.role==='tool'?[{functionResponse:{name:names.get(m.tool_call_id)??m.tool_call_id,response:{result:m.content}}}]:[
-      ...(m.content?[{text:m.content}]:[]),...(m.tool_calls??[]).map((c:any)=>({functionCall:{name:c.function.name,args:JSON.parse(c.function.arguments)},...(c.providerData?{thoughtSignature:c.providerData}:{})}))]})),
+      ...contentFor(m.content,kind),...(m.tool_calls??[]).map((c:any)=>({functionCall:{name:c.function.name,args:JSON.parse(c.function.arguments)},...(c.providerData?{thoughtSignature:c.providerData}:{})}))]})),
     ...(b.max_tokens?{generationConfig:{maxOutputTokens:b.max_tokens}}:{}),...(tools.length?{tools:[{functionDeclarations:tools.map((t:any)=>({name:t.function.name,description:t.function.description,parameters:t.function.parameters}))}]}:{})};
 }
 /** Normalize both JSON and SSE without buffering an entire streamed completion. */

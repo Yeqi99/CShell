@@ -3,7 +3,7 @@ import { z } from 'zod';
 // their own schemas; model output never creates new providers or executable actions.
 export const extractedConnectionSchema = z
   .object({
-    providerId: z.enum(['cshell.ssh','cshell.rdp','cshell.client','cshell.http']),
+    providerId: z.enum(['cshell.ssh','cshell.rdp','cshell.client','cshell.http','cshell.sftp','cshell.ftp','cshell.ftps']),
     fields: z
       .object({
         url: z.string().url().max(8192).refine(s=>{const u=new URL(s);return ['http:','https:'].includes(u.protocol)&&!u.username&&!u.password&&!u.hash;}).optional(),

@@ -21,7 +21,8 @@ export interface ConnectionTool {
   readonly needsReview: (input: unknown) => boolean;
   /** Shared resource mutation domain within this target. Undefined means no declared conflict. */
   readonly conflictDomain?: (input: unknown) => string | readonly string[] | undefined;
-  invoke(input: unknown, signal: AbortSignal, output?: (text: string) => void): Promise<string>;
+  /** Long-lived built-ins recheck this guard before each delayed side effect. */
+  invoke(input: unknown, signal: AbortSignal, output?: (text: string) => void, guard?: () => void): Promise<string>;
 }
 export interface ProviderConnection {
   readonly agent?: (

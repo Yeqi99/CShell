@@ -15,6 +15,7 @@ const call = (action: string, input?: unknown) =>
 type Account = { id: string; name: string; workspace: string; providerId?:string };
 type Model = { id: string; available: boolean };
 export function OpenCodeView() {
+  const [runtime,setRuntime]=useState<{kind:string;version?:string;platformSupported?:boolean}>();
   const [login, setLogin] = useState<any>(null),
     [accounts, setAccounts] = useState<Account[]>([]),
     [selected, setSelected] = useState(''),
@@ -59,6 +60,7 @@ export function OpenCodeView() {
       .then((s) => {
         if (active) {
           setAccounts(s.accounts);
+          setRuntime(s.runtime);
           if (s.accounts.length) select(s.accounts[0]);
           else setEditing(true);
         }
@@ -163,6 +165,8 @@ export function OpenCodeView() {
           <ExternalLink size={16} /> 获取 API Key
         </button>
       </header>
+      {runtime?.kind==='official' && <p className="opencode-note">{runtime.platformSupported ? `通过官方 OpenCode ${runtime.version} 运行。首次发送会下载并核验私有运行时；使用设置中的网络出口。模型权限、地区与额度仍以服务端结果为准。` : '此平台尚无已核验的官方运行时。账号仍保留，可继续管理目录与密钥。'}</p>}
+
       <div className="opencode-row">
         <button
           disabled={busy || !!login || accounts.length >= 32}
@@ -298,7 +302,7 @@ export function OpenCodeView() {
           </form>
         )}
         <p className="opencode-hint">
-          保存后验证密钥并接入账号。仅“检测所选模型”发送简短请求，可能使用少量额度。
+          保存后即可在智能体的 OpenCode 菜单选择模型；无需逐个接入基座。“检测所选模型”会发送简短请求，可能使用少量额度。
         </p>
       </div>
       <div className="opencode-card opencode-models">

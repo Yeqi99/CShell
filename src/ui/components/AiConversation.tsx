@@ -1,6 +1,7 @@
 import { submitsComposer } from '../composer-keys';
 import { AiToolRecord, toolInput } from './AiToolRecord';
 import { AiTaskTree } from './AiWork';
+import { AiModelMenu } from './AiModelMenu';
 import { useAiDrafts } from '../ai-drafts';
 import { useExtensionCatalog } from '../use-extension-catalog';
 import { useEffect, useRef, useState } from 'react';
@@ -284,7 +285,6 @@ export function AiConversation({
       </div>
       <form
         className="agent-composer"
-        hidden={!provider}
         onSubmit={(e) => {
           e.preventDefault();
           send();
@@ -309,42 +309,13 @@ export function AiConversation({
         <div className="agent-composer-tools">
           <div className="agent-model">
             <Cpu size={13} />
-            {(
-              <div
-                className="agent-model-picker"
-                title={thread ? '切换模型并开始新会话，保留当前会话' : provider?.model}
-              >
-                <span>
-                  {provider?.name || '选择基座'}
-                </span>
-                <select
-                  aria-label="AI 基座"
-                  value={thread?.providerId ?? providerId}
-                  disabled={active || busy}
-                  onChange={(e) => {
-                    const next = e.target.value;
-                    if (!thread) { setProviderId(next); return; }
-                    void run(async () => {
-                      const created = await window.cshell.aiThreadCreate(thread.location, next, thread.mode, thread.sessionId);
-                      setDrafts(previous => ({ ...previous, [created.id]: text }));
-                      setProviderId(next);
-                      openThread(created.id);
-                    });
-                  }}
-                >
-                  <option value="" disabled>
-                    选择基座
-                  </option>
-                  {snapshot.providers.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} · {p.model}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+            <AiModelMenu providers={snapshot.providers} providerId={thread?.providerId??providerId} model={thread?.extensionModel??chosenModel} disabled={busy} configure={configure} onSelect={async(next,reference)=>{
+              await run(async()=>{
+                const created=await window.cshell.aiThreadCreate(thread?.location??location,next,thread?.mode??mode,thread?.sessionId??sessionId,reference);
+                setDrafts(previous=>({...previous,[created.id]:text}));setProviderId(next);openThread(created.id);
+              });
+            }}/>
           </div>
-          {!thread && modelChoices.length>0 && <select className="agent-account-model" aria-label="账号模型" value={chosenModel} onChange={e=>setChosenModel(e.target.value)}><option value="" disabled>请选择可用模型</option>{modelChoices.map(c=><option key={c.ref} value={c.ref} disabled={!c.available}>{c.label??c.model}{c.available ? '' : ' · 当前不可用'}</option>)}</select>}
           {modelsLoading && <span className="agent-thread-model" role="status">加载模型…</span>}
           {modelsError && <span className="agent-thread-model" title={modelsError}>模型目录暂不可用</span>}
           {requiresModel && !modelsLoading && !modelsError && catalog?.current.reason && <span className="agent-thread-model" role="status" title={catalog.current.reason}>{catalog.current.reason}</span>}

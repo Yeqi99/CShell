@@ -10,6 +10,10 @@ import {
 } from '../../shared/ai';
 import type { Profile } from '../../shared/contracts';
 const names = {
+  'browser.read': '读取机器浏览器页面与截图',
+  'browser.control': '操作机器浏览器（包括已登录网站）',
+  'desktop.view': '查看远程桌面与截图',
+  'desktop.control': '远程桌面键鼠输入',
   'http.send': '从此机器发送 HTTP 请求',
   'agent.manage': '管理 CAgent 与系统环境',
   'agent.hosting': '管理 CAgent HTTP 服务',

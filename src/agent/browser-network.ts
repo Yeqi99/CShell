@@ -15,6 +15,7 @@ type Channel = {
 /** Authenticated RPC tunnel. No listening port on the agent; bounded per-owner buffers. */
 export class AgentBrowserNetwork {
   private channels = new Map<string, Channel>();
+  get activity(){return this.channels.size;}
   constructor(private allowed: (owner: string) => boolean,private route?: (host:string,port:number)=>Promise<Duplex>) {}
   private guard(owner: string) {
     if (!this.allowed(owner)) {
