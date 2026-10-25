@@ -1,9 +1,14 @@
+import {FileConnectionWorkspace} from './components/FileConnectionWorkspace';
+import {isFileConnection} from '../shared/file-connections';
 import {SharedTerminalMount, TerminalSlot} from './components/SharedTerminalMount';
+import {VisualSshTerminal} from './components/VisualSshTerminal';
+import {connectionUsesVisual} from '../shared/connection-view';
 import {RdpMachineWorkspace} from './components/RdpMachineWorkspace';
 import {LinuxWorkspace} from './components/LinuxWorkspace';
 import {SavedAgentConnection} from './components/SavedAgentConnection';
 import { MonitorViews } from './components/MonitorViews';
 import { WorkbenchHome } from './components/WorkbenchHome';
+import { CommandConsole } from './components/CommandConsole';
 import type { CurrentViewSource } from '../shared/monitor-views';
 import {AgentMachineWorkspace} from './components/AgentMachineWorkspace';
 import type {AgentTarget} from '../shared/agent';
@@ -235,7 +240,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
     [form, setForm] = useState<Profile | 'new' | null>(null),
     [settings, setSettings] = useState(false),
     [surface, setSurface] = useState<
-      'terminal' | 'connection' | 'quick' | 'settings' | 'extensions' | 'activity' | 'wsl' | 'machine' | 'views' | 'home'
+      'terminal' | 'connection' | 'quick' | 'settings' | 'extensions' | 'activity' | 'wsl' | 'machine' | 'views' | 'home' | 'command'
     >('home'),
     [palette, setPalette] = useState(false),
     [error, setError] = useState(''),
@@ -244,13 +249,16 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
     [confirmDelete, setConfirmDelete] = useState<Profile | null>(null),
     [confirmClose, setConfirmClose] = useState<Tab | null>(null);
   const [linuxWorkspaces,setLinuxWorkspaces]=useState<string[]>([]);
+  const [commandTabs, setCommandTabs] = useState<{id:string;name:string}[]>([]), [commandId, setCommandId] = useState('');
+  const commandNumber = useRef(0);
+  const newCommandTab = () => { const id = crypto.randomUUID(), name = `命令台 ${++commandNumber.current}`; setCommandTabs(v => [...v, {id, name}]); setCommandId(id); setSurface('command'); };
   const [linuxModes,setLinuxModes]=useState<Record<string,boolean>>({});
   const linuxRestored=useRef(new Set<string>());
-  useEffect(()=>{for(const tab of tabs){if(tab.local||tab.client||linuxRestored.current.has(tab.id))continue;linuxRestored.current.add(tab.id);if(config.preferences.defaultConnectionView !== 'original'){setLinuxWorkspaces(v=>v.includes(tab.id)?v:[...v,tab.id]);setLinuxModes(v=>({...v,[tab.id]:true}));}}},[tabs]);
+  useEffect(()=>{for(const tab of tabs){if(tab.local||tab.client||linuxRestored.current.has(tab.id))continue;linuxRestored.current.add(tab.id);if(connectionUsesVisual(tab.profile,config.preferences)){setLinuxWorkspaces(v=>v.includes(tab.id)?v:[...v,tab.id]);setLinuxModes(v=>({...v,[tab.id]:true}));}}},[tabs]);
   const [machineSessionIds,setMachineSessionIds]=useState<Record<string,string[]>>({});
   const [machineSessionCounts,setMachineSessionCounts]=useState<Record<string,number>>({});
   const [machines,setMachines]=useState<{device:ClientDevice;target:AgentTarget}[]>([]),[machineId,setMachineId]=useState('');
-  const currentSsh = [...tabs.filter(tab => !tab.closed).map(t=>({id:t.id})),...machines.flatMap(m=>(machineSessionIds[m.target.id]??[]).map(id=>({id})))];
+  const currentSsh = [...tabs.filter(tab => !tab.closed && !isFileConnection(tab.profile)).map(t=>({id:t.id})),...machines.flatMap(m=>(machineSessionIds[m.target.id]??[]).map(id=>({id})))];
   const currentDevices = [...new Set([...machines.map(m => m.device.deviceId), ...tabs.filter(t => !t.closed && t.client).map(t => t.client!.device.deviceId)])];
   const openCurrentView = async (mode: 'tile' | 'focus' | 'overview') => {
     const sources: CurrentViewSource[] = await Promise.all(currentSsh.map(async tab => ({
@@ -275,7 +283,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
   const [quickConnections, setQuickConnections] = useState<Profile[]>([]);
   const [quickId, setQuickId] = useState('');
   const [quickVisual, setQuickVisual] = useState<Record<string, boolean>>({});
-  const openSaved = (profile: Profile, visual = config.preferences.defaultConnectionView !== 'original') => {
+  const openSaved = (profile: Profile, visual = connectionUsesVisual(profile,config.preferences)) => {
     setQuickVisual(v => ({...v, [profile.id]: visual}));
     if (profile.protocol === 'rdp' && !visual) {
       void window.cshell.openRdp(profile.id).catch(onError);
@@ -387,6 +395,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
       if (shortcut === 'nextTab' || shortcut === 'previousTab') {
         const views = [
           { key: 'home', select: () => setSurface('home') },
+          ...commandTabs.map(tab => ({key:tab.id, select:()=>{setCommandId(tab.id);setSurface('command');}})),
           ...tabs.map((tab) => ({
             key: tab.id,
             select: () => {
@@ -413,7 +422,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
           ...(settings ? [{ key: 'settings', select: () => setSurface('settings') }] : []),
         ];
         const key =
-          surface === 'home' ? 'home' : surface === 'terminal'
+          surface === 'command' ? commandId : surface === 'home' ? 'home' : surface === 'terminal'
             ? active
             : surface === 'quick'
               ? `quick-${quickId}`
@@ -447,6 +456,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
     extensions,
     quickConnections,
     quickId,
+    commandId, commandTabs,
   ]);
   const current = surface === 'terminal' ? tabs.find((tab) => tab.id === active) : undefined;
   useEffect(
@@ -458,11 +468,11 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
       }),
     [],
   );
-  const showTools = surface === 'terminal' && !linuxModes[active] && right && !!current && !current.closed && !current.local && !current.client;
+  const showTools = !current?.profile || isFileConnection(current.profile) ? false : surface === 'terminal' && !linuxModes[active] && right && !!current && !current.closed && !current.local && !current.client;
   const saveProfile = async (p: Profile) => {
     await window.cshell.saveProfile(p);
     setTabs((items) =>
-      items.map((tab) => (tab.profile.id === p.id ? { ...tab, profile: p } : tab)),
+      items.map((tab) => (tab.profile.id === p.id ? { ...tab, profile: { ...tab.profile, name:p.name, group:p.group, favorite:p.favorite, defaultConnectionView:p.defaultConnectionView } } : tab)),
     );
     await refresh();
   };
@@ -477,7 +487,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
       ...v,
       { id: result.sessionId, profile, closed: terminalClosed(result.sessionId) },
     ]);
-    const visual = quickVisual[profile.id] ?? config.preferences.defaultConnectionView !== 'original';
+    const visual = !isFileConnection(profile) && (quickVisual[profile.id] ?? connectionUsesVisual(profile,config.preferences));
     if (visual) setLinuxWorkspaces(v=>[...v,result.sessionId]);
     setLinuxModes(v=>({...v,[result.sessionId]:visual}));
     linuxRestored.current.add(result.sessionId);
@@ -588,7 +598,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
     onLayout({ ...layout, [key]: !layout[key] });
   const docking = usePanelDrop(layout, onLayout);
   const openFiles = () => {
-    if (!current || current.closed || current.local || current.client) return;
+    if (!current || current.closed || current.local || current.client || isFileConnection(current.profile)) return;
     onLayout({...layout, fileVisible: true});
     setFileReveal(value => ({id: current.id, revision: value.revision + 1}));
   };
@@ -601,6 +611,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
       action: () => openConnection('new'),
     },
     { id: 'settings', name: t('settings'), hint: 'Ctrl+,', icon: Settings2, action: openSettings },
+    { id: 'command-console', name: '新建 CShell 命令台', icon: TerminalIcon, action: newCommandTab },
     {
       id: 'sidebar',
       name: t('sidebar'),
@@ -608,7 +619,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
       icon: PanelLeft,
       action: () => togglePanel('serverVisible'),
     },
-    ...(current && !current.closed && !current.local && !current.client
+    ...(current && !current.closed && !current.local && !current.client && !isFileConnection(current.profile)
       ? [
           {
             id: 'files',
@@ -806,6 +817,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
             </div>
             <TabStrip>
               <div className={`tab welcome-tab ${surface === 'home' ? 'active' : ''}`} onClick={() => setSurface('home')}><button onClick={() => setSurface('home')}><LayoutDashboard size={15}/>{t('workspace')}</button></div>
+              {commandTabs.map(tab => <div key={tab.id} className={`tab ${surface === 'command' && commandId === tab.id ? 'active' : ''}`} onClick={()=>{setCommandId(tab.id);setSurface('command');}}><button onClick={()=>{setCommandId(tab.id);setSurface('command');}}><TerminalIcon size={15}/>{tab.name}</button><button className="icon" title={`关闭${tab.name}`} aria-label={`关闭${tab.name}`} onClick={e=>{e.stopPropagation();setCommandTabs(v=>v.filter(t=>t.id!==tab.id));if(commandId===tab.id)setSurface('home');}}><X size={13}/></button></div>)}
               {machines.map(m=><div key={m.target.id} className={'tab '+(surface==='machine'&&machineId===m.target.id?'active':'')} onClick={()=>{setMachineId(m.target.id);setSurface('machine');}}><button onClick={()=>{setMachineId(m.target.id);setSurface('machine');}}>{m.target.name}</button><button className="icon" title="关闭机器工作区及其会话" aria-label={'关闭 '+m.target.name} onClick={e=>{e.stopPropagation();void closeMachine(m.target.id).catch(onError);}}>×</button></div>)}
 
               {tabs.length ? (
@@ -823,7 +835,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
                         .then((snapshot) => window.cshell.openFloating(tab.id, snapshot))
                         .catch(onError);
                     }}
-                    onClose={() => (tab.closed ? run(closeTab(tab)) : setConfirmClose(tab))}
+                    onClose={() => (tab.closed && !isFileConnection(tab.profile) ? run(closeTab(tab)) : setConfirmClose(tab))}
                     onMove={(source, target) =>
                       setTabs((items) => {
                         const next = [...items],
@@ -989,7 +1001,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
                 </div>
               )}
             </TabStrip>
-            {surface === 'terminal' && current && !current.local && !current.client && <button className="icon" title={linuxModes[active] ? '切换到 SSH 终端' : '打开可视化桌面'} aria-label={linuxModes[active] ? '切换到 SSH 终端' : '打开可视化桌面'} onClick={() => {
+            {surface === 'terminal' && current && !current.local && !current.client && !isFileConnection(current.profile) && <button className="icon" title={linuxModes[active] ? '切换到 SSH 终端' : '打开可视化桌面'} aria-label={linuxModes[active] ? '切换到 SSH 终端' : '打开可视化桌面'} onClick={() => {
               setLinuxWorkspaces(v => v.includes(active) ? v : [...v, active]);
               setLinuxModes(v => ({...v, [active]: !v[active]}));
             }}>{linuxModes[active] ? <TerminalIcon size={17}/> : <LayoutDashboard size={17}/>}</button>}
@@ -1046,7 +1058,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
             </button>
             <button
               className="workbench-tool ssh-files-toggle"
-              hidden={!current || current.closed || !!current.local || !!current.client}
+              hidden={!current || current.closed || !!current.local || !!current.client || isFileConnection(current.profile)}
               aria-label={t('files')}
               title={`${t('files')} (Ctrl+Shift+E)`}
               onClick={openFiles}
@@ -1085,7 +1097,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
                 <SavedAgentConnection profile={profile} onConnect={openMachineDevice} onDone={()=>setQuickConnections(items=>items.filter(item=>item.id!==profile.id))}/>
               ) : (
                 <SavedConnection
-                  visual={quickVisual[profile.id] ?? config.preferences.defaultConnectionView !== 'original'}
+                  visual={!isFileConnection(profile) && (quickVisual[profile.id] ?? connectionUsesVisual(profile,config.preferences))}
                   profile={profile}
                   saved={config.savedCredentials.includes(profile.id)}
                   persist={config.profiles.some((p) => p.id === profile.id)}
@@ -1105,6 +1117,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
             >
               {draft === 'new' ? (
                 <ConnectionEntry
+                  fileConnections={Object.fromEntries((['sftp','ftp','ftps'] as const).map(protocol=>[protocol,<ConnectionForm key={protocol} protocol={protocol} initialPersist={true} groups={config.groups} saved={false} onClose={()=>closeEditor(draft)} onSave={saveProfile} onConnect={connect}/>]))}
                   onSaved={refresh}
                   http={
                     pluginEnabled(config.plugins, 'http') ? (
@@ -1170,7 +1183,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
                   visible={surface === 'extensions'}
                   plugins={config.plugins}
                   sessions={tabs
-                    .filter((tab) => !tab.local)
+                    .filter((tab) => !tab.local && !isFileConnection(tab.profile))
                     .map((tab) => ({
                       id: tab.id,
                       label:
@@ -1220,9 +1233,11 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
           {viewsOpen && <div className="workspace-editor" hidden={surface !== 'views'}><MonitorViews config={config}/></div>}{machines.map(m=><div key={m.target.id} className="workspace-editor" hidden={surface!=='machine'||machineId!==m.target.id}><AgentMachineWorkspace onDisconnect={()=>closeMachine(m.target.id)} device={m.device} target={m.target} preferences={preferences} onSessionCount={(count,ids)=>{setMachineSessionCounts(v=>v[m.target.id]===count?v:{...v,[m.target.id]:count});setMachineSessionIds(v=>JSON.stringify(v[m.target.id])===JSON.stringify(ids)?v:{...v,[m.target.id]:ids});}} active={surface==='machine'&&machineId===m.target.id}/></div>)}
           <div className="workspace-editor" hidden={surface !== 'home' && !(surface === 'terminal' && !tabs.length)}>
             <WorkbenchHome config={config} active={surface === 'home' || (surface === 'terminal' && !tabs.length)} currentCount={currentSsh.length + currentDevices.length}
+              onView={view=>savePreferences({...config.preferences,workbenchView:view})} onSettings={openSettings} onExtensions={openExtensions} onAgent={()=>setAiVisible(true)} onCommandTab={newCommandTab}
               onNew={() => openConnection('new')} onViews={() => { setViewsOpen(true); setSurface('views'); }} onConnect={openSaved} onCurrent={openCurrentView}/>
           </div>
-          {surface === 'terminal' && current?.closed && !linuxModes[current.id] && (
+          {commandTabs.map(tab=><div key={tab.id} className="workspace-editor" hidden={surface!=='command'||commandId!==tab.id}><CommandConsole active={surface==='command'&&commandId===tab.id} onSettings={openSettings} onNewTab={newCommandTab}/></div>)}
+          {surface === 'terminal' && current?.closed && !isFileConnection(current.profile) && !linuxModes[current.id] && (
             <div className="disconnected-session-bar" role="status">
               <span>
                 <strong>{t('disconnected')}</strong>
@@ -1264,11 +1279,12 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
             </div>
           )}
 
-          {tabs.filter(tab=>linuxWorkspaces.includes(tab.id)).map(tab=><LinuxWorkspace key={tab.id} session={tab.id} profileId={tab.profile.id} preferences={preferences} name={tab.profile.name} active={surface==='terminal'&&active===tab.id&&!!linuxModes[tab.id]} closed={!!tab.closed} onRetry={()=>openSaved(tab.profile)} onTerminal={()=>{}} files={visible=><div inert={!!tab.closed} style={{height:"100%"}}><ToolsPanel sessionId={tab.id} sessionName={tab.profile.name} active={visible} dockerEnabled={pluginEnabled(config.plugins,'docker')} transfers={transfers.filter(t=>t.sessionId===tab.id)} onError={onError}/></div>} terminal={(visible)=><TerminalSlot id={tab.id} active={visible}/>}/>)}
+          {tabs.filter(tab=>linuxWorkspaces.includes(tab.id)).map(tab=><LinuxWorkspace key={tab.id} session={tab.id} profileId={tab.profile.id} preferences={preferences} name={tab.profile.name} active={surface==='terminal'&&active===tab.id&&!!linuxModes[tab.id]} closed={!!tab.closed} onRetry={()=>openSaved(tab.profile)} onTerminal={()=>{}} files={visible=><div inert={!!tab.closed} style={{height:"100%"}}><ToolsPanel sessionId={tab.id} sessionName={tab.profile.name} closed={!!tab.closed} active={visible} dockerEnabled={pluginEnabled(config.plugins,'docker')} transfers={transfers.filter(t=>t.sessionId===tab.id)} onError={onError}/></div>} terminal={(visible)=><VisualSshTerminal active={visible} closed={!!tab.closed} tools={toolsActive=><ToolsPanel sessionId={tab.id} sessionName={tab.profile.name} closed={!!tab.closed} active={toolsActive} dockerEnabled={pluginEnabled(config.plugins,'docker')} transfers={transfers.filter(t=>t.sessionId===tab.id)} onError={onError}/>}><TerminalSlot id={tab.id} active={visible}/></VisualSshTerminal>}/>)}
+          {tabs.filter(tab=>isFileConnection(tab.profile)).map(tab=><div key={tab.id} className="file-workspace-host" hidden={surface!=='terminal'||active!==tab.id}><FileConnectionWorkspace sessionId={tab.id} profile={tab.profile} closed={!!tab.closed} transfers={transfers.filter(t=>t.sessionId===tab.id)} onError={onError} onRetry={()=>openSaved(tab.profile)}/></div>)}
           <AiExecution enabled={preferences.showAiExecution && !minimal} sessionId={current?.id} />
           {tabs.length ? (
-            <div className="terminals" hidden={surface !== 'terminal'||!!linuxModes[active]}>
-              {tabs.map((tab) => (
+            <div className="terminals" hidden={surface !== 'terminal'||!!linuxModes[active]||!!current&&isFileConnection(current.profile)}>
+              {tabs.filter(tab=>!isFileConnection(tab.profile)).map((tab) => (
                 <SharedTerminalMount key={tab.id} id={tab.id} visual={!!linuxModes[tab.id]} active={surface === 'terminal' && active === tab.id}>{visible => <TerminalPane
                   id={tab.id}
                   active={visible}
@@ -1294,7 +1310,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
 
           {localDock && surface === 'terminal' && !minimal && (
             <LocalDock
-              sessionId={current?.local || current?.client ? undefined : current?.id}
+              sessionId={current?.local || current?.client || current && isFileConnection(current.profile) ? undefined : current?.id}
               transfers={transfers}
               onError={onError}
               onClose={() => setLocalDock(false)}
@@ -1315,7 +1331,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
               onChange={(fileWidth) => onLayout({ ...layout, fileWidth })}
             />
             {tabs
-              .filter((tab) => !tab.closed && !tab.client && !tab.local)
+              .filter((tab) => !tab.closed && !tab.client && !tab.local && !isFileConnection(tab.profile))
               .map((tab) => (
                 <div
                   className="session-tools"
@@ -1377,7 +1393,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
                 ? t('disconnected')
                 : current.local
                   ? `本机 · ${current.profile.name}`
-                  : `${current.client ? 'Client' : 'SSH'} · ${current.profile.host}:${current.profile.port}`
+                  : `${current.client ? 'CAgent' : (current.profile.protocol??'ssh').toUpperCase()} · ${current.profile.host}:${current.profile.port}`
               : t('ready')}
           </span>
         </div>
@@ -1463,7 +1479,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
       <TextAssist />
       {confirmClose && (
         <Modal title={t('closeSession')} onClose={() => setConfirmClose(null)}>
-          <p>{t('closeSessionBody')}</p>
+          <p>{isFileConnection(confirmClose.profile) ? '关闭文件会话将停止传输并丢弃此页未保存的编辑。请先保存需要的内容。' : t('closeSessionBody')}</p>
           <footer>
             <button onClick={() => setConfirmClose(null)}>{t('cancel')}</button>
             <button className="primary" onClick={() => run(closeTab(confirmClose))}>

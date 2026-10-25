@@ -141,6 +141,7 @@ export class CodingService {
     }
   >();
   private logins = new Map<string, Login>();
+  get activity(){return this.running.size + [...this.logins.values()].filter(v=>v.state==='running').length + [...this.installJobs.values()].filter(v=>v.state==='running').length;}
   private plans = new Map<
     string,
     { owner: string; engine: CodingEngine; directory: string; version: string; npm: string }

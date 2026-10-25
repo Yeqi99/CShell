@@ -16,6 +16,9 @@ import { applicationTools } from './application-tools';
 import { pseudoToolCall, progressOnly } from './ai-response';
 import { requestAiReply } from './ai-request';
 import { AiExtensionRegistry } from './ai-extension';
+import type { AiRuntimeProvider } from './ai-extension';
+import { AiImageStore, attachToolImage, parseToolImage, type AiImageReference } from './ai-images';
+import { visualAuditJson } from './visual-privacy';
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -56,7 +59,7 @@ export class AiService {
   requestTransport?: typeof fetch;
   private jobs=new AgentJobs();
   readonly providerExtensions=new AiExtensionRegistry();
-  private async resolveProvider(p:Provider,session:string){
+  private async resolveProvider(p:Provider,session:string):Promise<Provider & AiRuntimeProvider>{
     return p.extension?{...p,...await this.providerExtensions.resolve(p.extension,session)}:{...p,transport:this.requestTransport};
   }
   extensionTools?: ()=>import('./connections/contracts').ConnectionTool[];
@@ -834,6 +837,11 @@ export class AiService {
     const stored = this.providers.find((p) => p.id === t.providerId);
     if (!stored) throw new Error('AI provider was removed');
     const p=await this.resolveProvider(t.extensionModel && stored.extension ? {...stored,extension:{...stored.extension,model:t.extensionModel}} : stored,t.id);
+    const images=new AiImageStore(this.directory,this.store);
+    const previousImage=[...t.messages].reverse().find(message=>message.tool?.image);
+    let imageReference:AiImageReference|undefined=previousImage?.tool?.imageRejected?undefined:previousImage?.tool?.image;
+    let imageData:ReturnType<typeof parseToolImage>;
+    if(imageReference&&p.imageInput!==false){try{imageData=await images.load(t.id,imageReference);}catch{imageReference=undefined;}}
     const messages: any[] = [
       {
         role: 'system',
@@ -875,6 +883,7 @@ export class AiService {
       }
       const available = [...this.applicationTools(t), ...machineTools]
         .filter((d) => this.allowed(t, d.name))
+        .filter((d) => p.imageInput!==false||!['browser_screenshot','desktop_screenshot'].includes(d.name))
         .filter((d) => !triggered || !eventToolDenied(d.name))
         .map((d) => {
           // Function parameters already carry their schema in a typed API field.
@@ -898,7 +907,7 @@ export class AiService {
           boundSession: t.sessionId ?? null,
           boundTarget: t.target ?? null,
           connected: machineTools.length > 0,
-          activeBase: { id: p.id, name: p.name, model: p.model },
+          activeBase: { id: p.id, name: p.name, model: p.model, imageInput:p.imageInput===true?'supported by provider metadata':p.imageInput===false?'not supported by provider metadata':'unconfirmed; send images only for an actual screenshot task; service may reject' },
           reviewMode: t.mode,
           availableTools: available.map((d) => d.function.name),
         }) +
@@ -907,12 +916,13 @@ export class AiService {
       const url = base + (base.endsWith('/chat/completions') ? '' : '/chat/completions');
       const streamed = { role: 'assistant' as const, content: '', time: Date.now() };
       let inserted = false;
+      const requestMessages=attachToolImage(messages,imageData,imageReference);
       if(triggered){
-        const reservation=Buffer.byteLength(JSON.stringify({messages,tools:available}),'utf8')+1024;
+        const reservation=Buffer.byteLength(JSON.stringify({messages:requestMessages,tools:available}),'utf8')+1024;
         if(reservation>remaining)throw new Error('事件运行已达到请求预算，未继续调用模型');
         remaining-=reservation;
       }
-      budget.reserve({messages,tools:available});
+      budget.reserve({messages:requestMessages,tools:available});
       const reply = await requestAiReply(url, {
         method: 'POST',
         redirect: 'error',
@@ -922,7 +932,7 @@ export class AiService {
         },
         body: JSON.stringify({
           model: p.model,
-          messages,
+          messages:requestMessages,
           ...(available.length ? { tools: available, tool_choice: 'auto' } : {}),
           stream: true,
           ...(triggered?{max_tokens:512}:{}),
@@ -935,7 +945,7 @@ export class AiService {
           inserted = true;
         }
         this.onThreadUpdate?.(t);
-      },undefined,p.transport);
+      },undefined,p.transport).catch(async error=>{if(imageReference&&/未接受图片输入/.test(String(error))){const entry=t.messages.find(message=>message.tool?.image?.id===imageReference?.id);if(entry?.tool){entry.tool.imageRejected=true;entry.tool.output+='\n模型服务未接受此图片。后续对话不会自动重发；可使用页面文字快照或明确重新截图。';await this.persist();}}throw error;});
       budget.reserve(reply);
       if (reply.content && pseudoToolCall(reply.content) && !reply.tool_calls?.length) {
         if (inserted) t.messages.splice(t.messages.indexOf(streamed), 1);
@@ -972,6 +982,8 @@ export class AiService {
         signal.throwIfAborted();
         let execution: AiThread['execution'];
         let result: string;
+        let capturedImage:AiImageReference|undefined;
+        const auditArguments=visualAuditJson(call.function.name,call.function.arguments);
         let callTarget = call.function.name === 'connect_machine' ? '连接目标' : t.target;
         try {
           const args = JSON.parse(call.function.arguments);
@@ -995,7 +1007,7 @@ export class AiService {
             t.pending = {
               id: requestId,
               tool: call.function.name,
-              arguments: call.function.arguments,
+              arguments: auditArguments,
               target:
                 call.function.name === 'connect_machine'
                   ? this.store.profile(args.profileId).name +
@@ -1035,7 +1047,7 @@ export class AiService {
             t.execution = execution;
             this.onThreadUpdate?.(t);
           }
-          t.checkpoint={...t.checkpoint,phase:'执行工具',updatedAt:Date.now(),pending:{tool:call.function.name,input:call.function.arguments}};
+          t.checkpoint={...t.checkpoint,phase:'执行工具',updatedAt:Date.now(),pending:{tool:call.function.name,input:auditArguments}};
           await this.persist();
           result = await prepared.execute(
             () => this.allowed(t, call.function.name, args),
@@ -1046,7 +1058,9 @@ export class AiService {
               this.onThreadUpdate?.(t);
             },
           );
-          if(result.length>16000){const logId=randomUUID();await mkdir(join(this.directory,'ai-logs'),{recursive:true});await writeFile(join(this.directory,'ai-logs',t.id+'-'+logId+'.enc'),await this.store.encryptPrivate(result),{mode:0o600});result=result.slice(0,6000)+'\n[完整日志可用 task_log_read 读取，id='+logId+'；中间内容未放入上下文]\n'+result.slice(-6000);}
+          const picture=parseToolImage(result);
+          if(picture){capturedImage=await images.save(t.id,picture);imageReference=capturedImage;imageData=p.imageInput===false?undefined:picture;const {dataBase64,...metadata}=picture;result=JSON.stringify({...metadata,imageId:capturedImage.id,imageStatus:p.imageInput===false?'当前基座不支持图片输入；可使用 browser_snapshot 读取页面':'图片将作为独立图像输入发送，未放入文本日志'});}
+          else if(result.length>16000){const logId=randomUUID();await mkdir(join(this.directory,'ai-logs'),{recursive:true});await writeFile(join(this.directory,'ai-logs',t.id+'-'+logId+'.enc'),await this.store.encryptPrivate(result),{mode:0o600});result=result.slice(0,6000)+'\n[完整日志可用 task_log_read 读取，id='+logId+'；中间内容未放入上下文]\n'+result.slice(-6000);}
           if (execution) execution.state = 'finished';
         } catch (e) {
           result = call.function.name==='get_permission_link'&&e instanceof z.ZodError ? 'Error: Invalid permission node or arguments. Call get_permission_link with {} to list supported nodes, then use an exact returned ID. This error does not mean CPU/disk access was denied.' : `Error: ${String((e as Error).message)}`;
@@ -1060,15 +1074,17 @@ export class AiService {
           role: 'tool',
           tool: {
             name: call.function.name,
-            input: call.function.arguments,
+            input: auditArguments,
             output: result,
             target: callTarget ?? t.target,
+            ...(capturedImage?{image:capturedImage}:{}),
           },
-          content: `${call.function.name}\n${call.function.arguments}\n${result}`,
+          content: `${call.function.name}\n${auditArguments}\n${result}`,
           time: Date.now(),
         });
         if(t.checkpoint){if(!signal.aborted&&!result.startsWith('Error:'))t.checkpoint.pending=undefined;t.checkpoint.lastResult=result.slice(-2000);t.checkpoint.updatedAt=Date.now();}
         await this.persist();
+        call.function.arguments=auditArguments;
         messages.push(Object.defineProperty({ role: 'tool', tool_call_id: call.id, content: result },'historyIndex',{value:t.messages.length-1}));
         budget.observe(call.function.name,call.function.arguments,result);
         if (

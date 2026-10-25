@@ -1,3 +1,4 @@
+import {version as applicationVersion} from '../../package.json';
 import { createServer, type Server as HttpServer } from 'node:http';
 import { randomBytes, randomUUID, timingSafeEqual, createHash } from 'node:crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
@@ -6,6 +7,8 @@ import { join } from 'node:path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
+import { withMcpImage } from './mcp-images';
+import { visualAuditArguments } from './visual-privacy';
 import { Store } from './store';
 import { SshService } from './ssh';
 import { mcpSettingsSchema, type McpSettings, type McpStatus } from '../shared/contracts';
@@ -26,6 +29,7 @@ import { ServerPages, serverPageInput } from './api/server-pages';
 import { baseResultSchemas, baseResultJson } from './api/result-contracts';
 import { ApiTasks } from './api/tasks';
 import { createSshManager } from './connections/ssh-provider';
+import { profileProvider } from '../shared/file-connections';
 import type { ConnectionManager } from './connections/manager';
 import type { Profile, SessionEvent } from '../shared/contracts';
 import type { HttpWorkspaces } from './http-workspaces';
@@ -576,7 +580,8 @@ export class McpService {
     const profile = this.store.profile(profileId);
     if (
       profile.protocol &&
-      profile.protocol !== 'ssh' &&
+      !['ssh', 'sftp'].includes(profile.protocol) &&
+      !(this.host && ['ftp','ftps'].includes(profile.protocol) && this.manager.list().some(p => p.id === 'cshell.ftp')) &&
       !(this.host && profile.protocol === 'client')
     )
       throw new ApiError(
@@ -611,7 +616,7 @@ export class McpService {
       p.username,
       p.clientShell,
       p.clientDistribution,
-      p.protocol === 'client' ? null : this.store.host(`${p.host.toLowerCase()}:${p.port}`),
+      !p.protocol || ['ssh','sftp'].includes(p.protocol) ? this.store.host(`${p.host.toLowerCase()}:${p.port}`) : null,
     ]);
   }
   /** One synchronous decision only. Always reload after an await or approval. */
@@ -742,7 +747,7 @@ export class McpService {
       const visible = this.manager.tools
         .tools(id)
         .filter((t) => this.capabilityAllowed(t.capability, owner, this.connections.get(id)));
-      const source = JSON.stringify(visible.map((t) => [t.name, t.capability]));
+      const source = JSON.stringify(visible.map((t) => [t.name, t.capability,t.description,z.toJSONSchema(t.input, { io: 'input' }),t.jsonOutput?z.toJSONSchema(t.jsonOutput):null]));
       if (!this.catalogs.has(key) || this.catalogSources.get(key) !== source) {
         this.catalogSources.set(key, source);
         this.catalogs.set(
@@ -761,7 +766,7 @@ export class McpService {
                   }
                 : { type: 'string' },
               permission: t.capability,
-              effects: t.capability.endsWith('.read') ? ('read' as const) : ('write' as const),
+              effects: t.capability.endsWith('.read')||t.capability.endsWith('.view') ? ('read' as const) : ('write' as const),
               target: `${target.providerId}:${target.resourceId}`,
               prerequisites: ['API-owned live connection', `Granted capability: ${t.capability}`],
               cancellation:
@@ -1015,7 +1020,7 @@ export class McpService {
       registrations.push(() => {
         server.registerTool(name, { ...config, inputSchema: schema }, async (args) => {
           try {
-            return await call(args);
+            return withMcpImage(await call(args));
           } catch (e) {
             return {
               isError: true,
@@ -1137,16 +1142,16 @@ export class McpService {
     const visibleServers = () => {
       const allowedProfiles = new Set(this.principal(owner).allowedProfiles);
       return this.store.snapshot().profiles.filter(
-      (p) => (!p.protocol || p.protocol === 'ssh' || (this.host && p.protocol === 'client')) &&
+      (p) => (!p.protocol || ['ssh','sftp'].includes(p.protocol) || (this.host && (p.protocol === 'client' || (['ftp','ftps'].includes(p.protocol) && this.manager.list().some(v => v.id === 'cshell.ftp'))))) &&
         allowedProfiles.has(p.id),
     ).map(({ id, name, host, port, username, protocol }) => ({
-      id, name, host, port, username, protocol: (protocol ?? 'ssh') as 'ssh' | 'client',
+      id, name, host, port, username, protocol: (protocol ?? 'ssh') as 'ssh' | 'client' | 'sftp' | 'ftp' | 'ftps',
     }));
     };
     register(
       'list_servers_page',
       {
-        description: 'Search authorized saved SSH and Agent connections with bounded pages. Cursors expire after five minutes and on visible directory or authorization changes. No credentials are returned; counts include only authorized search matches. budgetBytes bounds the JSON result, excluding the transport envelope.',
+        description: 'Search authorized saved SSH, SFTP, FTP/FTPS and Agent connections with bounded pages. Only installed providers are included. Cursors expire after five minutes and on visible directory or authorization changes. No credentials are returned; counts include only authorized search matches. budgetBytes bounds the JSON result, excluding the transport envelope.',
         inputSchema: serverPageInput.shape,
         annotations: { readOnlyHint: true },
         permission: 'connections.read', target: 'application',
@@ -1292,7 +1297,7 @@ export class McpService {
               if (!secret) throw new Error('Save credentials in CShell first');
               signal.throwIfAborted();
               result = {
-                sessionId: await this.manager.connect('cshell.ssh', profile, secret, signal, ready),
+                sessionId: await this.manager.connect(profileProvider(profile), profile, secret, signal, ready),
               };
             }
             signal.throwIfAborted();
@@ -1749,7 +1754,7 @@ export class McpService {
           const review = this.principal(owner, this.connections.get(sessionId)).review ?? 'always';
           if (
             requiresReview(review, prepared.needsReview) &&
-            !(await this.confirm(target.label, JSON.stringify({ tool, arguments: args }), signal))
+            !(await this.confirm(target.label, JSON.stringify({ tool, arguments: visualAuditArguments(tool,args) }), signal))
           )
             throw new ApiError(
               'FORBIDDEN',
@@ -1877,7 +1882,7 @@ export class McpService {
     );
     for (const tool of this.host?.applicationTools ?? []) {
       const authorized = () =>
-        allowsApplication(this.callerPolicy(owner), tool.capability);
+        this.host?.applicationTools?.includes(tool) === true && allowsApplication(this.callerPolicy(owner), tool.capability);
       if (!authorized()) continue;
       register(
         tool.name,
@@ -2054,7 +2059,7 @@ export class McpService {
         );
       }
     }
-    const catalogSource = JSON.stringify(definitions.map((d) => d.id));
+    const catalogSource = JSON.stringify(definitions.map((d) => [d.id,d.description,d.permission,z.toJSONSchema(d.input, { io: 'input' }),d.output]));
     if (!this.catalogs.has(owner) || this.catalogSources.get(owner) !== catalogSource) {
       this.catalogs.set(owner, new CapabilityCatalog(definitions));
       this.catalogSources.set(owner, catalogSource);
@@ -2078,7 +2083,7 @@ export class McpService {
     };
     const createServer = () => {
       if (server) return server;
-      server = new McpServer({ name: 'CShell', version: '0.6.0' });
+      server = new McpServer({ name: 'CShell', version: applicationVersion });
       const disclosure = this.principal(owner).disclosure;
       const estimatedBytes =
         disclosure?.mode === 'adaptive'
@@ -2117,7 +2122,7 @@ export class McpService {
           try {
             return {
               content: [
-                { type: 'text' as const, text: JSON.stringify(this.discover(args, owner)) },
+                { type: 'text' as const, text: JSON.stringify((this.endpoint(owner,signal),this.discover(args, owner))) },
               ],
             };
           } catch (e) {
@@ -2138,7 +2143,7 @@ export class McpService {
         },
         async (args) => {
           try {
-            return await call(args);
+            return withMcpImage(await this.endpoint(owner,signal).call(args));
           } catch (e) {
             return {
               isError: true,

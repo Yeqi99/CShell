@@ -4,6 +4,7 @@ import { Code2, Download, ArrowLeft, Check, RefreshCw, ShieldCheck } from 'lucid
 import type { AgentCall } from '../../shared/agent';
 import './development-market.css';
 import { agentRead } from '../agent-read';
+import { agentCapabilityError, agentCompatibilityNotice } from '../../shared/agent-compatibility';
 export function DevelopmentMarket({
   call,
   onOpen,
@@ -19,7 +20,7 @@ export function DevelopmentMarket({
     [directory, setDirectory] = useState(''),
     [plan, setPlan] = useState<any>(),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState('');
+    [error, setError] = useState(''), [compatibility,setCompatibility]=useState('');
   const refresh = async () => {
     const [c, i] = await Promise.allSettled([
       agentRead(() => call('coding.status')),
@@ -27,14 +28,15 @@ export function DevelopmentMarket({
     ]);
     setCoding(c.status === 'fulfilled' ? c.value : undefined);
     setIde(i.status === 'fulfilled' ? i.value : undefined);
-    if (c.status === 'rejected' || i.status === 'rejected')
-      throw Error('无法读取开发应用，请检查机器连接与 CAgent 版本');
-    const cs = c.value as any,
-      editor = i.value as any;
-    onChanged?.({
-      codex: !!cs.engines?.find((e: any) => e.engine === 'codex')?.ready,
-      claude: !!cs.engines?.find((e: any) => e.engine === 'claude')?.ready,
-      ide: !!editor.supported && !!editor.ready,
+    const failures=[c,i].filter(r=>r.status==='rejected').map(r=>agentCapabilityError(r.reason));
+    setError([...new Set(failures.filter(message=>message!==agentCompatibilityNotice))].join(' '));
+    const cs = c.status==='fulfilled'?c.value as any:undefined,
+      editor = i.status==='fulfilled'?i.value as any:undefined;
+    setCompatibility([...failures.filter(message=>message===agentCompatibilityNotice),...[cs,editor].map(v=>typeof v?.compatibility==='string'?v.compatibility:'')].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).join(' '));
+    if(c.status==='fulfilled'&&i.status==='fulfilled')onChanged?.({
+      codex: !!cs?.engines?.find((e: any) => e.engine === 'codex')?.ready,
+      claude: !!cs?.engines?.find((e: any) => e.engine === 'claude')?.ready,
+      ide: !!editor?.supported && !!editor.ready,
     });
   };
   const run = async (fn?: () => Promise<unknown>) => {
@@ -44,7 +46,7 @@ export function DevelopmentMarket({
       if (fn) await fn();
       await refresh();
     } catch (e) {
-      setError(String(e).replace(/^Error: /, ''));
+      setError(agentCapabilityError(e));
     } finally {
       setBusy(false);
     }
@@ -99,6 +101,7 @@ export function DevelopmentMarket({
       {error && (
         <ErrorNotice title="应用操作未完成" error={error} />
       )}
+      {compatibility&&<p role="status">{compatibility}</p>}
       {app ? (
         <div className="development-detail">
           <button
@@ -272,7 +275,7 @@ export function DevelopmentMarket({
               </button>
             );
           })}
-          {!apps.length && !busy && !error && <p>当前机器没有可安装的开发应用。</p>}
+          {!apps.length && !busy && !error && !compatibility && <p>当前机器没有可安装的开发应用。</p>}
         </div>
       )}
     </section>

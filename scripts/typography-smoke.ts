@@ -15,7 +15,8 @@ async function main() {
     await page.getByRole('button', { name: '预览连接', exact: true }).click();
     await page.getByRole('button', { name: '确认导入 2 条', exact: true }).click();
     await page.locator('.server-open strong').first().waitFor();
-    assert.equal(await page.locator('.server-open strong').first().evaluate(e => getComputedStyle(e).fontSize), '15px');
+    assert.equal(await page.locator('.server-open strong').first().evaluate(e => getComputedStyle(e).fontSize), '12px');
+    assert.equal((await page.evaluate(()=>window.cshell.config())).preferences.sidebarGroupSize,14);
     await page.getByTitle('偏好设置', { exact: true }).click();
     await page.getByLabel('界面字号', { exact: true }).fill('17');
     await page.getByLabel('连接名称字号', { exact: true }).fill('19');
@@ -28,7 +29,7 @@ async function main() {
     assert.equal((await page.evaluate(() => window.cshell.config())).preferences.sidebarFontSize, 19);
     await page.getByTitle('偏好设置', { exact: true }).click();
     await page.getByRole('button', { name: '恢复界面字体与间距', exact: true }).click();
-    await page.waitForFunction(() => getComputedStyle(document.querySelector('.server-open strong')!).fontSize === '15px');
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('.server-open strong')!).fontSize === '12px');
     await page.screenshot({ path: 'test-results/typography-default.png' });
     console.log('PASS: sidebar defaults, live custom preview, persisted settings and reset');
   } finally {

@@ -2,6 +2,7 @@ import {TavilyView} from '../../extensions/tavily/View';
 import { usePermissionNavigation } from '../permission-navigation';
 import {OpenCodeView} from '../../extensions/opencode/View';
 import './extension-market.css';
+import './category-workspace.css';
 import { WechatPlugin } from './WechatPlugin';
 import { AgentWorkbench } from './AgentWorkbench';
 import { WslPlugin } from './WslPlugin';
@@ -69,6 +70,7 @@ export function ExtensionWorkbench({
   const [settingsPlugin, setSettingsPlugin] = useState<string | null>(null);
   const [importPreview,setImportPreview]=useState<Awaited<ReturnType<typeof window.cshell.pluginImportPreview>>>(null);
   const [importNotice,setImportNotice]=useState('');
+  const [processStatus,setProcessStatus]=useState<Awaited<ReturnType<typeof window.cshell.pluginProcessStatus>>>([]);
   const [dragging,setDragging]=useState(false);
   const views = availablePluginViews(plugins);
   const permissionRequest=usePermissionNavigation();
@@ -81,6 +83,7 @@ export function ExtensionWorkbench({
     [busy, setBusy] = useState(false),
     [catalogUrl, setCatalogUrl] = useState(pluginCatalogUrl),
     [catalog, setCatalog] = useState<CatalogEntry[]>([]);
+  useEffect(()=>{if(!plugins.some(item=>item.manifest.provider==='process')){setProcessStatus([]);return;}let active=true;void window.cshell.pluginProcessStatus().then(items=>{if(active)setProcessStatus(items);}).catch(e=>{if(active)setError(String(e));});return()=>{active=false;};},[plugins,visible]);
   useEffect(() => {
     void window.cshell
       .pluginSource()
@@ -134,8 +137,10 @@ export function ExtensionWorkbench({
       .map((p) => p.manifest),
   ];
   return (
-    <div className="extension-workbench" data-section={section}>
-      <nav className="extension-nav" aria-label={zh ? '扩展导航' : 'Extension navigation'}>
+    <div className="workspace-category-container"><div className="extension-workbench" data-section={section}>
+      <nav className="extension-nav" aria-label={zh ? '扩展导航' : 'Extension navigation'} onFocus={event => {
+        if (event.target instanceof HTMLButtonElement) event.target.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
+      }}>
         <h2>{zh ? '扩展' : 'Extensions'}</h2>
         {(
           [
@@ -251,7 +256,8 @@ export function ExtensionWorkbench({
           {importNotice&&<p role="status" className="custom-extension-hint">{importNotice}</p>}
           {importPreview&&<section className="custom-extension-preview" aria-label={zh?'扩展导入预览':'Extension import preview'}>
             <div><strong>{importPreview.manifest.name}</strong> <span>{importPreview.manifest.version}</span><p>{importPreview.manifest.description}</p></div>
-            <p>{importPreview.manifest.publisher} · {importPreview.trusted?(zh?'签名已验证':'Signature verified'):(zh?'自定义声明包 · 无可执行代码':'Custom declarative package · no executable code')}</p>
+            <p>{importPreview.manifest.publisher} · {importPreview.trusted?(zh?'签名已验证':'Signature verified'):importPreview.manifest.provider==='process'?(zh?'未签名 · 含可执行代码':'Unsigned · contains executable code'):(zh?'自定义声明包 · 无可执行代码':'Custom declarative package · no executable code')}</p>
+            {importPreview.manifest.provider==='process'&&<p>{zh?'代码在此电脑的独立进程中运行，具有当前系统用户权限。导入后仍需单独授权，独立进程不是安全沙箱。':'Code runs in a separate process on this computer with your OS user’s privileges. Importing does not authorize execution; a separate process is not a security sandbox.'}</p>}
             <p>{zh?'权限：':'Permissions: '}{importPreview.manifest.provider==='wechat'?(zh?'微信读取、发送、联系人管理均需另外授权；导入不会访问微信。':'WeChat operations require separate grants; importing does not access WeChat.'):importPreview.manifest.permissions.join(' · ')||(zh?'无':'None')}</p>
             <div className="custom-extension-actions"><button disabled={busy} onClick={()=>setImportPreview(null)}>{zh?'取消':'Cancel'}</button><button className="primary" disabled={busy} onClick={()=>void run(async()=>{await window.cshell.pluginImportApply(importPreview.token);await onChange();setFilter('custom');setImportPreview(null);setImportNotice(zh?'已导入。请启用扩展；微信运行包首次载入需要重新打开 CShell / CAgent。':'Imported. Enable the extension; restart CShell / CAgent to load the WeChat runtime.');})}>{zh?'确认导入':'Import'}</button></div>
           </section>}
@@ -292,7 +298,7 @@ export function ExtensionWorkbench({
                       <p>{!zh && p.descriptionEn ? p.descriptionEn : p.description}</p>
                       <small>
                         {p.publisher} ·{' '}
-                        {p.permissions
+                        {p.provider==='process'?(zh?'本机独立进程 · 需单独授权':'Local process · separate authorization required'):p.permissions
                           .map(
                             (permission) =>
                               ({
@@ -306,6 +312,7 @@ export function ExtensionWorkbench({
                       </small>
                     </div>
                     <div className="plugin-actions">
+                      {p.provider==='process'&&installed?.enabled&&<button disabled={busy} onClick={()=>void run(async()=>{const allowed=processStatus.find(item=>item.id===p.id)?.grants.includes('extension.execute')??false;setProcessStatus(await window.cshell.pluginProcessAuthorize(p.id,!allowed));})}>{processStatus.find(item=>item.id===p.id)?.grants.includes('extension.execute')?(zh?'撤销运行权限':'Revoke execution'):(zh?'授权运行':'Authorize execution')}</button>}
                       {p.id === 'cshell.docker' && installed?.enabled && (
                         <button
                           onClick={() => setSettingsPlugin(settingsPlugin === p.id ? null : p.id)}
@@ -441,7 +448,7 @@ export function ExtensionWorkbench({
           </div>
         ))}
       </div>
-    </div>
+    </div></div>
   );
 }
 

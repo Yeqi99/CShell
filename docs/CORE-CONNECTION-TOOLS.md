@@ -1,5 +1,7 @@
 # 内核功能批次：批量连接、延迟诊断、机器信息与小模型工具可靠性
 
+> 0.8.9 当前状态：下文保留各阶段历史记录，不代表当前缺口。最新实现、验证与发布状态请读 [0.8.9 收口记录](RELEASE-0.8.9.md)。
+
 用户 2026-10-22 要求先在开源内核实现、验证，再同步 Pro。独立工作树 D:/.codex/worktrees/core-connection-tools/CShell，分支 codex/core-connection-tools，基于开源 main 64b06b6。不覆盖 C:/Users/admin/Documents/ChatGPT/CShell 主工作区。Pro 工作树仍为 D:/.codex/worktrees/pro-cloud-sync/CShell，已提交 15fcd2a，全部账号隔离/导入/清理/CAgent/移动端追加目标仍有效，不得只完成这一批就发布或暂停自动化。
 
 ## 已实现，未发布

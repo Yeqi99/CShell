@@ -46,10 +46,11 @@ export class ConnectionImport {
     for (const row of rows) {
       if (!row.connection) { result.rows.push({ row: row.row, error: row.error }); continue; }
       const { fields, providerId } = row.connection;
-      if (!['cshell.ssh', 'cshell.rdp'].includes(providerId)) { result.rows.push({ row: row.row, error: '此连接类型不能批量导入' }); continue; }
+      if (!['cshell.ssh', 'cshell.rdp', 'cshell.sftp', 'cshell.ftp', 'cshell.ftps'].includes(providerId)) { result.rows.push({ row: row.row, error: '此连接类型不能批量导入' }); continue; }
       const username = fields.username || input.username;
       if (!username) { result.rows.push({ row: row.row, host: fields.host, error: '缺少用户名，可填写默认用户名或重新映射列' }); continue; }
-      const parsed = profileSchema.safeParse({ id: randomUUID(), name: fields.name || fields.host, protocol: providerId === 'cshell.rdp' ? 'rdp' : 'ssh', host: fields.host, port: fields.port ?? (providerId === 'cshell.rdp' ? 3389 : 22), username, group: row.group ?? fields.group ?? '', favorite: false, auth: fields.auth ?? 'password' });
+      const protocol=providerId.slice(7);
+      const parsed = profileSchema.safeParse({ id: randomUUID(), name: fields.name || fields.host, protocol, host: fields.host, port: fields.port ?? (protocol === 'rdp' ? 3389 : ['ftp','ftps'].includes(protocol) ? 21 : 22), username, group: row.group ?? fields.group ?? '', favorite: false, auth: fields.auth ?? 'password' });
       if (!parsed.success) { result.rows.push({ row: row.row, error: '连接信息不完整或格式不正确' }); continue; }
       const profile = parsed.data;
       source.values.set(row.row, { profile, password: fields.password });

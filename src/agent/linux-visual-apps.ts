@@ -126,6 +126,7 @@ export class LinuxVisualApps {
   private sessions = new Map<string, Session>();
   private opening = new Map<string, Promise<Session>>();
   private disposed = false;
+  get activity(){return this.sessions.size+this.opening.size;}
   async status(owner: string) {
     if (process.platform !== 'linux')
       return { supported: false, installed: false, running: false, applications: [], missing: [] };

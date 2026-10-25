@@ -16,6 +16,7 @@ export function ToolsPanel({
   sessionName,
   active,
   dockerEnabled,
+  closed = false,
 }: {
   dragHandle?: ReactNode;
   revealRevision?: number;
@@ -24,6 +25,7 @@ export function ToolsPanel({
   sessionName: string;
   active: boolean;
   dockerEnabled: boolean;
+  closed?: boolean;
   transfers: Transfer[];
   onError: (e: unknown) => void;
 }) {
@@ -66,7 +68,7 @@ export function ToolsPanel({
         {onClose && <button className="icon" style={{marginLeft:'auto'}} aria-label={t('close') + ' ' + t('files')} title={t('close') + ' ' + t('files')} onClick={onClose}><X size={14}/></button>}
       </header>
       <div className="tool-content" hidden={!filesOpen || dockerVisible}>
-        <FilePanel key={sessionId} sessionId={sessionId} transfers={transfers} onError={onError} />
+        <FilePanel key={sessionId} sessionId={sessionId} closed={closed} transfers={transfers} onError={onError} />
       </div>
       {dockerEnabled && (
         <div className="docker-tool-content" hidden={!dockerVisible}>

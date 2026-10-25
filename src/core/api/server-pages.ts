@@ -9,7 +9,7 @@ export const serverSummary = z
     host: z.string(),
     port: z.number().int(),
     username: z.string(),
-    protocol: z.enum(['ssh', 'client']),
+    protocol: z.enum(['ssh', 'client', 'sftp', 'ftp', 'ftps']),
   })
   .strict();
 export const serverPageInput = z

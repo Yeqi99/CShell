@@ -45,6 +45,7 @@ export class CagentAssistant {
   private settings=settingsSchema.parse({});
   private tasks:Task[]=[];
   private active?:{task:Task;abort:AbortController;done:Promise<void>;approval?:{resolve:(v:boolean)=>void}};
+  get activity(){return this.active?1:0;}
   constructor(private vault:ClientVault,private host:Host,private request=requestAiReply){}
   async load(){
     this.settings=(await this.vault.read('assistant-settings',settingsSchema))??settingsSchema.parse({});

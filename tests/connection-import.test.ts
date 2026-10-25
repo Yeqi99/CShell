@@ -6,6 +6,22 @@ import { join } from 'node:path';
 import { Store } from '../src/core/store';
 import { ConnectionImport } from '../src/core/connection-import';
 const codec = { encrypt: async (text: string) => Buffer.from(text).toString('base64'), decrypt: async (text: string) => Buffer.from(text, 'base64').toString() };
+
+test('FTP, FTPS and SFTP import preserve protocol and encrypted secrets without connecting',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'cshell-file-import-'));
+ try{
+  const store=new Store(directory,codec);await store.load();const service=new ConnectionImport(store);
+  const preview=service.prepare('protocol,host,username,password\nsftp,one.example,user,secret-one\nftp,one.example,user,secret-two\nftps,one.example,user,secret-three','csv');
+  assert.deepEqual(preview.rows.map(r=>r.protocol),['sftp','ftp','ftps']);assert.deepEqual(preview.rows.map(r=>r.port),[22,21,21]);
+  assert.ok(!JSON.stringify(preview).includes('secret-'));
+  const applied=await service.apply(preview.token,[2,3,4],'skip');assert.equal(applied.imported.length,3);
+  const reloaded=new Store(directory,codec);await reloaded.load();assert.deepEqual(reloaded.snapshot().profiles.map(p=>p.protocol),['sftp','ftp','ftps']);
+  const urls=service.prepare('sftp://user:p%40ss@one.example:2222\nftps://user:p%40ss@two.example:2121\nftp://user:p%40ss@three.example','text');
+  assert.deepEqual(urls.rows.map(r=>r.port),[2222,2121,21]);assert.ok(!JSON.stringify(urls).includes('p@ss'));assert.ok(!JSON.stringify(urls).includes('p%40ss'));
+  const result=await service.apply(urls.token,[1,2,3],'keep');assert.equal((await store.secret(result.imported[0]))?.password,'p@ss');
+  const invalid=service.prepare('ftp://user:secret@host/path\nsftp://user:secret@host?command=bad','text');assert.ok(invalid.rows.every(r=>!!r.error));
+ }finally{await rm(directory,{recursive:true,force:true});}
+});
 test('preview masks secrets; explicit append encrypts atomically, skips duplicates and preserves original credentials', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'cshell-batch-'));
   try {

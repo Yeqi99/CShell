@@ -4,6 +4,7 @@ import { RefreshCw } from 'lucide-react';
 import type { MachineSnapshot } from '../../agent/machine-info';
 import type { AgentCall } from '../../shared/agent';
 import './machine-information.css';
+import { agentCapabilityError } from '../../shared/agent-compatibility';
 const rate=(n:number)=>n>=1024**2?`${(n/1024**2).toFixed(1)} MB/s`:`${(n/1024).toFixed(1)} KB/s`;
 const size=(bytes:number)=>Number.isFinite(bytes)?`${(bytes/1024**3).toFixed(1)} GB`:'—';
 const sections=[['overview','概览'],['cpu','处理器'],['memory','内存'],['disks','磁盘'],['network','网络'],['gpu','显卡']] as const;
@@ -35,7 +36,7 @@ export function MachineInformation({call,active,closed}:{call:(method:AgentCall[
         setCpuParts(delta>0?Object.fromEntries((['user','sys','iowait'] as const).map(key=>[key,100*(next.cpuDetails![key]-old!.cpuDetails![key])/delta])):{});
         setLoad(values);if(values?.length)history.current=[...history.current,values.reduce((a,b)=>a+b,0)/values.length].slice(-30);
         previous.current=next;setSnapshot(next);setError('');
-      }catch(e){if(!disposed){setError(e instanceof Error?e.message:String(e));setLoad(undefined);}}
+      }catch(e){if(!disposed){setError(agentCapabilityError(e));setLoad(undefined);}}
       finally{if(!disposed){setBusy(false);timer=setTimeout(()=>void read(),4000);}}
     };
     void read();return()=>{disposed=true;clearTimeout(timer);};
@@ -46,7 +47,7 @@ export function MachineInformation({call,active,closed}:{call:(method:AgentCall[
   return <section className="machine-information">
     <header><div><strong>{snapshot?.hostname??'机器信息'}</strong><small>{snapshot?`${snapshot.platform} · ${snapshot.arch} · ${snapshot.release}`:'正在读取目标机器'}</small></div><button className="icon" title="刷新机器信息" aria-label="刷新机器信息" disabled={busy||closed} onClick={()=>setRefresh(n=>n+1)}><RefreshCw size={16}/></button></header>
     <nav aria-label="机器信息分类">{sections.map(([id,label])=><button key={id} aria-pressed={section===id} onClick={()=>setSection(id)}>{label}</button>)}</nav>
-    <p className="machine-freshness" role="status">{closed?'连接已断开，以下为最后采集数据':error?`采集失败：${error}`:snapshot?`采集于 ${new Date(snapshot.at).toLocaleTimeString()} · 运行 ${(snapshot.uptime/86400).toFixed(1)} 天`:busy?'正在采集…':'等待采集'}</p>
+    <p className="machine-freshness" role="status">{closed?'连接已断开，以下为最后采集数据':error?`采集失败：${error}`:snapshot?`采集于 ${new Date(snapshot.at).toLocaleTimeString()} · 运行 ${(snapshot.uptime/86400).toFixed(1)} 天${snapshot.source==='ssh'?' · SSH 实时采集':''}`:busy?'正在采集…':'等待采集'}</p>
     {snapshot&&<div className="machine-information-body">
       {['overview','cpu'].includes(section)&&<><div className="machine-stat-grid"><article><span>CPU · {snapshot.cpu.length} 逻辑核心</span><strong>{current&&cpu!==undefined?cpu.toFixed(1)+'%':'—'}</strong><small>{snapshot.cpu[0]?.model||'型号不可用'}</small></article><article><span>内存 · 已用 / 总量</span><strong>{size(snapshot.memory.total-snapshot.memory.available)}</strong><small>/ {size(snapshot.memory.total)}</small></article></div><h3>CPU 采样历史</h3><svg className="machine-cpu-history" viewBox="0 0 300 65" role="img" aria-label="CPU 最近采样历史，纵轴 0 至 100%"><path d="M0 5H300 M0 60H300" stroke="currentColor" opacity=".15"/>{history.current.length>1&&<polyline fill="none" stroke="#3986d7" strokeWidth="2" points={history.current.map((v,i)=>`${i*300/29},${60-v*.55}`).join(' ')}/>}</svg></>}
       {section==='cpu'&&<><div className="machine-stat-grid">{Object.entries({用户态:cpuParts.user,内核态:cpuParts.sys,IO等待:cpuParts.iowait}).map(([label,value])=><article key={label}><span>{label}</span><strong>{current&&value!==undefined?value.toFixed(1)+'%':'未提供'}</strong></article>)}<article><span>负载均值 · 1 / 5 / 15 分钟</span><strong>{snapshot.cpuDetails?.load.map(v=>v.toFixed(2)).join(' / ')||'未提供'}</strong></article>{snapshot.cpuDetails?.temperatures.map(t=><article key={t.name}><span>{t.name}</span><strong>{t.celsius.toFixed(1)} °C</strong></article>)}</div></>}

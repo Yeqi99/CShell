@@ -42,6 +42,8 @@ export type ClientDevice = Omit<ClientInvitation, 'token' | 'expires' | 'certifi
   fingerprint: string;
 };
 export type ClientStatus = {
+  agentVersion?: string;
+  methods?: string[];
   passwordConfigured?: boolean;
   allowedShells?: ClientShell[];
   allowHttp?: boolean;
@@ -77,7 +79,7 @@ export interface ClientBridge {
   clientPasswordPair(info: ClientInfo, password: string): Promise<ClientDevice>;
   openRdp(profileId: string): Promise<void>;
   saveRdp(profile: Profile, password?: string, clearPassword?: boolean): Promise<void>;
-  clientDownloadPage(): Promise<void>;
+  clientDownloadPage(platform?: 'windows'): Promise<void>;
   clientTheme(theme: 'light' | 'dark'): Promise<void>;
   clientDevices(): Promise<ClientDevice[]>;
   clientPair(invitation: string): Promise<ClientDevice>;

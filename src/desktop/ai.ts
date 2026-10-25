@@ -1,3 +1,4 @@
+import {OfficialOpenCode} from '../extensions/opencode/official-runtime';
 import {TavilyExtension} from '../extensions/tavily/service';
 import {ApplicationNetworkRoute} from './network-route';
 import { AiDrafts } from '../core/ai-drafts';
@@ -26,6 +27,7 @@ export async function registerAiHandlers(
   publish?: (channel: string, value?: unknown) => void,
   http?: import('../core/http-workspaces').HttpWorkspaces,
   wechat?: import('../core/wechat').WechatService,
+  customTools?: () => readonly import('../core/connections/contracts').ConnectionTool[],
 ) {
   const ai = new AiService(directory, store, connections, connectHost, { http, wechat });
   const drafts = new AiDrafts(directory, store);
@@ -50,11 +52,12 @@ export async function registerAiHandlers(
     }, 40);
   };
   await ai.load();
-  const openCode=new OpenCodeExtension({directory:join(directory,'extensions','opencode'),enabled:()=>pluginEnabled(store.plugins(),'opencode'),encrypt:s=>store.encryptPrivate(s),decrypt:s=>store.decryptPrivate(s),getProvider:id=>ai.snapshot().providers.find(p=>p.id===id),changed:()=>publish?.('ai:providers-changed'),saveProvider:async p=>{await ai.saveProvider(p);publish?.('ai:providers-changed');},open:async url=>(await import('electron')).shell.openExternal(url)},ai.requestTransport);
+  const officialOpenCode=new OfficialOpenCode(join(directory,'extensions','opencode'),ai.requestTransport);
+  const openCode=new OpenCodeExtension({official:officialOpenCode.request,officialStatus:officialOpenCode.status,directory:join(directory,'extensions','opencode'),enabled:()=>pluginEnabled(store.plugins(),'opencode'),encrypt:s=>store.encryptPrivate(s),decrypt:s=>store.decryptPrivate(s),getProvider:id=>ai.snapshot().providers.find(p=>p.id===id),changed:()=>publish?.('ai:providers-changed'),saveProvider:async p=>{await ai.saveProvider(p);publish?.('ai:providers-changed');},open:async url=>(await import('electron')).shell.openExternal(url)},ai.requestTransport);
   await openCode.load();
   ai.providerExtensions.register(openCode);
   const tavily=new TavilyExtension({directory:join(directory,'extensions','tavily'),enabled:()=>pluginEnabled(store.plugins(),'tavily'),encrypt:s=>store.encryptPrivate(s),decrypt:s=>store.decryptPrivate(s)},ai.requestTransport);
-  await tavily.load();ai.extensionTools=()=>tavily.tools();
+  await tavily.load();ai.extensionTools=()=>[...tavily.tools(),...(customTools?.()??[])];
   handle('ai:extension-call',(id,action,input)=>id==='cshell.tavily'?tavily.call(z.string().max(80).parse(action),input):ai.providerExtensions.call(z.string().max(100).parse(id),z.string().max(80).parse(action),input));
   const bindingKey=(id:string)=>{
     const thread=ai.snapshot().threads.find(t=>t.id===id);
@@ -144,8 +147,8 @@ export async function registerAiHandlers(
     ai.dispose();
     clearTimeout(timer);
     pending.clear();
-    disposal = Promise.all([events.close(),ai.flush(),remoteClose,network.close(),drafts.snapshot()]).then(()=>{});
+    disposal = Promise.all([events.close(),ai.flush(),officialOpenCode.dispose(),remoteClose,network.close(),drafts.snapshot()]).then(()=>{});
     return disposal;
   };
-  return Object.assign(dispose, { hasActiveWork: () => ai.hasActiveWork });
+  return Object.assign(dispose, { hasActiveWork: () => ai.hasActiveWork || officialOpenCode.status().active > 0 });
 }

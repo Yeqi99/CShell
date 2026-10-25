@@ -9,6 +9,7 @@
 - [安装与使用 CAgent](cagent.md)
 - [账号、云同步与会员](cloud.md)
 - [连接、终端与文件](connections.md)
+- [命令台与 CLI](cli.md)
 - [机器桌面与浏览器](desktop.md)
 - [将你的功能加入 CShell](developers.md)
 - [使用扩展与应用市场](extensions.md)

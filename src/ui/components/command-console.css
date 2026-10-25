@@ -1,0 +1,30 @@
+.command-console{display:flex;flex-direction:column;min-width:0;min-height:280px;height:100%;background:var(--panel,var(--bg));color:var(--text);border-radius:10px;overflow:hidden}
+.command-toolbar{display:flex;align-items:center;gap:9px;padding:12px 16px;flex:none;border-bottom:1px solid var(--border);font-size:13px}
+.command-toolbar>span{margin-left:auto;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.command-console button,.capability-explorer button,.workbench-studio button{font:inherit;color:inherit;background:transparent;border:1px solid transparent;border-radius:7px;cursor:pointer;padding:6px 9px;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.command-console button:hover,.capability-explorer button:hover,.workbench-studio button:hover{background:var(--hover)}
+.command-console button:focus-visible,.capability-explorer button:focus-visible,.workbench-studio button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.command-console button:disabled,.capability-explorer button:disabled{opacity:.45;cursor:default}
+.command-output{flex:1;overflow:auto;padding:18px;min-height:0;overscroll-behavior:contain}
+.command-welcome{max-width:600px;margin:30px auto;color:var(--muted);font-size:13px;line-height:1.8}
+.command-welcome h2{font-size:20px;color:var(--text);font-weight:600;margin:10px 0}
+.command-welcome small{display:block;margin-top:20px}
+.command-welcome button{background:var(--hover);font-family:monospace;margin-right:8px}
+.command-entry{margin-bottom:22px;font-size:13px;line-height:1.6;overflow-wrap:anywhere}
+.command-entry>header{display:flex;align-items:center;gap:9px;color:var(--accent)}
+.command-entry>header>span:last-child{margin-left:auto;font-size:11px;color:var(--muted)}
+.command-json,.command-catalog pre{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.7 ui-monospace,Consolas,monospace;margin:8px 0;tab-size:2}
+.command-help>div{display:grid;grid-template-columns:minmax(120px,1fr) 2fr;gap:12px;margin:8px 0}
+.command-help code{color:var(--accent);overflow-wrap:anywhere}
+.command-help span,.command-wait{color:var(--muted)}
+.command-catalog details{padding:9px 0;border-bottom:1px solid var(--border)}
+.command-catalog summary{cursor:pointer;line-height:1.6}
+.command-catalog summary span{display:block;color:var(--muted)}
+.command-image{display:block;max-width:100%;max-height:70vh;object-fit:contain;border-radius:6px}
+.command-composer{margin:0 12px 12px;display:grid;grid-template-columns:18px minmax(0,1fr) 34px;align-items:start;gap:5px;padding:10px 12px 6px;border:1px solid var(--border);border-radius:10px;background:var(--bg)}
+.command-composer:focus-within{border-color:var(--accent)}
+.command-composer>label{font-size:22px;line-height:28px;color:var(--accent)}
+.command-composer textarea{resize:vertical;min-height:52px;max-height:200px;width:100%;border:0;outline:0;background:transparent;color:var(--text);font:13px/1.7 ui-monospace,Consolas,monospace;padding:3px 0;box-sizing:border-box}
+.command-composer small{grid-column:2/4;color:var(--muted);font-size:10px}
+.command-api-state{padding:10px 16px;display:flex;gap:12px;align-items:center;font-size:12px;color:var(--muted);background:var(--hover)}
+.command-api-state span{flex:1;min-width:0}.command-api-state button{flex:none;color:var(--accent)}

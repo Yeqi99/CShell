@@ -1,6 +1,6 @@
 /** Host contract for optional model-provider extensions. Secrets and transport stay backend-only. */
 export type AiExtensionRef = { id: string; model: string };
-export type AiRuntimeProvider = { id?:string; name?:string; url:string; model:string; key:string; transport?:typeof fetch };
+export type AiRuntimeProvider = { id?:string; name?:string; url:string; model:string; key:string; transport?:typeof fetch; imageInput?:boolean };
 export interface AiProviderExtension {
   id:string;
   call(action:string,input:unknown):Promise<unknown>;

@@ -49,6 +49,11 @@ const status = z
     canImportLegacy: z.boolean().optional(),
     platform: z.string().optional(),
     interfaces: z.array(z.string()).optional(),
+    agentVersion: z.string().min(1).max(64).optional(),
+    methods: z.array(z.string().min(1).max(120)).max(1024).optional(),
+    updateProtocol: z.number().int().nonnegative().optional(),
+    updatePendingCommit: z.boolean().optional(),
+    activity: z.record(z.string().regex(/^[a-zA-Z][a-zA-Z0-9]{0,63}$/),z.number().int().nonnegative()).optional(),
   })
   .strict();
 const installation = z

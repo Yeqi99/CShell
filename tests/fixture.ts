@@ -11,6 +11,7 @@ export async function fixture(
     stallAuthentication?: boolean;
     stallShell?: boolean;
     writeFailure?: 'full' | 'permission';
+    opensshRename?: boolean;
   } = {},
 ) {
   const docker = dockerFixture();
@@ -18,7 +19,7 @@ export async function fixture(
   const shellInputs: string[] = [];
   const shells = new Set<import('ssh2').ServerChannel>();
   let authenticationRequests = 0,
-    shellRequests = 0;
+    shellRequests = 0,execRequests=0,forwardRequests=0;
   const root = await fs.mkdtemp(join(tmpdir(), 'cshell-ssh-'));
   const hostKey = generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey.export({
     type: 'pkcs1',
@@ -33,8 +34,28 @@ export async function fixture(
     clients = new Set<Connection>();
   await fs.writeFile(join(root, 'hello.txt'), '你好，CShell 🌏\n');
   const server = new Server({ hostKeys: [hostKey] }, (client) => {
+    // ssh2's server sends a fixed VERSION without extension names. In this
+    // opt-in fixture, advertise the real EXTENDED rename handler below on the
+    // wire; never mutate a client's capability map or claim unsupported methods.
+    const renameChannels = new Map<number,{window:number}>();
+    if (options.opensshRename) {
+      const protocol=(client as unknown as {_protocol:{channelData:(channel:number,data:Buffer)=>unknown}})._protocol;
+      const send=protocol.channelData.bind(protocol);
+      protocol.channelData=(channel,data)=>{
+        const flow=renameChannels.get(channel);
+        if(flow&&data.length===9&&data.readUInt32BE(0)===5&&data[4]===2&&data.readUInt32BE(5)===3){
+          const name=Buffer.from('posix-rename@openssh.com'),value=Buffer.from('1');
+          const packet=Buffer.alloc(data.length+8+name.length+value.length);data.copy(packet);packet.writeUInt32BE(packet.length-4,0);
+          packet.writeUInt32BE(name.length,9);name.copy(packet,13);packet.writeUInt32BE(value.length,13+name.length);value.copy(packet,17+name.length);
+          flow.window-=packet.length-data.length;return send(channel,packet);
+        }
+        return send(channel,data);
+      };
+    }
     docker.attach(client);
     extensions.attach(client);
+    client.on('tcpip',()=>{forwardRequests++;});
+    client.on('openssh.streamlocal',()=>{forwardRequests++;});
     let samples = 0;
     clients.add(client);
     client.on('error', () => {});
@@ -75,6 +96,7 @@ export async function fixture(
           });
         });
         session.on('exec', (acceptExec, _reject, info) => {
+          execRequests++;
           const stream = acceptExec();
           if (extensions.handle(info.command, stream)) return;
           if (info.command.includes('--query-gpu=')) {
@@ -95,6 +117,7 @@ export async function fixture(
         });
         session.on('sftp', (acceptSftp) => {
           const sftp = acceptSftp();
+          if(options.opensshRename){const outgoing=(sftp as unknown as {outgoing:{id:number;window:number}}).outgoing;renameChannels.set(outgoing.id,outgoing);sftp.once('close',()=>renameChannels.delete(outgoing.id));}
           const handles = new Map<
             string,
             { file?: fs.FileHandle; entries?: string[]; path: string }
@@ -238,6 +261,8 @@ export async function fixture(
     connectionsCount: () => clients.size,
     authenticationRequests: () => authenticationRequests,
     shellRequests: () => shellRequests,
+    execRequests:()=>execRequests,
+    forwardRequests:()=>forwardRequests,
     writeOutput: (data: string) => {
       for (const shell of shells) shell.write(data);
     },

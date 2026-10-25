@@ -27,6 +27,8 @@ test('Agent applications allow authenticated administration and preserve explici
   const f = await fixture();
   try {
     const { device } = await f.pair({ allowManage: true });
+    const activity=await f.runtime.dispatch('update.status',{}) as {coordination:{activity:{terminals:number}}};
+    assert.equal(activity.coordination.activity.terminals,1);
     const initial = await f.provider.call(device.deviceId, { method: 'applications.list' }) as { enabled: boolean };
     assert.equal(initial.enabled, true);
     await f.provider.call(device.deviceId, { method: 'applications.configure', params: { enabled: false } });
@@ -69,15 +71,19 @@ async function freePort() {
 async function fixture() {
   const directory = await mkdtemp(join(tmpdir(), 'cshell-agent-management-'));
   const sessions = new Map<string, ProviderConnection>();
+  let updateGuard=()=>false;
   const terminal = {
     id: 'test.terminal',
     version: '1.0.0',
     capabilities: ['terminal.interactive'],
     configuration: z.unknown(),
+    get activity(){return sessions.size;},
+    setUpdateGuard(guard:()=>boolean){updateGuard=guard;},
     shells: async () => [
       { id: shell, label: shell, executable: 'fixture', args: [], environment: 'host' },
     ],
     connect: async () => {
+      if(updateGuard())throw new Error('CAgent 正在完成更新，请稍后重试');
       const id = randomUUID();
       sessions.set(id, {
         target: { providerId: 'test.terminal', resourceId: id, identity: id, label: shell },

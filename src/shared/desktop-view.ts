@@ -10,6 +10,7 @@ export const desktopViewStartSchema = z
   })
   .strict();
 export const desktopViewInputSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('text'), text: z.string().min(1).max(512).refine(v=>!v.includes('\0')) }).strict(),
   z.object({ kind: z.literal('secure-attention') }).strict(),
   z
     .object({ kind: z.literal('key'), code: z.number().int().min(1).max(511), down: z.boolean() })

@@ -18,6 +18,7 @@ type Field = 'name' | 'host' | 'port' | 'username';
 
 export function ConnectionForm({
   profile,
+  protocol = 'ssh',
   initialPassword = '',
   groups,
   initialPersist = !!profile,
@@ -27,6 +28,7 @@ export function ConnectionForm({
   onConnect,
 }: {
   profile?: Profile;
+  protocol?: 'ssh' | 'sftp' | 'ftp' | 'ftps';
   initialPassword?: string;
   groups: string[];
   initialPersist?: boolean;
@@ -43,9 +45,10 @@ export function ConnectionForm({
     profile ?? {
       id: crypto.randomUUID(),
       name: '',
+      protocol,
       host: '',
-      port: 22,
-      username: 'root',
+      port: protocol === 'ftp' || protocol === 'ftps' ? 21 : 22,
+      username: protocol === 'ssh' ? 'root' : '',
       group: '',
       auth: 'password',
       favorite: false,
@@ -65,6 +68,8 @@ export function ConnectionForm({
   const [extraction, setExtraction] = useState<'done' | null>(null);
   const [invalid, setInvalid] = useState<Partial<Record<Field, boolean>>>({});
   const canReuse = persist && saved && profile?.auth === value.auth;
+  const ftp = value.protocol === 'ftp' || value.protocol === 'ftps';
+  const ssh = !value.protocol || value.protocol === 'ssh';
   const update = (field: keyof Profile, next: string | number | boolean) => {
     setExtraction(null);
     setValue((v) => ({ ...v, [field]: next }));
@@ -159,7 +164,7 @@ export function ConnectionForm({
       className="editor-page connection-editor compact-connection"
       aria-labelledby={id + '-title'}
     >
-      <ConnectionExtractor
+      {ssh ? <ConnectionExtractor
         title={profile ? t('editConnection') : t('sshConnection')}
         titleId={id + '-title'}
         disabled={!!busy}
@@ -178,7 +183,9 @@ export function ConnectionForm({
           setError('');
           setExtraction('done');
         }}
-      />
+      /> : <header className="connection-protocol-heading"><h2 id={id + '-title'}>{value.protocol?.toUpperCase()} · {locale === 'zh-CN' ? '文件连接' : 'File connection'}</h2>
+        <p className="muted">{value.protocol === 'sftp' ? (locale === 'zh-CN' ? '通过 SSH 加密传输文件，无需远端 Shell。' : 'Encrypted file access over SSH; no remote shell required.') : value.protocol === 'ftps' ? (locale === 'zh-CN' ? '显式 TLS 加密连接，校验证书与服务器名称。' : 'Explicit TLS with certificate and hostname verification.') : (locale === 'zh-CN' ? 'FTP 不加密账号和文件内容，请仅在可信网络使用。需要加密时选择 FTPS 或 SFTP。' : 'FTP sends credentials and files without encryption. Use FTPS or SFTP when encryption is needed.')}</p>
+      </header>}
       {extraction && (
         <p className="connection-extraction" role="status">
           {t('commandExtracted')}
@@ -227,7 +234,7 @@ export function ConnectionForm({
               {fieldError('port')}
             </div>
           </div>
-          <fieldset className="connection-auth">
+          {!ftp && <fieldset className="connection-auth">
             <legend>{t('auth')}</legend>
             <div className="connection-auth-options">
               {(['password', 'key'] as const).map((auth) => (
@@ -254,7 +261,7 @@ export function ConnectionForm({
                 </label>
               ))}
             </div>
-          </fieldset>
+          </fieldset>}
           <div className="connection-row">
             <div className="connection-field">
               <label htmlFor={id + '-username'}>{t('username')}</label>
