@@ -54,6 +54,10 @@ export class OpenCodeExtension implements AiProviderExtension {
   readonly id = 'cshell.opencode';
   private config: z.infer<typeof configSchema> = { accounts: [] };
   private cache = new Map<string, { at: number; models: { id: string; available: boolean }[] }>();
+  private modelRequests = new Map<string, Promise<{ id: string; available: boolean }[]>>();
+  private catalogFailures = new Set<string>();
+  private catalogEpoch = 0;
+  private rejectedModels = new Map<string, string>();
   private saving = Promise.resolve();
   private loadError = '';
   private device:
@@ -76,6 +80,8 @@ export class OpenCodeExtension implements AiProviderExtension {
       encrypt: (s: string) => Promise<string>;
       decrypt: (s: string) => Promise<string>;
       saveProvider: (p: any) => Promise<void>;
+      getProvider?: (id: string) => { name?: string; extension?: { id: string; model: string } } | undefined;
+      changed?: () => void;
       open: (url: string) => Promise<void>;
     },
     private network: typeof fetch = fetch,
@@ -248,15 +254,34 @@ export class OpenCodeExtension implements AiProviderExtension {
   async models(tier: 'go' | 'zen', refresh = false) {
     this.check();
     const cached = this.cache.get(tier);
+    if (!refresh && this.catalogFailures.has(tier)) throw Error('模型目录暂时无法加载，请刷新重试');
     if (!refresh && cached && Date.now() - cached.at < 300000) return cached.models;
+    const ongoing = this.modelRequests.get(tier);
+    if (ongoing) return ongoing;
+    const epoch = this.catalogEpoch;
+    const request = (async () => {
     const data = z
       .object({ data: z.array(modelSchema).max(2000) })
       .parse(await this.json(this.url(tier, 'v1/models')));
     const models = [...new Set(data.data.map((m) => m.id))]
       .sort()
       .map((id) => ({ id, available: !!family(id) }));
+    if (epoch !== this.catalogEpoch) throw Error('OpenCode 账号已同步，请重新加载模型目录');
     this.cache.set(tier, { at: Date.now(), models });
+    const recovered = this.catalogFailures.delete(tier);
+    if (recovered || JSON.stringify(cached?.models) !== JSON.stringify(models)) this.host.changed?.();
     return models;
+    })();
+    this.modelRequests.set(tier, request);
+    try { return await request; }
+    catch (error) {
+      if (epoch === this.catalogEpoch && !this.catalogFailures.has(tier)) {
+        this.catalogFailures.add(tier);
+        this.host.changed?.();
+      }
+      throw error;
+    }
+    finally { if (this.modelRequests.get(tier) === request) this.modelRequests.delete(tier); }
   }
   private reference(reference: string) {
     const parts = reference.split('/');
@@ -418,19 +443,24 @@ export class OpenCodeExtension implements AiProviderExtension {
         });
         return { accounts: [...this.config.accounts.filter((a) => a.id !== p.id), next] };
       });
-      if (p.key) this.invalidRefresh.delete(p.id);
+      if (p.key) {
+        this.invalidRefresh.delete(p.id);
+        for (const ref of this.rejectedModels.keys()) if (ref.startsWith(p.id + '/')) this.rejectedModels.delete(ref);
+      }
+      this.host.changed?.();
       return this.call('status');
     }
     if (action === 'remove') {
       const id = idSchema.parse((input as any)?.id);
       await this.mutate(() => ({ accounts: this.config.accounts.filter((a) => a.id !== id) }));
+      this.host.changed?.();
       return this.call('status');
     }
     if (action === 'models') {
       const p = z.object({ tier: tierSchema, refresh: z.boolean().default(false) }).parse(input);
       return this.models(p.tier, p.refresh);
     }
-    if (action === 'choices') {
+    if (action === 'choices' || action === 'catalog') {
       const p = this.reference(
         z
           .string()
@@ -443,9 +473,21 @@ export class OpenCodeExtension implements AiProviderExtension {
         (await this.models(tier,refresh)).map(m => ({
           ref: `${p.accountId}/${tier}/${m.id}`,
           model: m.id, label: `${m.id} · ${tier === 'go' ? 'Go' : 'Zen'}`,
-          available: m.available,
+          available: m.available && !this.rejectedModels.has(`${p.accountId}/${tier}/${m.id}`),
+          reason: this.rejectedModels.get(`${p.accountId}/${tier}/${m.id}`) ?? (m.available ? '' : '此模型的协议尚未适配'),
         }))));
       const models = groups.flatMap(g => g.status === 'fulfilled' ? g.value : []);
+      if (action === 'catalog') {
+        const ref = `${p.accountId}/${p.tier}/${p.model}`;
+        const selected = models.find(m => m.ref === ref);
+        const tierResult = groups[p.tier === 'go' ? 0 : 1];
+        return { choices: models, current: {
+          ref, model: p.model, available: selected?.available ?? false,
+          reason: selected?.reason || (tierResult.status === 'rejected'
+            ? '模型目录暂时无法加载，尚不能确认此模型是否可用；请刷新重试'
+            : selected ? '' : '此模型已不在 OpenCode 当前目录中，请选择其他模型；账号密钥已保留'),
+        }};
+      }
       if (!models.length) throw Error('OpenCode 模型目录暂不可用，请稍后刷新');
       return models;
     }
@@ -548,15 +590,30 @@ export class OpenCodeExtension implements AiProviderExtension {
       return { id };
     }
     if (action === 'connect') {
-      const id = idSchema.parse((input as any)?.id ?? 'default');
+      const p = z.object({
+        id: idSchema.default('default'),
+        reference: z.string().min(1).max(400).optional(),
+        setDefault: z.boolean().default(false),
+      }).parse(input ?? {});
+      const { id } = p;
       const account = this.account(id);
-      await this.json('https://opencode.ai/console/api/v2/config', await this.credential(id));
-      const choices = await this.call('choices', {reference:`${id}/go/placeholder`}) as {ref:string;model:string;available:boolean}[];
-      const choice = choices.find(m => m.available);
+      const key = await this.credential(id);
+      await this.json('https://opencode.ai/console/api/v2/config', key);
+      if (this.account(id).key !== key) throw Error('账号已变化，请重新检测');
+      // Verifying credentials must never replace a user's default (or switch billing tier).
+      const existing = account.providerId ? this.host.getProvider?.(account.providerId) : undefined;
+      if (!p.setDefault && account.providerId && (!this.host.getProvider || (existing?.extension?.id === this.id && this.reference(existing.extension.model).accountId === id)))
+        return { id: account.providerId };
+      if (p.setDefault && !p.reference) throw Error('请明确选择要设为默认的模型');
+      const choices = await this.call('choices', {reference:`${id}/go/placeholder`,refresh:true}) as {ref:string;model:string;available:boolean}[];
+      if (this.account(id).key !== key) throw Error('账号已变化，请重新检测');
+      const requested = p.reference;
+      const choice = requested ? choices.find(m => m.available && m.ref === requested)
+        : choices.find(m => m.available && /(?:^|-)free$/.test(m.model));
       const model = choice?.model;
-      if (!model) throw Error('没有已适配的模型');
+      if (!model) throw Error('账号已保存，请明确选择一个模型后接入；不会自动选择付费模型');
       const providerId = account.providerId ?? randomUUID();
-      await this.host.saveProvider({id:providerId,name:`OpenCode · ${account.name}`,url:'https://model-extension.invalid',model,extension:{id:this.id,model:choice!.ref}});
+      await this.host.saveProvider({...existing,id:providerId,name:existing?.name ?? `OpenCode · ${account.name}`,url:'https://model-extension.invalid',model,extension:{id:this.id,model:choice!.ref}});
       await this.mutate(() => ({accounts:this.config.accounts.map(a => a.id === id ? {...a,providerId} : a)}));
       return {id:providerId};
     }
@@ -566,9 +623,11 @@ export class OpenCodeExtension implements AiProviderExtension {
     this.check();
     const { accountId, tier, model } = this.reference(reference);
     this.account(accountId);
-    const listed = (await this.models(tier)).find((m) => m.id === model);
-    if (!listed?.available)
-      throw Error('该模型不在当前目录中，或尚未适配其协议；请刷新 OpenCode 模型列表');
+    // An actual user retry can recover a failed catalog without opening settings.
+    // Only the catalog is retried; inference/tool operations are never replayed.
+    const listed = (await this.models(tier, this.catalogFailures.has(tier))).find((m) => m.id === model);
+    if (!listed) throw Error('此模型已不在 OpenCode 当前目录中，请在智能体基座中重新选择模型；账号密钥已保留');
+    if (!listed.available) throw Error('此模型的协议尚未适配，请选择其他模型；账号密钥已保留');
     const kind = family(model)!;
     const transport: typeof fetch = async (_url, init) => {
       this.check();
@@ -601,6 +660,28 @@ export class OpenCodeExtension implements AiProviderExtension {
         await response.body?.cancel();
         throw Error('OpenCode 账号凭据已变化');
       }
+      const ref = `${accountId}/${tier}/${model}`;
+      if (response.status === 403 || response.status === 404) {
+        // Only classify bounded error text. Never expose upstream echoes of secrets.
+        const reader = response.body?.getReader();
+        let detail = '', bytes = 0;
+        try {
+          while (reader && bytes < 65536) {
+            const chunk = await reader.read();
+            if (chunk.done) break;
+            bytes += chunk.value.length;
+            detail += new TextDecoder().decode(chunk.value.subarray(0, Math.max(0, 65536 - detail.length)));
+          }
+        } finally { await reader?.cancel(); }
+        const reason = response.status === 404 ? '服务端已找不到此模型，请刷新目录并重新选择'
+          : /country|region/i.test(detail) ? '服务端限制了此模型在当前地区的调用，账号密钥已保留'
+          : /FreeTier|only.*opencode|opencode.*only/i.test(detail) ? '服务端限制了此免费模型的客户端使用范围，账号密钥已保留'
+          : '服务端拒绝此模型调用，请检查套餐、额度或模型权限；账号密钥已保留';
+        this.rejectedModels.set(ref, reason);
+        this.host.changed?.();
+        throw Error(`OpenCode HTTP ${response.status}：${reason}`);
+      }
+      if (response.ok && this.rejectedModels.delete(ref)) this.host.changed?.();
       return normalizeResponse(response, kind, !!b.stream);
     };
     return { url: 'https://model-extension.invalid', model, key: '', transport };

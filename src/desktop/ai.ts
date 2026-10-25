@@ -50,7 +50,7 @@ export async function registerAiHandlers(
     }, 40);
   };
   await ai.load();
-  const openCode=new OpenCodeExtension({directory:join(directory,'extensions','opencode'),enabled:()=>pluginEnabled(store.plugins(),'opencode'),encrypt:s=>store.encryptPrivate(s),decrypt:s=>store.decryptPrivate(s),saveProvider:async p=>{await ai.saveProvider(p);publish?.('ai:providers-changed');},open:async url=>(await import('electron')).shell.openExternal(url)},ai.requestTransport);
+  const openCode=new OpenCodeExtension({directory:join(directory,'extensions','opencode'),enabled:()=>pluginEnabled(store.plugins(),'opencode'),encrypt:s=>store.encryptPrivate(s),decrypt:s=>store.decryptPrivate(s),getProvider:id=>ai.snapshot().providers.find(p=>p.id===id),changed:()=>publish?.('ai:providers-changed'),saveProvider:async p=>{await ai.saveProvider(p);publish?.('ai:providers-changed');},open:async url=>(await import('electron')).shell.openExternal(url)},ai.requestTransport);
   await openCode.load();
   ai.providerExtensions.register(openCode);
   const tavily=new TavilyExtension({directory:join(directory,'extensions','tavily'),enabled:()=>pluginEnabled(store.plugins(),'tavily'),encrypt:s=>store.encryptPrivate(s),decrypt:s=>store.decryptPrivate(s)},ai.requestTransport);

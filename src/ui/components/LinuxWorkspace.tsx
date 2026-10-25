@@ -18,7 +18,7 @@ export function LinuxWorkspace({
   preferences, terminal, files, onRetry,
 }: {
   terminal?: (active: boolean, theme: 'light' | 'dark') => ReactNode;
-  files?: ReactNode;
+  files?: ReactNode | ((active: boolean) => ReactNode);
   onRetry?: () => void;
   profileId: string;
   preferences: Preferences;

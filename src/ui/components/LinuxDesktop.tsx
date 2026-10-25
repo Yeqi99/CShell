@@ -109,7 +109,7 @@ export function LinuxDesktop({
   files, onRetry, connectionLabel, initialApp,
 }: {
   initialApp?: string;
-  files?: ReactNode;
+  files?: ReactNode | ((active: boolean) => ReactNode);
   onRetry?: () => void;
   connectionLabel?: string;
   name: string;
@@ -172,7 +172,24 @@ export function LinuxDesktop({
   const gesture = useRef<
     { id: string; mode: 'move' | 'resize'; x: number; y: number; window: WindowState } | undefined
   >(undefined);
-  useEffect(()=>{try{localStorage.setItem(key+':windows',JSON.stringify(windows));}catch{setError('窗口状态未能保存，请检查本机存储空间');}},[key,windows]);
+  const gestureFrame = useRef<number | undefined>(undefined);
+  const pendingGeometry = useRef<{ id: string; change: Partial<WindowState> } | undefined>(undefined);
+  const latestWindows = useRef(windows);
+  latestWindows.current = windows;
+  useEffect(() => {
+    // Keep pointer movement on the render path; persist the final position only.
+    if (gesture.current) return;
+    try { localStorage.setItem(key + ':windows', JSON.stringify(windows)); }
+    catch { setError('窗口状态未能保存，请检查本机存储空间'); }
+  }, [key, windows]);
+  useEffect(() => () => {
+    if (gestureFrame.current !== undefined) cancelAnimationFrame(gestureFrame.current);
+    if (gesture.current) {
+      const pending = pendingGeometry.current;
+      const finalWindows = latestWindows.current.map(w => pending?.id === w.id ? {...w, ...pending.change} : w);
+      try { localStorage.setItem(key + ':windows', JSON.stringify(finalWindows)); } catch { /* The workspace is already unmounting. */ }
+    }
+  }, [key]);
   useEffect(() => {
     try {
       localStorage.setItem(key, JSON.stringify(look));
@@ -230,6 +247,28 @@ export function LinuxDesktop({
   useEffect(()=>{if(initialApp)open(initialApp);},[initialApp]);
   const patch = (id: string, change: Partial<WindowState>) =>
     setWindows((v) => v.map((w) => (w.id === id ? { ...w, ...change } : w)));
+  const queueGeometry = (id: string, change: Partial<WindowState>) => {
+    pendingGeometry.current = {id, change};
+    gestureFrame.current ??= requestAnimationFrame(() => {
+      gestureFrame.current = undefined;
+      const pending = pendingGeometry.current;
+      pendingGeometry.current = undefined;
+      if (pending) patch(pending.id, pending.change);
+    });
+  };
+  const finishGesture = () => {
+    if (gesture.current) {
+      if (gestureFrame.current !== undefined) cancelAnimationFrame(gestureFrame.current);
+      gestureFrame.current = undefined;
+      const pending = pendingGeometry.current;
+      pendingGeometry.current = undefined;
+      gesture.current = undefined;
+      // A fresh array also commits geometry already painted by the last frame.
+      setWindows(items => items.map(w => pending?.id === w.id ? {...w, ...pending.change} : w));
+    }
+    selectionStart.current = null;
+    setSelection(undefined);
+  };
   const front = windows.filter((w) => !w.minimized && !w.closed && catalog.some(a=>a.id===w.id)).sort((a, b) => b.z - a.z)[0]?.id;
   const bounds = (w: WindowState) => {
     const margin = Math.min(16,size.w/4,size.h/4);
@@ -319,7 +358,7 @@ export function LinuxDesktop({
           if (!g) return;
           const dx = e.clientX - g.x,
             dy = e.clientY - g.y;
-          patch(
+          queueGeometry(
             g.id,
             g.mode === 'move'
               ? {
@@ -338,16 +377,9 @@ export function LinuxDesktop({
                 },
           );
         }}
-        onPointerUp={() => {
-          gesture.current = undefined;
-          selectionStart.current = null;
-          setSelection(undefined);
-        }}
-        onPointerCancel={() => {
-          gesture.current = undefined;
-          selectionStart.current = null;
-          setSelection(undefined);
-        }}
+        onPointerUp={finishGesture}
+        onPointerCancel={finishGesture}
+        onLostPointerCapture={finishGesture}
       >
         <div className="desktop-icons" aria-label="桌面应用">
           {catalog.map((a) => (
@@ -478,7 +510,9 @@ export function LinuxDesktop({
                     onMinimize={() => patch(w.id, { minimized: true })}
                   />
                 )}
-                {w.id === 'files' && (files ?? (!closed && <AgentMachineFiles target={target} call={call} />))}
+                {w.id === 'files' && (typeof files === 'function'
+                  ? files(active && visible && front === w.id && !closed)
+                  : files ?? (!closed && <AgentMachineFiles target={target} call={call} />))}
                 {w.id === 'machine-info' && <MachineInformation call={call} active={active && visible && front === w.id} closed={closed}/>}
                 {w.id === 'applications' && (
                   <AgentApplications

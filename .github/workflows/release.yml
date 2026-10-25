@@ -47,6 +47,12 @@ jobs:
       - if: matrix.platform == 'win'
         run: pnpm exec tsx scripts/activity-smoke.ts
       - if: matrix.platform == 'win'
+        name: Verify OpenCode catalog and hidden terminal layout
+        run: |
+          pnpm exec tsx scripts/opencode-catalog-smoke.ts
+          pnpm exec tsx scripts/terminal-measurement-smoke.ts
+          pnpm exec tsx scripts/ssh-visual-activity-smoke.ts
+      - if: matrix.platform == 'win'
         name: Verify compact workbench and desktop layouts
         run: |
           pnpm exec tsx scripts/workbench-layout-smoke.ts

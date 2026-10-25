@@ -404,6 +404,9 @@ export class AiService {
       const choices = await this.providerExtensions.call(provider.extension.id,'choices',{reference:provider.extension.model}) as {ref:string;available:boolean}[];
       if (!choices.some(c => c.ref === extensionModel && c.available)) throw Error('所选模型不可用');
     }
+    const selectedProvider = this.providers.find(p => p.id === providerId)!;
+    if (selectedProvider.extension) await this.providerExtensions.resolve({ ...selectedProvider.extension,
+      model: extensionModel ?? selectedProvider.extension.model }, 'configuration');
     const target = sessionId ? this.connections.describe(idSchema.parse(sessionId)) : undefined;
     const thread: AiThread = {
       id: randomUUID(),

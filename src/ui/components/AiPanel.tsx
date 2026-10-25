@@ -1,7 +1,7 @@
 import { ErrorNotice } from './ErrorNotice';
 import { conversationHistory, conversationStatus } from '../ai-history';
 import { usePermissionNavigation } from '../permission-navigation';
-import {AiExtensionModelSelect} from './AiExtensionModelSelect';
+import {AiExtensionModelSelect, AiExtensionProviderStatus} from './AiExtensionModelSelect';
 import { AiPermissionTree } from './AiPermissionTree';
 import { AiGoals } from './AiWork';
 import { AiEventSubscriptions } from './AiEventSubscriptions';
@@ -514,6 +514,7 @@ export function AiPanel({
                 <small>
                   {p.model} · {p.extension ? '由扩展提供' : p.hasKey ? '已保存 Key' : '无 Key'}
                 </small>
+                {p.extension && <AiExtensionProviderStatus extension={p.extension} />}
               </button>
               <button
                 className="icon"
