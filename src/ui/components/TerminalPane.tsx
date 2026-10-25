@@ -8,6 +8,7 @@ import { SearchAddon } from '@xterm/addon-search';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { ArrowDown, ArrowUp, X, Search, Keyboard } from 'lucide-react';
 import { installTerminalColors } from '../terminal-colors';
+import { isolateTerminalMeasurement } from '../terminal-measurement';
 import type { Preferences } from '../../shared/contracts';
 import { subscribeTerminal, registerTerminalSnapshot } from '../terminalBus';
 import { useI18n } from '../i18n';
@@ -224,6 +225,7 @@ export function TerminalPane({
     terminal.loadAddon(new Unicode11Addon());
     terminal.unicode.activeVersion = '11';
     terminal.open(host.current!);
+    const restoreMeasurement = isolateTerminalMeasurement(terminal.element);
     term.current = terminal;
     fit.current = fitter;
     search.current = finder;
@@ -366,6 +368,10 @@ export function TerminalPane({
       parsedFrame ??= requestAnimationFrame(syncParsedUi);
     });
     const data = terminal.onData((value) => {
+      // Send first; local suggestions and editor detection must not hold up
+      // interactive SSH input. The remote PTY remains the source of echo.
+      for (let offset = 0; offset < value.length; offset += 32768)
+        void window.cshell.input(id, value.slice(offset, offset + 32768)).catch(errorRef.current);
       const entered = typed.current;
       const visibleInput = entered !== null && promptInput(terminal) === entered;
       if (terminal.buffer.active.type === 'normal') {
@@ -433,8 +439,6 @@ export function TerminalPane({
           else commandLine = (commandLine + char).slice(-512);
         }
       }
-      for (let offset = 0; offset < value.length; offset += 32768)
-        void window.cshell.input(id, value.slice(offset, offset + 32768)).catch(errorRef.current);
     });
     const resize = terminal.onResize(
       (size) => void window.cshell.resize(id, size.cols, size.rows).catch(() => {}),
@@ -461,16 +465,24 @@ export function TerminalPane({
         )),
       };
     });
-    const focusTerminal = () => {
-      if (suggestionState.current.active && host.current?.clientWidth) {
-        fitter.fit();
-        void window.cshell.resize(id, terminal.cols, terminal.rows).catch(() => {});
-      }
+    let fitFrame: number | undefined;
+    let forceRemoteResize = false;
+    const scheduleFit = () => {
+      fitFrame ??= requestAnimationFrame(() => {
+        fitFrame = undefined;
+        if (suggestionState.current.active && host.current?.clientWidth && host.current?.clientHeight) {
+          const cols = terminal.cols, rows = terminal.rows;
+          fitter.fit();
+          // A floating view may have resized this same PTY while unfocused.
+          if (forceRemoteResize && cols === terminal.cols && rows === terminal.rows)
+            void window.cshell.resize(id, terminal.cols, terminal.rows).catch(() => {});
+        }
+        forceRemoteResize = false;
+      });
     };
+    const focusTerminal = () => { forceRemoteResize = true; scheduleFit(); };
     window.addEventListener('focus', focusTerminal);
-    const observer = new ResizeObserver(() => {
-      if (host.current?.clientWidth) fitter.fit();
-    });
+    const observer = new ResizeObserver(scheduleFit);
     observer.observe(host.current!);
     const fontsLoaded = () => {
       if (host.current?.clientWidth) {
@@ -483,6 +495,7 @@ export function TerminalPane({
       dispose();
       snapshotDispose();
       window.removeEventListener('focus', focusTerminal);
+      if (fitFrame !== undefined) cancelAnimationFrame(fitFrame);
       observer.disconnect();
       window.removeEventListener('cshell:fonts-loaded', fontsLoaded);
       data.dispose();
@@ -491,13 +504,14 @@ export function TerminalPane({
       bufferChange.dispose();
       parsed.dispose();
       if (parsedFrame !== undefined) cancelAnimationFrame(parsedFrame);
+      restoreMeasurement();
       terminal.dispose();
     };
   }, [id]);
   useEffect(() => {
-    if (!term.current || !preferences.terminalSemanticColors) return;
+    if (!term.current || !active || closed || !preferences.terminalSemanticColors) return;
     return installTerminalColors(term.current, preferences.theme === 'dark');
-  }, [id, preferences.terminalSemanticColors, preferences.theme]);
+  }, [id, active, closed, preferences.terminalSemanticColors, preferences.theme]);
   useEffect(() => {
     if (term.current) {
       term.current.options.fontFamily = preferences.terminalFont;

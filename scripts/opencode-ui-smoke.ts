@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 const dir = await mkdtemp(join(tmpdir(), 'opencode-ui-'));
 await build({
   stdin: {
-    contents: `import React from 'react';import {createRoot} from 'react-dom/client';import {OpenCodeView} from './src/extensions/opencode/View';import './src/ui/styles.css';window.calls=[];window.cshell={aiExtensionCall:async(id,action,input)=>{window.calls.push({action,input});if(action==='status')return {accounts:[{id:'default',name:'个人账号',workspace:'wrk_test'}]};if(action==='save')return {accounts:[{id:'default',name:'个人账号',workspace:'wrk_test'},{id:input.id,name:input.name,workspace:''}]};if(action==='check')return {authenticated:true,model:'glm-5.3',elapsedMs:12,models:[{id:'glm-5.3',available:true}],usage:{windows:[{label:'5 小时',usedPercent:23}],checkedAt:Date.now(),message:'官方 Go 套餐使用量；不是现金余额'}};if(action==='models')return [{id:'glm-5.3',available:true},{id:'kimi-k3',available:true},{id:'unknown',available:false}];if(action==='usage')return {windows:[{label:'5 小时',usedPercent:23}],checkedAt:Date.now(),message:'官方 Go 套餐使用量；不是现金余额'};return {id:'new'};}};createRoot(document.getElementById('root')).render(<OpenCodeView/>);`,
+    contents: `import React from 'react';import {createRoot} from 'react-dom/client';import {OpenCodeView} from './src/extensions/opencode/View';import './src/ui/styles.css';window.calls=[];window.cshell={onAiProvidersChanged:()=>()=>{},aiExtensionCall:async(id,action,input)=>{window.calls.push({action,input});if(action==='status')return {accounts:[{id:'default',name:'个人账号',workspace:'wrk_test'}]};if(action==='save')return {accounts:[{id:'default',name:'个人账号',workspace:'wrk_test'},{id:input.id,name:input.name,workspace:''}]};if(action==='check')return {authenticated:true,model:'glm-5.3',elapsedMs:12,models:[{id:'glm-5.3',available:true}],usage:{windows:[{label:'5 小时',usedPercent:23}],checkedAt:Date.now(),message:'官方 Go 套餐使用量；不是现金余额'}};if(action==='models')return [{id:'glm-5.3',available:true},{id:'kimi-k3',available:true},{id:'unknown',available:false}];if(action==='usage')return {windows:[{label:'5 小时',usedPercent:23}],checkedAt:Date.now(),message:'官方 Go 套餐使用量；不是现金余额'};return {id:'new'};}};createRoot(document.getElementById('root')).render(<OpenCodeView/>);`,
     resolveDir: process.cwd(),
     loader: 'tsx',
   },
@@ -45,7 +45,7 @@ try {
   await page.waitForTimeout(500);
   console.log(await page.locator('body').innerText());
   await page.screenshot({ path: 'test-results/opencode-debug-ui.png', fullPage: true });
-  await page.getByRole('radio', { name: 'glm-5.3 可接入' }).click();
+  await page.getByRole('radio', { name: 'glm-5.3 目录已列出 · 调用权限待验证' }).click();
   await page.getByRole('button', { name: '接入此账号' }).click();
   await page.getByText('已接入账号，可在智能体中直接选择其模型').waitFor();
   await page.getByRole('button', { name: '刷新用量' }).click();

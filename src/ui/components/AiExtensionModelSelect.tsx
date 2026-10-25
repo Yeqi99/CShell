@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useExtensionCatalog } from '../use-extension-catalog';
 import './AiExtensionModelSelect.css';
 export function AiExtensionModelSelect({
   extension,
@@ -7,27 +8,12 @@ export function AiExtensionModelSelect({
   extension: { id: string; model: string };
   onChange: (ref: string, model: string) => void;
 }) {
-  const [choices, setChoices] = useState<{ ref: string; model: string; available: boolean }[]>([]),
-    [error, setError] = useState(''),
-    [query, setQuery] = useState('');
-  useEffect(() => {
-    let active = true;
-    setError('');
-    setChoices([]);
-    void window.cshell
-      .aiExtensionCall(extension.id, 'choices', { reference: extension.model })
-      .then((v) => {
-        if (active) setChoices(v as typeof choices);
-      })
-      .catch((e) => {
-        if (active) setError(e.message);
-      });
-    return () => {
-      active = false;
-    };
-  }, [extension.id, extension.model]);
+  const [query, setQuery] = useState('');
+  const { catalog, loading, error, refresh } = useExtensionCatalog(extension);
+  const choices = catalog?.choices ?? [];
+  const current = catalog?.current;
   const filtered = choices.filter(
-    (c) => c.ref !== extension.model && c.model.toLowerCase().includes(query.toLowerCase()),
+    (c) => c.ref !== current?.ref && c.model.toLowerCase().includes(query.toLowerCase()),
   );
   return (
     <div className="ai-extension-model-picker">
@@ -43,25 +29,38 @@ export function AiExtensionModelSelect({
       <label>
         扩展模型
         <select
-          value={extension.model}
+          aria-label="扩展模型"
+          value={current?.ref ?? extension.model}
+          disabled={loading}
           onChange={(e) => {
             const c = choices.find((c) => c.ref === e.target.value);
-            if (c) onChange(c.ref, c.model);
+            if (c?.available) onChange(c.ref, c.model);
           }}
         >
-          <option value={extension.model}>
-            {choices.find((c) => c.ref === extension.model)?.model ?? extension.model}
+          <option value={current?.ref ?? extension.model} disabled={!current?.available}>
+            {current?.model ?? extension.model}{loading ? ' · 正在确认' : current?.available ? '' : ' · 当前不可用'}
           </option>
           {filtered.map((c) => (
             <option key={c.ref} value={c.ref} disabled={!c.available}>
               {c.model}
-              {c.available ? '' : ' · 协议待适配'}
+              {c.available ? '' : ` · ${c.reason || '当前不可用'}`}
             </option>
           ))}
         </select>
       </label>
       {query && !filtered.length && <small>没有其他匹配模型</small>}
+      {!loading && current?.reason && <small role="status">{current.reason}</small>}
       {error && <small role="alert">{error}</small>}
+      <button type="button" disabled={loading} onClick={refresh}>刷新模型目录</button>
     </div>
   );
+}
+
+/** Runtime catalog status is not written into account/cloud configuration. */
+export function AiExtensionProviderStatus({ extension }: { extension: { id: string; model: string } }) {
+  const { catalog, loading, error } = useExtensionCatalog(extension);
+  if (loading) return <small>正在确认模型目录…</small>;
+  const reason = error || catalog?.current.reason;
+  if (!reason) return null;
+  return <small role="status" title={reason}>{reason} · 点击重新选择</small>;
 }

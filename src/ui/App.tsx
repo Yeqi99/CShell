@@ -1275,7 +1275,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
             </div>
           )}
 
-          {tabs.filter(tab=>linuxWorkspaces.includes(tab.id)).map(tab=><LinuxWorkspace key={tab.id} session={tab.id} profileId={tab.profile.id} preferences={preferences} name={tab.profile.name} active={surface==='terminal'&&active===tab.id&&!!linuxModes[tab.id]} closed={!!tab.closed} onRetry={()=>openSaved(tab.profile)} onTerminal={()=>{}} files={<div inert={!!tab.closed} style={{height:"100%"}}><ToolsPanel sessionId={tab.id} sessionName={tab.profile.name} active={surface==='terminal'&&active===tab.id&&!tab.closed} dockerEnabled={pluginEnabled(config.plugins,'docker')} transfers={transfers.filter(t=>t.sessionId===tab.id)} onError={onError}/></div>} terminal={(visible)=><TerminalSlot id={tab.id} active={visible}/>}/>)}
+          {tabs.filter(tab=>linuxWorkspaces.includes(tab.id)).map(tab=><LinuxWorkspace key={tab.id} session={tab.id} profileId={tab.profile.id} preferences={preferences} name={tab.profile.name} active={surface==='terminal'&&active===tab.id&&!!linuxModes[tab.id]} closed={!!tab.closed} onRetry={()=>openSaved(tab.profile)} onTerminal={()=>{}} files={visible=><div inert={!!tab.closed} style={{height:"100%"}}><ToolsPanel sessionId={tab.id} sessionName={tab.profile.name} active={visible} dockerEnabled={pluginEnabled(config.plugins,'docker')} transfers={transfers.filter(t=>t.sessionId===tab.id)} onError={onError}/></div>} terminal={(visible)=><TerminalSlot id={tab.id} active={visible}/>}/>)}
           <AiExecution enabled={preferences.showAiExecution && !minimal} sessionId={current?.id} />
           {tabs.length ? (
             <div className="terminals" hidden={surface !== 'terminal'||!!linuxModes[active]}>

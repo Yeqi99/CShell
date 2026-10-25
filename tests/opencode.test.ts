@@ -487,7 +487,7 @@ test('one authenticated account provider exposes Go and Zen without inference or
  try{
   await e.load(); await e.call('save',{key:'private-key'});
   const a=await e.call('connect',{id:'default'}),b=await e.call('connect',{id:'default'});
-  assert.equal(a.id,b.id); assert.equal(saved.length,2); assert.equal(calls,2);
+  assert.equal(a.id,b.id); assert.equal(saved.length,1); assert.equal(calls,2);
   const choices=await e.call('choices',{reference:saved[0].extension.model});
   assert.deepEqual(choices.map((m:any)=>m.ref),['default/go/glm-5.3','default/zen/beam-free']);
   assert.equal(JSON.stringify(choices).includes('private-key'),false);

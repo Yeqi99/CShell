@@ -1,0 +1,62 @@
+import { build } from 'esbuild';
+import { chromium } from 'playwright';
+import { createServer } from 'node:http';
+import { mkdtemp, readFile, rm, mkdir } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import assert from 'node:assert/strict';
+
+const dir = await mkdtemp(join(tmpdir(), 'opencode-catalog-ui-'));
+await build({ stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
+import React,{useState} from 'react';import {createRoot} from 'react-dom/client';
+import {AiExtensionModelSelect} from './src/ui/components/AiExtensionModelSelect';
+import {AiConversation} from './src/ui/components/AiConversation';
+import './src/ui/styles.css';import './src/ui/components/ai-panel.css';
+window.notifications=new Set();window.requests=0;window.created=[];window.offline=false;window.retired=true;
+const beam={ref:'default/go/beam-free',model:'beam-free',available:true};
+const old={ref:'default/go/longcat-flash-free',model:'longcat-flash-free',available:false,reason:'此模型已不在 OpenCode 当前目录中，请选择其他模型；账号密钥已保留'};
+window.cshell={onAiProvidersChanged:fn=>{window.notifications.add(fn);return ()=>window.notifications.delete(fn)},aiSend:async()=>{},aiExtensionCall:async(id,action,{reference})=>{window.requests++;if(window.offline)throw Error('模型目录暂时无法加载，尚不能确认此模型是否可用');const current=reference.includes('beam-free')?beam:old;return {choices:[beam,{ref:'default/zen/claude-opus-5',model:'claude-opus-5',available:true}],current}}};
+function Fixture(){const [ref,setRef]=useState(old.ref);const extension={id:'cshell.opencode',model:ref};const provider={id:'provider',name:'OpenCode · 个人账号',url:'https://model-extension.invalid',model:ref.split('/').at(-1),extension};const noop=()=>{};return <div style={{display:'grid',gap:24,padding:20,maxWidth:960,gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))'}}><section><h2>智能体基座</h2><AiExtensionModelSelect extension={extension} onChange={next=>setRef(next)}/></section><aside className="ai-panel" style={{position:'relative',width:'100%',height:580}}><AiConversation snapshot={{providers:[provider],threads:[]}} providerId="provider" location="workspace" mode="review" busy={false} openThread={noop} insertion={null} setProviderId={noop} setMode={noop} create={async model=>{window.created.push(model);return {id:'thread'}}} run={async fn=>fn()} configure={noop} executionVisible={false}/></aside></div>};createRoot(document.getElementById('root')).render(<Fixture/>);
+` }, outfile: join(dir,'app.js'), bundle: true, jsx:'automatic', loader:{'.woff2':'dataurl','.svg':'dataurl'} });
+const server = createServer(async(req,res)=>{
+  const file=req.url==='/app.js'?'app.js':req.url==='/app.css'?'app.css':null;
+  res.setHeader('Content-Type',file?(file.endsWith('.js')?'application/javascript':'text/css'):'text/html; charset=utf-8');
+  res.end(file?await readFile(join(dir,file)):'<link rel="stylesheet" href="app.css"><div id="root"></div><script src="app.js"></script>');
+});
+await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
+const browser=await chromium.launch({channel:process.platform==='win32'?'msedge':undefined,headless:true});
+try {
+  const page=await browser.newPage({viewport:{width:1040,height:800}});
+  const errors:string[]=[];page.on('pageerror',e=>{errors.push(e.message);console.error(e.message)});
+  await page.goto(`http://127.0.0.1:${(server.address() as any).port}`);
+  await page.getByLabel('扩展模型',{exact:true}).waitFor();
+  await page.getByText(/此模型已不在 OpenCode 当前目录/).first().waitFor();
+  assert.equal(await page.getByLabel('扩展模型',{exact:true}).inputValue(),'default/go/longcat-flash-free');
+  assert.equal(await page.getByLabel('扩展模型',{exact:true}).locator('option[value="default/go/longcat-flash-free"]').evaluate((el:HTMLOptionElement)=>el.disabled),true);
+  assert.equal(await page.getByLabel('账号模型').inputValue(),'');
+  await page.locator('textarea').fill('你好');
+  assert.equal(await page.getByRole('button',{name:'发送',exact:true}).isDisabled(),true);
+  await mkdir('test-results',{recursive:true});
+  await page.screenshot({path:'test-results/opencode-catalog-unavailable.png',fullPage:true});
+  assert.equal(await page.evaluate(()=>(window as any).created.length),0);
+  await page.getByLabel('账号模型').selectOption('default/go/beam-free');
+  assert.equal(await page.getByRole('button',{name:'发送',exact:true}).isEnabled(),true);
+  await page.getByRole('button',{name:'发送',exact:true}).click();
+  await page.waitForFunction(()=>(window as any).created.length===1);
+  assert.deepEqual(await page.evaluate(()=>(window as any).created),['default/go/beam-free']);
+  await page.evaluate(()=>{(window as any).offline=true;(window as any).notifications.forEach((fn:()=>void)=>fn())});
+  await page.getByRole('alert').filter({hasText:'尚不能确认'}).waitFor();
+  assert.equal(await page.getByLabel('扩展模型',{exact:true}).locator('option').count(),1);
+  await page.evaluate(()=>{(window as any).offline=false});
+  await page.getByRole('button',{name:'刷新模型目录'}).click();
+  await page.getByLabel('扩展模型',{exact:true}).selectOption('default/go/beam-free');
+  await page.waitForFunction(()=>(document.querySelector('select[aria-label="账号模型"]') as HTMLSelectElement)?.value==='default/go/beam-free');
+  assert.equal(await page.getByLabel('扩展模型',{exact:true}).locator('option:checked').isDisabled(),false);
+  await page.setViewportSize({width:390,height:900});
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  await mkdir('test-results',{recursive:true});
+  await page.screenshot({path:'test-results/opencode-catalog-repair.png',fullPage:true});
+  assert.deepEqual(errors,[]);
+  assert.ok(await page.evaluate(()=>(window as any).requests)<20,'catalog must not enter a refresh loop');
+  console.log('PASS retired model disabled; no implicit fallback; explicit model selection; offline unknown; recovery; 390px layout');
+} finally { await browser.close();server.close();await rm(dir,{recursive:true,force:true}); }

@@ -2,6 +2,7 @@ import { submitsComposer } from '../composer-keys';
 import { AiToolRecord, toolInput } from './AiToolRecord';
 import { AiTaskTree } from './AiWork';
 import { useAiDrafts } from '../ai-drafts';
+import { useExtensionCatalog } from '../use-extension-catalog';
 import { useEffect, useRef, useState } from 'react';
 import {
   ArrowDown,
@@ -57,10 +58,8 @@ export function AiConversation({
   const sending = useRef(new Set<string>());
   const [sendErrors, setSendErrors] = useState<Record<string, string>>({});
   const [pendingSends, setPendingSends] = useState<string[]>([]);
-  const [modelChoices,setModelChoices]=useState<{ref:string;model:string;label?:string;available:boolean}[]>([]);
   const [chosenModel,setChosenModel]=useState('');
-  const [modelsLoading,setModelsLoading]=useState(false);
-  const [modelsError,setModelsError]=useState('');
+  const initializedModel = useRef(false);
   const composer = useRef<HTMLTextAreaElement>(null),
     inserted = useRef('');
   useEffect(() => {
@@ -88,6 +87,10 @@ export function AiConversation({
   const follow = useRef(true);
   const [away, setAway] = useState(false);
   const provider = snapshot.providers.find((p) => p.id === (thread?.providerId ?? providerId));
+  const { catalog, loading: modelsLoading, error: modelsError } = useExtensionCatalog(!thread ? provider?.extension : undefined);
+  const modelChoices = catalog?.choices ?? [];
+  const selectedModel = modelChoices.find(c => c.ref === chosenModel);
+  const requiresModel = !thread && !!provider?.extension && !selectedModel?.available;
   useEffect(() => {
     follow.current = true;
     setAway(false);
@@ -102,21 +105,17 @@ export function AiConversation({
     thread?.pending?.id,
     thread?.state,
   ]);
-  useEffect(()=>{
-    let alive=true;setChosenModel('');setModelChoices([]);setModelsError('');
-    setModelsLoading(!!provider?.extension && !thread);
-    if(provider?.extension && !thread)void window.cshell.aiExtensionCall(provider.extension.id,'choices',{reference:provider.extension.model,refresh:true}).then(v=>{
-      if(!alive)return;
-      if(!Array.isArray(v))throw Error('模型目录不可用');
-      const choices=v as typeof modelChoices;
-      setModelChoices(choices);
-      const ref=provider.extension!.model;
-      setChosenModel(choices.find(c=>c.ref===ref)?.ref ?? choices.find(c=>c.ref===`default/${ref}`)?.ref ?? '');
-    }).catch(e=>{if(alive)setModelsError(String(e.message??e))}).finally(()=>{if(alive)setModelsLoading(false)});
-    return()=>{alive=false};
-  },[provider?.id,provider?.extension?.model,thread?.id]);
+  useEffect(() => { setChosenModel(''); initializedModel.current = false; }, [provider?.id, provider?.extension?.model, thread?.id]);
+  useEffect(() => {
+    if (!thread && catalog) {
+      const initial = !initializedModel.current;
+      initializedModel.current = true;
+      setChosenModel(previous => initial ? (catalog.current.available ? catalog.current.ref : '')
+        : catalog.choices.some(c => c.ref === previous && c.available) ? previous : '');
+    }
+  }, [catalog, thread?.id]);
   const send = () => {
-    if (busy || active || sending.current.has(draftId) || modelsLoading || !text.trim() || !provider) return;
+    if (busy || active || sending.current.has(draftId) || modelsLoading || requiresModel || !text.trim() || !provider) return;
     sending.current.add(draftId);
     setPendingSends([...sending.current]);
     setSendErrors(previous => ({ ...previous, [draftId]: '' }));
@@ -345,9 +344,10 @@ export function AiConversation({
               </div>
             )}
           </div>
-          {!thread && modelChoices.length>0 && <select className="agent-account-model" aria-label="账号模型" value={chosenModel} onChange={e=>setChosenModel(e.target.value)}>{modelChoices.map(c=><option key={c.ref} value={c.ref} disabled={!c.available}>{c.label??c.model}</option>)}</select>}
+          {!thread && modelChoices.length>0 && <select className="agent-account-model" aria-label="账号模型" value={chosenModel} onChange={e=>setChosenModel(e.target.value)}><option value="" disabled>请选择可用模型</option>{modelChoices.map(c=><option key={c.ref} value={c.ref} disabled={!c.available}>{c.label??c.model}{c.available ? '' : ' · 当前不可用'}</option>)}</select>}
           {modelsLoading && <span className="agent-thread-model" role="status">加载模型…</span>}
           {modelsError && <span className="agent-thread-model" title={modelsError}>模型目录暂不可用</span>}
+          {requiresModel && !modelsLoading && !modelsError && catalog?.current.reason && <span className="agent-thread-model" role="status" title={catalog.current.reason}>{catalog.current.reason}</span>}
           {thread?.extensionModel && <span className="agent-thread-model" title={thread.extensionModel}>{thread.extensionModel.split('/').slice(1).join(' / ')}</span>}
           <div className="agent-policy">
             <ShieldCheck size={13} />
@@ -383,7 +383,7 @@ export function AiConversation({
               className="primary icon agent-send"
               title="发送 · Enter（Shift+Enter 换行）"
               aria-label="发送"
-              disabled={busy || !text.trim() || !provider}
+              disabled={busy || modelsLoading || requiresModel || !text.trim() || !provider}
             >
               <ArrowUp size={16} />
             </button>

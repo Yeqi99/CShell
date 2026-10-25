@@ -70,6 +70,9 @@ export function OpenCodeView() {
       active = false;
     };
   }, []);
+  useEffect(() => window.cshell.onAiProvidersChanged(() => {
+    void call('status').then(s => setAccounts(s.accounts)).catch(() => {});
+  }), []);
   useEffect(() => {
     let active = true;
     setModels([]);
@@ -80,7 +83,7 @@ export function OpenCodeView() {
       .then((m) => {
         if (active) {
           setModels(m);
-          setModel(m.find((v: Model) => v.available)?.id ?? '');
+          setModel(m.find((v: Model) => v.available && /(?:^|-)free$/.test(v.id))?.id ?? '');
         }
       })
       .catch((e) => {
@@ -125,9 +128,9 @@ export function OpenCodeView() {
   const verify = async (id: string, inference = false) => {
     setCheck(null);
     setUsage(null);
-    const connected=await call('connect', { id });
-    setAccounts(previous=>previous.map(a=>a.id===id?{...a,providerId:connected.id}:a));
     if (!inference) {
+      const connected=await call('connect', { id });
+      setAccounts(previous=>previous.map(a=>a.id===id?{...a,providerId:connected.id}:a));
       setCheck({authenticated:true});
       try { setUsage(await call('usage', {id})); } catch {}
       setMessage('账号已验证并接入，可在智能体中选择 Go 与 Zen 模型');
@@ -314,7 +317,12 @@ export function OpenCodeView() {
             aria-label="刷新模型"
             disabled={busy}
             onClick={() =>
-              void run(async () => setModels(await call('models', { tier, refresh: true })))
+              void run(async () => {
+                const next = await call('models', { tier, refresh: true }) as Model[];
+                setModels(next);
+                setModel(previous => next.some(m => m.id === previous && m.available) ? previous : '');
+                setCheck(null);
+              })
             }
           >
             <RefreshCw size={16} />
@@ -352,7 +360,7 @@ export function OpenCodeView() {
               >
                 <span>
                   {m.id}
-                  <small>{m.available ? '可接入' : '协议待适配'}</small>
+                  <small>{check?.model === m.id ? '已验证调用' : m.available ? '目录已列出 · 调用权限待验证' : '协议待适配'}</small>
                 </span>
                 {model === m.id && <Check size={17} />}
               </button>
@@ -367,9 +375,9 @@ export function OpenCodeView() {
             className="primary"
             onClick={() =>
               void run(async () => {
-                const connected=await call('connect', { id: selected });
+                const connected=await call('connect', { id: selected, reference:`${selected}/${tier}/${model}`, setDefault:true });
                 setAccounts(previous=>previous.map(a=>a.id===selected?{...a,providerId:connected.id}:a));
-                setMessage('已接入账号，可在智能体中直接选择其模型');
+                setMessage(`已接入账号，默认模型已设为 ${model}；已有会话保持原模型`);
               })
             }
           >
