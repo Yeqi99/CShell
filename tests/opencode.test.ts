@@ -319,15 +319,15 @@ test('availability requires authenticated config and real completion, never publ
   );
   try {
     await e.call('save', { key: 'fixture' });
-    await assert.rejects(() => e.call('check', { tier: 'go' }), /401/);
+    await assert.rejects(() => e.call('check', { tier: 'go', model: 'glm-5.3' }), /401/);
     assert.equal(
       requests.some((u) => u.includes('completions')),
       false,
     );
     auth = true;
-    await assert.rejects(() => e.call('check', { tier: 'go' }), /429/);
+    await assert.rejects(() => e.call('check', { tier: 'go', model: 'glm-5.3' }), /429/);
     completion = true;
-    const r = await e.call('check', { tier: 'go' });
+    const r = await e.call('check', { tier: 'go', model: 'glm-5.3' });
     assert.equal(r.authenticated, true);
     assert.equal(r.usage.windows[0].usedPercent, 9);
     assert.ok(requests.some((u) => u.endsWith('/go/openai/v1/chat/completions')));

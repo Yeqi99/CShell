@@ -1,9 +1,11 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';
-import {mkdtemp,mkdir,writeFile,readFile,copyFile,readdir,rm} from 'node:fs/promises';import {join,resolve} from 'node:path';import {tmpdir} from 'node:os';import {execFile} from 'node:child_process';import {promisify} from 'node:util';import {createHash} from 'node:crypto';
+import {mkdtemp,mkdir,writeFile,readFile,copyFile,readdir,rm,realpath} from 'node:fs/promises';import {join,resolve} from 'node:path';import {tmpdir} from 'node:os';import {execFile} from 'node:child_process';import {promisify} from 'node:util';import {createHash} from 'node:crypto';
 import {prepareWindowsAgentReplacement} from '../src/agent/windows-update';import {callAgent} from '../src/agent/control';import {updateDaemonSource} from './helpers/update-daemon';
 const exec=promisify(execFile);
 for(const mode of ['normal','wrong-identity'])test('Windows native preparation '+(mode==='normal'?'keeps the active launcher until verified handoff':'restores the old launcher and daemon after failed handshake'),{skip:process.platform!=='win32',timeout:60000},async()=>{
- const dir=await mkdtemp(join(tmpdir(),'cagent-update-native-')),originalExecutable=process.execPath,originalArgs=[...process.argv];
+ // CI's TEMP can use an 8.3 alias; production deliberately canonicalizes the
+ // runtime path before handing the destination to the native installer.
+ const dir=await realpath(await mkdtemp(join(tmpdir(),'cagent-update-native-'))),originalExecutable=process.execPath,originalArgs=[...process.argv];
  const root=join(dir,'installation'),runtime=join(root,'versions','old'),setup=join(dir,'setup'),payload=join(setup,'payload'),data=join(dir,'data');
  const launcher=join(root,'Open CAgent.vbs'),previous=Buffer.from('previous-launcher');
  try{
