@@ -39,4 +39,3 @@
 <h2 id="section-4">按平台查阅</h2>
 
 <p><a href="https://shell.canp.ai/docs/windows.html">Windows</a> · <a href="https://shell.canp.ai/docs/macos.html">macOS</a> · <a href="https://shell.canp.ai/docs/linux.html">Linux</a> · <a href="https://shell.canp.ai/docs/android.html">Android</a> · <a href="https://shell.canp.ai/docs/extensions.html">扩展与应用</a></p>
-

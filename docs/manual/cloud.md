@@ -37,4 +37,3 @@
 
 <h2 id="section-6">版本权益</h2>
 <table><thead><tr><th>项目</th><th>Pro 免费版</th><th>Pro 会员版</th></tr></thead><tbody><tr><td>加密配置空间</td><td>2 MiB</td><td>64 MiB</td></tr><tr><td>配置、习惯记忆、共享基座</td><td>✓</td><td>✓</td></tr><tr><td>同账号设备发现</td><td>✓</td><td>✓</td></tr><tr><td>免公网 IP 中继连接</td><td>—</td><td>✓</td></tr><tr><td>机器应用网络出口</td><td>—</td><td>✓</td></tr></tbody></table><p>配置空间不是网盘容量。官方模型按账号可用额度使用；实际额度和会员到期日以账号页为准。</p>
-
