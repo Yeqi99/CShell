@@ -12,8 +12,8 @@
 
 <h2 id="text">一次识别多条连接文本</h2>
 <p>在批量导入文本框粘贴多条 SSH / RDP 信息并点击「预览连接」。例如：</p>
-<pre><code>ssh alice@dev.example.com -p 22
-ssh bob@test.example.com -p 2222</code></pre><p>逐条确认地址、协议、用户名和分组，再保存。无法识别的行不会自动执行；缺少密码可在真正连接时补齐。剪贴板导入提示只创建草稿，不会覆盖已有草稿或自动连接。</p>
+<pre><code>ssh -l alice dev.example.com -p 22
+ssh -l bob test.example.com -p 2222</code></pre><p>逐条确认地址、协议、用户名和分组，再保存。无法识别的行不会自动执行；缺少密码可在真正连接时补齐。剪贴板导入提示只创建草稿，不会覆盖已有草稿或自动连接。</p>
 
 
 <h2 id="account">把开源版或未登录配置载入 Pro 账号</h2>
@@ -27,4 +27,3 @@ ssh bob@test.example.com -p 2222</code></pre><p>逐条确认地址、协议、�
 
 <h2 id="missing">导入后仍缺模型或连接</h2>
 <p>先核对来源和当前账号，再查看冲突选择。配置导入成功不代表模型服务可访问：Key 失效、模型下架、服务商地区限制都会导致调用失败。遇到 OpenCode 账号缺失时，不要反复导入覆盖当前配置，先看<a href="https://shell.canp.ai/docs/opencode.html">OpenCode 故障说明</a>并保留原数据。</p>
-

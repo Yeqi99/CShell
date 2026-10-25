@@ -27,3 +27,6 @@
 
 <p>请提供 macOS 版本、CPU 架构、下载版本和可复现步骤，移除日志中的密钥。不要通过关闭系统安全机制解决来源不明的软件包问题。</p>
 
+
+<h2 id="app-updates">应用内更新</h2>
+<p>更新入口、各平台安装方式与旧版升级说明见<a href="https://shell.canp.ai/docs/releases.html#one-click-update">一键更新指南</a>。更新使用香港源，保留当前产品渠道与账号数据；安装前先保存工作。</p>
