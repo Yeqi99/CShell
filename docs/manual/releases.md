@@ -7,6 +7,11 @@
 
 
 
+<h2 id="release-0810">0.8.10 · 同步与多面板体验（准备中）</h2>
+<p><strong>正在开发与验证，尚未发布。</strong>官网当前正式下载与应用更新源仍为 0.8.9，不使用开发包替换已发布附件。</p>
+<ul><li>Pro 保留按 ID 合并的列表排序；Android 保存未使用的 FTP / SFTP 连接位置与未知云字段。</li><li>Tavily 账号和 Key 纳入加密同步与确认导入，付费许可和扩展授权留在本机；空字段、明确删除与失败回滚分别处理。</li><li>补齐机器桌面背景、主题、命名方案和图片的同步，排除运行窗口与原生临时状态。新增可选段要求新版桌面，旧版不认识时拒绝恢复并保留云数据。</li><li>SSH 文件与信息面板可与智能体共存；模型菜单补齐键盘与窄宽定位，命令台异步结果不抢焦点，OpenCode 默认值按钮改为「设为默认模型」。</li></ul><p>具体范围见<a href="https://shell.canp.ai/docs/cloud.html#sync-0810">同步说明</a>、<a href="https://shell.canp.ai/docs/terminal.html#ssh-panels-0810">SSH 面板</a>和<a href="https://shell.canp.ai/docs/ai.html#model-menu-0810">模型菜单</a>。最终测试、包与渠道核验仍在进行，不把本地渲染基准当作用户网络延迟已经解决。</p>
+
+
 <h2 id="release-089">0.8.9 · 文件连接与统一工作台</h2>
 <p><strong>0.8.9 已发布。</strong>开源版、Pro 与 CAgent 的最终安装包已核验，官网与香港更新渠道同步提供。升级保留已有账号、连接与密钥；各平台验收范围和限制见对应发行记录。</p>
 <ul><li><strong>FTP / FTPS / SFTP：</strong>桌面端新增独立文件连接，支持浏览、上传、下载、重命名、建目录与传输队列；文件连接不启动 Shell。FTP 不提供未实现的递归传输或文本编辑。<a href="https://shell.canp.ai/docs/connections.html#file-protocols">查看协议与操作范围</a>。</li><li><strong>原生连接与可视化：</strong>SSH 默认打开原生终端，单台连接右键可记住可视化选择。可视化终端中可折叠展开文件与机器信息，切换保留同一 PTY 和历史。<a href="https://shell.canp.ai/docs/connections.html#default-connection-view">设置打开方式</a>。</li><li><strong>工作台与 CLI：</strong>概览、命令台、可视化三种视图共用能力目录，支持独立命令台标签、草稿、契约查询和真实调用。命令台不是 CMD 或 PowerShell。<a href="https://shell.canp.ai/docs/cli.html">查看完整命令</a>。</li><li><strong>智能体与 MCP：</strong>补齐真实浏览器读取、交互、截图与有限抓取，以及受支持的远控画面、鼠标和键盘操作。读取、控制分别授权，保留网站正常鉴权流程。<a href="https://shell.canp.ai/docs/automation.html#visual-tools">了解工具与权限</a>。</li><li><strong>自定义扩展：</strong>独立 process 工具包可接入智能体、CLI 和 MCP；安装、启用与运行授权分开。<a href="https://shell.canp.ai/docs/plugin-authoring.html#process-tools">制作工具扩展</a>。</li><li><strong>模型选择：</strong>OpenCode 账号下动态列出模型，不必逐个填入基座；失效状态同步到设置，已有会话保持原选择。接入官方运行时不等于服务端允许所有模型。<a href="https://shell.canp.ai/docs/opencode.html">查看接入与实际拒绝状态</a>。</li><li><strong>界面与兼容：</strong>侧栏字号收进右键折叠设置，默认字号更紧凑；窄面板分类不再竖排挤压。硬件与市场按机器实际能力读取，RDP-only 安装入口改为 Windows 安装指南。支持新协议的 CAgent 空闲时核验更新并保留身份与权限。<a href="https://shell.canp.ai/docs/cagent.html#safe-updates">查看更新条件</a>。</li></ul><p>独立文件协议、三种工作台视图与官方 OpenCode 运行时属于桌面端功能。Android 保留已有 SSH / CAgent 功能，并保留不消费的云配置字段；不把桌面能力标成手机已实现。</p>

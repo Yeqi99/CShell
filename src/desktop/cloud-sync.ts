@@ -25,6 +25,8 @@ const bundleSchema = z
     http: z.unknown(),
     browser: z.unknown().optional(),
     opencode: z.unknown().optional(),
+    tavily: z.unknown().optional(),
+    desktopLooks:z.unknown().optional(),
     assets: z.record(assetName, z.string().max(11 * 1024 * 1024)).default({}),
   })
   .strict();
@@ -40,10 +42,14 @@ export async function registerCloudHandlers(
   openCode: import('../extensions/opencode/service').OpenCodeExtension,
   profileOptions?:{profiles:DesktopAccountProfiles;assertIdle():void;block(value:boolean):void},
   network?: import('./network-route').ApplicationNetworkRoute,
+  tavily?: import('../extensions/tavily/service').TavilyExtension,
+  desktopLooks?:import('../core/desktop-looks').DesktopLooks,
 ) {
   const directory = app.getPath('userData');
   const assertAccountIdle=()=>{profileOptions?.assertIdle();if(ai.snapshot().threads.some(t=>t.state==='running'||t.state==='approval'||t.goal?.state==='active'))throw Error('请先停止智能体任务，再切换账号');};
   const snapshot = async () => {
+    const tavilyData=await tavily?.cloudExport();
+    const desktopLookData=await desktopLooks?.cloudExport();
     const data = await store.cloudExport(),
       assets: Record<string, string> = {};
     for (const preferences of [data.preferences, ...data.presets.map((p) => p.preferences)]) {
@@ -64,6 +70,8 @@ export async function registerCloudHandlers(
       store: data,
       ai: ai.cloudExport(),
       opencode: await openCode.cloudExport(),
+      ...(tavilyData===undefined?{}:{tavily:tavilyData}),
+      ...(desktopLookData===undefined?{}:{desktopLooks:desktopLookData}),
       devices: client.cloudExport(),
       browser: await browser.cloudExport(),
       http: http.cloudExport(),
@@ -73,8 +81,10 @@ export async function registerCloudHandlers(
   const validate = (value: unknown) => {
     const data = bundleSchema.parse(value);
     store.cloudValidate(data.store);
+    if(data.desktopLooks!==undefined){if(!desktopLooks)throw Error('桌面外观同步未就绪');desktopLooks.cloudValidate(data.desktopLooks);}
     ai.cloudValidate(data.ai);
     if(data.opencode!==undefined)openCode.cloudValidate(data.opencode);
+    if(data.tavily!==undefined){if(!tavily)throw Error('Tavily 同步服务尚未就绪');tavily.cloudValidate(data.tavily);}
     client.cloudValidate(data.devices);
     http.cloudValidate(data.http);
     if(data.browser!==undefined)browser.cloudValidate(data.browser);
@@ -87,12 +97,14 @@ export async function registerCloudHandlers(
   };
   const apply = async (value: unknown, rollback = false) => {
     const data = validate(value);
+    if(data.desktopLooks!==undefined||rollback)await desktopLooks?.cloudImport(data.desktopLooks,rollback);
     await mkdir(join(directory, 'appearance'), { recursive: true });
     for (const [name, encoded] of Object.entries(data.assets))
       await writeFile(join(directory, 'appearance', name), Buffer.from(encoded, 'base64'));
     await client.cloudImport(data.devices);
     await http.cloudImport(data.http);
     if(data.opencode!==undefined)await openCode.cloudImport(data.opencode);
+    if(data.tavily!==undefined||rollback)await tavily?.cloudImport(data.tavily,rollback);
     await ai.cloudImport(data.ai);
     await store.cloudImport(data.store,rollback);
     if(data.browser!==undefined)await (rollback?browser.cloudRestore(data.browser):browser.cloudImport(data.browser));

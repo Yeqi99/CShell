@@ -26,6 +26,7 @@ import { ClientProvider } from '../core/client/provider';
 import { ClientVault } from '../core/client/identity';
 import { ProcessExtensions } from '../core/process-extensions';
 import { registerCloudHandlers } from './cloud-sync';
+import { DesktopLooks } from '../core/desktop-looks';
 import { DesktopAccountProfiles } from '../core/desktop-account-profiles';
 import { clientShellSchema } from '../shared/client';
 import { LocalTerminalProvider } from '../core/connections/local-terminal-provider';
@@ -470,6 +471,10 @@ else
         );
         return { sessionId, name: clientProvider.resolve(sessionId).target.label };
       });
+      const desktopLooks=new DesktopLooks(app.getPath('userData'),store,()=>{if(!window.isDestroyed())window.webContents.send('desktop-look:changed');});
+      await desktopLooks.load();
+      handle('desktop-look:get',(id,legacy)=>desktopLooks.get(id,legacy));
+      handle('desktop-look:save',(id,value)=>desktopLooks.save(id,value));
       registerAppearanceHandlers(handle, window, app.getPath('userData'), consume, text);
       registerUpdateHandlers(handle, window);
       registerActivity(handle, window, activity);
@@ -596,7 +601,7 @@ else
         },
         http,
         wechat,
-        (ai, openCode, network) => registerCloudHandlers(handle, store, ai, clientProvider, http, () => {
+        (ai, openCode, network, tavily) => registerCloudHandlers(handle, store, ai, clientProvider, http, () => {
           if (!window.isDestroyed()) {
             window.webContents.send('cloud:changed');
             window.webContents.send('ai:providers-changed');
@@ -605,7 +610,7 @@ else
           profiles:accountProfiles,
           assertIdle:()=>{if(ssh.size||ftp.size||localTerminal.size||clientProvider.size||transfers.size||http.running)throw Error('请先关闭连接并等待传输结束，再切换账号');},
           block:(value:boolean)=>{accountTransition=value;},
-        }:undefined, network),
+        }:undefined, network, tavily, desktopLooks),
         () => processExtensions.applicationTools(),
       );
       registerPresetHandlers(handle, window, app.getPath('userData'), store, text);

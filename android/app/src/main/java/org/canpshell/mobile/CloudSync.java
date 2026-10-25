@@ -154,18 +154,22 @@ final class CloudSync {
       if(!state.has("bundle"))throw new IOException("请先从 Windows 上传，再在这里恢复云端");
       if(!state.has("pending")){
         JSONObject data=new JSONObject(state.getJSONObject("bundle").toString());JSONObject store=data.getJSONObject("store");
-        JSONArray input=request.getJSONArray("profiles"),previous=store.getJSONArray("profiles"),merged=new JSONArray();Map<String,JSONObject> existing=new HashMap<>();
-        for(int i=0;i<previous.length();i++){JSONObject p=previous.getJSONObject(i);existing.put(p.getString("id"),p);if(!Arrays.asList("ssh","client").contains(p.optString("protocol","ssh")))merged.put(p);}
+        JSONArray input=request.getJSONArray("profiles"),previous=store.getJSONArray("profiles");Map<String,JSONObject> existing=new HashMap<>();
+        List<JSONObject> original=new ArrayList<>(),updated=new ArrayList<>();
+        for(int i=0;i<previous.length();i++){JSONObject p=previous.getJSONObject(i);existing.put(p.getString("id"),p);original.add(p);}
         Set<String> ids=new HashSet<>();
         for(int i=0;i<input.length();i++){
           JSONObject p=input.getJSONObject(i);String id=p.getString("id");UUID.fromString(id);if(!ids.add(id))throw new IOException("重复连接");
           JSONObject old=existing.get(id),next=old==null?new JSONObject():new JSONObject(old.toString());
+          if(old!=null&&!Arrays.asList("ssh","client").contains(old.optString("protocol","ssh")))throw new IOException("此连接协议不能在手机端修改");
           if(p.optString("protocol").equals("agent")&&old==null)throw new IOException("新增 CAgent 需先在桌面端配对；本轮未上传");
           for(String field:Arrays.asList("id","name","host","username","group","auth"))next.put(field,p.getString(field));
           next.put("protocol",p.optString("protocol").equals("agent")?"client":"ssh").put("port",Integer.parseInt(p.getString("port"))).put("favorite",p.optBoolean("favorite"));
           if(old!=null&&(!old.optString("host").equals(next.optString("host"))||old.optInt("port")!=next.optInt("port")||!old.optString("username").equals(next.optString("username"))||!old.optString("auth").equals(next.optString("auth"))))store.getJSONObject("secrets").remove(id);
-          merged.put(next);
+          updated.add(next);
         }
+        JSONArray merged=new JSONArray();
+        for(JSONObject p:CloudProfileOrder.merge(original,updated,p->p.optString("id"),p->Arrays.asList("ssh","client").contains(p.optString("protocol","ssh"))))merged.put(p);
         store.put("profiles",merged);String theme=request.getString("theme");if(!theme.equals("light")&&!theme.equals("dark"))throw new IOException("主题不正确");store.getJSONObject("preferences").put("theme",theme);
         validate(data);state.put("pendingBundle",data).put("pending",new JSONObject().put("baseRevision",state.getLong("revision")).put("mutationId",UUID.randomUUID().toString()).put("envelope",encrypt(data)));save();
       }

@@ -4,6 +4,8 @@ import {join,isAbsolute} from 'node:path';
 import {z} from 'zod';
 import {Store} from '../core/store';
 import {OpenCodeExtension} from '../extensions/opencode/service';
+import {TavilyExtension} from '../extensions/tavily/service';
+import {DesktopLooks} from '../core/desktop-looks';
 import {emptySharedAi} from '../shared/shared-ai';
 import {browserLibrarySchema} from '../core/browser-library';
 
@@ -23,11 +25,16 @@ export async function runSourceExport(){
   // Store and extension readers use their original schemas and do not save during load/export.
   await bounded(join(source,'config.json')).catch(error=>{if(error.code!=='ENOENT')throw error;});
   const store=new Store(source,codec);await store.load();const configuration=await store.cloudExport();
+  const desktopRaw=await encrypted('desktop-looks.enc',undefined);
+  const desktopLooks=desktopRaw===undefined?undefined:new DesktopLooks(source,store).cloudValidate(desktopRaw);
   const rawAi=await encrypted('ai.enc',emptySharedAi());
   const ai={...(rawAi.policy?{policy:rawAi.policy}:{}),providers:rawAi.providers??[],habits:rawAi.habits??[],extractionProviderId:rawAi.extractionProviderId??null,textProviderIds:rawAi.textProviderIds??{translate:null,compose:null}};
   const extension=new OpenCodeExtension({directory:join(source,'extensions','opencode'),enabled:()=>false,...codec,saveProvider:async()=>{},open:async()=>{}});
   await bounded(join(source,'extensions','opencode','opencode.enc')).catch(error=>{if(error.code!=='ENOENT')throw error;});
   await extension.load();
+  const tavily=new TavilyExtension({directory:join(source,'extensions','tavily'),enabled:()=>false,...codec});
+  await bounded(join(source,'extensions','tavily','tavily.enc')).catch(error=>{if(error.code!=='ENOENT')throw error;});
+  await tavily.load();
   const devices=await encrypted(join('client-controller','devices.enc'),[]);
   const http=(await encrypted('http.enc',{workspaces:[]})).workspaces;
   const browser:Record<string,unknown>={};
@@ -40,7 +47,7 @@ export async function runSourceExport(){
     const value=await bounded(join(source,'appearance',asset.id));if(value.length>8*1024*1024)throw Error();assets[asset.id]=value.toString('base64');
    }
   }
-  const result=JSON.stringify({format:1,store:configuration,ai,opencode:await extension.cloudExport(),devices,http,browser,assets});
+  const result=JSON.stringify({format:1,store:configuration,ai,opencode:await extension.cloudExport(),tavily:await tavily.cloudExport(),...(desktopLooks===undefined?{}:{desktopLooks}),devices,http,browser,assets});
   if(Buffer.byteLength(result)>90*1024*1024)throw Error();
   await new Promise<void>((resolve,reject)=>process.stdout.write('CSHELL_SOURCE_V1\n'+result,error=>error?reject(error):resolve()));
   app.quit();

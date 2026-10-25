@@ -27,7 +27,7 @@ export async function registerAiHandlers(
   publish?: (channel: string, value?: unknown) => void,
   http?: import('../core/http-workspaces').HttpWorkspaces,
   wechat?: import('../core/wechat').WechatService,
-  setupCloud?: (ai: AiService, openCode: OpenCodeExtension, network: ApplicationNetworkRoute) => Promise<void>,
+  setupCloud?: (ai: AiService, openCode: OpenCodeExtension, network: ApplicationNetworkRoute, tavily:TavilyExtension) => Promise<void>,
   customTools?: () => readonly import('../core/connections/contracts').ConnectionTool[],
 ) {
   const ai = new AiService(directory, store, connections, connectHost, { http, wechat });
@@ -57,10 +57,10 @@ export async function registerAiHandlers(
   const openCode=new OpenCodeExtension({official:officialOpenCode.request,officialStatus:officialOpenCode.status,directory:join(directory,'extensions','opencode'),enabled:()=>pluginEnabled(store.plugins(),'opencode'),encrypt:s=>store.encryptPrivate(s),decrypt:s=>store.decryptPrivate(s),getProvider:id=>ai.snapshot().providers.find(p=>p.id===id),changed:()=>publish?.('ai:providers-changed'),saveProvider:async p=>{await ai.saveProvider(p);publish?.('ai:providers-changed');},open:async url=>(await import('electron')).shell.openExternal(url)},ai.requestTransport);
   await openCode.load();
   ai.providerExtensions.register(openCode);
-  await setupCloud?.(ai, openCode, network);
   const tavily=new TavilyExtension({directory:join(directory,'extensions','tavily'),enabled:()=>pluginEnabled(store.plugins(),'tavily'),encrypt:s=>store.encryptPrivate(s),decrypt:s=>store.decryptPrivate(s)},ai.requestTransport);
 
   await tavily.load();ai.extensionTools=()=>[...tavily.tools(),...(customTools?.()??[])];
+  await setupCloud?.(ai, openCode, network, tavily);
   handle('ai:extension-call',(id,action,input)=>id==='cshell.tavily'?tavily.call(z.string().max(80).parse(action),input):ai.providerExtensions.call(z.string().max(100).parse(id),z.string().max(80).parse(action),input));
   const bindingKey=(id:string)=>{
     const thread=ai.snapshot().threads.find(t=>t.id===id);

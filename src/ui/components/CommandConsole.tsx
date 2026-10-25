@@ -26,6 +26,8 @@ export function CommandConsole({ active, onSettings, onNewTab }: { active: boole
     if (pending.current || !text.trim()) return;
     if (text.trim() === 'clear') { setEntries([]); setDraft(''); return; }
     const id = crypto.randomUUID(); pending.current = id; setRequest(id); setDraft('');
+    // Restore typing focus for this explicit submit, never after a delayed result.
+    if (active) input.current?.focus();
     let parsed; try { parsed = parseConsoleCommand(text); } catch { /* Backend returns the validation error. */ }
     connecting.current = parsed?.type === 'invoke' && parsed.name === 'connect';
     setEntries(v => [...v.slice(-79), { id, label: commandLabel(text) }]);
@@ -38,7 +40,7 @@ export function CommandConsole({ active, onSettings, onNewTab }: { active: boole
       if (result.kind === 'context') setSessionId(result.sessionId);
       setEntries(v => boundedEntries(v.map(item => item.id === id ? { ...item, result: displayResult(result) } : item)));
     } catch (e) { if (alive.current) setEntries(v => v.map(item => item.id === id ? { ...item, error: String(e) } : item)); }
-    finally { pending.current = ''; connecting.current = false; if (alive.current) { setRequest(''); input.current?.focus(); } }
+    finally { pending.current = ''; connecting.current = false; if (alive.current) setRequest(''); }
   };
   return <section className="command-console" aria-label="CShell 命令台">
     <header className="command-toolbar"><Terminal size={16}/><strong>CShell 命令台</strong><span title={sessionId}>{sessionId ? `会话 ${sessionId.slice(0, 8)}` : '应用范围'}</span>

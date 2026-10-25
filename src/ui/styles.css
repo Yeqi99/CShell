@@ -4313,8 +4313,9 @@ input[type='radio']:focus-visible {
   box-shadow: none;
   z-index: 2;
 }
-.dock-workspace:has(.ai-panel-slot:not([hidden])) > .dock-side[data-panel='files'] {
-  display: none;
+.ssh-files-toggle[aria-expanded='true'] {
+  color: var(--accent);
+  background: var(--accent-soft);
 }
 .ai-panel {
   background: var(--panel);

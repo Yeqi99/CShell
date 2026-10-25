@@ -3,7 +3,7 @@ import {z} from 'zod';
 
 const record=z.record(z.string(),z.unknown());
 const section=record;
-const bundle=z.object({format:z.literal(1),store:section,ai:section,opencode:section.optional(),devices:z.array(record),http:z.array(record),browser:z.record(z.string(),record).optional(),assets:z.record(z.string(),z.string())}).passthrough();
+const bundle=z.object({format:z.literal(1),store:section,ai:section,opencode:section.optional(),tavily:section.optional(),devices:z.array(record),http:z.array(record),browser:z.record(z.string(),record).optional(),assets:z.record(z.string(),z.string())}).passthrough();
 export interface ImportConflict {id:string;category:string;name:string}
 export interface ImportOptions {settings:boolean;choices:Record<string,'account'|'source'>}
 /** Operates on backend-validated portable bundles only. Policy changes require an explicit choice; device grants and installation state remain local. */
@@ -42,6 +42,13 @@ export function planAccountImport(account:unknown,source:unknown,options:ImportO
  a.ai.habits=merge('习惯记忆',a.ai.habits,s.ai.habits);
  if(options.settings){a.ai.extractionProviderId=s.ai.extractionProviderId;a.ai.textProviderIds=s.ai.textProviderIds;}
  a.opencode={...a.opencode,accounts:merge('OpenCode 账号',a.opencode?.accounts,s.opencode?.accounts)};
+ if(s.tavily!==undefined)a.tavily={accounts:merge('Tavily 账号',a.tavily?.accounts,s.tavily.accounts)};
+ if(options.settings&&s.desktopLooks!==undefined){
+  const incoming=z.object({looks:record,images:z.record(z.string(),z.string())}).strict().parse(s.desktopLooks);
+  const current=z.object({looks:record,images:z.record(z.string(),z.string())}).strict().parse(a.desktopLooks??{looks:{},images:{}});
+  for(const [id,look]of Object.entries(incoming.looks))current.looks[id]=Object.hasOwn(current.looks,id)?choose('desktop-look/'+id,'机器桌面外观',id,current.looks[id],look):look;
+  a.desktopLooks={looks:current.looks,images:{...current.images,...incoming.images}};
+ }
  for(const incoming of s.devices){const old=a.devices.find(d=>d.deviceId===incoming.deviceId);if(old&&old.certificate!==incoming.certificate)throw Error('来源 CAgent 身份与当前账号不一致，请先核对设备身份');}
  a.devices=merge('CAgent 设备',a.devices,s.devices,'deviceId');a.http=merge('HTTP 工作区',a.http,s.http);
  const browser={...a.browser};

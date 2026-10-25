@@ -28,7 +28,7 @@ export function registerAccountImports(handle:(name:string,fn:(...args:any[])=>a
  handle('account:sources',async()=>{
   account();const result:AccountSource[]=[];
   for(const source of ['opensource','guest'] as const){
-   for(const file of ['config.json','ai.enc','opencode.enc','http.enc','client-controller/devices.enc','machine-browser']){
+   for(const file of ['config.json','desktop-looks.enc','ai.enc','opencode.enc','extensions/opencode/opencode.enc','extensions/tavily/tavily.enc','http.enc','client-controller/devices.enc','machine-browser']){
     try{await stat(join(path(source),file));result.push(source);break;}catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw Error('无法检查本机配置来源');}
    }
   }return result;
@@ -36,9 +36,9 @@ export function registerAccountImports(handle:(name:string,fn:(...args:any[])=>a
  handle('account:source-preview',async(input)=>{
   const source=kind.parse(input),id=account(),value=await read(source);
   if(account()!==id)throw Error('账号已改变，请重新检查');
-  const plan=planAccountImport(await snapshot(),value,{settings:false,choices:{}}),s=z.object({store:z.object({profiles:z.array(z.unknown()),presets:z.array(z.unknown()),monitorViews:z.array(z.unknown())}),ai:z.object({providers:z.array(z.unknown()),habits:z.array(z.unknown()).optional()}),opencode:z.object({accounts:z.array(z.unknown())}).optional(),devices:z.array(z.unknown()),http:z.array(z.unknown())}).parse(value);
+  const plan=planAccountImport(await snapshot(),value,{settings:false,choices:{}}),s=z.object({store:z.object({profiles:z.array(z.unknown()),presets:z.array(z.unknown()),monitorViews:z.array(z.unknown())}),ai:z.object({providers:z.array(z.unknown()),habits:z.array(z.unknown()).optional()}),opencode:z.object({accounts:z.array(z.unknown())}).optional(),tavily:z.object({accounts:z.array(z.unknown())}).optional(),desktopLooks:z.object({looks:z.record(z.string(),z.unknown())}).optional(),devices:z.array(z.unknown()),http:z.array(z.unknown())}).parse(value);
   preview={token:randomUUID(),account:id,source,digest:digest(value),expires:Date.now()+10*60*1000};
-  const result:AccountSourcePreview={source,token:preview.token,conflicts:plan.conflicts,counts:[{label:'连接',count:s.store.profiles.length+s.devices.length},{label:'模型基座',count:s.ai.providers.length},{label:'OpenCode 账号',count:s.opencode?.accounts.length??0},{label:'习惯记忆',count:s.ai.habits?.length??0},{label:'外观与视图',count:s.store.presets.length+s.store.monitorViews.length},{label:'HTTP 工作区',count:s.http.length}]};return result;
+  const result:AccountSourcePreview={source,token:preview.token,conflicts:plan.conflicts,counts:[{label:'连接',count:s.store.profiles.length+s.devices.length},{label:'模型基座',count:s.ai.providers.length},{label:'OpenCode 账号',count:s.opencode?.accounts.length??0},{label:'Tavily 账号',count:s.tavily?.accounts.length??0},{label:'习惯记忆',count:s.ai.habits?.length??0},{label:'外观与视图',count:s.store.presets.length+s.store.monitorViews.length+Object.values(s.desktopLooks?.looks??{}).filter(v=>v!==null).length},{label:'HTTP 工作区',count:s.http.length}]};return result;
  });
  handle('account:source-import',async(token,settings,choices)=>{
   z.string().uuid().parse(token);z.boolean().parse(settings);const decisions=z.record(z.string().max(200),z.enum(['account','source'])).parse(choices);

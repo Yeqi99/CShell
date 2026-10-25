@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
 import type { ConnectionTool } from '../../core/connections/contracts';
@@ -13,7 +13,10 @@ const accountSchema = z.object({
 const configSchema = z.object({
   accounts: z.array(accountSchema).max(32).default([]),
   allowPaygo: z.boolean().default(false),
+  cloudPresent: z.boolean().default(false),
 });
+// Billing consent and live quota reservations are local to this installation.
+const portableSchema = z.object({ accounts: z.array(accountSchema).max(32) }).strict();
 const nonnegative = z.number().finite().nonnegative();
 const usageSchema = z.object({
   key: z.object({ usage: nonnegative, limit: nonnegative.nullable() }),
@@ -102,6 +105,36 @@ export class TavilyExtension {
         this.loadError = 'Tavily 配置读取失败，请检查本机凭据存储';
     }
   }
+  async cloudExport() {
+    await this.saving;
+    if(this.loadError)throw Error(this.loadError);
+    if(!this.config.accounts.length&&!this.config.cloudPresent)return undefined;
+    return structuredClone({accounts:this.config.accounts});
+  }
+  cloudValidate(value:unknown) {
+    const next=portableSchema.parse(value);
+    if(new Set(next.accounts.map(a=>a.id)).size!==next.accounts.length)throw Error('云端 Tavily 账号重复');
+    if(new Set(next.accounts.map(a=>a.key)).size!==next.accounts.length)throw Error('云端 Tavily 密钥重复');
+    return next;
+  }
+  async cloudImport(value:unknown,restoreMissing=false) {
+    if(value===undefined&&!restoreMissing)return;
+    const portable=this.cloudValidate(value??{accounts:[]});
+    const task=this.saving.catch(()=>{}).then(async()=>{
+      if(this.loadError)throw Error(this.loadError);
+      if(this.active)throw Error('请等待搜索任务结束后恢复 Tavily 账号');
+      const next=configSchema.parse({...this.config,accounts:portable.accounts,cloudPresent:value!==undefined});
+      await mkdir(this.host.directory,{recursive:true});
+      const path=join(this.host.directory,'tavily.enc'),temp=path+'.'+randomUUID()+'.tmp';
+      try{
+        await writeFile(temp,await this.host.encrypt(JSON.stringify(next)),{mode:0o600});
+        if(this.active)throw Error('请等待搜索任务结束后恢复 Tavily 账号');
+        await rename(temp,path);
+        this.config=next;this.states.clear();this.checks.clear();
+      }finally{await rm(temp,{force:true});}
+    });
+    this.saving=task;await task;
+  }
   private state(id: string) {
     let s = this.states.get(id);
     if (!s) {
@@ -173,7 +206,7 @@ export class TavilyExtension {
         s.usage = undefined;
         s.until = Date.now() + 120000;
       }
-    })().finally(() => this.checks.delete(a.id));
+    })().finally(() => { if (this.checks.get(a.id) === task) this.checks.delete(a.id); });
     this.checks.set(a.id, task);
     return task;
   }
@@ -238,6 +271,7 @@ export class TavilyExtension {
               .string()
               .uuid()
               .parse((input as any)?.id);
+            next.cloudPresent ||= next.accounts.length > 0;
             next.accounts = next.accounts.filter((a) => a.id !== id);
           } else
             next.allowPaygo = z

@@ -2,6 +2,9 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { Bridge, SessionEvent } from '../shared/contracts';
 const bridge: Bridge = {
   platform: process.platform,
+  desktopLookGet:(id,legacy)=>ipcRenderer.invoke('desktop-look:get',id,legacy),
+  desktopLookSave:(id,value)=>ipcRenderer.invoke('desktop-look:save',id,value),
+  onDesktopLookChanged:listener=>{const fn=()=>listener();ipcRenderer.on('desktop-look:changed',fn);return()=>ipcRenderer.removeListener('desktop-look:changed',fn);},
   guestCacheClear:confirmation=>ipcRenderer.invoke('account:clear-guest',confirmation),
   accountSources:()=>ipcRenderer.invoke('account:sources'),
   accountSourcePreview:source=>ipcRenderer.invoke('account:source-preview',source),

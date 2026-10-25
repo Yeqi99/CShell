@@ -35,12 +35,24 @@ export function AiModelMenu({
     [error, setError] = useState(''),
     [loading, setLoading] = useState(false),
     [selecting, setSelecting] = useState(false),
-    [position, setPosition] = useState({ left: 8, top: 8, width: 320, maxHeight: 360 });
+    [position, setPosition] = useState<{left:number;top?:number;bottom?:number;width:number;maxHeight:number}>({ left: 8, top: 8, width: 320, maxHeight: 360 });
   const anchor = useRef<HTMLButtonElement>(null),
     panel = useRef<HTMLDivElement>(null),
     request = useRef<Promise<void> | undefined>(undefined);
   const selected = providers.find((p) => p.id === providerId),
     selectedRef = model ?? selected?.extension?.model;
+  const search = query.trim().toLowerCase();
+  const visibleAccounts = catalog?.accounts.map(account => ({
+    ...account,
+    choices: account.choices.filter(choice => choice.available && `${choice.model} ${choice.label ?? ''}`.toLowerCase().includes(search)),
+  })).filter(account => !search || account.choices.length > 0);
+  useEffect(() => {
+    if (!open) return;
+    const frame = requestAnimationFrame(() => {
+      panel.current?.querySelector<HTMLElement>(page === 'opencode' ? 'input[type="search"]' : 'button:not(:disabled)')?.focus();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [open, page]);
   useEffect(() => {
     if (!open) return;
     let active = true;
@@ -48,10 +60,12 @@ export function AiModelMenu({
       const rect = anchor.current?.getBoundingClientRect();
       if (!rect) return;
       const width = Math.min(360, innerWidth - 16),
-        maxHeight = Math.min(440, Math.max(200, innerHeight - 32));
+        above = Math.max(0, rect.top - 16), below = Math.max(0, innerHeight - rect.bottom - 16),
+        upwards = above >= below, maxHeight = Math.min(440, upwards ? above : below);
       setPosition({
         left: Math.max(8, Math.min(rect.left, innerWidth - width - 8)),
-        top: Math.max(8, rect.top - maxHeight - 8),
+        top: upwards ? undefined : Math.min(innerHeight - 8, rect.bottom + 8),
+        bottom: upwards ? innerHeight - rect.top + 8 : undefined,
         width,
         maxHeight,
       });
@@ -65,6 +79,8 @@ export function AiModelMenu({
     };
     const key = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
         setOpen(false);
         anchor.current?.focus();
       }
@@ -174,6 +190,16 @@ export function AiModelMenu({
             role="dialog"
             aria-label="选择模型"
             style={position}
+            onKeyDown={event => {
+              if (event.key !== 'Tab') return;
+              const controls = [...event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled)')].filter(element => element.offsetParent !== null);
+              const index = controls.indexOf(document.activeElement as HTMLElement);
+              if ((event.shiftKey && index === 0) || (!event.shiftKey && index === controls.length - 1)) {
+                setOpen(false);
+                anchor.current?.focus();
+                if (event.shiftKey) event.preventDefault();
+              }
+            }}
           >
             <header>
               {page === 'opencode' ? (
@@ -246,18 +272,12 @@ export function AiModelMenu({
                   {loading ? (
                     <p role="status">正在更新模型目录…</p>
                   ) : (
-                    catalog?.accounts.map((account) => (
+                    visibleAccounts?.map((account) => (
                       <section key={account.id}>
                         <h4>{account.name}</h4>
                         {account.reason && <p role="status">{account.reason}</p>}
+                        {!account.reason && account.choices.length === 0 && <p role="status">当前账号暂无可用模型，刷新目录或检查账号设置。</p>}
                         {account.choices
-                          .filter(
-                            (c) =>
-                              c.available &&
-                              `${c.model} ${c.label ?? ''}`
-                                .toLowerCase()
-                                .includes(query.toLowerCase()),
-                          )
                           .map((c) => (
                             <button
                               type="button"
@@ -280,6 +300,7 @@ export function AiModelMenu({
                       </section>
                     ))
                   )}
+                  {!loading && !!search && !!catalog?.accounts.length && visibleAccounts?.length === 0 && <p role="status">未找到匹配的模型，请尝试其他名称。</p>}
                   {!loading && catalog?.accounts.length === 0 && (
                     <p>先在 OpenCode 扩展中登录或保存 Key，即可在这里选择模型。</p>
                   )}

@@ -2,7 +2,7 @@ import {lstat,realpath,rm} from 'node:fs/promises';
 import {resolve,relative,isAbsolute,dirname,sep} from 'node:path';
 
 // Only portable guest configuration and Chromium browsing data. Never recurse the profile root.
-export const guestCacheEntries=['config.json','ai-drafts.enc','network-route.enc','ai.enc','opencode.enc','http.enc','client-controller/devices.enc','machine-browser','appearance','Network','Local Storage','Session Storage','IndexedDB','Cache','Code Cache','GPUCache','Service Worker'] as const;
+export const guestCacheEntries=['config.json','desktop-looks.enc','ai-drafts.enc','network-route.enc','ai.enc','opencode.enc','extensions/opencode/opencode.enc','extensions/tavily/tavily.enc','http.enc','client-controller/devices.enc','machine-browser','appearance','Network','Local Storage','Session Storage','IndexedDB','Cache','Code Cache','GPUCache','Service Worker'] as const;
 export async function clearGuestCache(directory:string,currentDirectory:string){
  const root=await realpath(directory),current=await realpath(currentDirectory);
  if(root===current)throw Error('不能清除正在使用的工作区');

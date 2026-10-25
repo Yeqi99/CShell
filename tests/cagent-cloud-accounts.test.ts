@@ -39,12 +39,14 @@ test('CAgent keeps guest habits out of registration and restores isolated accoun
     assert(!JSON.stringify(accounts.get('b@example.com')).includes('Guest preference'));
     const remote=decryptVault(a.envelope,key,a.accountId) as any;
     remote.opencode={accounts:[{id:'default',name:'fixture',key:'opencode-test-secret'}]};
+    remote.tavily={accounts:[{id:'search-account',name:'Search',key:'tavily-test-secret',enabled:false}]};
     remote.futureExtension={enabled:true,opaque:'preserve-me'};
     a.envelope=encryptVault(remote,key,a.accountId);a.revision++;
     await cloud.call('account.login',{email:'a@example.com',password:'fixture-password'});
     assert.equal(assistant.cloudExport().habits?.[0].text,'Account A preference');
     const updated=decryptVault(a.envelope,key,a.accountId) as any;
     assert.deepEqual(updated.opencode,remote.opencode);
+    assert.deepEqual(updated.tavily,remote.tavily);
     assert.deepEqual(updated.futureExtension,remote.futureExtension);
     await cloud.call('account.logout',{});
     await cloud.call('account.login',{email:'b@example.com',password:'fixture-password'});

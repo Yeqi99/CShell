@@ -36,3 +36,10 @@ test('browser histories merge by URL and date without replacing current tabs',()
  const result=planAccountImport(a,s,{settings:false,choices:{}}).value.browser!.machine;
  assert.deepEqual(result.tabs,a.browser.machine.tabs);assert.equal((result.history as any[]).length,2);assert.equal((result.history as any[])[1].at,'2026-01-02');
 });
+test('Tavily import preserves IDs, asks for credential conflicts and excludes local billing consent',()=>{
+ const a:any=sample(),s:any=sample();a.tavily={accounts:[{id:'search',name:'Search',key:'account-key',enabled:false}]};s.tavily={accounts:[{id:'search',name:'Search',key:'source-key',enabled:true}]};
+ const preview=planAccountImport(a,s,{settings:true,choices:{}});
+ assert.deepEqual(preview.value.tavily,a.tavily);assert(preview.unresolved.some(c=>c.id==='Tavily 账号/search'));assert(!JSON.stringify(preview.conflicts).includes('source-key'));
+ const chosen=planAccountImport(a,s,{settings:false,choices:{'Tavily 账号/search':'source'}});assert.deepEqual(chosen.value.tavily,s.tavily);
+ delete s.tavily;assert.deepEqual(planAccountImport(a,s,{settings:true,choices:{}}).value.tavily,a.tavily);
+});

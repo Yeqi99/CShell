@@ -46,8 +46,8 @@ try {
   console.log(await page.locator('body').innerText());
   await page.screenshot({ path: 'test-results/opencode-debug-ui.png', fullPage: true });
   await page.getByRole('radio', { name: 'glm-5.3 目录已列出 · 调用权限待验证' }).click();
-  await page.getByRole('button', { name: '接入此账号' }).click();
-  await page.getByText('已接入账号，可在智能体中直接选择其模型').waitFor();
+  await page.getByRole('button', { name: '设为默认模型' }).click();
+  await page.getByText('已接入账号，默认模型已设为 glm-5.3；已有会话保持原模型').waitFor();
   await page.getByRole('button', { name: '刷新用量' }).click();
   await page.getByText('已用 23.0%').waitFor();
   await page.getByRole('button', { name: '添加密钥', exact: true }).click();

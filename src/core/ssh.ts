@@ -45,6 +45,8 @@ export class SshService {
     signal?.throwIfAborted();
     if (profile.protocol && profile.protocol !== 'ssh' && profile.protocol !== 'sftp') throw new Error('This connection cannot use SSH');
     const client = new ssh2.Client();
+    // Interactive keystrokes must not wait for TCP small-packet coalescing.
+    client.once('connect', () => client.setNoDelay(true));
     const session: Session = {
       profile: { ...profile },
       id: randomUUID(),
