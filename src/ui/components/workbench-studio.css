@@ -8,18 +8,6 @@
 .workbench-mode{flex:1;min-height:0;min-width:0;overflow:hidden}.workbench-mode[hidden]{display:none}
 .workbench-mode>.workbench-home>.home-heading,.studio-content>.workbench-home>.home-heading{display:none}
 .workbench-mode>.command-console{border-radius:0}
-.workbench-studio{height:100%;display:flex;flex-direction:column;background:linear-gradient(135deg,#173247,#274a67 48%,#5b9498);isolation:isolate;min-width:0;container-type:inline-size}
-.studio-desktop{flex:1;position:relative;min-height:0;overflow:hidden}
-.studio-icons{display:grid;grid-template-columns:repeat(2,92px);gap:18px 10px;align-content:start;padding:26px 18px;width:fit-content}
-.studio-icons>button{display:flex;flex-direction:column;color:#fff;gap:8px;font-size:12px;padding:8px 3px;line-height:1.3;text-shadow:0 1px 2px #0004;min-width:0}
-.studio-icons>button>span{display:grid;place-items:center;width:54px;height:54px;border-radius:16px;background:linear-gradient(135deg,#92d8e173,#5a98d09c);box-shadow:inset 0 1px 1px #ffffff38,0 5px 15px #112e4322}
-.studio-icons>button:nth-child(2)>span{background:linear-gradient(135deg,#d5b769,#bc8b50)}.studio-icons>button:nth-child(3)>span{background:linear-gradient(135deg,#76b8a2,#3e8c8a)}
-.studio-icons>button:hover{background:#ffffff18}.studio-icons>button:focus-visible{outline-color:#fff}
-.studio-brand{position:absolute;bottom:28px;right:32px;z-index:-1;color:#d6eeec88;font-size:42px;font-weight:300;letter-spacing:1px}.studio-brand span{display:block;text-align:right;font-size:12px;letter-spacing:3px;margin-top:6px}
-.studio-window{position:absolute;inset:5% 4%;display:flex;flex-direction:column;border-radius:12px;overflow:hidden;box-shadow:0 14px 50px #061a3a40;background:var(--panel,var(--bg));min-width:0;min-height:0}
-.studio-window[hidden]{display:none}.studio-window>header{display:flex;align-items:center;gap:6px;padding:6px 10px 6px 17px;background:var(--hover);min-height:32px;flex:none}.studio-window>header strong{margin-right:auto;font-size:13px;font-weight:500}
-.studio-content{min-height:0;flex:1;overflow:hidden}.studio-content>.command-console{border-radius:0}
-.studio-taskbar{display:flex;align-items:center;gap:5px;padding:7px 12px;background:var(--panel,var(--bg));overflow-x:auto;flex:none;min-height:36px}
-.studio-taskbar button{flex:none;font-size:12px;position:relative}.studio-taskbar button[aria-pressed=true]{color:var(--accent);background:var(--hover)}.studio-taskbar button[aria-pressed=true]:after{content:'';position:absolute;bottom:-3px;height:2px;background:var(--accent);width:24px;border-radius:2px}
-.studio-taskbar>span{margin-left:auto;white-space:nowrap;font-size:11px;color:var(--muted)}
-@container(max-width:460px){.studio-window{inset:10px 8px}.studio-icons{grid-template-columns:repeat(2,84px);padding:16px 12px}.studio-taskbar>span{display:none}}
+
+.desktop-extra-connections > .workbench-home > .home-heading { display: none; }
+.desktop-extra-command > .command-console { height: 100%; border-radius: 0; }

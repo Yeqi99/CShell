@@ -106,8 +106,9 @@ export function LinuxDesktop({
   onTerminal,
   terminal,
   extraPanels = [],
-  files, onRetry, connectionLabel, initialApp,
+  files, onRetry, connectionLabel, initialApp, workbench = false,
 }: {
+  workbench?: boolean;
   initialApp?: string;
   files?: ReactNode | ((active: boolean) => ReactNode);
   onRetry?: () => void;
@@ -116,7 +117,7 @@ export function LinuxDesktop({
   machine: any;
   target: string;
   call: (method: AgentCall['method'], params?: unknown) => Promise<unknown>;
-  extraPanels?: { id: string; label: string; content: ReactNode | ((active: boolean, options: boolean, closeOptions: () => void) => ReactNode); icon?: typeof Monitor }[];
+  extraPanels?: { id: string; label: string; content: ReactNode | ((active: boolean, options: boolean, closeOptions: () => void) => ReactNode); icon?: typeof Monitor; color?: string; onOpen?: () => void }[];
   active: boolean;
   closed?: boolean;
   onTerminal?: () => void;
@@ -124,17 +125,18 @@ export function LinuxDesktop({
 }) {
   const [installed,setInstalled]=useState<string[]>([]);
   const refreshInstalled=useCallback(async()=>{
-    if(machine.sshOnly || machine.desktopOnly || closed)return;
+    if(workbench || machine.sshOnly || machine.desktopOnly || closed)return;
     const [c,i]=await Promise.allSettled([agentRead(()=>call('coding.status')),agentRead(()=>call('ide.status'))]);
     const ids:string[]=[];
     if(c.status==='fulfilled')for(const engine of (c.value as any)?.engines??[])if(engine.ready)ids.push(engine.engine);
     if(i.status==='fulfilled'&&(i.value as any)?.ready&&(i.value as any)?.supported)ids.push('ide');
     setInstalled(ids);
-  },[call,machine.sshOnly,closed]);
+  },[call,machine.sshOnly,machine.desktopOnly,closed,workbench]);
   useEffect(()=>{void refreshInstalled();},[refreshInstalled]);
   const catalog = [
-    ...apps.filter(app => machine.desktopOnly ? false : machine.sshOnly ? ['terminal','files'].includes(app.id) : ['codex','claude','ide'].includes(app.id)?installed.includes(app.id):machine.terminalOnly ? app.id === 'terminal' : machine.platform === 'android' ? app.id === 'settings' : app.id === 'browser' ? ['linux','win32','darwin'].includes(machine.platform) : app.id !== 'native' || machine.platform === 'linux'),
-    ...extraPanels.map((p) => ({ id: p.id, label: p.label, icon: p.icon ?? Settings, color: 'slate' })),
+    ...apps.filter(app => workbench ? false : machine.desktopOnly ? false : machine.sshOnly ? ['terminal','files'].includes(app.id) : ['codex','claude','ide'].includes(app.id)?installed.includes(app.id):machine.terminalOnly ? app.id === 'terminal' : machine.platform === 'android' ? app.id === 'settings' : app.id === 'browser' ? ['linux','win32','darwin'].includes(machine.platform) : app.id !== 'native' || machine.platform === 'linux'),
+    ...extraPanels.map((p) => ({ id: p.id, label: p.label, icon: p.icon ?? Settings, color: p.color ?? 'slate' })),
+    ...(workbench ? [{ id: 'settings', label: '桌面外观', icon: Settings, color: 'slate' }] : []),
   ];
   const [context, setContext] = useState<{id:string;x:number;y:number}>();
   const [options, setOptions] = useState('');
@@ -241,6 +243,8 @@ export function LinuxDesktop({
     );
   const open = (id: string) => {
     setMenu(false);
+    const action = extraPanels.find(p => p.id === id)?.onOpen;
+    if (action) { action(); return; }
     setWindows((v) =>
       v.some((w) => w.id === id)
         ? v.map((w) =>
@@ -332,7 +336,7 @@ export function LinuxDesktop({
       data-theme={look.theme}
       onPointerDownCapture={e=>{if(context&&!(e.target as HTMLElement).closest('.desktop-context-menu'))setContext(undefined);}}
       onContextMenu={e=>{if(!(e.target as HTMLElement).closest('.desktop-window,button'))showContext(e,'desktop');}}
-      aria-label="机器桌面"
+      aria-label={workbench ? "工作台桌面" : "机器桌面"}
       style={{ backgroundImage: look.image ? `url("${look.image}")` : wallpapers[look.wallpaper] }}
     >
       <div
@@ -368,6 +372,8 @@ export function LinuxDesktop({
               .filter((el) => {
                 const b = el.getBoundingClientRect();
                 return (
+                  b.right > r.left + 16 && b.left < r.right - 16 &&
+                  b.bottom > r.top + 16 && b.top < r.bottom - 16 &&
                   b.right - r.left >= box.x &&
                   b.left - r.left <= box.x + box.w &&
                   b.bottom - r.top >= box.y &&
@@ -405,10 +411,12 @@ export function LinuxDesktop({
         onPointerCancel={finishGesture}
         onLostPointerCapture={finishGesture}
       >
-        <div className="desktop-icons" aria-label="桌面应用">
+        <div className="desktop-icons" aria-label="桌面应用" style={{ gridTemplateRows: `repeat(${Math.max(1, Math.floor((size.h - 32) / 96))}, 84px)` }}>
           {catalog.map((a) => (
             <button
               key={a.id}
+              draggable={false}
+              onDragStart={e => e.preventDefault()}
               data-desktop-icon={a.id}
               onContextMenu={e=>showContext(e,a.id)}
               aria-pressed={selectedIcons.includes(a.id)}
@@ -445,7 +453,7 @@ export function LinuxDesktop({
         )}
         <div className="desktop-watermark">
           <span>{name}</span>
-          <small>{machine.platform === 'win32' ? 'Windows' : machine.platform === 'linux' ? 'Linux' : machine.platform === 'android' ? 'Android' : '设备'} · {machine.protocolLabel || (machine.sshOnly ? 'SSH' : 'CAgent')}</small>
+          <small>{workbench ? '工作台' : <>{machine.platform === 'win32' ? 'Windows' : machine.platform === 'linux' ? 'Linux' : machine.platform === 'android' ? 'Android' : '设备'} · {machine.protocolLabel || (machine.sshOnly ? 'SSH' : 'CAgent')}</>}</small>
         </div>
         {windows.map((w) => {
           const app = catalog.find((a) => a.id === w.id);
@@ -559,7 +567,7 @@ export function LinuxDesktop({
                       {[
                         ['appearance', '个性化'],
                         ['display', '显示与操作'],
-                        ['system', '系统信息'],
+                        ...(!workbench ? [['system', '系统信息']] : []),
                       ].map(([id, label]) => (
                         <button
                           key={id}
@@ -668,10 +676,10 @@ export function LinuxDesktop({
                         <>
                           <h2>显示与操作</h2>
                           <dl>
-                            <dt>远端画面</dt>
-                            <dd>1440 × 900，完整适应窗口</dd>
-                            <dt>滚轮</dt>
-                            <dd>仅发送到鼠标所在的远端画面</dd>
+                            <dt>桌面应用</dt>
+                            <dd>单击选择，双击或 Enter 打开；在空白处拖动框选</dd>
+                            <dt>排列</dt>
+                            <dd>随桌面高度自动换列，空间不足时滚动浏览</dd>
                             <dt>窗口</dt>
                             <dd>拖动标题栏移动，右下角调整大小，双击标题栏最大化</dd>
                             <dt>会话</dt>
@@ -813,10 +821,10 @@ export function LinuxDesktop({
             })}
         </nav>
         <span className="desktop-taskbar-spacer" />
-        <button className="desktop-machine-name" title={connectionLabel || (closed ? '无法连接，点击重试' : '网络连接正常')} onClick={onRetry} aria-label={closed ? '连接已断开，重试' : '网络连接正常'}>
+        {!workbench && <button className="desktop-machine-name" title={connectionLabel || (closed ? '无法连接，点击重试' : '网络连接正常')} onClick={onRetry} aria-label={closed ? '连接已断开，重试' : '网络连接正常'}>
           <i className={closed ? 'offline' : ''} />
           {connectionLabel || (closed ? '无法连接' : name)}
-        </button>
+        </button>}
         <button
           title="切换桌面明暗主题"
           aria-label="切换桌面明暗主题"

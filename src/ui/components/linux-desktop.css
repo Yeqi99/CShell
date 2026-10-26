@@ -74,12 +74,23 @@
 }
 .desktop-icons {
   position: absolute;
-  inset: 20px auto 20px 18px;
-  display: flex;
-  flex-direction: column;
-  flex-wrap: wrap;
-  align-content: flex-start;
+  inset: 16px;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 86px;
+  align-content: start;
+  justify-content: start;
   gap: 12px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.desktop-icons > button, .desktop-icons > button * {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
 }
 .desktop-icons > button {
   border: 1px solid transparent;
@@ -524,9 +535,7 @@
   .desktop-settings > nav {
     width: 105px;
   }
-  .desktop-icons {
-    gap: 4px;
-  }
+
   .desktop-start {
     max-width: calc(100% - 24px);
   }

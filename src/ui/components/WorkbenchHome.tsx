@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { ArrowUpRight, Grid2X2, LayoutDashboard, Monitor, Plus, Terminal, View, Blocks, Settings2, Bot, Code2, Minus, X } from 'lucide-react';
+import { ArrowUpRight, Grid2X2, LayoutDashboard, Monitor, Plus, Terminal, View, Blocks, Settings2, Bot, Code2 } from 'lucide-react';
 import type { Config, Profile } from '../../shared/contracts';
 import type { MonitorView } from '../../shared/monitor-views';
 import './workbench-home.css';
 import { CommandConsole } from './CommandConsole';
 import { CapabilityExplorer } from './CapabilityExplorer';
 import './workbench-studio.css';
+import { LinuxDesktop } from './LinuxDesktop';
 
 type OverviewProps = { config: Config; active: boolean; currentCount: number; onNew: () => void; onViews: () => void;
     onConnect: (profile: Profile) => void; onCurrent: (mode: 'tile' | 'focus' | 'overview') => Promise<void> };
@@ -26,19 +27,17 @@ export function WorkbenchHome(props: WorkbenchProps) {
     {seen.has('visual') && <div className="workbench-mode" role="tabpanel" aria-label="可视化" hidden={mode !== 'visual'}><WorkbenchStudio {...props} active={props.active && mode === 'visual'}/></div>}
   </section>;
 }
+const workbenchMachine = { deviceId: 'cshell-workbench', desktopOnly: true };
+const noMachineCall = async () => { throw new Error('工作台不绑定远端机器'); };
 function WorkbenchStudio(props: WorkbenchProps) {
-  type App = 'connections' | 'command' | 'capabilities';
-  const [opened, setOpened] = useState<App[]>([]), [front, setFront] = useState<App>();
-  const open = (app: App) => { setOpened(v => v.includes(app) ? v : [...v, app]); setFront(app); };
-  const labels = { connections: '连接与视图', command: '命令台', capabilities: '能力浏览器' };
-  const apps = [
-    ['connections', '连接与视图', Monitor, () => open('connections')], ['command', '命令台', Terminal, () => open('command')],
-    ['capabilities', '能力浏览器', Code2, () => open('capabilities')], ['extensions', '扩展', Blocks, props.onExtensions],
-    ['agent', '智能体', Bot, props.onAgent], ['settings', '设置', Settings2, props.onSettings],
-  ] as const;
-  return <div className="workbench-studio"><div className="studio-desktop"><div className="studio-icons">{apps.map(([id, label, Icon, action]) => <button key={id} onClick={action}><span><Icon size={27}/></span>{label}</button>)}</div><div className="studio-brand" aria-hidden="true">CShell<span>工作台</span></div>
-    {opened.map(app => <section key={app} className="studio-window" aria-label={labels[app]} hidden={front !== app}><header><strong>{labels[app]}</strong><button title="最小化" aria-label={`最小化${labels[app]}`} onClick={() => setFront(undefined)}><Minus size={16}/></button><button title="关闭" aria-label={`关闭${labels[app]}`} onClick={() => { setOpened(v => v.filter(a => a !== app)); setFront(undefined); }}><X size={16}/></button></header><div className="studio-content">{app === 'connections' ? <WorkbenchOverview {...props} active={props.active && front === app}/> : app === 'command' ? <CommandConsole active={props.active && front === app} onSettings={props.onSettings} onNewTab={props.onCommandTab}/> : <CapabilityExplorer active={props.active && front === app} onSettings={props.onSettings} profiles={props.config.profiles}/>}</div></section>)}
-    </div><footer className="studio-taskbar"><button title="显示工作台桌面" aria-label="显示工作台桌面" onClick={() => setFront(undefined)}><Grid2X2 size={19}/></button>{opened.map(app => <button key={app} aria-pressed={front === app} onClick={() => setFront(front === app ? undefined : app)}>{labels[app]}</button>)}<span>应用工作台</span></footer></div>;
+  return <LinuxDesktop workbench name="CShell" machine={workbenchMachine} target="" call={noMachineCall} active={props.active} extraPanels={[
+    { id: 'connections', label: '连接与视图', icon: Monitor, color: 'blue', content: active => <WorkbenchOverview {...props} active={active}/> },
+    { id: 'command', label: '命令台', icon: Terminal, color: 'amber', content: active => <CommandConsole active={active} onSettings={props.onSettings} onNewTab={props.onCommandTab}/> },
+    { id: 'capabilities', label: '能力浏览器', icon: Code2, color: 'green', content: active => <CapabilityExplorer active={active} onSettings={props.onSettings} profiles={props.config.profiles}/> },
+    { id: 'extensions', label: '扩展', icon: Blocks, content: null, onOpen: props.onExtensions },
+    { id: 'agent', label: '智能体', icon: Bot, content: null, onOpen: props.onAgent },
+    { id: 'preferences', label: '偏好设置', icon: Settings2, content: null, onOpen: props.onSettings },
+  ]}/>;
 }
 function WorkbenchOverview({ config, active, currentCount, onNew, onViews, onConnect, onCurrent }: OverviewProps) {
   const [views, setViews] = useState<MonitorView[]>([]), [error, setError] = useState(''), [busy, setBusy] = useState(false);
