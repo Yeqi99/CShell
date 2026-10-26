@@ -132,6 +132,8 @@ const bridge: Bridge = {
   setMinimalMode: (enabled) => ipcRenderer.invoke('window:minimal', enabled),
   agentDownloadList:()=>ipcRenderer.invoke('agent:download-list'),
   agentDownloadOpen:id=>ipcRenderer.invoke('agent:download-open',id),
+  classroomTasks:{targets:()=>ipcRenderer.invoke('classroom:tasks-targets'),choices:()=>ipcRenderer.invoke('classroom:tasks-choices'),prepare:input=>ipcRenderer.invoke('classroom:tasks-prepare',input),execute:id=>ipcRenderer.invoke('classroom:tasks-execute',id),list:()=>ipcRenderer.invoke('classroom:tasks-list'),cancel:id=>ipcRenderer.invoke('classroom:tasks-cancel',id)},
+  agentLan:{status:()=>ipcRenderer.invoke('classroom:lan-status'),prepare:ids=>ipcRenderer.invoke('classroom:lan-prepare',ids),confirm:input=>ipcRenderer.invoke('classroom:lan-confirm',input)},
   classroom: {screens:()=>ipcRenderer.invoke('classroom:screens'),status:()=>ipcRenderer.invoke('classroom:status'),start:(options:unknown)=>ipcRenderer.invoke('classroom:start',options),stop:()=>ipcRenderer.invoke('classroom:stop'),setDiscovery:(enabled:boolean)=>ipcRenderer.invoke('classroom:discover',enabled),frame:(id:string)=>ipcRenderer.invoke('classroom:frame',id)},
   usageRead: () => ipcRenderer.invoke('usage:read'),
   usageConsent: (enabled:boolean) => ipcRenderer.invoke('usage:consent',enabled),

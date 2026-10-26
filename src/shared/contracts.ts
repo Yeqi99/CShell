@@ -367,6 +367,8 @@ export interface Bridge
     FloatingBridge,
     MonitorViewsBridge,
     ActivityBridge {
+  classroomTasks?: import('./classroom-tasks').ClassroomTasksBridge;
+  agentLan?: import('./agent-lan').AgentLanBridge;
   classroom?: import('./classroom').ClassroomBridge;
   readonly platform: string;
   networkDiagnostics?(): Promise<import('./network-probe').NetworkDiagnostics>;

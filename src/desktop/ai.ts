@@ -153,5 +153,5 @@ export async function registerAiHandlers(
     disposal = Promise.all([events.close(),ai.flush(),remoteClose,network.close(),drafts.snapshot()]).then(()=>{});
     return disposal;
   };
-  return Object.assign(dispose, { hasActiveWork: () => ai.hasActiveWork });
+  return Object.assign(dispose, { classroomModels:()=>ai.classroomModels(),classroomModel:(id:string)=>ai.classroomModel(id), hasActiveWork: () => ai.hasActiveWork });
 }

@@ -52,25 +52,37 @@ export class CagentAssistant {
   async ensureOfficialModels(available:string[]){const providers=[...this.shared.providers];for(const p of officialModels)if(available.includes(p.model)&&!providers.some(x=>x.id===p.id))providers.push({...p});if(providers.length!==this.shared.providers.length){this.shared={...this.shared,providers};await this.vault.write('assistant-shared',this.shared);}}
   private shared:SharedAiConfig=emptySharedAi();
   cloudExport(){return structuredClone(this.shared);}
-  assertAccountIdle(){if(this.active)throw Error('请等待当前智能体任务结束后切换账号');}
+  assertAccountIdle(){if(this.configuring)throw Error('基座配置正在更新，请稍后切换账号或同步');if(this.active)throw Error('请等待当前智能体任务结束后切换账号');}
   localWorkspace(){this.assertAccountIdle();return structuredClone({shared:this.shared,settings:this.settings,tasks:this.tasks});}
   emptyWorkspace(){return {shared:emptySharedAi(),settings:settingsSchema.parse({commands:false,review:true,delegates:[]}),tasks:[]};}
   validateWorkspace(value:unknown){return z.object({shared:sharedAiConfigSchema,settings:settingsSchema,tasks:z.array(taskSchema).max(30)}).strict().parse(value);}
   async restoreWorkspace(value:unknown){
     this.assertAccountIdle();const next=this.validateWorkspace(value);
     if(next.tasks.some(t=>t.state==='running'||t.state==='approval'))throw Error('账号工作区仍有未结束任务');
+    this.configuring=true;
+    try {
     await this.vault.write('assistant-shared',next.shared);
     await this.vault.write('assistant-settings',next.settings);
     await this.vault.write('assistant-tasks',next.tasks);
     this.shared=next.shared;this.settings=next.settings;this.tasks=next.tasks;
+    } finally { this.configuring=false; }
   }
-  async cloudImport(input:unknown){if(this.active)throw Error('请等待智能体任务结束后同步基座');const next=sharedAiConfigSchema.parse(input);const selected=next.providers.find(p=>p.url===this.settings.endpoint&&p.model===this.settings.model)??next.providers.find(p=>!p.extension);const settings=selected?settingsSchema.parse({...this.settings,endpoint:selected.url,model:selected.model,key:selected.key}):this.settings;await this.vault.write('assistant-shared',next);await this.vault.write('assistant-settings',settings);this.shared=next;this.settings=settings;}
+  async cloudImport(input:unknown){
+    this.assertAccountIdle();
+    const next=sharedAiConfigSchema.parse(input);
+    const selected=next.providers.find(p=>p.url===this.settings.endpoint&&p.model===this.settings.model)??next.providers.find(p=>!p.extension);
+    const settings=selected?settingsSchema.parse({...this.settings,endpoint:selected.url,model:selected.model,key:selected.key}):this.settings;
+    this.configuring=true;
+    try {await this.vault.write('assistant-shared',next);await this.vault.write('assistant-settings',settings);this.shared=next;this.settings=settings;}
+    finally {this.configuring=false;}
+  }
   async remember(input:unknown){const q=habitWriteSchema.parse(input),id=q.id??randomUUID();const next={...this.shared,habits:habitsSchema.parse([...(this.shared.habits??[]).filter(x=>x.id!==id),{id,text:q.text,updatedAt:new Date().toISOString()}])};await this.vault.write('assistant-shared',next);this.shared=next;return next.habits;}
   async forget(id:string){z.string().uuid().parse(id);const next={...this.shared,habits:(this.shared.habits??[]).filter(x=>x.id!==id)};await this.vault.write('assistant-shared',next);this.shared=next;return next.habits;}
 
   private jobs=new AgentJobs();
   private settings=settingsSchema.parse({});
   private tasks:Task[]=[];
+  private configuring=false;
   private active?:{task:Task;abort:AbortController;done:Promise<void>;approval?:{resolve:(v:boolean)=>void}};
   get activity(){return this.active?1:0;}
   constructor(private vault:ClientVault,private host:Host,private request=requestAiReply){}
@@ -85,6 +97,9 @@ export class CagentAssistant {
   private persist(){return this.vault.write('assistant-tasks',this.tasks);}
   snapshot(){const {key,...settings}=this.settings;return {...settings,keyConfigured:!!key};}
   async configure(input:unknown){
+    if(this.configuring)throw Error('基座配置正在更新，请稍后重试');
+    this.configuring=true;
+    try {
     const raw=z.object({runMinutes:z.number().optional(),contextBytes:z.number().optional(),noProgress:z.number().optional(),endpoint:z.string(),model:z.string(),key:z.string().optional(),commands:z.boolean(),review:z.boolean(),delegates:z.array(z.string())}).strict().parse(input);
     const next=settingsSchema.parse({...this.settings,...raw,key:raw.key??this.settings.key});
     await this.vault.write('assistant-settings',next);
@@ -93,12 +108,21 @@ export class CagentAssistant {
     // A provider/grant change cancels the whole task, including pending approval.
     this.active?.abort.abort(new Error('配置或授权已改变，任务已停止'));
     return this.snapshot();
+    } finally { this.configuring=false; }
+  }
+  async configureModel(input:unknown){
+    if(this.configuring)throw Error('基座配置正在更新，请稍后重试');
+    if(this.active)throw Error('智能体正在执行任务；完成后再更新基座');
+    const patch=z.object({endpoint:z.string(),model:z.string(),key:z.string().min(1).max(16000)}).strict().parse(input);
+    // Retain Pro's shared-provider synchronization while preserving all grants.
+    return this.configure({...this.settings,...patch});
   }
   private authorize(owner:string){if(owner!=='local'&&(!this.host.allowed(owner)||!(this.settings.delegates.includes('*')||this.settings.delegates.includes(owner))))throw new Error('未授权此控制端委派任务');}
   list(owner:string){this.authorize(owner);return structuredClone(this.tasks.filter(t=>owner==='local'||t.owner===owner));}
   get(input:unknown,owner:string){this.authorize(owner);const {id}=z.object({id:z.string().uuid()}).strict().parse(input);const task=this.tasks.find(t=>t.id===id&&(owner==='local'||t.owner===owner));if(!task)throw new Error('任务不存在');return task;}
   async start(input:unknown,owner:string){
     this.authorize(owner);
+    if(this.configuring)throw Error('基座配置正在更新，请稍后启动任务');
     const {prompt,requestId,resumeId}=z.object({resumeId:z.string().uuid().nullish(),prompt:z.string().trim().min(1).max(16000),requestId:z.string().uuid()}).strict().parse(input);
     const previous=this.tasks.find(t=>t.owner===owner&&t.requestId===requestId);
     if(previous){if(previous.prompt!==prompt)throw new Error('同一请求 ID 不能用于不同任务');return {id:previous.id};}

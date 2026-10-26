@@ -2,9 +2,15 @@ import {useEffect,useRef,useState} from 'react';
 import {Monitor,Radio,RefreshCw,Square,Eye,Play} from 'lucide-react';
 import type {ClassroomBridge,ClassroomScreen,ClassroomSource,ClassroomStatus} from '../../shared/classroom';
 import './classroom.css';
+import {ClassroomManagement} from './Management';
+import type {ClassroomTasksBridge} from '../../shared/classroom-tasks';
+import {ClassroomDiscovery} from './Discovery';
+import type {AgentLanBridge} from '../../shared/agent-lan';
 
-export function ClassroomView({bridge,onWatch}:{bridge:ClassroomBridge;onWatch:(source:ClassroomSource)=>void}) {
-  const [role,setRole]=useState<'watch'|'share'>('watch');
+export function ClassroomView({bridge,onWatch,tasksBridge,discoveryBridge,onDevicesAdded}:{bridge:ClassroomBridge;onWatch:(source:ClassroomSource)=>void;tasksBridge?:ClassroomTasksBridge;discoveryBridge?:AgentLanBridge;onDevicesAdded?:()=>void}) {
+  const [role,setRole]=useState<'watch'|'share'|'manage'>('watch');
+  const [managementOpened,setManagementOpened]=useState(false);
+  const [devicesRevision,setDevicesRevision]=useState(0);
   const [status,setStatus]=useState<ClassroomStatus|null>(null),[screens,setScreens]=useState<ClassroomScreen[]>([]);
   const [screenId,setScreenId]=useState(''),[label,setLabel]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false);
   const alive=useRef(false),running=useRef(false);
@@ -22,9 +28,10 @@ export function ClassroomView({bridge,onWatch}:{bridge:ClassroomBridge;onWatch:(
   };
   return <section className="classroom" aria-label="机房屏幕共享">
     {status?.sharing&&<div className="classroom-live" role="status"><Radio size={19}/><div><strong>正在共享 · {status.sharing.label}</strong><span>同一局域网内启用此扩展的设备可以观看</span></div><button onClick={()=>void run(()=>bridge.stop())} disabled={busy}><Square size={15}/>停止共享</button></div>}
-    <div className="classroom-switch" aria-label="共享方式"><button aria-pressed={role==='watch'} onClick={()=>setRole('watch')}><Eye size={17}/>观看屏幕</button><button aria-pressed={role==='share'} onClick={()=>setRole('share')}><Monitor size={17}/>共享我的屏幕</button></div>
+    <div className="classroom-switch" aria-label="机房功能"><button aria-pressed={role==='watch'} onClick={()=>setRole('watch')}><Eye size={17}/>观看屏幕</button><button aria-pressed={role==='share'} onClick={()=>setRole('share')}><Monitor size={17}/>共享我的屏幕</button>{tasksBridge&&<button aria-pressed={role==='manage'} onClick={()=>{setManagementOpened(true);setRole('manage');}}><Monitor size={17}/>集中管理</button>}</div>
     {(error||status?.error)&&<div className="classroom-error" role="alert">{error||status?.error}<button onClick={()=>void run(()=>bridge.status())} disabled={busy}>重试</button></div>}
-    {!status?<p role="status">正在检查共享服务…</p>:!status.supported?<div className="classroom-empty"><Monitor/><h3>当前平台暂不支持屏幕共享</h3><p>不会自动打开远程控制或请求额外权限。</p></div>:role==='watch'?<>
+    {tasksBridge&&managementOpened&&<div hidden={role!=='manage'}>{discoveryBridge&&<ClassroomDiscovery api={discoveryBridge} onAdded={()=>{setDevicesRevision(v=>v+1);onDevicesAdded?.();}}/>}<ClassroomManagement bridge={tasksBridge} refreshKey={devicesRevision}/></div>}
+    {role==='manage'?null:!status?<p role="status">正在检查共享服务…</p>:!status.supported?<div className="classroom-empty"><Monitor/><h3>当前平台暂不支持屏幕共享</h3><p>不会自动打开远程控制或请求额外权限。</p></div>:role==='watch'?<>
       <div className="classroom-heading"><div><h2>局域网中的屏幕</h2><p>选择一个共享，在独立标签页中只读观看。</p></div><button disabled={busy} onClick={()=>void run(()=>bridge.setDiscovery(!status.discovering))}>{status.discovering?'停止发现':'查找共享'}</button></div>
       <div className="classroom-discovery" role="status"><span className={status.discovering?'active':''}/>{status.discovering?'正在发现 · 列表自动更新':'发现已停止'}</div>
       {status.sources.length===0?<div className="classroom-empty"><Radio size={32}/><h3>{status.discovering?'还没有发现共享':'开始查找老师的屏幕'}</h3><p>{status.discovering?'确认在同一局域网，且对方已点击“开始共享”。':'只查找共享服务，不连接或控制其他机器。'}</p></div>:<div className="classroom-sources">{status.sources.map(source=><button className="classroom-source" key={source.id} onClick={()=>onWatch(source)}><span className="classroom-source-icon"><Monitor size={24}/></span><span><strong>{source.label}</strong><small>{source.address} · 只读观看</small></span><Play size={18}/></button>)}</div>}

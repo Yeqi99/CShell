@@ -1,3 +1,6 @@
+import {AgentLanService} from '../core/agent-lan';
+import {AgentLanEnrollment} from './agent-lan-enrollment';
+import {registerClassroomTasks} from './classroom-tasks';
 import {provisionDesktop} from '../core/provisioning-desktop';
 import {ClassroomShareService} from './classroom-share';
 import {registerUsage} from './usage';
@@ -269,8 +272,11 @@ else
         return true;
       });
       const classroom = new ClassroomShareService();
+      const agentLan=new AgentLanService();
+      let classroomTasks:ReturnType<typeof registerClassroomTasks>|undefined;
+      let enrollment:AgentLanEnrollment|undefined;
       const processExtensions = new ProcessExtensions({ directory: join(app.getPath('userData'), 'process-extensions'), vault: new ClientVault(join(app.getPath('userData'), 'process-extensions'), clientCodec), version: app.getVersion(), plugins: () => store.plugins(), changed: () => extensionServices.refreshProcessTools() });
-      const extensionServices = createExtensionServices(ssh, store, async id => { if (id === 'cshell.http') http.dispose(); if(id === 'cshell.classroom') await classroom.dispose(); }, processExtensions);
+      const extensionServices = createExtensionServices(ssh, store, async id => { if (id === 'cshell.http') http.dispose(); if(id === 'cshell.classroom'){classroomTasks?.dispose();enrollment?.clear();await agentLan.dispose();await classroom.dispose();} }, processExtensions);
       await processExtensions.refresh();
       window.once('closed', () => { void processExtensions.dispose(); });
       const ftp = new FtpService(emit);
@@ -489,7 +495,11 @@ else
       registerAppearanceHandlers(handle, window, app.getPath('userData'), consume, text);
       registerUpdateHandlers(handle, window);
       registerUsage(handle, window);
-      const classroomEnabled=()=>store.plugins().some(p=>p.manifest.id==='cshell.classroom'&&p.enabled);
+      const classroomEnabled=()=>!accountTransition&&store.plugins().some(p=>p.manifest.id==='cshell.classroom'&&p.enabled);
+      enrollment=new AgentLanEnrollment({sources:()=>agentLan.status().sources,enabled:classroomEnabled,probe:endpoint=>clientProvider.probe(endpoint),pair:async(info,password)=>{const device=await clientProvider.pairPassword(info,password);await syncClientProfiles(store,[device]);return device;}});
+      handle('classroom:lan-status',()=>{if(!classroomEnabled())throw Error('请启用机房扩展');return agentLan.status();});
+      handle('classroom:lan-prepare',ids=>enrollment!.prepare(ids));
+      handle('classroom:lan-confirm',input=>enrollment!.confirm(input));
       const requireClassroom=()=>{if(!classroomEnabled())throw Error('请先启用机房屏幕共享扩展');};
       handle('classroom:status',()=>{requireClassroom();return classroom.status();});
       handle('classroom:screens',()=>{requireClassroom();return classroom.screens();});
@@ -498,9 +508,9 @@ else
       handle('classroom:stop',()=>classroom.stop());
       handle('classroom:start',async input=>{requireClassroom();const result=await classroom.start(z.object({screenId:z.string().min(1).max(120),label:z.string().trim().min(1).max(60)}).strict().parse(input));if(!classroomEnabled()){await classroom.dispose();throw Error('扩展已关闭');}return result;});
       let classroomWasEnabled=false, classroomChecking=false;
-      const updateClassroom=async()=>{if(classroomChecking)return;const enabled=classroomEnabled();if(enabled===classroomWasEnabled)return;classroomWasEnabled=enabled;classroomChecking=true;try{if(enabled&&process.platform==='win32')await classroom.setDiscovery(true);else await classroom.dispose();}catch{}finally{classroomChecking=false;}};
+      const updateClassroom=async()=>{if(classroomChecking)return;const enabled=classroomEnabled();if(enabled===classroomWasEnabled)return;classroomWasEnabled=enabled;classroomChecking=true;try{if(enabled){await agentLan.setDiscovery(true);if(process.platform==='win32')await classroom.setDiscovery(true);}else{enrollment?.clear();classroomTasks?.dispose();await agentLan.dispose();await classroom.dispose();}}catch{}finally{classroomChecking=false;}};
       void updateClassroom();const classroomTimer=setInterval(()=>void updateClassroom(),1000);classroomTimer.unref();
-      window.once('closed',()=>{clearInterval(classroomTimer);void classroom.dispose();});
+      window.once('closed',()=>{clearInterval(classroomTimer);enrollment?.clear();classroomTasks?.dispose();void agentLan.dispose();void classroom.dispose();});
       window.webContents.on('render-process-gone',()=>{void classroom.stop();});
 
 
@@ -635,13 +645,14 @@ else
           }
         }, machineBrowser, openCode, accountProfiles?{
           profiles:accountProfiles,
-          assertIdle:()=>{if(ssh.size||ftp.size||localTerminal.size||clientProvider.size||transfers.size||http.running)throw Error('请先关闭连接并等待传输结束，再切换账号');},
-          block:(value:boolean)=>{accountTransition=value;},
+          assertIdle:()=>{if(ssh.size||ftp.size||localTerminal.size||clientProvider.size||transfers.size||http.running||classroomTasks?.hasActiveWork)throw Error('请先关闭连接并等待传输及机房任务结束，再切换账号');},
+          block:(value:boolean)=>{accountTransition=value;if(value){classroomTasks?.dispose();enrollment?.clear();}},
         }:undefined, network, tavily, desktopLooks),
         () => processExtensions.applicationTools(),
       );
       registerPresetHandlers(handle, window, app.getPath('userData'), store, text);
       registerConnectionImport(handle, window, store);
+      classroomTasks=registerClassroomTasks(handle,clientProvider,classroomEnabled,disposeAi);
       const stopDiagnostics = registerNetworkDiagnostics(handle, store, ssh, clientProvider, connections.tools);
       window.once('closed', stopDiagnostics);
       window.once('closed', () => {
@@ -734,7 +745,7 @@ else
       app.once('before-quit', disposeCommandConsole);
       await mcp.start();
       registerExtensionHandlers(handle, window, store, ssh, connections, async id => {
-        if (id === 'cshell.http') http.dispose(); if(id === 'cshell.classroom') await classroom.dispose();
+        if (id === 'cshell.http') http.dispose(); if(id === 'cshell.classroom'){classroomTasks?.dispose();enrollment?.clear();await agentLan.dispose();await classroom.dispose();}
       }, extensionServices);
       const docker = extensionServices.docker;
       const requireDocker = (id: unknown) => {
@@ -1064,7 +1075,7 @@ else
       window.on('close', (event) => {
         if (
           closing ||
-          (!ssh.size && !ftp.size && !localTerminal.size && !clientProvider.size && !transfers.size && !http.running && !disposeAi.hasActiveWork())
+          (!ssh.size && !ftp.size && !localTerminal.size && !clientProvider.size && !transfers.size && !http.running && !disposeAi.hasActiveWork()&&!classroomTasks?.list().some(t=>!t.finishedAt))
         )
           return;
         event.preventDefault();

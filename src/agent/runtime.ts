@@ -1,3 +1,5 @@
+import {createLanRegistration} from './lan-registration';
+import {ManagedEnvironment,ManagedScripts} from './managed-classroom';
 import {AccountNetwork} from './account-network';
 import {CagentCloud} from './cloud';
 import { machineSnapshot } from './machine-info';
@@ -122,6 +124,8 @@ export async function createAgentRuntime(
     execute: (input, signal) => terminal.execute(input, signal),
   });
   await server.load();
+  const managedEnvironment=new ManagedEnvironment(vault,values=>terminal.setManagedEnvironment(values));await managedEnvironment.load();
+  const managedScripts=new ManagedScripts((owner,shell)=>{if(owner==='local')return true;const status=server.status(),peer=status.peers.find(p=>p.fingerprint===owner);return server.managementAllowed(owner)&&(!shell||!!peer?.shells.includes(shell as any)&&!!status.allowedShells?.includes(shell as any));},(input,signal,output)=>terminal.execute(input,signal,output));
   const applications = new AgentApplicationService(vault, (owner) =>
     server.managementAllowed(owner));
   await applications.load();
@@ -164,6 +168,7 @@ export async function createAgentRuntime(
     const previous=server.status();
     if(previous.passwordConfigured&&previous.bind&&previous.port)try{await server.start({bind:previous.bind,port:previous.port,advertisedHost:previous.advertisedHost,advertisedPort:previous.advertisedPort});}catch{listenerStartupError='连接服务未启动，请检查本机地址和端口';}
   }
+  const lanRegistration=await createLanRegistration({vault,status:()=>server.status(),version:agentVersion});
   const assistant=new CagentAssistant(vault,{shells,applications:owner=>applications.list(owner),execute:(input,signal,owner,output)=>{
     if(owner!=='local'){
       const status=server.status(),peer=status.peers.find(p=>p.fingerprint===owner);
@@ -225,7 +230,7 @@ export async function createAgentRuntime(
   };
   const updateActivity=()=>({
     operations:activeDispatches,mutations:queuedMutations,terminals:terminal.activity,
-    assistant:assistant.activity,coding:coding.activity,ide:ide.activity,applications:applications.activity,
+    classroomScripts:managedScripts.activity,assistant:assistant.activity,coding:coding.activity,ide:ide.activity,applications:applications.activity,
     uploads:files.activity,browser:browserNetwork.activity,visual:visual.activity,desktop:desktop.service.activity,
     capabilities:packages.activity,wsl:wsl.activity,hosting:hosting.list().filter(s=>s.running).length,
     relay:relay.status().activeConnections,reverseRelay:reverseRelay.status().activeConnections,
@@ -353,6 +358,8 @@ export async function createAgentRuntime(
       if(method==='packages.refresh')return packages.refresh(params);
       throw new Error('未知能力包操作');
     }
+    if(method==='environment.read'||method==='environment.save'){if(!admin)throw Error('未授权环境配置');return method==='environment.read'?managedEnvironment.snapshot():serialized(()=>managedEnvironment.save(params));}
+    if(method.startsWith('management.script.')){if(!admin)throw Error('未授权批量命令');if(method==='management.script.start')return managedScripts.start(owner,params);return managedScripts.query(owner,params,method==='management.script.cancel');}
     if(method.startsWith('assistant.')){
       if(!local&&owner==='local')throw new Error('缺少控制端身份');
       if(method==='assistant.start')return assistant.start(params,owner);
@@ -361,6 +368,7 @@ export async function createAgentRuntime(
       if(method==='assistant.cancel')return assistant.cancel(params,owner);
       if(!admin)throw new Error('未授权管理智能体配置');
       if(method==='assistant.settings')return assistant.snapshot();
+      if(method==='assistant.model.configure')return serialized(()=>assistant.configureModel(params));
       if(method==='assistant.configure')return serialized(()=>assistant.configure(params));
       if(method==='assistant.approve')return assistant.approve(params);
       throw new Error('未知智能体操作');
@@ -609,8 +617,8 @@ export async function createAgentRuntime(
     const failures:unknown[]=[];
     // A failed optional service must not leave the authenticated control socket
     // or listener half alive when an update needs to restore the old runtime.
-    for(const stop of [()=>visual.dispose(),()=>files.close(),()=>accountNetwork.close(),()=>account.close(),()=>accountReverse.stop(),()=>browserNetwork.close(),()=>coding.close(),()=>ide.close(),
-      ()=>assistant.close(),()=>control?.close(),()=>mutation,()=>packages.dispose(),()=>wechat?.shutdown(),()=>desktop.shutdown(),
+    for(const stop of [()=>lanRegistration.close(),()=>visual.dispose(),()=>files.close(),()=>accountNetwork.close(),()=>account.close(),()=>accountReverse.stop(),()=>browserNetwork.close(),()=>coding.close(),()=>ide.close(),
+      ()=>managedScripts.close(),()=>assistant.close(),()=>control?.close(),()=>mutation,()=>packages.dispose(),()=>wechat?.shutdown(),()=>desktop.shutdown(),
       ()=>applications.dispose(),()=>wsl.dispose(),()=>hosting.dispose(),()=>reverseRelay.stop(),()=>relay.stop(),()=>server.stop(),
       ()=>terminal.dispose(),()=>vault.flush(),()=>options.onClose?.()])try{await stop();}catch(error){failures.push(error);}
     if(failures.length)throw new AggregateError(failures,'部分后台服务清理失败');
