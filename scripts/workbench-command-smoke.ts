@@ -31,7 +31,7 @@ try {
   const page=await browser.newPage({viewport:{width:1200,height:850}});const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto(`http://127.0.0.1:${(server.address() as {port:number}).port}`);
   await page.getByRole('tab',{name:'命令行',exact:true}).click();
-  const input=page.getByRole('textbox',{name:'输入 CShell 命令',exact:true});
+  const input=page.getByRole('tabpanel',{name:'命令行',exact:true}).getByRole('textbox',{name:'输入 CShell 命令',exact:true});
   await input.fill('call echo {"message":"尚未发送的草稿"}');
   await page.getByRole('tab',{name:'概览',exact:true}).click();await page.getByRole('tab',{name:'命令行',exact:true}).click();
   assert.match(await input.inputValue(),/尚未发送/);assert.equal(await page.evaluate(()=>(window as any).calls.length),0);
@@ -41,11 +41,11 @@ try {
   assert.match(await page.getByRole('log').innerText(),/尚未发送的草稿/);
   await input.fill('call echo {"message":"独立草稿"}');
   await page.getByRole('button',{name:'新建命令台标签',exact:true}).click();assert((await page.evaluate(()=>(window as any).actions)).includes('command-tab'));
-  await page.getByRole('tab',{name:'可视化',exact:true}).click();await page.getByRole('button',{name:'命令台',exact:true}).click();
-  const studio=page.locator('.studio-window:visible');await studio.getByRole('textbox',{name:'输入 CShell 命令'}).fill('help');
-  await page.getByRole('button',{name:'最小化命令台',exact:true}).click();await page.locator('.studio-taskbar').getByRole('button',{name:'命令台',exact:true}).click();assert.equal(await studio.getByRole('textbox').inputValue(),'help');
+  await page.getByRole('tab',{name:'可视化',exact:true}).click();await page.locator('[data-desktop-icon="command"]').dblclick();
+  const studio=page.locator('.desktop-window:visible');await studio.getByRole('textbox',{name:'输入 CShell 命令'}).fill('help');
+  await page.getByRole('button',{name:'最小化命令台',exact:true}).click();await page.locator('.desktop-taskbar').getByRole('button',{name:'切换到命令台',exact:true}).click();assert.equal(await studio.getByRole('textbox').inputValue(),'help');
   await page.getByRole('tab',{name:'命令行',exact:true}).click();assert.match(await input.inputValue(),/独立草稿/);
-  await page.getByRole('tab',{name:'可视化',exact:true}).click();await page.getByRole('button',{name:'最小化命令台',exact:true}).click();await page.getByRole('button',{name:'能力浏览器',exact:true}).click();
+  await page.getByRole('tab',{name:'可视化',exact:true}).click();await page.getByRole('button',{name:'最小化命令台',exact:true}).click();await page.locator('[data-desktop-icon="capabilities"]').dblclick();
   await page.getByRole('button',{name:/echo 返回当前输入/}).click();await page.getByLabel('message *').fill('从可视化表单执行');await page.getByRole('button',{name:'读取',exact:true}).click();await page.locator('.capability-result').getByText(/从可视化表单执行/).waitFor();
   for(const width of [340,600,900]){await page.locator('#workspace').evaluate((el,w)=>{(el as HTMLElement).style.width=w+'px';},width);assert(await page.locator('.workbench-shell').evaluate(el=>el.scrollWidth<=el.clientWidth+1),`No horizontal overflow ${width}`);await page.locator('#workspace').screenshot({path:`test-results/workbench-command/visual-${width}.png`});}
   await page.getByRole('button',{name:'最小化能力浏览器',exact:true}).click();await page.locator('#workspace').screenshot({path:'test-results/workbench-command/desktop.png'});
