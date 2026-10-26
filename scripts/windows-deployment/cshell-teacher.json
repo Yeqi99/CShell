@@ -1,0 +1,9 @@
+{
+  "format": "cshell-deployment-1",
+  "target": "cshell",
+  "extensions": [
+    { "id": "cshell.classroom", "enabled": true },
+    { "id": "cshell.agent", "enabled": true }
+  ],
+  "packages": []
+}
