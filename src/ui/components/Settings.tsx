@@ -1,3 +1,4 @@
+import {UsageConsent} from './UsageStats';
 import { LocalEnvironmentSettings } from './LocalEnvironmentSettings';
 import { CloudSettings } from './CloudSettings';
 import { NetworkSettings } from './NetworkSettings';
@@ -123,6 +124,7 @@ export function Settings({
         </header>
         <div hidden={category !== 'updates'}>
           <UpdateSettings english={!cn} />
+          <UsageConsent english={!cn} active={category === 'updates'} />
         </div>
         <div hidden={category !== 'cloud'}><CloudSettings /></div>
         {window.cshell.networkStatus && <div hidden={category !== 'network'}><NetworkSettings/></div>}

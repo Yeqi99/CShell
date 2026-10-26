@@ -3,6 +3,7 @@ import type { InstalledPlugin } from '../../shared/plugins';
 // Trusted view adapters belong to plugins. The shell consumes this registry rather
 // than reserving permanent navigation entries for individual languages/tools.
 export const pluginViews = [
+  { pluginId:'cshell.classroom',id:'classroom',title:'机房屏幕共享',titleEn:'Classroom screen sharing' },
   { pluginId:'cshell.tavily',id:'tavily',title:'Tavily 搜索',titleEn:'Tavily Search' },
   { pluginId:'cshell.opencode',id:'opencode',title:'OpenCode',titleEn:'OpenCode' },
   { pluginId: 'cshell.wechat', id: 'wechat', title: '微信', titleEn: 'WeChat' },

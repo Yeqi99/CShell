@@ -1,0 +1,11 @@
+{
+  "format": "cshell-deployment-1",
+  "target": "cagent",
+  "passwordFile": "student-password.txt",
+  "bind": "127.0.0.1",
+  "port": 24443,
+  "listenOnLaunch": false,
+  "shells": ["powershell"],
+  "permissions": { "manage": false, "http": false, "hosting": false, "relay": false },
+  "packages": []
+}

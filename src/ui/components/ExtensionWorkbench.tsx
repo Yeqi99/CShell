@@ -1,4 +1,6 @@
 import {TavilyView} from '../../extensions/tavily/View';
+import {ClassroomView} from '../../extensions/classroom/View';
+import type {ClassroomBridge,ClassroomSource} from '../../shared/classroom';
 import { usePermissionNavigation } from '../permission-navigation';
 import {OpenCodeView} from '../../extensions/opencode/View';
 import './extension-market.css';
@@ -52,6 +54,8 @@ export function ExtensionWorkbench({
   onChange,
   onTerminal,
   request,
+  classroomBridge,
+  onClassroomWatch,
 }: {
   onLocal: (shell: LocalShell) => Promise<void>;
   tools: ToolsSettings;
@@ -61,11 +65,13 @@ export function ExtensionWorkbench({
   onChange: () => Promise<void>;
   onTerminal: (parent: string, id: string, name: string, python: string) => void;
   request: PythonFileRequest | null;
+  classroomBridge?: ClassroomBridge;
+  onClassroomWatch?: (source:ClassroomSource)=>void;
 }) {
   const { locale } = useI18n(),
     zh = locale === 'zh-CN';
   const [section, setSection] = useState<
-    'plugins' | 'apps' | 'environment' | 'python' | 'wsl' | 'agent' | 'wechat' | 'opencode' | 'tavily'
+    'plugins' | 'apps' | 'environment' | 'python' | 'wsl' | 'agent' | 'wechat' | 'opencode' | 'tavily' | 'classroom'
   >('plugins');
   const [settingsPlugin, setSettingsPlugin] = useState<string | null>(null);
   const [importPreview,setImportPreview]=useState<Awaited<ReturnType<typeof window.cshell.pluginImportPreview>>>(null);
@@ -183,14 +189,14 @@ export function ExtensionWorkbench({
                       ? 'WSL Linux'
                       : section === 'agent'
                         ? 'CAgent'
-                        : section === 'tavily' ? 'Tavily 搜索' : section === 'opencode' ? 'OpenCode' : section === 'wechat' ? '微信' : 'Python'}
+                        : section === 'classroom' ? '机房屏幕共享' : section === 'tavily' ? 'Tavily 搜索' : section === 'opencode' ? 'OpenCode' : section === 'wechat' ? '微信' : 'Python'}
             </h1>
             <p>
               {section === 'plugins'
                 ? zh
                   ? '按需添加，随时停用。'
                   : 'Add the tools you need.'
-                : section === 'tavily' ? '网络搜索扩展' : section === 'opencode' ? '模型接入扩展' : section === 'wechat' ? '本机微信 · 独立授权' : section === 'agent'
+                : section === 'classroom' ? '局域网共享 · 仅观看画面' : section === 'tavily' ? '网络搜索扩展' : section === 'opencode' ? '模型接入扩展' : section === 'wechat' ? '本机微信 · 独立授权' : section === 'agent'
                   ? zh
                     ? '配置所选 Agent 的连接、权限与服务。'
                     : 'Manage connections, permissions and services on the selected Agent.'
@@ -201,7 +207,7 @@ export function ExtensionWorkbench({
                       : 'Actions belong to the selected connection.'}
             </p>
           </div>
-          {section !== 'plugins' && section !== 'wsl' && section !== 'agent' && section !== 'wechat' && section !== 'opencode' && section !== 'tavily' && (
+          {section !== 'plugins' && section !== 'wsl' && section !== 'agent' && section !== 'wechat' && section !== 'opencode' && section !== 'tavily' && section !== 'classroom' && (
             <label className="extension-server">
               {zh ? '目标服务器' : 'Target server'}
               <select
@@ -412,8 +418,9 @@ export function ExtensionWorkbench({
         {section === 'wechat' && currentView && <WechatPlugin />}
         {section === 'opencode' && currentView && <OpenCodeView />}
         {section === 'tavily' && currentView && <TavilyView />}
+        {section === 'classroom' && currentView && (classroomBridge && onClassroomWatch ? <ClassroomView bridge={classroomBridge} onWatch={onClassroomWatch}/> : <p role="status">屏幕共享服务尚未就绪。</p>)}
         {section === 'wsl' && currentView && <WslPlugin onOpen={onLocal} />}
-        {section !== 'plugins' && section !== 'wsl' && section !== 'agent' && section !== 'wechat' && section !== 'opencode' && section !== 'tavily' && !target && (
+        {section !== 'plugins' && section !== 'wsl' && section !== 'agent' && section !== 'wechat' && section !== 'opencode' && section !== 'tavily' && section !== 'classroom' && !target && (
           <div className="extension-empty">
             {zh
               ? '先连接一台服务器，再选择安装或管理环境。'
@@ -425,7 +432,7 @@ export function ExtensionWorkbench({
             className="extension-session"
             key={s.id}
             hidden={
-              section === 'plugins' || section === 'wsl' || section === 'agent' || section === 'wechat' || section === 'opencode' || section === 'tavily' || target !== s.id
+              section === 'plugins' || section === 'wsl' || section === 'agent' || section === 'wechat' || section === 'opencode' || section === 'tavily' || section === 'classroom' || target !== s.id
             }
           >
             <ServerExtensions
@@ -435,10 +442,10 @@ export function ExtensionWorkbench({
                 target === s.id &&
                 section !== 'plugins' &&
                 section !== 'wsl' &&
-                section !== 'wechat' && section !== 'opencode' && section !== 'tavily' &&
+                section !== 'wechat' && section !== 'opencode' && section !== 'tavily' && section !== 'classroom' &&
                 section !== 'agent'
               }
-              section={section === 'wsl' || section === 'wechat' || section === 'opencode' || section === 'tavily' ? 'plugins' : section}
+              section={section === 'wsl' || section === 'wechat' || section === 'opencode' || section === 'tavily' || section === 'classroom' ? 'plugins' : section}
               plugins={plugins}
               appRequest={appRequest}
               fileRequest={request?.sessionId === s.id ? request : null}

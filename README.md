@@ -1,5 +1,9 @@
 <p align="center"><img src="assets/icon-512.png" width="88" alt="CShell" /></p>
 
+
+[![CShell usage: registered accounts, active accounts and opt-in devices](https://shell.canp.ai/api/v1/public/usage-badge)](https://shell.canp.ai/usage.html)
+
+统计口径：注册账号、最近 5 分钟活跃账号、自愿参与的匿名活跃设备分别展示，不相加；GitHub 图片可能缓存。[查看统计说明](https://shell.canp.ai/usage.html)。
 # CShell
 
 **一个工作台，连接和管理你的电脑与服务器。**
@@ -8,7 +12,7 @@
 
 CShell 把终端、文件、远程桌面与智能体放在同一工作台。桌面端默认双击 SSH 打开原生终端、RDP 打开远程桌面，也可按连接选择可视化工作区；CAgent 进入机器桌面。手机端使用适合触控的机器主页与应用页面。
 
-[官网与下载](https://shell.canp.ai/) · [完整使用手册](https://shell.canp.ai/docs/start.html) · [平台差异](docs/PLATFORMS.md) · [问题反馈](https://github.com/Yeqi99/CShell/issues) · [MIT License](LICENSE)
+[机房屏幕共享](docs/CLASSROOM.md) · [学生机批量部署](docs/DEPLOYMENT.md) · [官网与下载](https://shell.canp.ai/) · [完整使用手册](https://shell.canp.ai/docs/start.html) · [平台差异](docs/PLATFORMS.md) · [问题反馈](https://github.com/Yeqi99/CShell/issues) · [MIT License](LICENSE)
 
 ## CShell 和 CAgent 是什么？
 

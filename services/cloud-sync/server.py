@@ -40,6 +40,8 @@ class Service:
             db.executescript('''
             PRAGMA journal_mode=WAL;
             PRAGMA max_page_count=2097152;
+            CREATE TABLE IF NOT EXISTS usage_accounts(account TEXT PRIMARY KEY,seen REAL NOT NULL);
+            CREATE TABLE IF NOT EXISTS usage_devices(digest TEXT PRIMARY KEY,seen REAL NOT NULL);
             CREATE TABLE IF NOT EXISTS accounts(id TEXT PRIMARY KEY,email TEXT UNIQUE NOT NULL);
             CREATE TABLE IF NOT EXISTS passwords(account TEXT PRIMARY KEY,salt TEXT NOT NULL,digest TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS keyboxes(account TEXT PRIMARY KEY,box TEXT NOT NULL);
@@ -241,7 +243,29 @@ class Service:
             row = db.execute('SELECT account FROM sessions WHERE digest=? AND expires>?', (self.digest(token), time.time())).fetchone()
         if not row:
             raise Failure(401, '请重新登录')
+        with self.db() as db:
+            db.execute('INSERT INTO usage_accounts VALUES(?,?) ON CONFLICT(account) DO UPDATE SET seen=excluded.seen WHERE seen<?', (row[0],time.time(),time.time()-30))
         return row[0]
+
+    def usage(self):
+        now=time.time()
+        with self.db() as db:
+            db.execute('DELETE FROM usage_devices WHERE seen<?',(now-30*86400,))
+            registered=db.execute('SELECT COUNT(*) FROM accounts').fetchone()[0]
+            online=db.execute('SELECT COUNT(*) FROM usage_accounts u WHERE seen>? AND EXISTS(SELECT 1 FROM sessions s WHERE s.account=u.account AND s.expires>?)',(now-300,now)).fetchone()[0]
+            devices=db.execute('SELECT COUNT(*),COALESCE(SUM(seen>?),0) FROM usage_devices',(now-300,)).fetchone()
+        return {'registeredAccounts':registered,'activeAccounts':online,'participatingDevices30d':devices[0],'activeDevices':devices[1],'windowSeconds':300,'sampledAt':int(now)}
+
+    def usage_device(self,body):
+        token=body.get('token')
+        if not isinstance(token,str) or not re.fullmatch(r'[a-f0-9]{64}',token) or type(body.get('enabled')) is not bool:
+            raise Failure(400,'Invalid usage consent')
+        digest=self.digest('usage:'+token)
+        with self.db() as db:
+            if body['enabled']:
+                db.execute('INSERT INTO usage_devices VALUES(?,?) ON CONFLICT(digest) DO UPDATE SET seen=excluded.seen',(digest,time.time()))
+            else:db.execute('DELETE FROM usage_devices WHERE digest=?',(digest,))
+        return {'ok':True}
 
     def read(self, account):
         with self.db() as db:
@@ -335,6 +359,12 @@ def handler(service):
             acquired=False
             self.streaming=False
             try:
+                if self.command == 'GET' and self.path in ('/v1/public/usage.svg','/v1/public/usage-badge'):
+                    service.limit('usage-svg:'+service.digest(self.headers.get('X-Real-IP',self.client_address[0])),240,60)
+                    counts=service.usage()
+                    label=f"Accounts {counts['registeredAccounts']} | active 5m {counts['activeAccounts']} | opt-in devices {counts['activeDevices']}"
+                    data=('<svg xmlns="http://www.w3.org/2000/svg" width="510" height="32" role="img" aria-label="'+label+'"><title>'+label+'</title><rect width="510" height="32" rx="7" fill="#17263b"/><text x="14" y="21" fill="#eaf2ff" font-family="Arial,sans-serif" font-size="13">'+label+'</text></svg>').encode()
+                    self.send_response(200);self.send_header('Content-Type','image/svg+xml');self.send_header('Cache-Control','no-cache');self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data);return
                 if self.path=='/v1/vault':
                     acquired=VAULT_SLOTS.acquire(False)
                     if not acquired:raise Failure(429,'同步服务繁忙，客户端会自动重试')
@@ -377,6 +407,10 @@ def handler(service):
                     value = service.admin_accounts()
                 elif admin and self.path == '/v1/admin/membership' and self.command == 'POST':
                     value = service.admin_membership(body)
+                elif self.command == 'GET' and self.path == '/v1/public/usage':
+                    value=service.usage()
+                elif self.command == 'POST' and self.path == '/v1/public/usage-device':
+                    value=service.usage_device(body)
                 elif self.command == 'GET' and self.path == '/v1/health':
                     value = {'ok': True, 'protocol': 1, 'mailConfigured': mail_configured()}
                 elif self.command == 'POST' and self.path == '/v1/auth/code':

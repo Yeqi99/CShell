@@ -1,3 +1,5 @@
+import {ClassroomViewer} from '../extensions/classroom/View';
+import type {ClassroomSource,ClassroomStatus} from '../shared/classroom';
 import {FileConnectionWorkspace} from './components/FileConnectionWorkspace';
 import {isFileConnection} from '../shared/file-connections';
 import {SharedTerminalMount, TerminalSlot} from './components/SharedTerminalMount';
@@ -267,7 +269,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
     [form, setForm] = useState<Profile | 'new' | null>(null),
     [settings, setSettings] = useState(false),
     [surface, setSurface] = useState<
-      'terminal' | 'connection' | 'quick' | 'settings' | 'extensions' | 'activity' | 'wsl' | 'machine' | 'views' | 'home' | 'account' | 'command'
+      'terminal' | 'connection' | 'quick' | 'settings' | 'extensions' | 'activity' | 'wsl' | 'machine' | 'views' | 'home' | 'account' | 'command' | 'classroom'
     >('home'),
     [palette, setPalette] = useState(false),
     [error, setError] = useState(''),
@@ -277,6 +279,11 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
     [confirmClose, setConfirmClose] = useState<Tab | null>(null);
   const [accountOpen,setAccountOpen]=useState(false);
   const [linuxWorkspaces,setLinuxWorkspaces]=useState<string[]>([]);
+  const [classroomTabs,setClassroomTabs]=useState<ClassroomSource[]>([]),[classroomId,setClassroomId]=useState('');
+  const [classroomStatus,setClassroomStatus]=useState<ClassroomStatus|null>(null);
+  const classroomInstalled=pluginEnabled(config.plugins,'classroom');
+  useEffect(()=>{if(!classroomInstalled||!window.cshell.classroom){setClassroomStatus(null);setClassroomTabs([]);if(surface==='classroom')setSurface('home');return;}let disposed=false,pending=false;const poll=async()=>{if(pending)return;pending=true;try{const status=await window.cshell.classroom!.status();if(!disposed)setClassroomStatus(status);}catch{if(!disposed)setClassroomStatus(null);}finally{pending=false;}};void poll();const timer=setInterval(poll,1000);return()=>{disposed=true;clearInterval(timer);};},[classroomInstalled]);
+  const openClassroom=(source:ClassroomSource)=>{setClassroomTabs(tabs=>tabs.some(t=>t.id===source.id)?tabs:[...tabs,source]);setClassroomId(source.id);setSurface('classroom');};
   const [commandTabs, setCommandTabs] = useState<{id:string;name:string}[]>([]), [commandId, setCommandId] = useState('');
   const commandNumber = useRef(0);
   const newCommandTab = () => { const id = crypto.randomUUID(); setCommandTabs(v => [...v, {id, name:`命令台 ${++commandNumber.current}`}]); setCommandId(id); setSurface('command'); };
@@ -424,6 +431,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
         const views = [
           { key: 'home', select: () => setSurface('home') },
           ...commandTabs.map(tab => ({key:tab.id, select:()=>{setCommandId(tab.id);setSurface('command');}})),
+          ...classroomTabs.map(source=>({key:'classroom-'+source.id,select:()=>openClassroom(source)})),
           ...tabs.map((tab) => ({
             key: tab.id,
             select: () => {
@@ -450,7 +458,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
           ...(settings ? [{ key: 'settings', select: () => setSurface('settings') }] : []),
         ];
         const key =
-          surface === 'command' ? commandId : surface === 'home' ? 'home' : surface === 'terminal'
+          surface === 'classroom' ? 'classroom-'+classroomId : surface === 'command' ? commandId : surface === 'home' ? 'home' : surface === 'terminal'
             ? active
             : surface === 'quick'
               ? `quick-${quickId}`
@@ -484,7 +492,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
     extensions,
     quickConnections,
     quickId,
-    commandId, commandTabs,
+    commandId, commandTabs, classroomTabs, classroomId,
   ]);
   const current = surface === 'terminal' ? tabs.find((tab) => tab.id === active) : undefined;
   useEffect(
@@ -734,6 +742,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
           <Settings2 size={18} />
         </button>
       </header>
+      {classroomStatus?.sharing&&<div className="classroom-global-status" role="status"><span>正在向局域网共享：{classroomStatus.sharing.label}</span><button onClick={()=>{void window.cshell.classroom!.stop().then(setClassroomStatus).catch(onError);}}>停止共享</button></div>}
       {palette && <CommandPicker commands={commands} onClose={() => setPalette(false)} />}
 
       <div
@@ -851,6 +860,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
             </div>
             <TabStrip>
               <div className={`tab welcome-tab ${surface === 'home' ? 'active' : ''}`} onClick={() => setSurface('home')}><button onClick={() => setSurface('home')}><LayoutDashboard size={15}/>{t('workspace')}</button></div>
+              {classroomTabs.map(source=><div key={'classroom-'+source.id} className={`tab ${surface==='classroom'&&classroomId===source.id?'active':''}`} onClick={()=>openClassroom(source)}><button onClick={()=>openClassroom(source)}><span>{source.label} · 观看</span></button><button className="icon" aria-label={`关闭共享 ${source.label}`} title={`关闭共享 ${source.label}`} onClick={e=>{e.stopPropagation();setClassroomTabs(t=>t.filter(v=>v.id!==source.id));if(classroomId===source.id)setSurface('home');}}><X size={13}/></button></div>)}
               {commandTabs.map(tab => <div key={tab.id} className={`tab ${surface === 'command' && commandId === tab.id ? 'active' : ''}`} onClick={()=>{setCommandId(tab.id);setSurface('command');}}><button onClick={()=>{setCommandId(tab.id);setSurface('command');}}><TerminalIcon size={15}/>{tab.name}</button><button className="icon" title={`关闭${tab.name}`} aria-label={`关闭${tab.name}`} onClick={e=>{e.stopPropagation();setCommandTabs(v=>v.filter(t=>t.id!==tab.id));if(commandId===tab.id)setSurface('home');}}><X size={13}/></button></div>)}
               {machines.map(m=><div key={m.target.id} className={'tab '+(surface==='machine'&&machineId===m.target.id?'active':'')} onClick={()=>{setMachineId(m.target.id);setSurface('machine');}}><button onClick={()=>{setMachineId(m.target.id);setSurface('machine');}}>{m.target.name}</button><button className="icon" title="关闭机器工作区及其会话" aria-label={'关闭 '+m.target.name} onClick={e=>{e.stopPropagation();void closeMachine(m.target.id).catch(onError);}}>×</button></div>)}
 
@@ -1216,6 +1226,8 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
             >
               <Suspense fallback={<div className="extension-empty">…</div>}>
                 <ExtensionWorkbench
+                  classroomBridge={window.cshell.classroom}
+                  onClassroomWatch={openClassroom}
                   onLocal={openLocal}
                   tools={config.tools}
                   visible={surface === 'extensions'}
@@ -1275,6 +1287,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
               onView={view=>savePreferences({...config.preferences,workbenchView:view})} onSettings={openSettings} onExtensions={openExtensions} onAgent={()=>setAiVisible(true)} onCommandTab={newCommandTab}
               onNew={() => openConnection('new')} onViews={() => { setViewsOpen(true); setSurface('views'); }} onConnect={openSaved} onCurrent={openCurrentView}/>
           </div>
+          {window.cshell.classroom&&classroomTabs.map(source=><div key={'classroom-'+source.id} className="workspace-editor" hidden={surface!=='classroom'||classroomId!==source.id}><ClassroomViewer bridge={window.cshell.classroom!} source={source} visible={surface==='classroom'&&classroomId===source.id}/></div>)}
           {commandTabs.map(tab=><div key={tab.id} className="workspace-editor" hidden={surface!=='command'||commandId!==tab.id}><CommandConsole active={surface==='command'&&commandId===tab.id} onSettings={openSettings} onNewTab={newCommandTab}/></div>)}
           {surface === 'terminal' && current?.closed && !isFileConnection(current.profile) && !linuxModes[current.id] && (
             <div className="disconnected-session-bar" role="status">

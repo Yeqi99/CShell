@@ -10,6 +10,25 @@ class ServiceTest(unittest.TestCase):
         self.mail = {}
         self.service = Service(self.directory.name + '/test.sqlite', secrets.token_bytes(32), lambda email, code: self.mail.update({email: code}))
 
+    def test_public_usage_is_deduplicated_and_consent_reversible(self):
+        import time
+        first=self.login('usage@example.com','usage-ip')
+        self.service.authenticate(first['token'])
+        self.service.authenticate(first['token'])
+        self.assertEqual(self.service.usage()['activeAccounts'],1)
+        token='a'*64
+        self.service.usage_device({'token':token,'enabled':True})
+        self.service.usage_device({'token':token,'enabled':True})
+        self.assertEqual(self.service.usage()['activeDevices'],1)
+        with self.service.db() as db:
+            db.execute('UPDATE usage_devices SET seen=?',(time.time()-301,))
+        self.assertEqual(self.service.usage()['activeDevices'],0)
+        self.service.usage_device({'token':token,'enabled':False})
+        self.assertEqual(self.service.usage()['participatingDevices30d'],0)
+        self.assertNotIn('email',str(self.service.usage()))
+        self.assertNotIn(token,str(self.service.usage()))
+        with self.assertRaises(Failure):self.service.usage_device({'token':'invalid','enabled':True})
+
     def test_membership_is_real_and_audited(self):
         session = self.login('member@example.com', 'member-ip')
         account = session['accountId']
