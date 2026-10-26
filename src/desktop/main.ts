@@ -1,3 +1,6 @@
+import {provisionDesktop} from '../core/provisioning-desktop';
+import {ClassroomShareService} from './classroom-share';
+import {registerUsage} from './usage';
 import {ftpTransfers} from './ftp-transfers';
 import {FtpConnectionProvider,ftpIdentity} from '../core/connections/ftp-provider';
 import {FtpService} from '../core/ftp';
@@ -107,6 +110,7 @@ ipcMain.on('diagnostics:error', (event, value) => {
   if (typeof value.stack === 'string') error.stack = value.stack.slice(0, 12000);
   diagnostics.record('renderer.error', error);
 });
+const provisioningIndex=process.argv.indexOf('--provision-file');
 const cliIndex = process.argv.indexOf('--cli');
 const hasLock = cliIndex < 0 && app.requestSingleInstanceLock();
 // A launcher may leave the first window hidden. Focusing alone cannot reveal it.
@@ -119,12 +123,17 @@ const revealWindow = () => {
 };
 if (hasLock) app.on('second-instance', revealWindow);
 if (cliIndex >= 0) void runCli(process.argv.slice(cliIndex + 1)).then(code => app.exit(code));
-else if (!hasLock) app.quit();
+else if (!hasLock) { if(provisioningIndex>=0)app.exit(2);else app.quit(); }
 else
   app
     .whenReady()
     .then(async () => {
       await testStartGate;
+      if(provisioningIndex>=0){
+        try{const file=process.argv[provisioningIndex+1];if(!file||file.startsWith('--')||clientMode)throw Error();const result=await provisionDesktop(file,app.getPath('userData'),process.argv.includes('--apply'));console.log(JSON.stringify(result));if(process.argv.includes('--provision-only')||!process.argv.includes('--apply')){app.exit(0);return;}}
+        catch{console.error('CShell 初始部署未完成，请检查配置文件、扩展包与数据目录；原数据保留。');app.exit(1);return;}
+      }
+
       if (clientMode) return startClientApplication();
       const store = new Store(app.getPath('userData'), {
         encrypt: async (value) => {
@@ -249,8 +258,9 @@ else
         await store.trust(endpoint, fingerprint);
         return true;
       });
+      const classroom = new ClassroomShareService();
       const processExtensions = new ProcessExtensions({ directory: join(app.getPath('userData'), 'process-extensions'), vault: new ClientVault(join(app.getPath('userData'), 'process-extensions'), clientCodec), version: app.getVersion(), plugins: () => store.plugins(), changed: () => extensionServices.refreshProcessTools() });
-      const extensionServices = createExtensionServices(ssh, store, async id => { if (id === 'cshell.http') http.dispose(); }, processExtensions);
+      const extensionServices = createExtensionServices(ssh, store, async id => { if (id === 'cshell.http') http.dispose(); if(id === 'cshell.classroom') await classroom.dispose(); }, processExtensions);
       await processExtensions.refresh();
       window.once('closed', () => { void processExtensions.dispose(); });
       const ftp = new FtpService(emit);
@@ -467,6 +477,21 @@ else
       handle('desktop-look:save',(id,value)=>desktopLooks.save(id,value));
       registerAppearanceHandlers(handle, window, app.getPath('userData'), consume, text);
       registerUpdateHandlers(handle, window);
+      registerUsage(handle, window);
+      const classroomEnabled=()=>store.plugins().some(p=>p.manifest.id==='cshell.classroom'&&p.enabled);
+      const requireClassroom=()=>{if(!classroomEnabled())throw Error('请先启用机房屏幕共享扩展');};
+      handle('classroom:status',()=>{requireClassroom();return classroom.status();});
+      handle('classroom:screens',()=>{requireClassroom();return classroom.screens();});
+      handle('classroom:frame',(id)=>{requireClassroom();return classroom.frame(z.string().regex(/^[a-f0-9]{32}$/).parse(id));});
+      handle('classroom:discover',(enabled)=>{requireClassroom();return classroom.setDiscovery(z.boolean().parse(enabled));});
+      handle('classroom:stop',()=>classroom.stop());
+      handle('classroom:start',async input=>{requireClassroom();const result=await classroom.start(z.object({screenId:z.string().min(1).max(120),label:z.string().trim().min(1).max(60)}).strict().parse(input));if(!classroomEnabled()){await classroom.dispose();throw Error('扩展已关闭');}return result;});
+      let classroomWasEnabled=false, classroomChecking=false;
+      const updateClassroom=async()=>{if(classroomChecking)return;const enabled=classroomEnabled();if(enabled===classroomWasEnabled)return;classroomWasEnabled=enabled;classroomChecking=true;try{if(enabled&&process.platform==='win32')await classroom.setDiscovery(true);else await classroom.dispose();}catch{}finally{classroomChecking=false;}};
+      void updateClassroom();const classroomTimer=setInterval(()=>void updateClassroom(),1000);classroomTimer.unref();
+      window.once('closed',()=>{clearInterval(classroomTimer);void classroom.dispose();});
+      window.webContents.on('render-process-gone',()=>{void classroom.stop();});
+
       registerActivity(handle, window, activity);
       let normalBounds: Electron.Rectangle | null = null;
       let wasMaximized = false;
@@ -687,7 +712,7 @@ else
       app.once('before-quit', disposeCommandConsole);
       await mcp.start();
       registerExtensionHandlers(handle, window, store, ssh, connections, async id => {
-        if (id === 'cshell.http') http.dispose();
+        if (id === 'cshell.http') http.dispose(); if(id === 'cshell.classroom') await classroom.dispose();
       }, extensionServices);
       const docker = extensionServices.docker;
       const requireDocker = (id: unknown) => {

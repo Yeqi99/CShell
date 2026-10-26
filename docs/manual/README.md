@@ -27,3 +27,9 @@
 - [终端、复制粘贴与文件](terminal.md)
 - [按现象排查问题](troubleshooting.md)
 - [Windows](windows.md)
+
+## 机房部署
+
+- [机房屏幕共享](../CLASSROOM.md)
+- [学生机批量安装与初始配置](../DEPLOYMENT.md)
+- [GitHub 使用统计口径](../USAGE-STATISTICS.md)

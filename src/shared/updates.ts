@@ -18,6 +18,9 @@ export interface UpdateState {
   automatic?: boolean;
 }
 export interface UpdateBridge {
+  usageRead?():Promise<{enabled:boolean}>;
+  usageConsent?(enabled:boolean):Promise<{enabled:boolean}>;
+
   updateState(): Promise<UpdateState>;
   checkUpdate(): Promise<UpdateState>;
   downloadUpdate(): Promise<UpdateState>;

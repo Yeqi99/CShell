@@ -366,6 +366,7 @@ export interface Bridge
     FloatingBridge,
     MonitorViewsBridge,
     ActivityBridge {
+  classroom?: import('./classroom').ClassroomBridge;
   readonly platform: string;
   networkDiagnostics?(): Promise<import('./network-probe').NetworkDiagnostics>;
   networkProbe?(input: { id: string; source: string; target: string }): Promise<import('./network-probe').NetworkProbeResult>;

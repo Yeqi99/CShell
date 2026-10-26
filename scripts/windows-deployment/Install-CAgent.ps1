@@ -3,9 +3,11 @@
   [switch]$NoLaunch,
   [switch]$NoShortcuts,
   [switch]$RefreshExistingShortcuts,
-  [switch]$PrepareOnly
+  [switch]$PrepareOnly,
+  [string]$ProvisionFile
 )
 $ErrorActionPreference = 'Stop'
+if ($PrepareOnly -and $ProvisionFile) { throw 'PrepareOnly cannot apply initial provisioning' }
 Set-StrictMode -Version Latest
 function FileSha256([string]$Path) {
   $stream = [IO.File]::OpenRead($Path)
@@ -94,6 +96,12 @@ if (-not $NoShortcuts -or $RefreshExistingShortcuts) {
     $shortcut.Save()
     if (-not (Test-Path -LiteralPath $shortcutPath)) { throw 'Shortcut creation failed' }
   }
+}
+# Provision before launch. Only a file path is passed; no password enters argv.
+if ($ProvisionFile) {
+  $configPath = (Resolve-Path -LiteralPath $ProvisionFile).Path
+  & (Join-Path $versionRoot 'node.exe') (Join-Path $versionRoot 'agent.cjs') provision $configPath --apply
+  if ($LASTEXITCODE -ne 0) { throw 'Initial provisioning failed; application was not started' }
 }
 # User-requested default autostart; preserve an explicit opt-out.
 if (-not $NoShortcuts -and -not (Test-Path -LiteralPath (Join-Path $root 'autostart-disabled'))) {

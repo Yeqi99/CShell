@@ -28,6 +28,7 @@ export const pluginManifestSchema = z
       'wechat',
       'opencode',
       'tavily',
+      'classroom',
       'process',
     ]),
     permissions: z
@@ -84,6 +85,7 @@ const builtin = (
   commands: [],
 });
 export const builtinPlugins = [
+  builtin('classroom', '机房屏幕共享', '在局域网中主动共享屏幕，或在独立标签页只读观看。', 'classroom', []),
   builtin('tavily', 'Tavily 搜索', '多 Key 用量管理，为智能体提供带来源的网络搜索。', 'tavily', []),
   builtin('opencode', 'OpenCode', '接入 Go 套餐或按量计费模型，选择模型并查看官方用量。', 'opencode', []),
   builtin('http', 'HTTP', '编辑请求、多目标、切换发送方与请求历史，可供智能体调用。', 'http', [

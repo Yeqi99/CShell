@@ -1,3 +1,4 @@
+import {UsageConsent} from './UsageStats';
 import { LocalEnvironmentSettings } from './LocalEnvironmentSettings';
 import { NetworkSettings } from './NetworkSettings';
 import { Globe } from 'lucide-react';
@@ -121,6 +122,7 @@ export function Settings({
         </header>
         <div hidden={category !== 'updates'}>
           <UpdateSettings english={!cn} />
+          <UsageConsent english={!cn} active={category === 'updates'} />
         </div>
         {window.cshell.networkStatus && <div hidden={category !== 'network'}><NetworkSettings/></div>}
         <div hidden={category !== 'workspace'}>

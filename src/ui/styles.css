@@ -5993,3 +5993,11 @@ input[type='radio']:focus-visible {
 .compact-monitor [hidden] { display: none !important; }
 .compact-monitor .gpu-device > span { white-space: normal; overflow-wrap: anywhere; }
 .compact-monitor .resource-details { border: 0; margin-top: 0; }
+
+.usage-consent { margin-top:28px; padding-top:20px; border-top:1px solid var(--border); }
+
+.usage-consent label { display:flex; align-items:center; gap:8px; }
+.usage-consent input[type=checkbox] {width:16px; min-height:16px;}
+
+.classroom-global-status {display:flex;align-items:center;justify-content:center;gap:20px;padding:6px 16px;background:var(--accent);color:white;font-size:13px;}
+.classroom-global-status button {background:white;color:#17263b;padding:4px 12px;border-radius:5px;}
