@@ -144,6 +144,18 @@ export class AgentTerminalProvider implements ManagedProvider {
   private closing = new Set<Promise<void>>();
   private opening = 0;
   private executing = 0;
+  private managedEnvironment:Record<string,string>={};
+  setManagedEnvironment(values:Record<string,string>){this.managedEnvironment={...values};}
+  private processEnvironment(){
+    const values={...process.env};
+    for(const [name,value] of Object.entries(this.managedEnvironment)){
+      // Windows keys are case-insensitive. Node otherwise retains the first
+      // lexical variant (PATH/Path), potentially discarding the requested value.
+      if(process.platform==='win32')for(const key of Object.keys(values))if(key.toLowerCase()===name.toLowerCase())delete values[key];
+      values[name]=value;
+    }
+    return values;
+  }
   private updateGuard = () => false;
   setUpdateGuard(guard: () => boolean) { this.updateGuard = guard; }
   get activity() { return this.sessions.size + this.opening + this.executing + this.closing.size; }
@@ -207,7 +219,7 @@ export class AgentTerminalProvider implements ManagedProvider {
     }>((resolve, reject) => {
       const child = spawnProcess(shell.executable, args, {
         cwd: homedir(),
-        env: process.env,
+        env: this.processEnvironment(),
         windowsHide: true,
         windowsVerbatimArguments: request.shell === 'cmd',
         detached: process.platform !== 'win32',
@@ -291,7 +303,7 @@ export class AgentTerminalProvider implements ManagedProvider {
     if (this.sessions.size >= 16) throw new Error('终端会话达到上限');
     const spawn = this.spawnPty ?? (await import('node-pty')).spawn;
     const env = Object.fromEntries(
-      Object.entries(process.env).filter((v): v is [string, string] => v[1] !== undefined),
+      Object.entries(this.processEnvironment()).filter((v): v is [string, string] => v[1] !== undefined),
     );
     delete env.ELECTRON_RUN_AS_NODE;
     delete env.CSHELL_AGENT_CONTROL_TOKEN;

@@ -1,0 +1,28 @@
+import { readFile, writeFile, mkdir, cp, stat } from 'node:fs/promises';
+import { resolve, join, basename } from 'node:path';
+import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+const [installerArg, agentArg, outputArg] = process.argv.slice(2);
+if (!installerArg || !agentArg || !outputArg) throw Error('Usage: node scripts/package-classroom-windows.mjs <CShell installer.exe> <CAgent deployment dir> <new output dir>');
+const installer=resolve(installerArg),agent=resolve(agentArg),output=resolve(outputArg);
+if(process.platform!=='win32')throw Error('Classroom Windows bundle must be verified on Windows');
+const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
+const metadata=JSON.parse(await readFile(join(agent,'deployment.json'),'utf8'));
+const version=JSON.parse(await readFile('package.json','utf8')).version;
+if(metadata.version!==version||metadata.platform!=='win32'||metadata.arch!=='x64')throw Error('CAgent build/version mismatch');
+for(const file of metadata.files){if(!/^[a-zA-Z0-9_. /-]+$/.test(file.path)||file.path.split('/').includes('..'))throw Error('Unsafe payload path');const bytes=await readFile(join(agent,'payload',file.path));if(bytes.length!==file.bytes||digest(bytes)!==file.sha256)throw Error('CAgent payload checksum mismatch');}
+const exeBytes=await readFile(installer);if(exeBytes.subarray(0,2).toString()!=='MZ')throw Error('Invalid Windows installer');
+const productProbe=spawnSync('powershell.exe',['-NoProfile','-NonInteractive','-Command','$p=[Console]::In.ReadToEnd();$v=[Diagnostics.FileVersionInfo]::GetVersionInfo($p);@{name=$v.ProductName;version=$v.ProductVersion}|ConvertTo-Json -Compress'],{input:installer,encoding:'utf8',windowsHide:true,timeout:15000});
+if(productProbe.status!==0)throw Error('Cannot verify installer product');
+const normalized=value=>/^\d+\.\d+\.\d+(\.\d+)?$/.test(value)?[...value.split('.'),...Array(4-value.split('.').length).fill('0')].map(Number).join('.'):undefined;
+const product=JSON.parse(productProbe.stdout);if(!['CShell','CShell Pro'].includes(product.name)||normalized(product.version)!==normalized(version))throw Error('CShell installer product/version mismatch');
+await mkdir(output,{recursive:false});
+await cp(installer,join(output,basename(installer)));
+await cp(agent,join(output,'CAgent'),{recursive:true,dereference:false});
+for(const file of ['Install-ClassroomStudent.ps1','Install Classroom Student.cmd','Install-Student.ps1'])await cp(join('scripts/windows-deployment',file),join(output,file));
+await cp('docs/DEPLOYMENT.md',join(output,'DEPLOYMENT.md'));
+await cp('docs/CLASSROOM-QUICKSTART.md',join(output,'CLASSROOM-QUICKSTART.md'));
+const manifest={format:'cshell-classroom-bundle-1',version,cshell:{file:basename(installer),productName:product.name,sha256:digest(exeBytes)},cagent:{directory:'CAgent',installerSha256:digest(await readFile(join(output,'CAgent/Install-CAgent.ps1')))},studentScript:{file:'Install-Student.ps1',sha256:digest(await readFile(join(output,'Install-Student.ps1')))}};
+await writeFile(join(output,'classroom-deployment.json'),JSON.stringify(manifest,null,2));
+const archive=output+'.zip',result=spawnSync('tar',['-a','-cf',archive,'-C',output,'.'],{stdio:'inherit',windowsHide:true});if(result.error||result.status!==0)throw result.error??Error('Archive failed');
+const sha256=digest(await readFile(archive));await writeFile(archive+'.sha256',`${sha256}  ${basename(archive)}\n`);console.log(JSON.stringify({archive,bytes:(await stat(archive)).size,sha256,version}));

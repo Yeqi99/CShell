@@ -150,5 +150,5 @@ export async function registerAiHandlers(
     disposal = Promise.all([events.close(),ai.flush(),officialOpenCode.dispose(),remoteClose,network.close(),drafts.snapshot()]).then(()=>{});
     return disposal;
   };
-  return Object.assign(dispose, { hasActiveWork: () => ai.hasActiveWork || officialOpenCode.status().active > 0 });
+  return Object.assign(dispose, { classroomModels:()=>ai.classroomModels(),classroomModel:(id:string)=>ai.classroomModel(id), hasActiveWork: () => ai.hasActiveWork || officialOpenCode.status().active > 0 });
 }

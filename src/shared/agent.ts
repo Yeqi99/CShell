@@ -3,6 +3,7 @@ import {codingMethods} from './coding';
 import { z } from 'zod';
 export const agentMethods = [
   'network.probe','machine.snapshot',
+  'environment.read','environment.save','assistant.model.configure','management.script.start','management.script.status','management.script.cancel',
   ...codingMethods,
   ...ideMethods,
   'browser.status','browser.open','browser.read','browser.write','browser.close',

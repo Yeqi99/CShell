@@ -8,6 +8,7 @@ param(
   [string]$CAgentConfig,
   [string]$CAgentInstallerSha256,
   [string]$CAgentDestination = (Join-Path $env:LOCALAPPDATA 'Programs\CAgent'),
+  [switch]$StartCAgent,
   [switch]$Apply
 )
 # Run as the student's normal Windows account. No elevation, remote execution,
@@ -54,6 +55,6 @@ if ($provision.ExitCode -ne 0) { throw 'CShell initial configuration failed' }
 if ($CAgentBundle) {
   # Use an extracted, separately verified official deployment bundle. Its installer
   # verifies every payload file before copying and never closes an existing Agent.
-  & (Join-Path $bundle 'Install-CAgent.ps1') -Destination $CAgentDestination -ProvisionFile $CAgentConfig -NoLaunch
+  & (Join-Path $bundle 'Install-CAgent.ps1') -Destination $CAgentDestination -ProvisionFile $CAgentConfig -NoLaunch:(-not $StartCAgent)
 }
 Write-Output 'Installation finished. Open CShell / CAgent normally. Screen sharing and capability execution require their own explicit authorization.'

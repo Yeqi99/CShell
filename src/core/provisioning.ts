@@ -5,12 +5,15 @@ import { z } from 'zod';
 import { builtinPlugins, pluginId, type InstalledPlugin } from '../shared/plugins';
 import { clientShellSchema } from '../shared/client';
 import { readCustomExtension } from './custom-extensions';
+import { lanRegistrationSchema } from '../shared/agent-lan';
 
 const packages = z.array(z.object({ file: z.string().min(1).max(4096), sha256: z.string().regex(/^[a-f0-9]{64}$/) }).strict()).max(30).default([]);
 export const deploymentSchema = z.discriminatedUnion('target', [
   z.object({ format: z.literal('cshell-deployment-1'), target: z.literal('cshell'),
     extensions: z.array(z.object({ id: pluginId, enabled: z.boolean() }).strict()).max(100), packages }).strict(),
   z.object({ format: z.literal('cshell-deployment-1'), target: z.literal('cagent'),
+    preset: z.literal('classroom-student').optional(),
+    lanDiscovery: lanRegistrationSchema.optional(),
     passwordFile: z.string().min(1).max(4096), bind: z.string().min(1).max(253).default('127.0.0.1'),
     port: z.number().int().min(1024).max(65535).default(24443), listenOnLaunch: z.boolean().default(false),
     shells: z.array(clientShellSchema).min(1).max(6),

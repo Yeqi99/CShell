@@ -68,6 +68,8 @@ export class AiService {
   private childCounts = new Map<string, number>();
   onThreadUpdate?: (thread: AiThread) => void;
   private testingProvider = false;
+  classroomModels(){return this.providers.filter(p=>!p.extension&&!!p.key&&p.url.startsWith('https:')).map(p=>({id:p.id,label:p.name+' · '+p.model}));}
+  classroomModel(id:string){const p=this.providers.find(p=>p.id===id&&!p.extension&&!!p.key&&p.url.startsWith('https:'));if(!p)throw Error('该基座不能下发至独立CAgent');return {endpoint:p.url,model:p.model,key:p.key};}
   private providers: Provider[] = [];
   private permissions: AiPermission[] = [];
   private policy: AiPolicy = emptyAiPolicy();

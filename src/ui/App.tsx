@@ -1217,6 +1217,9 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
             >
               <Suspense fallback={<div className="extension-empty">…</div>}>
                 <ExtensionWorkbench
+                  classroomTasksBridge={window.cshell.classroomTasks}
+                  discoveryBridge={window.cshell.agentLan}
+                  onDevicesAdded={()=>void refresh()}
                   classroomBridge={window.cshell.classroom}
                   onClassroomWatch={openClassroom}
                   onLocal={openLocal}

@@ -22,7 +22,7 @@ export async function provisionAgent(file: string, directory: string, apply = fa
   const password = (await readFile(passwordPath, 'utf8')).replace(/\r?\n$/, '');
   if (!password.length || password.length > 128 || /[\r\n\0]/.test(password)) throw Error('密码文件内容无效');
   const packs = await deploymentPackages(input);
-  const plan = { bind: config.bind, port: config.port, listenOnLaunch: config.listenOnLaunch, shells: config.shells, permissions: config.permissions,
+  const plan = { bind: config.bind, port: config.port, listenOnLaunch: config.listenOnLaunch, shells: config.shells, permissions: config.permissions, preset: config.preset, lanDiscovery: config.lanDiscovery,
     extensions: packs.map(pack => ({ id: pack.value.manifest.id, version: pack.value.manifest.version, executionGranted: false })), firewallChanged: false };
   if (!apply) return { applied: false, plan };
   // Adjacent staging + atomic directory rename means a failed encryption/write never
@@ -40,6 +40,11 @@ export async function provisionAgent(file: string, directory: string, apply = fa
     await vault.write('connection-password', password);
     await vault.write('listener', { bind: config.bind, port: config.port });
     await vault.write('connection-resume-listener', config.listenOnLaunch);
+    if (config.lanDiscovery) await vault.write('lan-registration', config.lanDiscovery);
+    if (config.preset === 'classroom-student') await vault.write('desktop-config', {
+      enabled: true, authenticatedPeers: true, directListener: false, bindAddress: '127.0.0.1', tcpPort: 9998, udpPort: 9999,
+      local: { view: true, control: true }, ownerGrants: {},
+    });
     await vault.flush();
     if (await exists(destination)) throw Error('数据目录已由其他进程创建；未覆盖');
     await rename(stage, destination);

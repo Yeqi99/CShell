@@ -26,7 +26,7 @@ test('Agent preview is side-effect free; apply encrypts and upgrades preserve ev
     const destination = join(root, 'data'), file = join(root, 'deploy.json');
     const secret = 'a-private-password-123';
     await writeFile(join(root, 'password.txt'), secret + '\n', { mode: 0o600 });
-    const config = { format: 'cshell-deployment-1', target: 'cagent', passwordFile: 'password.txt', port: 24555, shells: ['sh'], permissions: { manage: true, http: false, hosting: false, relay: false } };
+    const config = { format: 'cshell-deployment-1', target: 'cagent', preset: 'classroom-student', lanDiscovery: { enabled: true, name: 'Student fixture', room: 'Classroom' }, passwordFile: 'password.txt', bind: '0.0.0.0', listenOnLaunch: true, port: 24555, shells: ['sh'], permissions: { manage: true, http: false, hosting: false, relay: false } };
     await writeFile(file, JSON.stringify(config));
     const preview = await provisionAgent(file, destination);
     assert.equal(preview.applied, false);
@@ -39,7 +39,9 @@ test('Agent preview is side-effect free; apply encrypts and upgrades preserve ev
     const record = await vault.read('access', accessSchema);
     assert.ok(record && await verifyPassword(secret, record));
     assert.equal(record.allowHttp, false);
-    assert.equal(await vault.read('connection-resume-listener', z.boolean()), false);
+    assert.equal(await vault.read('connection-resume-listener', z.boolean()), true);
+    assert.equal((await vault.read('lan-registration', z.object({ name: z.string() })))?.name, 'Student fixture');
+    assert.deepEqual(await vault.read('desktop-config', z.object({ enabled: z.boolean(), authenticatedPeers: z.boolean(), directListener: z.boolean() })), { enabled: true, authenticatedPeers: true, directListener: false });
     assert.equal((await vault.read('listener', z.object({ port: z.number() })))?.port, 24555);
     assert.ok(!(await readFile(join(destination, 'connection-password.enc'), 'utf8')).includes(secret));
     const before = await readFile(join(destination, 'identity.enc'));

@@ -1,3 +1,5 @@
+import type {ClassroomTasksBridge} from '../../shared/classroom-tasks';
+import type {AgentLanBridge} from '../../shared/agent-lan';
 import {TavilyView} from '../../extensions/tavily/View';
 import {ClassroomView} from '../../extensions/classroom/View';
 import type {ClassroomBridge,ClassroomSource} from '../../shared/classroom';
@@ -54,6 +56,7 @@ export function ExtensionWorkbench({
   onChange,
   onTerminal,
   request,
+  classroomTasksBridge, discoveryBridge, onDevicesAdded,
   classroomBridge,
   onClassroomWatch,
 }: {
@@ -65,6 +68,9 @@ export function ExtensionWorkbench({
   onChange: () => Promise<void>;
   onTerminal: (parent: string, id: string, name: string, python: string) => void;
   request: PythonFileRequest | null;
+  classroomTasksBridge?:ClassroomTasksBridge;
+  discoveryBridge?:AgentLanBridge;
+  onDevicesAdded?:()=>void;
   classroomBridge?: ClassroomBridge;
   onClassroomWatch?: (source:ClassroomSource)=>void;
 }) {
@@ -189,14 +195,14 @@ export function ExtensionWorkbench({
                       ? 'WSL Linux'
                       : section === 'agent'
                         ? 'CAgent'
-                        : section === 'classroom' ? '机房屏幕共享' : section === 'tavily' ? 'Tavily 搜索' : section === 'opencode' ? 'OpenCode' : section === 'wechat' ? '微信' : 'Python'}
+                        : section === 'classroom' ? '机房' : section === 'tavily' ? 'Tavily 搜索' : section === 'opencode' ? 'OpenCode' : section === 'wechat' ? '微信' : 'Python'}
             </h1>
             <p>
               {section === 'plugins'
                 ? zh
                   ? '按需添加，随时停用。'
                   : 'Add the tools you need.'
-                : section === 'classroom' ? '局域网共享 · 仅观看画面' : section === 'tavily' ? '网络搜索扩展' : section === 'opencode' ? '模型接入扩展' : section === 'wechat' ? '本机微信 · 独立授权' : section === 'agent'
+                : section === 'classroom' ? '屏幕共享与机房管理' : section === 'tavily' ? '网络搜索扩展' : section === 'opencode' ? '模型接入扩展' : section === 'wechat' ? '本机微信 · 独立授权' : section === 'agent'
                   ? zh
                     ? '配置所选 Agent 的连接、权限与服务。'
                     : 'Manage connections, permissions and services on the selected Agent.'
@@ -418,7 +424,7 @@ export function ExtensionWorkbench({
         {section === 'wechat' && currentView && <WechatPlugin />}
         {section === 'opencode' && currentView && <OpenCodeView />}
         {section === 'tavily' && currentView && <TavilyView />}
-        {section === 'classroom' && currentView && (classroomBridge && onClassroomWatch ? <ClassroomView bridge={classroomBridge} onWatch={onClassroomWatch}/> : <p role="status">屏幕共享服务尚未就绪。</p>)}
+        {section === 'classroom' && currentView && (classroomBridge && onClassroomWatch ? <ClassroomView tasksBridge={classroomTasksBridge} discoveryBridge={discoveryBridge} onDevicesAdded={onDevicesAdded} bridge={classroomBridge} onWatch={onClassroomWatch}/> : <p role="status">屏幕共享服务尚未就绪。</p>)}
         {section === 'wsl' && currentView && <WslPlugin onOpen={onLocal} />}
         {section !== 'plugins' && section !== 'wsl' && section !== 'agent' && section !== 'wechat' && section !== 'opencode' && section !== 'tavily' && section !== 'classroom' && !target && (
           <div className="extension-empty">

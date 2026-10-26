@@ -44,6 +44,7 @@ export class CagentAssistant {
   private jobs=new AgentJobs();
   private settings=settingsSchema.parse({});
   private tasks:Task[]=[];
+  private configuring=false;
   private active?:{task:Task;abort:AbortController;done:Promise<void>;approval?:{resolve:(v:boolean)=>void}};
   get activity(){return this.active?1:0;}
   constructor(private vault:ClientVault,private host:Host,private request=requestAiReply){}
@@ -56,6 +57,9 @@ export class CagentAssistant {
   private persist(){return this.vault.write('assistant-tasks',this.tasks);}
   snapshot(){const {key,...settings}=this.settings;return {...settings,keyConfigured:!!key};}
   async configure(input:unknown){
+    if(this.configuring)throw Error('基座配置正在更新，请稍后重试');
+    this.configuring=true;
+    try {
     const raw=z.object({runMinutes:z.number().optional(),contextBytes:z.number().optional(),noProgress:z.number().optional(),endpoint:z.string(),model:z.string(),key:z.string().optional(),commands:z.boolean(),review:z.boolean(),delegates:z.array(z.string())}).strict().parse(input);
     const next=settingsSchema.parse({...this.settings,...raw,key:raw.key??this.settings.key});
     await this.vault.write('assistant-settings',next);
@@ -63,12 +67,23 @@ export class CagentAssistant {
     // A provider/grant change cancels the whole task, including pending approval.
     this.active?.abort.abort(new Error('配置或授权已改变，任务已停止'));
     return this.snapshot();
+    } finally { this.configuring=false; }
+  }
+  async configureModel(input:unknown){
+    if(this.configuring)throw Error('基座配置正在更新，请稍后重试');
+    if(this.active)throw Error('智能体正在执行任务；完成后再更新基座');
+    this.configuring=true;
+    try {
+    const patch=z.object({endpoint:z.string(),model:z.string(),key:z.string().min(1).max(16000)}).strict().parse(input);
+    const next=settingsSchema.parse({...this.settings,...patch});await this.vault.write('assistant-settings',next);this.settings=next;return this.snapshot();
+    } finally { this.configuring=false; }
   }
   private authorize(owner:string){if(owner!=='local'&&(!this.host.allowed(owner)||!(this.settings.delegates.includes('*')||this.settings.delegates.includes(owner))))throw new Error('未授权此控制端委派任务');}
   list(owner:string){this.authorize(owner);return structuredClone(this.tasks.filter(t=>owner==='local'||t.owner===owner));}
   get(input:unknown,owner:string){this.authorize(owner);const {id}=z.object({id:z.string().uuid()}).strict().parse(input);const task=this.tasks.find(t=>t.id===id&&(owner==='local'||t.owner===owner));if(!task)throw new Error('任务不存在');return task;}
   async start(input:unknown,owner:string){
     this.authorize(owner);
+    if(this.configuring)throw Error('基座配置正在更新，请稍后启动任务');
     const {prompt,requestId,resumeId}=z.object({resumeId:z.string().uuid().nullish(),prompt:z.string().trim().min(1).max(16000),requestId:z.string().uuid()}).strict().parse(input);
     const previous=this.tasks.find(t=>t.owner===owner&&t.requestId===requestId);
     if(previous){if(previous.prompt!==prompt)throw new Error('同一请求 ID 不能用于不同任务');return {id:previous.id};}
