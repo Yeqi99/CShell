@@ -10,7 +10,7 @@ const source=`Unicode true
 !include "MUI2.nsh"
 Name "CShell 机房教师端"
 OutFile "${quote(output)}"
-Icon "${quote(resolve('assets/cagent-icon.ico'))}"
+Icon "${quote(resolve('assets/icon.ico'))}"
 RequestExecutionLevel user
 InstallDir "$LOCALAPPDATA\\Programs\\CShell"
 SetCompress off
