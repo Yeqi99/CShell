@@ -1,3 +1,4 @@
+import {classroomDiscoveryLifecycle} from '../core/classroom-discovery-lifecycle';
 import {AgentLanService} from '../core/agent-lan';
 import {AgentLanEnrollment} from './agent-lan-enrollment';
 import {registerClassroomTasks} from './classroom-tasks';
@@ -496,8 +497,10 @@ else
       handle('classroom:discover',(enabled)=>{requireClassroom();return classroom.setDiscovery(z.boolean().parse(enabled));});
       handle('classroom:stop',()=>classroom.stop());
       handle('classroom:start',async input=>{requireClassroom();const result=await classroom.start(z.object({screenId:z.string().min(1).max(120),label:z.string().trim().min(1).max(60)}).strict().parse(input));if(!classroomEnabled()){await classroom.dispose();throw Error('扩展已关闭');}return result;});
-      let classroomWasEnabled=false, classroomChecking=false;
-      const updateClassroom=async()=>{if(classroomChecking)return;const enabled=classroomEnabled();if(enabled===classroomWasEnabled)return;classroomWasEnabled=enabled;classroomChecking=true;try{if(enabled){await agentLan.setDiscovery(true);if(process.platform==='win32')await classroom.setDiscovery(true);}else{enrollment?.clear();classroomTasks?.dispose();await agentLan.dispose();await classroom.dispose();}}catch{}finally{classroomChecking=false;}};
+      const updateClassroom=classroomDiscoveryLifecycle({enabled:classroomEnabled,
+        healthy:()=>agentLan.status().enabled&&!agentLan.status().error,
+        enable:async transition=>{await agentLan.setDiscovery(true);if(transition&&process.platform==='win32')await classroom.setDiscovery(true);},
+        disable:async()=>{enrollment?.clear();classroomTasks?.dispose();await agentLan.dispose();await classroom.dispose();}});
       void updateClassroom();const classroomTimer=setInterval(()=>void updateClassroom(),1000);classroomTimer.unref();
       window.once('closed',()=>{clearInterval(classroomTimer);enrollment?.clear();classroomTasks?.dispose();void agentLan.dispose();void classroom.dispose();});
       window.webContents.on('render-process-gone',()=>{void classroom.stop();});

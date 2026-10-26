@@ -63,12 +63,13 @@ export class AgentLanService {
   }
   private async reconcile() {
     if (!this.enabled && !this.advertisement) { this.closeSocket();return; }
-    if (this.socket) return;
+    if (this.socket && !this.error) return;
+    if (this.socket) this.closeSocket();
     const socket = createSocket({ type: 'udp4', reuseAddr: true });this.socket = socket;
     socket.on('message', (bytes, remote) => { if (this.enabled) this.directory.accept(bytes, remote.address); });
     try {
       await new Promise<void>((resolve, reject) => { socket.once('error', reject);socket.bind(AGENT_LAN_PORT, '0.0.0.0', () => { socket.removeListener('error', reject);resolve(); }); });
-      socket.on('error', () => { this.error = '机房发现网络不可用，请检查局域网和防火墙'; });
+      socket.on('error', () => { this.error = '机房发现网络不可用，请检查局域网和防火墙';this.closeSocket();this.enabled = false; });
       socket.setMulticastTTL(1);socket.setMulticastLoopback(true);
       let joined = 0;
       for (const i of Object.values(this.interfaces()).flat()) if (i && i.family === 'IPv4' && !i.internal) {
@@ -82,7 +83,7 @@ export class AgentLanService {
     if (!this.advertisement || !this.socket) return;
     const bytes = Buffer.from(JSON.stringify(this.advertisement));
     for (const i of Object.values(this.interfaces()).flat()) if (i && i.family === 'IPv4' && !i.internal && (!this.bind || ['0.0.0.0', '::'].includes(this.bind) || i.address === this.bind)) {
-      try { this.socket.setMulticastInterface(i.address);this.socket.send(bytes, AGENT_LAN_PORT, AGENT_LAN_GROUP, () => {}); } catch { this.error = '机房公告发送失败'; }
+      try { this.socket.setMulticastInterface(i.address);this.socket.send(bytes, AGENT_LAN_PORT, AGENT_LAN_GROUP, error => { if (error) this.error = '机房公告发送失败'; }); } catch { this.error = '机房公告发送失败'; }
     }
   }
   private closeSocket() { if (this.timer) clearInterval(this.timer);this.timer = null;try { this.socket?.close(); } catch {}this.socket = null; }
