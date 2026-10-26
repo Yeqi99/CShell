@@ -507,7 +507,7 @@ else
       handle('classroom:frame',(id)=>{requireClassroom();return classroom.frame(z.string().regex(/^[a-f0-9]{32}$/).parse(id));});
       handle('classroom:discover',(enabled)=>{requireClassroom();return classroom.setDiscovery(z.boolean().parse(enabled));});
       handle('classroom:stop',()=>classroom.stop());
-      handle('classroom:start',async input=>{requireClassroom();const result=await classroom.start(z.object({screenId:z.string().min(1).max(120),label:z.string().trim().min(1).max(60)}).strict().parse(input));if(!classroomEnabled()){await classroom.dispose();throw Error('扩展已关闭');}return result;});
+      handle('classroom:start',async input=>{requireClassroom();const result=await classroom.start(z.object({screenId:z.string().min(1).max(120),label:z.string().trim().max(60)}).strict().parse(input));if(!classroomEnabled()){await classroom.dispose();throw Error('扩展已关闭');}return result;});
       const updateClassroom=classroomDiscoveryLifecycle({enabled:classroomEnabled,
         healthy:()=>agentLan.status().enabled&&!agentLan.status().error,
         enable:async transition=>{await agentLan.setDiscovery(true);if(transition&&process.platform==='win32')await classroom.setDiscovery(true);},

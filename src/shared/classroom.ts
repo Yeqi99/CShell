@@ -2,6 +2,7 @@ export interface ClassroomScreen { id: string; name: string }
 export interface ClassroomSource { id: string; label: string; address: string; lastSeen: number }
 export interface ClassroomFrame { dataUrl: string; capturedAt: number }
 export interface ClassroomStatus {
+  defaultShareLabel?: string;
   supported: boolean;
   discovering: boolean;
   sharing: null | { id: string; label: string; screenId: string; port: number };
