@@ -40,6 +40,8 @@ test('AI lab task fits batch limit and pins distributions before execution', asy
 test('preview emits CPU plan without creating its directory; explicit CUDA and proxy remain preview', { skip: !windows }, async () => {
   const temp = await mkdtemp(join(await realpath(tmpdir()), 'cshell-lab-preview-'));
   try {
+  // Hidden ancestors (including AppData on Windows runners) are valid paths.
+  assert.equal(spawnSync('attrib.exe',['+h',temp],{encoding:'utf8'}).status,0);
     const root = join(temp, 'new lab');
     const result = run(['-Root', root]);
     checkPreview(result, 20);
