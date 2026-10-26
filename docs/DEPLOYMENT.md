@@ -8,6 +8,8 @@
 
 ### 一键课堂方案
 
+教师与学生使用不同的一键包。教师包双击 `Install Classroom Teacher.cmd`，仅安装 CShell 并在新数据目录预选 `cshell.classroom`、`cshell.agent`；不会安装 CAgent 被控程序、创建密码或开启监听。`Install-ClassroomTeacher.ps1` 默认预检，`-Apply` 执行。旧配置保持，需自行检查扩展是否已启用。
+
 完整的课堂部署 ZIP 里双击 `Install Classroom Student.cmd` 即应用显式课堂预设。先核对整个 ZIP 的发布摘要；需要先查看计划时运行 `Install-ClassroomStudent.ps1`（不加 `-Apply`）。脚本再核对包内 CShell 安装器、CAgent 安装脚本和学生机部署脚本的摘要。
 
 新安装会预装并启用 CShell 的机房共享和 CAgent 扩展；初始化 CAgent 密码为用户指定的 `123456`，监听本机所有接口的 `24443` 端口、启动应用，并设置用户登录后自动启动。可用 `-Port`、`-Room`、两个 Destination 参数调整端口、机房名和专用程序目录。密码经当前用户私有临时文件传入，清理后不保留在命令参数或运行日志中。这个固定密码只用于显式课堂预设，通用安装默认不变。
