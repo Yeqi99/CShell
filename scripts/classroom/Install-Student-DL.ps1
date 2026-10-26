@@ -20,6 +20,12 @@ $work=Join-Path $env:LOCALAPPDATA ('CShell-ClassroomSetup\'+[guid]::NewGuid().To
 $log=Join-Path $work 'setup.log'
 Start-Transcript -Path $log | Out-Null
 function GetVerified([string]$Url,[string]$File,[string]$Hash){
+ $local=Join-Path $PSScriptRoot ([IO.Path]::GetFileName($File))
+ if(Test-Path -LiteralPath $local){
+  if((Get-FileHash -LiteralPath $local -Algorithm SHA256).Hash -ine $Hash){throw 'Bundled file checksum failed'}
+  Copy-Item -LiteralPath $local -Destination $File
+  return
+ }
  $options=@{Uri=$Url;OutFile=$File;UseBasicParsing=$true;TimeoutSec=1800}
  $proxy=$env:HTTPS_PROXY;if(-not $proxy){$proxy=$env:HTTP_PROXY}
  if($proxy){$u=[uri]$proxy;if($u.Scheme -notin @('http','https') -or $u.UserInfo){throw 'Proxy must be HTTP(S) without credentials'};$options.Proxy=$proxy}
