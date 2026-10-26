@@ -137,17 +137,22 @@ try {
   await page.locator('.compact-monitor > header').getByRole('button', { name: '重试' }).click();
   const after = await page.locator('.compact-monitor').boundingBox();
   assert.equal(after!.height, before!.height);
-  await page.getByRole('button', { name: '进程', exact: true }).click();
-  await page.locator('.process-table-scroll').getByText('python3', { exact: true }).waitFor();
+  const categories = page.getByRole('group', { name: '机器信息分类', exact: true });
   assert.equal(
     await page.locator('.metric-cpu .resource-detail').getAttribute('title'),
     'Test CPU Model',
   );
+  await categories.getByRole('button', { name: 'GPU', exact: true }).click();
   await page.locator('.gpu-device').getByText('NVIDIA Test GPU', { exact: true }).waitFor();
+  assert.equal(await page.locator('.metric-cpu').isVisible(), false);
+  await categories.getByRole('button', { name: '进程', exact: true }).click();
+  await page.locator('.process-table-scroll').getByText('python3', { exact: true }).waitFor();
+  assert.equal(await page.locator('.gpu-inventory').isVisible(), false);
   assert.equal(await page.getByLabel('进程刷新间隔').inputValue(), '0');
   await page.getByLabel('进程刷新间隔').selectOption('15');
-  await page.getByRole('button', { name: '进程', exact: true }).click();
-  await page.getByRole('button', { name: '进程', exact: true }).click();
+  await categories.getByRole('button', { name: 'CPU', exact: true }).click();
+  assert.equal(await page.getByLabel('进程刷新间隔').isVisible(), false);
+  await categories.getByRole('button', { name: '进程', exact: true }).click();
   assert.equal(await page.getByLabel('进程刷新间隔').inputValue(), '15');
   await page.screenshot({ path: 'test-results/resources-refined.png' });
   // Test global layout on the workbench, outside the machine's app window layer.
