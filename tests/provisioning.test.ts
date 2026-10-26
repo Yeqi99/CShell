@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, writeFile, readFile, rm, lstat } from 'node:fs/promises';
+import { realpath, mkdtemp, writeFile, readFile, rm, lstat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { z } from 'zod';
@@ -21,7 +21,7 @@ test('desktop deployment accepts only known builtins, does not invent grants', (
 });
 
 test('Agent preview is side-effect free; apply encrypts and upgrades preserve every existing byte', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'cshell-provision-'));
+  const root = await mkdtemp(join(await realpath(tmpdir()), 'cshell-provision-'));
   try {
     const destination = join(root, 'data'), file = join(root, 'deploy.json');
     const secret = 'a-private-password-123';
@@ -54,7 +54,7 @@ test('Agent preview is side-effect free; apply encrypts and upgrades preserve ev
 });
 
 test('invalid secrets and package digests fail before creating data', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'cshell-provision-invalid-'));
+  const root = await mkdtemp(join(await realpath(tmpdir()), 'cshell-provision-invalid-'));
   try {
     const path = join(root, 'config.json');
     await writeFile(path, JSON.stringify({ format: 'cshell-deployment-1', target: 'cshell', extensions: [], password: 'do-not-print-secret' }));
