@@ -13,7 +13,7 @@ function SafePath([string]$path){
  if(-not [IO.Path]::IsPathRooted($path)){throw 'Absolute directory required'}
  $full=[IO.Path]::GetFullPath($path).TrimEnd('\','/')
  if($full -match '[%"!^&|<>\r\n]' -or $full -eq [IO.Path]::GetPathRoot($full).TrimEnd('\','/')){throw 'Unsafe deployment directory'}
- for($p=$full;$p;$p=[IO.Path]::GetDirectoryName($p)){if((Test-Path -LiteralPath $p) -and ((Get-Item -LiteralPath $p).Attributes -band [IO.FileAttributes]::ReparsePoint)){throw 'Reparse-point directory refused'}}
+ for($p=$full;$p;$p=[IO.Path]::GetDirectoryName($p)){if((Test-Path -LiteralPath $p) -and ((Get-Item -Force -LiteralPath $p).Attributes -band [IO.FileAttributes]::ReparsePoint)){throw 'Reparse-point directory refused'}}
  return $full
 }
 $rootPath=SafePath $Root;$labPath=SafePath $LabRoot

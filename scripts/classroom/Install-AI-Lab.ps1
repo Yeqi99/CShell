@@ -12,7 +12,7 @@ if(-not [IO.Path]::IsPathRooted($Root)){throw 'Lab directory must be an absolute
 $rootPath=[IO.Path]::GetFullPath($Root).TrimEnd('\','/')
 if($rootPath -match '["\r\n]' -or $rootPath -eq [IO.Path]::GetPathRoot($rootPath).TrimEnd('\','/')){throw 'Choose a dedicated lab directory'}
 for($p=$rootPath;$p;$p=[IO.Path]::GetDirectoryName($p)){
-  if((Test-Path -LiteralPath $p) -and ((Get-Item -LiteralPath $p).Attributes -band [IO.FileAttributes]::ReparsePoint)){throw 'Lab path cannot traverse reparse points'}
+  if((Test-Path -LiteralPath $p) -and ((Get-Item -Force -LiteralPath $p).Attributes -band [IO.FileAttributes]::ReparsePoint)){throw 'Lab path cannot traverse reparse points'}
 }
 $effectiveProxy=$Proxy
 if(-not $effectiveProxy){$effectiveProxy=$env:HTTPS_PROXY}

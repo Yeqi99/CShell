@@ -20,6 +20,8 @@ test('DL independent task is bounded, pinned CPU and only bootstraps a private c
 test('PowerShell parses and preview or insufficient space never creates target; existing dl refused', {skip:!win}, async()=>{
  const dir=await mkdtemp(join(await realpath(tmpdir()),'dl-preview-'));
  try {
+  // Hidden ancestors (including AppData on Windows runners) are valid paths.
+  assert.equal(spawnSync('attrib.exe',['+h',dir],{encoding:'utf8'}).status,0);
   const target=join(dir,'new dl'), old=join(dir,'missing base');
   const result=ps(`$e=$null;$t=$null;[void][Management.Automation.Language.Parser]::ParseFile(${quote(file)},[ref]$t,[ref]$e);if($e){throw ($e|Out-String)};& ${quote(file)} -Root ${quote(target)} -LabRoot ${quote(old)}`);
   assert.match(result.stdout,/"bootstrap":\s*true/,`Preview plan missing: status=${result.status}; error=${result.error}; stderr=${result.stderr}`);
