@@ -7,6 +7,12 @@ import type { AgentCall } from '../../shared/agent';
  * the catalog coverage test rejects newly added, unclassified RPC methods.
  */
 export const agentApiExcludedMethods = {
+  'assistant.model.configure': 'Classroom model deployment requires the prepared target identity, selected model snapshot and explicit batch confirmation; generic management cannot bypass that boundary.',
+  'environment.read': 'Managed environment may contain private values and is restricted to authenticated target administration, not generic MCP management.',
+  'environment.save': 'Classroom environment deployment requires an authorized paired target and confirmed batch plan; generic management cannot bypass target scope or confirmation.',
+  'management.script.start': 'Classroom script execution requires a prepared paired-target plan and explicit batch confirmation, not a generic management grant.',
+  'management.script.status': 'Managed script output belongs to its authenticated controller and job; it is accessed through the dedicated classroom task lifecycle.',
+  'management.script.cancel': 'Managed script cancellation is bound to the authenticated controller and active classroom job, not generic management.',
   'network.probe': 'Network diagnostics are exposed through the dedicated authenticated connection diagnostics UI, not generic management.',
   'network.status':'Account network configuration is available through authenticated machine settings only.',
   'network.configure':'Changing a machine network exit requires explicit user action in machine settings.',

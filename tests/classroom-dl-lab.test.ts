@@ -1,13 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, writeFile, rm, access, mkdir } from 'node:fs/promises';
+import { realpath, mkdtemp, readFile, writeFile, rm, access, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 const file = resolve('scripts/classroom/Install-DL-Lab.ps1');
 const win = process.platform === 'win32';
 const quote = (s: string) => `'${s.replaceAll("'", "''")}'`;
-function ps(code: string) { return spawnSync('powershell.exe', ['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-EncodedCommand',Buffer.from(code,'utf16le').toString('base64')], {encoding:'utf8',timeout:20000}); }
+function ps(code: string) { const env={...process.env};delete env.PSModulePath;code="[Console]::OutputEncoding=New-Object Text.UTF8Encoding($false);$OutputEncoding=[Console]::OutputEncoding;"+code;return spawnSync('powershell.exe', ['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-EncodedCommand',Buffer.from(code,'utf16le').toString('base64')], {encoding:'utf8',timeout:20000,env}); }
 test('DL independent task is bounded, pinned CPU and only bootstraps a private conda', async () => {
  const s=await readFile(file,'utf8');assert.ok(Buffer.byteLength(s)<16384);
  for(const pin of ['tensorflow==2.15.1','numpy==1.26.4','pandas==2.2.3','matplotlib==3.9.4','jupyter==1.1.1','python=3.10'])assert.ok(s.includes(pin));
@@ -18,11 +18,11 @@ test('DL independent task is bounded, pinned CPU and only bootstraps a private c
  assert.match(s,/Run \$python '-I -m pip check'/);
 });
 test('PowerShell parses and preview or insufficient space never creates target; existing dl refused', {skip:!win}, async()=>{
- const dir=await mkdtemp(join(tmpdir(),'dl-preview-'));
+ const dir=await mkdtemp(join(await realpath(tmpdir()),'dl-preview-'));
  try {
   const target=join(dir,'new dl'), old=join(dir,'missing base');
   const result=ps(`$e=$null;$t=$null;[void][Management.Automation.Language.Parser]::ParseFile(${quote(file)},[ref]$t,[ref]$e);if($e){throw ($e|Out-String)};& ${quote(file)} -Root ${quote(target)} -LabRoot ${quote(old)}`);
-  assert.match(result.stdout,/"bootstrap":\s*true/);
+  assert.match(result.stdout,/"bootstrap":\s*true/,`Preview plan missing: status=${result.status}; error=${result.error}; stderr=${result.stderr}`);
   if(result.status!==0)assert.match(result.stderr,/Insufficient space/);
   await assert.rejects(access(target));
   await mkdir(target);await writeFile(join(target,'keep.txt'),'keep');
@@ -32,7 +32,7 @@ test('PowerShell parses and preview or insufficient space never creates target; 
  }finally{await rm(dir,{recursive:true,force:true});}
 });
 test('real shortcut generation preserves spaces and Chinese paths without opening programs', {skip:!win}, async()=>{
- const dir=await mkdtemp(join(tmpdir(),'dl-links-'));
+ const dir=await mkdtemp(join(await realpath(tmpdir()),'dl-links-'));
  try{
   const root=join(dir,'中文 teaching lab'), desktop=join(dir,'fixture desktop');await mkdir(root);await mkdir(desktop);
   const source=await readFile(file,'utf8');
@@ -49,7 +49,7 @@ test('real shortcut generation preserves spaces and Chinese paths without openin
   const launcher=await readFile(launch,'utf8');
   await writeFile(mock,"function Capture { $args | ConvertTo-Json; if($env:JUPYTER_TOKEN.Length -ne 64){throw 'Missing auth token'} };$global:LASTEXITCODE=0;\n"+launcher.replace("& (Join-Path $PSScriptRoot 'envs\\dl\\python.exe')",'Capture'));
   const argv=ps(`& ${quote(mock)}`);assert.equal(argv.status,0,argv.stderr);
-  assert.ok(JSON.parse(argv.stdout).includes('--ServerApp.root_dir='+join(root,'notebooks')));
+  assert.ok(JSON.parse(argv.stdout).includes('--ServerApp.root_dir='+join(root,'notebooks')),argv.stdout);
   await mkdir(join(root,'Anaconda3','condabin'),{recursive:true});
   await writeFile(join(root,'Anaconda3','condabin','conda.bat'),'@set "DL_TEST_ACTIVE=1"\r\n@exit /b 0\r\n');
   const activation=spawnSync('cmd.exe',['/d','/v:on','/c',`call "${join(root,'Start-dl.cmd')}" && echo DL_ACTIVE=!DL_TEST_ACTIVE!`],{encoding:'utf8',timeout:15000,windowsVerbatimArguments:true});

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, writeFile, rm, access } from 'node:fs/promises';
+import { realpath, mkdtemp, readFile, writeFile, rm, access } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -8,10 +8,12 @@ import { spawnSync } from 'node:child_process';
 const script = resolve('scripts/classroom/Install-AI-Lab.ps1');
 const windows = process.platform === 'win32';
 function run(args: string[]) {
-  return spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script, ...args], { encoding: 'utf8', timeout: 20000 });
+  const env={...process.env};delete env.PSModulePath;
+  return spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script, ...args], { encoding: 'utf8', timeout: 20000, env });
 }
 function checkPreview(result: ReturnType<typeof run>, requiredGiB: number) {
   const json = result.stdout.slice(result.stdout.indexOf('{'), result.stdout.lastIndexOf('}') + 1);
+  assert.ok(json, `Preview plan missing: status=${result.status}; error=${result.error}; stderr=${result.stderr}`);
   const plan = JSON.parse(json);
   assert.equal(plan.requiredGiB, requiredGiB);
   assert.equal(typeof plan.availableGiB, 'number');
@@ -36,7 +38,7 @@ test('AI lab task fits batch limit and pins distributions before execution', asy
   assert.match(source, /no CPU fallback/);
 });
 test('preview emits CPU plan without creating its directory; explicit CUDA and proxy remain preview', { skip: !windows }, async () => {
-  const temp = await mkdtemp(join(tmpdir(), 'cshell-lab-preview-'));
+  const temp = await mkdtemp(join(await realpath(tmpdir()), 'cshell-lab-preview-'));
   try {
     const root = join(temp, 'new lab');
     const result = run(['-Root', root]);
@@ -50,7 +52,7 @@ test('preview emits CPU plan without creating its directory; explicit CUDA and p
   } finally { await rm(temp, { recursive: true, force: true }); }
 });
 test('existing unowned or incomplete conda is not overwritten, credentials in proxy rejected', { skip: !windows }, async () => {
-  const temp = await mkdtemp(join(tmpdir(), 'cshell-lab-existing-'));
+  const temp = await mkdtemp(join(await realpath(tmpdir()), 'cshell-lab-existing-'));
   try {
     const sentinel = join(temp, 'python.exe'); await writeFile(sentinel, 'existing-python');
     assert.notEqual(run(['-Root', temp, '-Apply']).status, 0);

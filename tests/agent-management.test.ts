@@ -79,6 +79,7 @@ async function fixture() {
     configuration: z.unknown(),
     get activity(){return sessions.size;},
     setUpdateGuard(guard:()=>boolean){updateGuard=guard;},
+    setManagedEnvironment(_values: Record<string,string>) {},
     shells: async () => [
       { id: shell, label: shell, executable: 'fixture', args: [], environment: 'host' },
     ],
