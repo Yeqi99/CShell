@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ClassroomShareService, parseClassroomAnnouncement, sameClassroomLan } from '../src/desktop/classroom-share';
-import type { NetworkInterfaceInfo } from 'node:os';
+import { ClassroomShareService, classroomScreenKey, classroomDefaultLabel, parseClassroomAnnouncement, sameClassroomLan } from '../src/desktop/classroom-share';
+import { hostname, type NetworkInterfaceInfo } from 'node:os';
 import { createServer, request } from 'node:http';
 const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xd9]);
 const announcement = { protocol: 'cshell-classroom-v1', kind: 'share', id: 'a'.repeat(32), token: 'b'.repeat(64), label: '机房教师', port: 47884 };
@@ -30,7 +30,7 @@ type Internals = {
 test('disabled initial state never captures; unsupported platform never claims support', async () => {
   let count = 0;
   const service = new ClassroomShareService({ platform: 'linux', capture: { screens: async () => [], capture: async () => { count++;return jpeg; } } });
-  assert.deepEqual(await service.status(), { supported: false, sharing: null, discovering: false, sources: [], error: null });
+  assert.deepEqual(await service.status(), { supported: false, sharing: null, discovering: false, sources: [], error: null, defaultShareLabel: classroomDefaultLabel(hostname()) });
   await assert.rejects(service.setDiscovery(true), /Windows/);await assert.rejects(service.screens(), /Windows/);assert.equal(count, 0);
   await service.dispose();
 });
@@ -86,4 +86,43 @@ test('student frames use only discovered endpoint, no redirect following, no arb
     await assert.rejects(service.frame('http://example.invalid/'), /离线/);
     await service.setDiscovery(false);await assert.rejects(service.frame(announcement.id), /离线/);
   } finally { await service.dispose();server.closeAllConnections();await new Promise<void>(resolve => server.close(() => resolve())); }
+});
+
+
+test('screen display identity survives source renumbering without selecting another monitor', () => {
+  const before = [{id:'screen:0:0',display_id:'100'}, {id:'screen:1:0',display_id:'200'}];
+  const selected = classroomScreenKey(before[1], before);
+  const after = [{id:'screen:0:0',display_id:'200'}, {id:'screen:1:0',display_id:'100'}];
+  assert.equal(selected, 'display:200');
+  assert.equal(after.find(s => classroomScreenKey(s, after) === selected)?.display_id, '200');
+  const unplugged = [{id:'screen:0:0',display_id:'100'}];
+  assert.equal(unplugged.find(s => classroomScreenKey(s, unplugged) === selected), undefined);
+  const ambiguous = [{id:'screen:0:0',display_id:'200'}, {id:'screen:1:0',display_id:'200'}];
+  assert.equal(ambiguous.find(s => classroomScreenKey(s, ambiguous) === selected), undefined);
+  assert.deepEqual(ambiguous.map(s=>classroomScreenKey(s,ambiguous)), ['screen:0:0','screen:1:0']);
+  for (const display_id of ['', '-1', undefined]) {
+    const source = {id:'screen:7:0',display_id};
+    assert.equal(classroomScreenKey(source,[source]),source.id);
+  }
+});
+
+test('default share label is recognizable, bounded and contains no control characters', () => {
+  assert.equal(classroomDefaultLabel(' teacher-01 ', ' Screen 2 '), 'teacher-01 · Screen 2');
+  assert.equal(classroomDefaultLabel(''), '共享设备 · 屏幕');
+  const label = classroomDefaultLabel('PC\n\0\x7f'+'x'.repeat(90),'Screen\t\r'+'y'.repeat(90));
+  assert(!/[\u0000-\u001f\u007f]/.test(label));assert(label.length<=60);assert(label.startsWith('PC'));
+});
+
+test('blank teacher name uses machine and selected screen while removed screen never captures', async () => {
+  let captures=0;
+  const service=new ClassroomShareService({platform:'win32',capture:{screens:async()=>[{id:'display:200',name:'Screen 2'}],capture:async()=>{captures++;return jpeg;}}});
+  const state=service as unknown as Internals;
+  state.bindDiscoverySocket=async()=>{};
+  try {
+    await assert.rejects(service.start({screenId:'display:100',label:''}),/屏幕列表已变化/);
+    assert.equal(captures,0);assert.equal((await service.status()).sharing,null);
+    const started=await service.start({screenId:'display:200',label:'   '});
+    assert.equal(started.sharing?.label,classroomDefaultLabel(hostname(),'Screen 2'));
+    assert.equal(started.sharing?.screenId,'display:200');assert.equal(captures,1);
+  } finally {await service.dispose();}
 });

@@ -13,14 +13,23 @@ export function ClassroomView({bridge,onWatch,tasksBridge,discoveryBridge,onDevi
   const [devicesRevision,setDevicesRevision]=useState(0);
   const [status,setStatus]=useState<ClassroomStatus|null>(null),[screens,setScreens]=useState<ClassroomScreen[]>([]);
   const [screenId,setScreenId]=useState(''),[label,setLabel]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false);
+  const [screensLoading,setScreensLoading]=useState(false),[screenError,setScreenError]=useState('');
+  const screenRequest=useRef(0);
   const alive=useRef(false),running=useRef(false);
   useEffect(()=>{
     alive.current=true;let cancelled=false,timer:ReturnType<typeof setTimeout>;
     const poll=async()=>{try{const next=await bridge.status();if(!cancelled&&!running.current)setStatus(next);}catch(e){if(!cancelled)setError(String(e));}finally{if(!cancelled)timer=setTimeout(poll,2000);}};
     void poll();
-    void bridge.screens().then(items=>{if(!cancelled){setScreens(items);setScreenId(current=>items.some(s=>s.id===current)?current:items[0]?.id||'');}}).catch(e=>{if(!cancelled)setError(String(e));});
-    return()=>{cancelled=true;alive.current=false;clearTimeout(timer);};
+    return()=>{cancelled=true;alive.current=false;screenRequest.current++;clearTimeout(timer);};
   },[bridge]);
+  const refreshScreens=async()=>{
+    const request=++screenRequest.current;setScreensLoading(true);setScreenError('');
+    try{const items=await bridge.screens();if(alive.current&&request===screenRequest.current)setScreens(items);}
+    catch(e){if(alive.current&&request===screenRequest.current)setScreenError(String(e));}
+    finally{if(alive.current&&request===screenRequest.current)setScreensLoading(false);}
+  };
+  useEffect(()=>{if(role==='share')void refreshScreens();},[role,bridge]);
+  const screenValid=!!screenId&&screens.some(screen=>screen.id===screenId);
   const run=async(action:()=>Promise<ClassroomStatus>)=>{
     if(running.current)return;running.current=true;setBusy(true);setError('');
     try{const next=await action();if(alive.current)setStatus(next);}catch(e){if(alive.current)setError(String(e));}
@@ -35,12 +44,15 @@ export function ClassroomView({bridge,onWatch,tasksBridge,discoveryBridge,onDevi
       <div className="classroom-heading"><div><h2>局域网中的屏幕</h2><p>选择一个共享，在独立标签页中只读观看。</p></div><button disabled={busy} onClick={()=>void run(()=>bridge.setDiscovery(!status.discovering))}>{status.discovering?'停止发现':'查找共享'}</button></div>
       <div className="classroom-discovery" role="status"><span className={status.discovering?'active':''}/>{status.discovering?'正在发现 · 列表自动更新':'发现已停止'}</div>
       {status.sources.length===0?<div className="classroom-empty"><Radio size={32}/><h3>{status.discovering?'还没有发现共享':'开始查找老师的屏幕'}</h3><p>{status.discovering?'确认在同一局域网，且对方已点击“开始共享”。':'只查找共享服务，不连接或控制其他机器。'}</p></div>:<div className="classroom-sources">{status.sources.map(source=><button className="classroom-source" key={source.id} onClick={()=>onWatch(source)}><span className="classroom-source-icon"><Monitor size={24}/></span><span><strong>{source.label}</strong><small>{source.address} · 只读观看</small></span><Play size={18}/></button>)}</div>}
-    </>:<form className="classroom-share" onSubmit={event=>{event.preventDefault();void run(()=>bridge.start({screenId,label:label.trim()||'我的屏幕'}));}}>
+    </>:<form className="classroom-share" onSubmit={event=>{event.preventDefault();if(!screenValid||screensLoading||screenError)return;void run(()=>bridge.start({screenId,label:label.trim()}));}}>
       <h2>把当前屏幕分享给同学</h2><p>这是局域网只读广播，不是私密加密会议。开始后，同一局域网中的用户可发现并观看整个所选屏幕；请先关闭不希望展示的窗口。</p>
-      <label>共享名称<input value={label} maxLength={60} placeholder="例如：老师的演示屏幕" onChange={e=>setLabel(e.target.value)} disabled={busy||!!status.sharing}/></label>
-      <label>选择屏幕<select value={screenId} onChange={e=>setScreenId(e.target.value)} disabled={busy||!!status.sharing}><option value="" disabled>选择要共享的屏幕</option>{screens.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
-      {!screens.length&&<p>没有可用屏幕。请检查系统屏幕录制权限后重新进入扩展。</p>}
-      <div className="classroom-share-footer"><p>仅共享画面 · 不传输音频 · 不允许鼠标或键盘控制</p><button className="primary" type="submit" disabled={busy||!screenId||!!status.sharing}><Radio size={17}/>{status.sharing?'正在共享':busy?'正在启动…':'开始共享'}</button></div>
+      <label>共享名称<input value={label} maxLength={60} placeholder={status.defaultShareLabel||'留空使用机器名称与所选屏幕'} onChange={e=>setLabel(e.target.value)} disabled={busy||!!status.sharing}/></label>
+      <label>选择屏幕<select value={screenId} onChange={e=>setScreenId(e.target.value)} disabled={busy||screensLoading||!!status.sharing}><option value="" disabled>选择要共享的屏幕</option>{screenId&&!screenValid&&<option value={screenId} disabled>原屏幕已不可用，请重新选择</option>}{screens.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+      <button type="button" onClick={()=>void refreshScreens()} disabled={busy||screensLoading}><RefreshCw size={16}/>{screensLoading?'正在读取屏幕…':'刷新屏幕列表'}</button>
+      {screenError&&<p role="alert">无法读取屏幕：{screenError}。请刷新后重试。</p>}
+      {!screensLoading&&screenId&&!screenValid&&<p role="alert">原来选择的屏幕已不可用。请明确选择另一块屏幕后再开始共享。</p>}
+      {!screensLoading&&!screenError&&!screens.length&&<p>没有可用屏幕。请检查屏幕连接与系统屏幕录制权限，再刷新列表。</p>}
+      <div className="classroom-share-footer"><p>仅共享画面 · 不传输音频 · 不允许鼠标或键盘控制</p><button className="primary" type="submit" disabled={busy||screensLoading||!!screenError||!screenValid||!!status.sharing}><Radio size={17}/>{status.sharing?'正在共享':busy?'正在启动…':'开始共享'}</button></div>
     </form>}
   </section>;
 }

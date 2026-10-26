@@ -1,6 +1,6 @@
 import { createSocket, type Socket } from 'node:dgram';
 import { createServer, get, type Server } from 'node:http';
-import { networkInterfaces, type NetworkInterfaceInfo } from 'node:os';
+import { hostname, networkInterfaces, type NetworkInterfaceInfo } from 'node:os';
 import { randomBytes } from 'node:crypto';
 import { isIPv4 } from 'node:net';
 import type { ClassroomBridge, ClassroomFrame, ClassroomScreen, ClassroomSource, ClassroomStatus } from '../shared/classroom';
@@ -14,15 +14,25 @@ export interface ClassroomCapture {
   screens(): Promise<ClassroomScreen[]>;
   capture(screenId: string): Promise<Buffer>;
 }
+export function classroomScreenKey(source:{id:string;display_id?:string},sources:{id:string;display_id?:string}[]):string {
+  const display=source.display_id;
+  return display && display!=='-1' && sources.filter(s=>s.display_id===display).length===1 ? `display:${display}` : source.id;
+}
+export function classroomDefaultLabel(machine:string,screenName?:string):string {
+  const clean=(value:string)=>value.replace(/[\u0000-\u001f\u007f]/g,'').trim();
+  const name=clean(machine).slice(0,36)||'共享设备';
+  return `${name} · ${screenName?clean(screenName):'屏幕'}`.slice(0,60);
+}
 export const electronClassroomCapture: ClassroomCapture = {
   async screens() {
     const { desktopCapturer } = await import('electron');
-    return (await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 0, height: 0 } }))
-      .map(s => ({ id: s.id, name: s.name }));
+    const sources=await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 0, height: 0 } });
+    return sources.map(s => ({ id: classroomScreenKey(s,sources), name: s.name }));
   },
   async capture(screenId) {
     const { desktopCapturer } = await import('electron');
-    const source = (await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 1600, height: 900 } })).find(s => s.id === screenId);
+    const sources=await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 1600, height: 900 } });
+    const source=sources.find(s=>classroomScreenKey(s,sources)===screenId);
     if (!source || source.thumbnail.isEmpty()) throw new Error('无法采集所选屏幕，请检查屏幕是否仍连接');
     return source.thumbnail.toJPEG(65);
   },
@@ -78,7 +88,7 @@ export class ClassroomShareService implements ClassroomBridge {
   async status(): Promise<ClassroomStatus> {
     const now = Date.now();
     for (const [id, s] of this.sources) if (now - s.lastSeen > TTL) this.sources.delete(id);
-    return { supported: this.platform === 'win32', discovering: this.discovering, sharing: this.sharing ? { ...this.sharing } : null,
+    return { supported: this.platform === 'win32', defaultShareLabel:classroomDefaultLabel(hostname()), discovering: this.discovering, sharing: this.sharing ? { ...this.sharing } : null,
       sources: [...this.sources.values()].map(({ id, label, address, lastSeen }) => ({ id, label, address, lastSeen })), error: this.error };
   }
   private allowed(address: string) { return sameClassroomLan(address, this.interfaces()); }
@@ -158,10 +168,12 @@ export class ClassroomShareService implements ClassroomBridge {
   async start(options: { screenId: string; label: string }) {
     this.supported();if (this.starting || this.sharing) throw new Error('请先停止当前共享');
     if (!options || typeof options.screenId !== 'string' || typeof options.label !== 'string') throw new Error('无效共享设置');
-    const label = options.label.trim();if (!label || label.length > 60 || /[\u0000-\u001f\u007f]/.test(label)) throw new Error('共享名称需为 1–60 个可见字符');
+    let label = options.label.trim();if (label.length > 60 || /[\u0000-\u001f\u007f]/.test(label)) throw new Error('共享名称最多 60 个可见字符');
     this.starting = true;const generation = ++this.generation;
     try {
-      if (!(await this.screens()).some(s => s.id === options.screenId)) throw new Error('所选屏幕不存在');
+      const selected=(await this.screens()).find(s => s.id === options.screenId);
+      if (!selected) throw new Error('屏幕列表已变化，请刷新并重新选择要共享的屏幕');
+      if(!label)label=classroomDefaultLabel(hostname(),selected.name);
       const jpeg = await bounded(this.capture.capture(options.screenId));this.validateJpeg(jpeg);
       if (generation !== this.generation) throw new Error('共享启动已取消');
       await this.openDiscoverySocket();
