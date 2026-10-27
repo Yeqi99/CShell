@@ -34,6 +34,8 @@ jobs:
       - run: pnpm exec tsx --test tests/cloud-merge.test.ts tests/cloud-sync.test.ts tests/agent-relay.test.ts tests/updates.test.ts tests/portable-update.test.ts tests/posix-agent-update.test.ts
       - name: Verify preference persistence, classroom merges and extension cleanup
         run: pnpm exec tsx --test --test-concurrency=1 tests/cagent-update-settings.test.ts tests/managed-environment-save.test.ts tests/classroom-proxy.test.ts tests/process-extension-close.test.ts tests/process-extensions.test.ts
+      - name: Verify hosting startup deadline and real worker cleanup
+        run: pnpm exec tsx --test --test-concurrency=1 tests/hosting-startup-deadline.test.ts tests/agent-hosting.test.ts
       - run: pnpm exec vite build && node scripts/build.mjs
       - run: pnpm exec electron-builder --config electron-builder.pro.cjs --${{ matrix.platform }} --${{ matrix.arch }} --publish never
       - if: matrix.platform == 'mac'

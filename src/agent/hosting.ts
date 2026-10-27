@@ -2,6 +2,7 @@ import { createServer, type Server, type IncomingMessage, type ServerResponse } 
 import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { spawn, type ChildProcess } from 'node:child_process';
+import { performance } from 'node:perf_hooks';
 import { z } from 'zod';
 import {
   hostingConfigSchema,
@@ -29,7 +30,7 @@ export class HostingService {
   private queue: Promise<unknown> = Promise.resolve();
   private closed = false;
   private terminating = new WeakMap<ChildProcess, Promise<void>>();
-  constructor(private readonly directory: string) {}
+  constructor(private readonly directory: string, private readonly startWorker: typeof spawn = spawn) {}
   private exclusive<T>(action: () => Promise<T>): Promise<T> {
     const result = this.queue.then(action);
     this.queue = result.catch(() => {});
@@ -275,8 +276,10 @@ export class HostingService {
     signal: AbortSignal,
   ): Promise<Record<string, unknown>> {
     if (active.children.size >= 4) return Promise.reject(new Error('代码工作进程繁忙'));
+    if (signal.aborted) return Promise.reject(new Error('代码执行已取消'));
+    const deadline=performance.now()+5000;
     return new Promise((resolve, reject) => {
-      const child = spawn(
+      const child = this.startWorker(
         process.execPath,
         ['--max-old-space-size=64', '--input-type=module', '-e', hostingWorkerSource],
         {
@@ -304,7 +307,7 @@ export class HostingService {
           reject(terminationError);
         });
       };
-      const timer = setTimeout(() => finish(new Error('代码执行超过 5 秒')), 5000);
+      const timer = setTimeout(() => finish(new Error('代码执行超过 5 秒')), Math.max(0,deadline-performance.now()));
       const abort = () => finish(new Error('代码执行已取消'));
       signal.addEventListener('abort', abort, { once: true });
       const output = (data: Buffer) => {
@@ -331,6 +334,7 @@ export class HostingService {
         }
       });
       if (signal.aborted) abort();
+      else if (performance.now()>=deadline) finish(new Error('代码执行超过 5 秒'));
       else
         child.send({ code, request }, (error) => {
           if (error) finish(error);
