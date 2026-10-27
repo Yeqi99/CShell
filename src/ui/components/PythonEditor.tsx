@@ -132,12 +132,20 @@ export function PythonEditor({
   };
   const reload = async () => {
     if (!path || !connected || savingLock.current) return;
+    const editor = view.current;
+    const document = editor?.state.doc;
     savingLock.current = true;
     setReloadConfirm(false);
     setSaving(true);
     setError('');
     try {
       const result = await readFile(sessionId, path);
+      // Confirmation covers the draft at click time, not edits made while
+      // waiting for the remote read. Keep those edits and the prior revision.
+      if (view.current !== editor || editor?.state.doc !== document)
+        throw new Error(zh
+          ? '读取期间有新的编辑，已保留当前草稿；如需放弃修改，请再次重新读取。'
+          : 'New edits were made while loading. Your draft was kept; reload again to discard it.');
       view.current?.dispatch({
         changes: { from: 0, to: view.current.state.doc.length, insert: result.code },
       });
