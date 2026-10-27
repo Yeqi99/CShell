@@ -11,4 +11,4 @@
 - 现有两项加密草稿保存／损坏文件保留测试通过；Core TypeScript 检查通过。
 - 首次新测试因 output 元素隐式 status 角色导致选择器歧义失败，修正为具体警告元素后重跑通过，未放宽业务断言。
 
-回归加入 Windows release workflow。该浏览器验证覆盖 hook 状态，不等同成品 Electron 账号切换或磁盘故障实机测试；Pro 同步验证另行记录。
+回归加入 Windows release workflow。该浏览器验证覆盖 hook 状态，不等同成品 Electron 账号切换或磁盘故障实机测试；Pro `b8cc8ca` 同步后同一浏览器回归、两项存储测试和类型检查均通过；Core 为 `67f03b7`。
