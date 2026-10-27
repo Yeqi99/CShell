@@ -43,4 +43,3 @@ const fs=require('node:fs/promises'),path=require('node:path'),http=require('nod
   assert.deepEqual(errors,[]);assert.deepEqual(failures,[]);console.log('PASS '+pages.length+' documentation pages × 320/390/900/1440: readable columns, no document overflow, mobile collapsed navigation, TOC; '+index.length+' search anchors, Ctrl+K, feature terms, result navigation, empty state, result Arrow/Home/End/Escape navigation; no JS/network errors');
  }finally{await owned.kill();server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}
 })().catch(error=>{console.error(error);process.exitCode=1;});
-
