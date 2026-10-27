@@ -5,6 +5,11 @@ on:
   pull_request:
     paths: ['android/**', 'scripts/build-android.mjs', '.github/workflows/android.yml']
   workflow_dispatch:
+    inputs:
+      native:
+        description: Run encrypted remote input and capture on API 29 and 35
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
@@ -41,3 +46,4 @@ jobs:
           path: |
             android/app/build/outputs/apk/debug/*.apk
             android/app/build/reports/lint-results-debug.html
+
