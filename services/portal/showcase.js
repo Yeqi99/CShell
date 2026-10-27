@@ -1,4 +1,43 @@
 (() => {
+  const menu = document.querySelector('.home-menu-toggle');
+  const navigation = document.getElementById('home-navigation');
+  if (menu && navigation) {
+    const compact = matchMedia('(max-width:700px)');
+    const closeMenu = (restoreFocus = false) => {
+      menu.setAttribute('aria-expanded', 'false');
+      menu.querySelector('span').textContent = '＋';
+      if (restoreFocus) menu.focus();
+    };
+    menu.hidden = false;
+    document.querySelector('.site-header').classList.add('navigation-ready');
+    menu.addEventListener('click', () => {
+      const open = menu.getAttribute('aria-expanded') !== 'true';
+      menu.setAttribute('aria-expanded', String(open));
+      menu.querySelector('span').textContent = open ? '−' : '＋';
+    });
+    navigation.addEventListener('click', event => {
+      const link = event.target.closest('a');
+      if (link && compact.matches) {
+        closeMenu();
+        const href = link.getAttribute('href');
+        const target = href?.startsWith('#') ? document.getElementById(href.slice(1)) : null;
+        if (target) { target.tabIndex = -1; target.focus({preventScroll: true}); }
+      }
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && compact.matches && menu.getAttribute('aria-expanded') === 'true') {
+        event.preventDefault(); closeMenu(true);
+      }
+    });
+    document.addEventListener('click', event => {
+      if (!event.target.closest('.site-header')) closeMenu();
+    });
+    compact.addEventListener('change', () => {
+      const focusInside = navigation.contains(document.activeElement);
+      closeMenu(compact.matches && focusInside);
+    });
+  }
+
   const tabs = [...document.querySelectorAll('[data-scene]')];
   const scenes = {
     windows: ['windows-workspace.png', 'CShell 机器桌面与智能体窗口', '机器桌面与智能体，在同一个工作空间。', 'desktop'],

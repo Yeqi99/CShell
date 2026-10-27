@@ -1,6 +1,6 @@
 # 0.8.11 后续：Android 手势队列
 
-状态：实现与 Android 测试编译通过，尚未完成模拟器/真机运行验收，未发布。
+状态：实现、两版测试编译和 API 29 / 35 模拟器原生回归均通过；真机运行、取消/拒绝/超时故障注入仍未完成，未发布。
 
 ## 可确认的问题
 
@@ -26,3 +26,7 @@ Pro 测试编译同样通过（29 tasks）。增加 Android validation 的 `nati
 - Core：`75374c4517a9cb22139ca7b0191f2d839cfc06cc`，运行 [40435339908](https://github.com/Yeqi99/CShell/actions/runs/40435339908)。
 - Pro：`89b8ceb14c4470385a882641a69424fc153f31bb`，运行 [40435390337](https://github.com/Yeqi99/CShell/actions/runs/40435390337)。
 - 记录时两次运行仍进行中，不能认定 API 29/35 已通过。该手动流程不验证发行签名 APK 安装，正式发布仍保留 release workflow 的独立签名包验收。
+
+## 运行结果
+
+上述两次运行全部成功，四组 API 29/35 原生任务通过。已读取实际任务日志，覆盖真实系统录屏授权、连续点击与编辑输入、Unicode/选择区删除、H264 原生解码、同意会话内重连、尺寸调整和停止监听；并覆盖文件边界、SOCKS、TLS/AEAD、重放拒绝与口令轮换。连续三次点击断言位于本次冻结 SHA 的 AndroidInputTest 中，日志的输入测试通过包含该断言。日志节选及 SHA 保存于 Pro `.local/android-gesture-evidence/`。不据此宣称真机或故障注入已通过。
