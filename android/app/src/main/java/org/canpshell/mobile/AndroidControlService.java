@@ -56,7 +56,8 @@ public final class AndroidControlService extends AccessibilityService {
     inputHandler.post(this::drainInputs);
   }
   static void releaseAll(){AndroidControlService s=instance;if(s!=null){synchronized(s){s.queue.clear();}s.inputHandler.post(s::reset);}}
-  private void reset(){drag=null;points=0;downAt=0;shiftLeft=false;shiftRight=false;control=false;alt=false;}
+  private void resetPointer(){drag=null;points=0;downAt=0;}
+  private void reset(){resetPointer();shiftLeft=false;shiftRight=false;control=false;alt=false;}
   private float px(float value,boolean horizontal){
     android.util.DisplayMetrics dm=new android.util.DisplayMetrics();
     ((android.view.WindowManager)getSystemService(WINDOW_SERVICE)).getDefaultDisplay().getRealMetrics(dm);
@@ -74,7 +75,7 @@ public final class AndroidControlService extends AccessibilityService {
           int button=value.optInt("button");
           if(button==0){
             if(value.optBoolean("down")){drag=new Path();drag.moveTo(px(x,true),px(y,false));downAt=android.os.SystemClock.uptimeMillis();points=1;}
-            else if(drag!=null){Path path=drag;long duration=Math.min(points>1?500:1500,Math.max(40,android.os.SystemClock.uptimeMillis()-downAt));reset();gesture(path,duration);}
+            else if(drag!=null){Path path=drag;long duration=Math.min(points>1?500:1500,Math.max(40,android.os.SystemClock.uptimeMillis()-downAt));resetPointer();gesture(path,duration);}
           } else if(button==1&&!value.optBoolean("down")) { // Existing CShell clients map secondary button to 1.
             Path path=new Path();path.moveTo(px(x,true),px(y,false));gesture(path,650);
           }
@@ -129,22 +130,31 @@ public final class AndroidControlService extends AccessibilityService {
       if(sequence!=gestureSequence||!gestureBusy)return;
       // No completion is not proof of failure: discard dependent input, never
       // replay an uncertain click or release stale queued actions on a new app.
-      gestureState="completion-unknown";gestureBusy=false;
-      synchronized(this){queue.clear();}reset();
+      finishGesture(sequence,"completion-unknown");
     };
     inputHandler.postDelayed(watchdog,Math.max(5000,duration+2000));
     try{
       boolean accepted=dispatchGesture(new GestureDescription.Builder().addStroke(new GestureDescription.StrokeDescription(path,0,duration)).build(),new GestureResultCallback(){
         private void finish(String outcome){
           if(sequence!=gestureSequence||!gestureBusy)return;
-          inputHandler.removeCallbacks(watchdog);gestureState=outcome;gestureBusy=false;
+          inputHandler.removeCallbacks(watchdog);finishGesture(sequence,outcome);
         }
         @Override public void onCompleted(GestureDescription g){finish("completed");}
         @Override public void onCancelled(GestureDescription g){finish("cancelled");}
       },inputHandler);
-      if(!accepted){inputHandler.removeCallbacks(watchdog);gestureState="rejected";gestureBusy=false;}
+      if(!accepted){inputHandler.removeCallbacks(watchdog);finishGesture(sequence,"rejected");}
     }catch(RuntimeException error){
-      inputHandler.removeCallbacks(watchdog);gestureState="dispatch-error";gestureBusy=false;throw error;
+      inputHandler.removeCallbacks(watchdog);finishGesture(sequence,"dispatch-error");throw error;
+    }
+  }
+  private void finishGesture(long sequence,String outcome){
+    if(sequence!=gestureSequence||!gestureBusy)return;
+    gestureState=outcome;gestureBusy=false;
+    // A failed focus-changing gesture invalidates the dependent input sequence.
+    // In particular, do not type queued text into the previously focused field.
+    if(!outcome.equals("completed")){
+      synchronized(this){queue.clear();}
+      reset();
     }
   }
   private AccessibilityNodeInfo focused(){
