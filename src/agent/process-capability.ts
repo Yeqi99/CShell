@@ -70,12 +70,14 @@ export class ProcessCapabilityAdapter implements TrustedCapabilityAdapter {
     const child = spawn(this.executable, ['--no-addons', join(root, ...config.entry.split('/'))], {
       cwd: root, env, stdio: ['pipe', 'pipe', 'pipe'], shell: false, windowsHide: true, detached: process.platform !== 'win32',
     });
+    // Observe immediately: close can precede cleanup after a successful response.
+    const closed=new Promise<void>(resolve=>child.once('close',()=>resolve()));
     let timer: ReturnType<typeof setTimeout> | undefined;
     let terminate: Promise<void> | undefined;
     try {
       const output = await new Promise<string>((resolve, reject) => {
         let bytes = 0, stderrBytes = 0, chunks: Buffer[] = [], finished = false;
-        const fail = (error: Error) => { if (finished) return; finished = true; terminate ??= stopChild(child); reject(error); };
+        const fail = (error: Error) => { if (finished) return; finished = true; terminate ??= stopChild(child,closed); reject(error); };
         const abort = () => fail(new Error('Extension invocation cancelled'));
         signal.addEventListener('abort', abort, { once: true });
         child.once('close', code => {
@@ -101,20 +103,26 @@ export class ProcessCapabilityAdapter implements TrustedCapabilityAdapter {
       if (reply.id !== id) throw new Error('Extension response does not match this invocation');
       try { return z.fromJSONSchema(tool.outputSchema as Parameters<typeof z.fromJSONSchema>[0]).parse(reply.result); }
       catch { throw new Error('Extension result does not match its declared schema'); }
-    } finally { clearTimeout(timer); await (terminate ?? stopChild(child)); }
+    } finally { clearTimeout(timer); await (terminate ?? stopChild(child,closed)); }
   }
 }
 
-async function stopChild(child: ChildProcess): Promise<void> {
-  if (!child.pid) return;
+export async function stopChild(child: ChildProcess, closed:Promise<void>, spawnHelper:typeof spawn=spawn): Promise<void> {
+  if (child.pid && child.exitCode===null && !child.signalCode) {
   if (process.platform === 'win32') {
-    if (child.exitCode !== null || child.signalCode) return;
     // Only our just-spawned process tree, never a user supplied PID or shell command.
     await new Promise<void>(resolve => {
-      const killer = spawn(join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'taskkill.exe'), ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, shell: false, stdio: 'ignore' });
+      const killer = spawnHelper(join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'taskkill.exe'), ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, shell: false, stdio: 'ignore' });
       const timeout = setTimeout(() => { killer.kill(); child.kill(); resolve(); }, 2000);
       const done = () => { clearTimeout(timeout); resolve(); };
-      killer.once('error', () => { child.kill(); done(); }); killer.once('exit', done);
+      killer.once('error', () => { child.kill(); done(); }); killer.once('exit', code=>{if(code)child.kill();done();});
     });
   } else { try { process.kill(-child.pid, 'SIGKILL'); } catch { /* already exited */ } }
+  }
+  let deadline:ReturnType<typeof setTimeout>|undefined;
+  try {
+    await Promise.race([closed,new Promise<never>((_,reject)=>{
+      deadline=setTimeout(()=>reject(new Error('Extension process did not close after termination')),3000);
+    })]);
+  } finally {clearTimeout(deadline);}
 }
