@@ -27,7 +27,26 @@ export class AgentUpdater{
  constructor(private directory:string,private version:string,private request:typeof updateRequest=updateRequest){}
  async initialize(){try{const saved=JSON.parse(await readFile(join(this.directory,'update-settings.json'),'utf8'));this.automatic=saved.automatic!==false;}catch{}try{const result=JSON.parse(await readFile(join(this.directory,'update-result.json'),'utf8'));if(['rollback-pending','rolled-back'].includes(result.state)&&/^\d+\.\d+\.\d+$/.test(result.version)&&Number.isFinite(result.at))this.failedVersion={version:result.version,retryAt:result.at+6*60*60*1000};}catch{}if(this.lifetime.signal.aborted)return;if(['win32','linux','darwin'].includes(process.platform)){this.timer=setInterval(()=>void this.tick(),6*60*60*1000);this.timer.unref();void this.tick();}}
  close(){if(this.timer)clearInterval(this.timer);this.timer=undefined;this.lifetime.abort(new Error('更新服务已关闭'));}
- async settings(automatic?:boolean){this.assertOpen();if(automatic!==undefined){this.automatic=automatic;await mkdir(this.directory,{recursive:true});const path=join(this.directory,'update-settings.json');await writeFile(path+'.tmp',JSON.stringify({automatic}));await rename(path+'.tmp',path);if(automatic)void this.tick();}return {automatic:this.automatic,supported:['win32','linux','darwin'].includes(process.platform)};}
+ private settingsWrite:Promise<void>=Promise.resolve();
+ async settings(automatic?:boolean){
+  this.assertOpen();
+  const snapshot=()=>({automatic:this.automatic,supported:['win32','linux','darwin'].includes(process.platform)});
+  if(automatic===undefined){await this.settingsWrite;this.assertOpen();return snapshot();}
+  const write=this.settingsWrite.then(async()=>{
+   this.assertOpen();
+   await mkdir(this.directory,{recursive:true});
+   const path=join(this.directory,'update-settings.json');
+   await writeFile(path+'.tmp',JSON.stringify({automatic}));
+   await rename(path+'.tmp',path);
+   // Only a persisted preference may change the running update scheduler.
+   this.automatic=automatic;
+   if(automatic)void this.tick();
+   return snapshot();
+  });
+  // A failed save must not poison later changes or reads of the last saved value.
+  this.settingsWrite=write.then(()=>{},()=>{});
+  return write;
+ }
  private async tick(){if(this.lifetime.signal.aborted||!this.automatic||this.checking||['ready','downloading'].includes(this.state.phase))return;this.checking=true;try{const result=await this.check();if(result.available&&this.automatic){if(this.failedVersion&&this.failedVersion.version===result.version&&Date.now()<this.failedVersion.retryAt)this.state={phase:'deferred',version:result.version,retryAt:this.failedVersion.retryAt,error:'此版本上次启动未通过核验，已保留原后台，稍后再自动检查'};else this.start();}}catch(e){if(!this.lifetime.signal.aborted)this.state={phase:'failed',error:e instanceof Error?e.message:String(e)};}finally{this.checking=false;}}
  async check(){this.assertOpen();if(!['win32','linux','darwin'].includes(process.platform))throw new Error('当前平台没有更新安装包');const r=await this.request('https://shell.canp.ai/downloads/pro/releases.json',{headers:{Accept:'application/json'},signal:AbortSignal.any([this.lifetime.signal,AbortSignal.timeout(15000)])});if(!r.ok)throw new Error('检查更新失败：香港更新服务 HTTP '+r.status);const releases=await r.json();this.assertOpen();if(!Array.isArray(releases))throw new Error('更新目录格式不正确');this.candidate=selectUpdate(releases,this.version,process.arch,process.platform);return {current:this.version,available:!!this.candidate,version:this.candidate?.version};}
  async prepareInstall(identity?:string){
