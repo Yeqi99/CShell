@@ -5,10 +5,26 @@ export const environmentValues=z.record(z.string().regex(/^[A-Za-z_][A-Za-z0-9_]
 const savedEnvironment=z.record(z.string(),z.string());
 export class ManagedEnvironment {
  private values:Record<string,string>={};
+ private pendingSave:Promise<void>=Promise.resolve();
  constructor(private vault:ClientVault,private apply:(values:Record<string,string>)=>void){}
  async load(){this.values=await this.vault.read('managed-environment',savedEnvironment)??{};this.apply({...this.values});}
  snapshot(){return {names:Object.keys(this.values).sort(),scope:'cagent-new-processes'};}
- async save(input:unknown){const {variables}=z.object({variables:environmentValues}).strict().parse(input);const next={...this.values};for(const [name,value] of Object.entries(variables)){for(const key of Object.keys(next))if(process.platform==='win32'&&key.toLowerCase()===name.toLowerCase())delete next[key];if(value===null)delete next[name];else next[name]=value;}if(Object.keys(next).length>100)throw Error('最多配置100个变量');await this.vault.write('managed-environment',next);this.values=next;this.apply({...next});return this.snapshot();}
+ async save(input:unknown){
+  const {variables}=z.object({variables:environmentValues}).strict().parse(input);
+  const save=this.pendingSave.then(async()=>{
+   // Merge against the last persisted change, not the state at request arrival.
+   const next={...this.values};
+   for(const [name,value] of Object.entries(variables)){
+    for(const key of Object.keys(next))if(process.platform==='win32'&&key.toLowerCase()===name.toLowerCase())delete next[key];
+    if(value===null)delete next[name];else next[name]=value;
+   }
+   if(Object.keys(next).length>100)throw Error('最多配置100个变量');
+   await this.vault.write('managed-environment',next);
+   this.values=next;this.apply({...next});return this.snapshot();
+  });
+  this.pendingSave=save.then(()=>{},()=>{});
+  return save;
+ }
 }
 export class ManagedScripts {
  private jobs=new AgentJobs();private owners=new Set<string>();private closed=new AbortController();
