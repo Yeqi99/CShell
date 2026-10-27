@@ -12,6 +12,7 @@ export async function agentBrowserStream(call: BrowserAgentCall, host: string, p
         try {
           while (!stream.destroyed) {
             const r = await call('browser.read', { id });
+            if (stream.destroyed) break;
             if (r.error) throw Error(r.error);
             const ok = !r.data || stream.push(Buffer.from(r.data, 'base64'));
             if (r.ended) {
@@ -30,11 +31,13 @@ export async function agentBrowserStream(call: BrowserAgentCall, host: string, p
     write(chunk: Buffer, _enc, done) {
       void (async () => {
         for (let offset = 0; offset < chunk.length; offset += 65536) {
+          if (stream.destroyed) throw Error('浏览器连接已关闭');
           await call('browser.write', {
             id,
             sequence,
             data: chunk.subarray(offset, offset + 65536).toString('base64'),
           });
+          if (stream.destroyed) throw Error('浏览器连接已关闭');
           sequence++;
         }
       })().then(() => done(), done);
