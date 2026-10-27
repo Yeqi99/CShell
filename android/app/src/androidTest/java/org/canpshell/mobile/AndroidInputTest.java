@@ -89,7 +89,38 @@ final class AndroidInputTest implements AutoCloseable {
       input(connection,new JSONObject().put("kind","text").put("text","Z"));
       awaitText("CAgent input checkZ");pressBackspace(connection);awaitText("CAgent input check");
     }
+    failUnconfirmedEdit();
+    awaitText("CAgent input check");
+    input(connection,new JSONObject().put("kind","text").put("text","Z"));
+    awaitText("CAgent input checkZ");pressBackspace(connection);awaitText("CAgent input check");
     return "PASS encrypted remote input → real Accessibility tap, editable text, scan-code letter, repeated/Unicode/selection backspace, held Shift across tap, fail-stop gesture outcomes and fresh input recovery\n";
+  }
+  private void failUnconfirmedEdit()throws Exception {
+    Class<AndroidControlService> type=AndroidControlService.class;
+    java.lang.reflect.Field instance=type.getDeclaredField("instance");instance.setAccessible(true);
+    AndroidControlService service=(AndroidControlService)instance.get(null);check(service!=null,"Service disconnected");
+    java.lang.reflect.Field handlerField=type.getDeclaredField("inputHandler");handlerField.setAccessible(true);
+    android.os.Handler handler=(android.os.Handler)handlerField.get(service);
+    java.lang.reflect.Method focused=type.getDeclaredMethod("focused");focused.setAccessible(true);
+    java.lang.reflect.Method settle=type.getDeclaredMethod("settleEdit",android.view.accessibility.AccessibilityNodeInfo.class,String.class,int.class);settle.setAccessible(true);
+    java.util.concurrent.CountDownLatch queued=new java.util.concurrent.CountDownLatch(1);
+    AtomicReference<Throwable> failure=new AtomicReference<>();
+    handler.post(()->{
+      android.view.accessibility.AccessibilityNodeInfo node=null;
+      try{
+        node=(android.view.accessibility.AccessibilityNodeInfo)focused.invoke(service);check(node!=null,"Fixture has no native focus");
+        // A stale/unconfirmed snapshot must not allow dependent input through.
+        // This only injects the expected snapshot, not a synthetic edit result.
+        settle.invoke(service,node,"UNCONFIRMED-TEST-SNAPSHOT",0);
+        check(AndroidControlService.dispatch(new JSONObject().put("kind","text").put("text","SHOULD-NOT-TYPE")),"Queue rejected fixture");
+      }catch(Throwable error){failure.set(error);}finally{if(node!=null)node.recycle();queued.countDown();}
+    });
+    check(queued.await(10,TimeUnit.SECONDS),"Edit injection timed out");
+    if(failure.get()!=null)throw new AssertionError("Edit injection failed",failure.get());
+    long end=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);
+    while(AndroidControlService.isEditing()&&System.nanoTime()<end)Thread.sleep(25);
+    check(!AndroidControlService.isEditing(),"Unconfirmed edit remained busy");
+    check(AndroidControlService.editState().contains("edit:caret-unconfirmed"),"Expected caret timeout: "+AndroidControlService.editState());
   }
   // Fault injection stays in androidTest: no production bypass or test endpoint.
   // Real OS acceptance is exercised above; here we deterministically inject its
