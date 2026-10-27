@@ -30,3 +30,17 @@ Pro 测试编译同样通过（29 tasks）。增加 Android validation 的 `nati
 ## 运行结果
 
 上述两次运行全部成功，四组 API 29/35 原生任务通过。已读取实际任务日志，覆盖真实系统录屏授权、连续点击与编辑输入、Unicode/选择区删除、H264 原生解码、同意会话内重连、尺寸调整和停止监听；并覆盖文件边界、SOCKS、TLS/AEAD、重放拒绝与口令轮换。连续三次点击断言位于本次冻结 SHA 的 AndroidInputTest 中，日志的输入测试通过包含该断言。日志节选及 SHA 保存于 Pro `.local/android-gesture-evidence/`。不据此宣称真机或故障注入已通过。
+
+## 后续异常路径修复（2026-10-27）
+
+代码审计确认两处问题：取消/拒绝/dispatch 异常只解除 busy，后续文本仍可能发往旧焦点；普通鼠标松开调用全量 reset，清掉仍按住的 Shift/Ctrl/Alt。
+
+Core `260fcdd`、Pro `eb25ef3`：所有非成功手势结果统一丢弃依赖队列并重置状态；普通鼠标松开只重置指针，键盘修饰键直到 key-up、断开或失败才释放。
+
+新增 AndroidInputTest：真实加密输入按住 Shift、点击编辑器、输入 A；测试包通过反射在实际输入线程注入四种失败结果，验证旧回调不解锁新手势、排队文本不被执行、失败后新输入能恢复。故障注入仅存在 androidTest，没有生产测试入口；这不等于操作系统真实拒绝/取消场景全覆盖。
+
+本地 Core 测试编译通过（38s，29 tasks）。新的运行尚进行中，不能沿用上一组绿灯作为新提交证明：
+- [Core 40439683647](https://github.com/Yeqi99/CShell/actions/runs/40439683647)，SHA `260fcddc1be67ac20fcbe9e823a60a9b82a62604`。
+- [Pro 40439686104](https://github.com/Yeqi99/CShell/actions/runs/40439686104)，SHA `eb25ef3b2961878abdb262a6eba20f5e9a387e1b`。
+
+正式版仍 0.8.11。连续手势与失败依赖队列按同一输入可靠性问题整体收口，不把多个失败枚举拆开凑三个功能。
