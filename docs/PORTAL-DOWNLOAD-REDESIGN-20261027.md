@@ -19,3 +19,7 @@
 - 校验展开不超出本列、无 JS 错误；查看桌面及 320px 实际截图。
 
 页面样式与筛选由 Pro 官网仓库管理；开源侧同步本说明。客户端正式版保持 0.8.11，页面改进不计成多个客户端改动凑版本。
+
+## 上线
+
+Pro 源码提交 `a244566`。downloads.html、download-picker.css、download-picker.js 三份文件已上线，公开 HTTPS 摘要逐项一致。远端旧文件备份 `portal-download-backup-1793068425`。设置 `PORTAL_ORIGIN=https://shell.canp.ai` 后，完整四宽度/架构/校验/无 JS 回归通过且正常退出。
