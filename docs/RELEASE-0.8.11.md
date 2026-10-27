@@ -36,7 +36,7 @@ Windows 安装包未签名；macOS 未公证。发布只列出实际构建和核
 - GitHub 开源 `v0.8.11`（release 424885538，16 个附件含摘要）与 Pro `pro-v0.8.11`（release 424877912，14 个附件含摘要）已公开；标签提交及全部附件摘要核验通过。
 - 香港两条更新清单已激活，30 个渠道附件 HTTPS 检查通过。官网包含机房页的 32 个文件与部署源码逐字节摘要一致。
 - 教师与学生 `final1` 单 EXE 已上传并核验，旧下载地址保留。学生包内的 DL 环境仍是独立下发脚本；封装核验不代表完整教学环境已在学生机安装验收。
-- 本机更新尚未执行：用户按 Esc 停止界面操作后停止安装。此前 Core 已装的本地 0.8.11 预览构建不等同于这次正式附件；Pro 仍需安装最终包。不得用版本号相同代替摘要与运行路径核验。
+- 本机三份正式安装包均已执行成功（退出码 0）；Core / Pro 程序版本为 0.8.11.0，CAgent 启动器已指向正式包版本目录。设备身份与 vault-key 摘要保持不变。Core / Pro 已重开；用户按 Esc 停止后，CAgent 旧窗口关闭与新运行时切换、重开后的界面验收仍待核对，不将安装成功当成全部运行验证。
 - 原生 Android 29 通过；Android 35 首次点击测试失败，原提交单次复跑通过，原失败记录保留。两版 Windows 检查及 Android 编译检查通过。测试专用解码器修正未进入生产 APK。
 
 发布地址：[开源](https://github.com/Yeqi99/CShell/releases/tag/v0.8.11)、[Pro](https://github.com/Yeqi99/CShell/releases/tag/pro-v0.8.11)、[下载](https://shell.canp.ai/downloads.html)、[机房部署](https://shell.canp.ai/classroom.html)。

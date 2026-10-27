@@ -18,3 +18,11 @@
 Core `compileDebugAndroidTestJavaWithJavac --offline` 通过（29 tasks，2026-10-27）；本机 adb 未连接任何设备。编译只证明 Java/Android 接口一致，不证明手势运行正确。
 
 下一步在 API 29 / 35 真实模拟器运行完整 capture/input 验收，检查连续点击无丢失、无重复，并核对取消/拒绝/超时后的输入状态。同步 Pro 后需复查编译及运行结果。还需另外两个独立、有实际用途的问题修复才能立项下一小版本，不把状态字段和测试各算一个功能。
+
+## 原生验收运行（2026-10-27）
+
+Pro 测试编译同样通过（29 tasks）。增加 Android validation 的 `native` 手动选项，在不构建发布附件、不访问签名秘密、不改更新源的情况下运行原有真实加密远控/录屏验收。默认编译检查保持不变；模拟器任务 35 分钟有界超时。
+
+- Core：`75374c4517a9cb22139ca7b0191f2d839cfc06cc`，运行 [40435339908](https://github.com/Yeqi99/CShell/actions/runs/40435339908)。
+- Pro：`89b8ceb14c4470385a882641a69424fc153f31bb`，运行 [40435390337](https://github.com/Yeqi99/CShell/actions/runs/40435390337)。
+- 记录时两次运行仍进行中，不能认定 API 29/35 已通过。该手动流程不验证发行签名 APK 安装，正式发布仍保留 release workflow 的独立签名包验收。
