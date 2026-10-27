@@ -67,7 +67,48 @@ final class AndroidInputTest implements AutoCloseable {
     pressBackspace(connection);awaitText("CAgent  check");
     input(connection,new JSONObject().put("kind","text").put("text","input"));
     awaitText("CAgent input check");
-    return "PASS encrypted remote input → real Accessibility tap, editable text, scan-code letter, repeated/Unicode/selection backspace\n";
+    // A pointer release is not a keyboard release: keep Shift until key-up.
+    input(connection,new JSONObject().put("kind","key").put("code",42).put("down",true));
+    tap(connection,editor);
+    input(connection,new JSONObject().put("kind","key").put("code",30).put("down",true));
+    input(connection,new JSONObject().put("kind","key").put("code",30).put("down",false));
+    input(connection,new JSONObject().put("kind","key").put("code",42).put("down",false));
+    awaitText("CAgent input checkA");pressBackspace(connection);awaitText("CAgent input check");
+    for(String outcome:new String[]{"cancelled","rejected","dispatch-error","completion-unknown"}){
+      failQueuedGesture(outcome);
+      input(connection,new JSONObject().put("kind","text").put("text","Z"));
+      awaitText("CAgent input checkZ");pressBackspace(connection);awaitText("CAgent input check");
+    }
+    return "PASS encrypted remote input → real Accessibility tap, editable text, scan-code letter, repeated/Unicode/selection backspace, held Shift across tap, fail-stop gesture outcomes and fresh input recovery\n";
+  }
+  // Fault injection stays in androidTest: no production bypass or test endpoint.
+  // Real OS acceptance is exercised above; here we deterministically inject its
+  // four failure outcomes on the actual service input thread and native editor.
+  private void failQueuedGesture(String outcome)throws Exception {
+    Class<AndroidControlService> type=AndroidControlService.class;
+    java.lang.reflect.Field instance=type.getDeclaredField("instance");instance.setAccessible(true);
+    AndroidControlService service=(AndroidControlService)instance.get(null);check(service!=null,"Service disconnected");
+    java.lang.reflect.Field handlerField=type.getDeclaredField("inputHandler");handlerField.setAccessible(true);
+    android.os.Handler handler=(android.os.Handler)handlerField.get(service);
+    java.lang.reflect.Field sequence=type.getDeclaredField("gestureSequence");sequence.setAccessible(true);
+    java.lang.reflect.Field busy=type.getDeclaredField("gestureBusy");busy.setAccessible(true);
+    java.lang.reflect.Method finish=type.getDeclaredMethod("finishGesture",long.class,String.class);finish.setAccessible(true);
+    java.util.concurrent.CountDownLatch done=new java.util.concurrent.CountDownLatch(1);
+    AtomicReference<Throwable> failure=new AtomicReference<>();
+    handler.post(()->{
+      try{
+        check(!busy.getBoolean(service),"Previous gesture still active");
+        long token=sequence.getLong(service)+1;sequence.setLong(service,token);busy.setBoolean(service,true);
+        check(AndroidControlService.dispatch(new JSONObject().put("kind","text").put("text","SHOULD-NOT-TYPE")),"Queue rejected fixture");
+        finish.invoke(service,token-1,"completed");check(busy.getBoolean(service),"Stale callback released new gesture");
+        handler.postDelayed(()->{
+          try{finish.invoke(service,token,outcome);check(!busy.getBoolean(service),"Failure did not unblock queue");}
+          catch(Throwable error){failure.set(error);}finally{done.countDown();}
+        },80);
+      }catch(Throwable error){failure.set(error);done.countDown();}
+    });
+    check(done.await(10,TimeUnit.SECONDS),"Fault outcome timed out: "+outcome);
+    if(failure.get()!=null)throw new AssertionError("Gesture fault injection failed: "+outcome,failure.get());
   }
   private static void pressBackspace(AgentConnection connection)throws Exception {
     input(connection,new JSONObject().put("kind","key").put("code",14).put("down",true));
