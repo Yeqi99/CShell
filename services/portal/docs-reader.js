@@ -22,6 +22,17 @@
  });
  input.addEventListener('keydown',e=>{if(e.key==='Escape'){input.value='';input.dispatchEvent(new Event('input'));}if(e.key==='ArrowDown'){const a=list.querySelector('a');if(a){e.preventDefault();a.focus();}}});
  document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();input.focus();input.select();}});
+ list.addEventListener('keydown',e=>{
+  const links=[...list.querySelectorAll('a')],at=links.indexOf(document.activeElement);
+  if(at<0||e.ctrlKey||e.metaKey||e.altKey)return;
+  if(e.key==='Escape'){e.preventDefault();input.value='';input.dispatchEvent(new Event('input'));input.focus();return;}
+  let target;
+  if(e.key==='ArrowDown')target=links[Math.min(at+1,links.length-1)];
+  else if(e.key==='ArrowUp')target=at===0?input:links[at-1];
+  else if(e.key==='Home')target=links[0];
+  else if(e.key==='End')target=links[links.length-1];
+  if(target){e.preventDefault();target.focus();}
+ });
  const initialQuery = new URLSearchParams(location.search).get('q');
  if(initialQuery){input.value=initialQuery.slice(0,200);input.dispatchEvent(new Event('input'));}
  const headings=[...article.querySelectorAll('h2[id]')];
