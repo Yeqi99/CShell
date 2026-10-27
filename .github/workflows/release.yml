@@ -39,6 +39,9 @@ jobs:
       - if: matrix.platform == 'win'
         run: pnpm exec tsx scripts/ai-ui-smoke.ts
       - if: matrix.platform == 'win'
+        name: Verify draft persistence recovery and per-conversation warnings
+        run: pnpm exec tsx scripts/ai-draft-recovery-smoke.ts
+      - if: matrix.platform == 'win'
         name: Verify settings preview and layout update convergence
         run: pnpm exec tsx scripts/settings-preview-race-smoke.ts
       - if: matrix.platform == 'win'
