@@ -53,10 +53,15 @@ final class AndroidInputTest implements AutoCloseable {
     tap(connection,button);long end=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);while(clicks.get()==0&&System.nanoTime()<end)Thread.sleep(50);check(clicks.get()==1,"Remote native tap did not click fixture button; "+inputDiagnostics());
     // Queue clicks without waiting for gesture callbacks. Each accepted click
     // must run once; the service must not silently drop input while busy.
-    for(int i=0;i<3;i++)tap(connection,button);
-    end=System.nanoTime()+TimeUnit.SECONDS.toNanos(8);
-    while(clicks.get()<4&&System.nanoTime()<end)Thread.sleep(25);
-    check(clicks.get()==4,"Rapid remote taps lost or duplicated; clicks="+clicks.get()+", "+inputDiagnostics());
+    // Reproduce burst boundaries repeatedly inside one connection. Any failed
+    // batch fails the run; there is no retry or replacement of lost clicks.
+    for(int batch=0;batch<8;batch++){
+      int expected=1+(batch+1)*3;
+      for(int i=0;i<3;i++)tap(connection,button);
+      end=System.nanoTime()+TimeUnit.SECONDS.toNanos(8);
+      while(clicks.get()<expected&&System.nanoTime()<end)Thread.sleep(25);
+      check(clicks.get()==expected,"Rapid remote taps lost or duplicated; batch="+batch+", expected="+expected+", clicks="+clicks.get()+", "+inputDiagnostics());
+    }
     tap(connection,editor);AtomicBoolean focused=new AtomicBoolean();end=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);
     while(!focused.get()&&System.nanoTime()<end){test.runOnMainSync(()->focused.set(editor.hasFocus()));Thread.sleep(50);}check(focused.get(),"Remote tap did not focus editor");
     input(connection,new JSONObject().put("kind","text").put("text","CAgent input check"));
