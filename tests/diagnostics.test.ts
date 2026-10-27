@@ -24,8 +24,10 @@ test('diagnostics rotate bounded files, rate limit error storms, and tolerate di
   const files = await readdir(log.directory);
   assert.equal(files.length, 4);
   const content = (await Promise.all(files.map(file => readFile(join(log.directory, file), 'utf8')))).join('');
-  assert(content.includes('119'));
-  assert(!content.includes('199'));
+  // Inspect messages, not ISO timestamps whose milliseconds can contain 199.
+  const messages = content.trim().split('\n').map(line => JSON.parse(line).message);
+  assert(messages.includes('x'.repeat(300) + '119'));
+  assert(!messages.includes('x'.repeat(300) + '199'));
   const invalid = join(directory, 'file'); await writeFile(invalid, 'not a directory');
   assert.doesNotThrow(() => new Diagnostics(invalid, 'test').record('disk', new Error('failure')));
 });
