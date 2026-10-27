@@ -199,7 +199,7 @@ test('hosting failed bind is visible and does not claim running', async () => {
   }
 });
 
-test('hosting terminates hung code and excessive output without stopping the service', async () => {
+test('hosting terminates hung code and excessive output without stopping the service', async context => {
   const f = await fixture();
   try {
     const input = config();
@@ -220,9 +220,22 @@ test('hosting terminates hung code and excessive output without stopping the ser
       expectedRevision: 1,
     });
     const base = `http://127.0.0.1:${actualPort}`;
-    const began = Date.now();
-    assert.equal((await fetch(base)).status, 500);
-    assert.ok(Date.now() - began < 9000);
+    const termination: {durationMs:number;exited:boolean;failed:boolean}[]=[];
+    const originalKill=(f.service as any).kill.bind(f.service);
+    (f.service as any).kill=(child:import('node:child_process').ChildProcess)=>{
+      const started=Date.now(),operation=originalKill(child) as Promise<void>;
+      const record=(failed:boolean)=>termination.push({durationMs:Date.now()-started,exited:child.exitCode!==null||child.signalCode!==null,failed});
+      void operation.then(()=>record(false),()=>record(true));return operation;
+    };
+    const began = Date.now();let previousTick=began,maxEventLoopDelayMs=0;
+    const probe=setInterval(()=>{const now=Date.now();maxEventLoopDelayMs=Math.max(maxEventLoopDelayMs,now-previousTick-100);previousTick=now;},100);
+    let elapsedMs=0;
+    try {assert.equal((await fetch(base)).status, 500);}
+    finally {
+      elapsedMs=Date.now()-began;clearInterval(probe);
+      context.diagnostic(JSON.stringify({elapsedMs,serverDurationMs:f.service.logs(input.id).at(-1)?.durationMs,maxEventLoopDelayMs,termination}));
+    }
+    assert.ok(elapsedMs < 9000,`hosting response exceeded 9s: ${elapsedMs}ms; see lifecycle diagnostic`);
     assert.match(f.service.logs(input.id).at(-1)?.error ?? '', /5 秒/);
     assert.equal((await fetch(`${base}/output`)).status, 500);
     assert.equal((await fetch(`${base}/body`)).status, 500);
