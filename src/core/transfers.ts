@@ -13,7 +13,10 @@ export class Transfers {
   get size() {
     return this.jobs.size;
   }
-  private jobs = new Map<string, { state: Transfer; controller: AbortController }>();
+  private jobs = new Map<
+    string,
+    { state: Transfer; controller: AbortController; sessions: Set<string> }
+  >();
   private tail: Promise<void> = Promise.resolve();
   constructor(
     private ssh: SshService,
@@ -24,7 +27,7 @@ export class Transfers {
     this.jobs.get(id)?.controller.abort();
   }
   cancelSession(id: string) {
-    for (const job of this.jobs.values()) if (job.state.sessionId === id) job.controller.abort();
+    for (const job of this.jobs.values()) if (job.sessions.has(id)) job.controller.abort();
   }
   dispose() {
     for (const job of this.jobs.values()) job.controller.abort();
@@ -33,6 +36,7 @@ export class Transfers {
     sessionId: string,
     name: string,
     operation: (state: Transfer, signal: AbortSignal, publish: () => void) => Promise<void>,
+    relatedSessions: string[] = [],
   ) {
     const state: Transfer = {
       id: randomUUID(),
@@ -44,7 +48,11 @@ export class Transfers {
       state: 'running',
     };
     const controller = new AbortController();
-    this.jobs.set(state.id, { state, controller });
+    this.jobs.set(state.id, {
+      state,
+      controller,
+      sessions: new Set([sessionId, ...relatedSessions]),
+    });
     this.emit({ ...state });
     this.tail = this.tail
       .catch(() => {})
@@ -64,11 +72,17 @@ export class Transfers {
     return state.id;
   }
   copyRemote(sourceId: string, source: string, targetId: string, target: string) {
-    return this.enqueueOperation(targetId, posix.basename(source), async (state, signal) => {
-      const from = await this.ssh.sftp(sourceId),
-        to = await this.ssh.sftp(targetId);
-      await this.remoteCopy(from, source, to, target, state, signal, 0);
-    });
+    return this.enqueueOperation(
+      targetId,
+      posix.basename(source),
+      async (state, signal) => {
+        const from = await this.ssh.sftp(sourceId);
+        signal.throwIfAborted();
+        const to = await this.ssh.sftp(targetId);
+        await this.remoteCopy(from, source, to, target, state, signal, 0);
+      },
+      [sourceId],
+    );
   }
   private async remoteCopy(
     from: SFTPWrapper,
@@ -82,10 +96,12 @@ export class Transfers {
     signal.throwIfAborted();
     if (depth > 64) throw new Error('Directory nesting limit reached');
     const stat = await this.remoteStat(from, source);
+    signal.throwIfAborted();
     if (!stat) throw new Error('Source no longer exists');
     if (stat.isSymbolicLink()) throw new Error('Symbolic links are not copied');
     if (await this.remoteStat(to, target))
       throw new Error('Destination already exists; original preserved');
+    signal.throwIfAborted();
     if (stat.isDirectory()) {
       await new Promise<void>((r, j) => to.mkdir(target, (e) => (e ? j(e) : r())));
       const files = await new Promise<import('ssh2').FileEntryWithStats[]>((r, j) =>
@@ -138,7 +154,7 @@ export class Transfers {
       state: 'running',
     };
     const controller = new AbortController();
-    this.jobs.set(state.id, { state, controller });
+    this.jobs.set(state.id, { state, controller, sessions: new Set([sessionId]) });
     this.emit({ ...state });
     this.tail = this.tail
       .catch(() => {})
@@ -207,6 +223,7 @@ export class Transfers {
     if (depth > 64) throw new Error('Directory nesting limit reached');
     const stat = await lstat(source),
       existing = await this.remoteStat(sftp, target);
+    signal.throwIfAborted();
     if (stat.isSymbolicLink() || existing?.isSymbolicLink())
       throw new Error('Symbolic links are not transferred');
     if (stat.isDirectory()) {
@@ -271,6 +288,7 @@ export class Transfers {
       if (error.code === 'ENOENT') return null;
       throw error;
     });
+    signal.throwIfAborted();
     if (stat.isSymbolicLink() || existing?.isSymbolicLink())
       throw new Error('Symbolic links are not transferred');
     if (stat.isDirectory()) {
