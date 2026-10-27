@@ -48,6 +48,8 @@ jobs:
           python-version: '3.12'
           architecture: 'x64'
       - run: pnpm exec tsx --test tests/cagent-update.test.ts tests/posix-agent-update.test.ts
+      - name: Verify preference persistence, classroom merges and extension cleanup
+        run: pnpm exec tsx --test --test-concurrency=1 tests/cagent-update-settings.test.ts tests/managed-environment-save.test.ts tests/classroom-proxy.test.ts tests/process-extension-close.test.ts tests/process-extensions.test.ts
       - name: Build standalone CAgent on the native architecture
         run: node scripts/agent-build.mjs
       - name: Archive, install or extract, and verify real packaged PTY
