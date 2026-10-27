@@ -11,7 +11,7 @@ const fs=require('node:fs/promises'),path=require('node:path'),http=require('nod
  const origin=process.env.PORTAL_ORIGIN||'http://127.0.0.1:'+server.address().port,owned=await chromium.launchServer({channel:process.platform==='win32'?'msedge':undefined}),browser=await chromium.connect(owned.wsEndpoint());
  try{
   const page=await browser.newPage(),errors=[],failures=[];page.on('pageerror',error=>errors.push(error.message));page.on('response',response=>{if(response.status()>=400)failures.push(response.url()+':'+response.status());});
-  const pages=['connections','settings','desktop','automation','extensions','plugin-authoring','cagent','machine-info'];
+  const pages=['connections','settings','desktop','automation','extensions','plugin-authoring','cagent','machine-info','developers'];
   const index=JSON.parse(await fs.readFile(path.join(root,'docs-index.json'),'utf8'));
   for(const item of index){const url=new URL(item.url,origin);assert.equal(url.origin,origin);const body=await fs.readFile(path.join(root,url.pathname),'utf8');assert(body.includes('id="'+decodeURIComponent(url.hash.slice(1))+'"'),'Missing search anchor: '+item.url);}
   for(const width of [320,390,900,1440]){
@@ -22,7 +22,7 @@ const fs=require('node:fs/promises'),path=require('node:path'),http=require('nod
     assert(await page.locator('.doc-content').evaluate(element=>element.clientWidth>=Math.min(300,innerWidth-40)),name+' readable column width '+width);
     const headings=await page.locator('.doc-content h2[id]').allTextContents();assert.equal(await page.locator('.doc-toc a').count(),headings.length);assert.equal(await page.locator('.doc-toc').evaluate(element=>element.open),width>620);
     assert.equal(await page.locator('.doc-categories').evaluate(element=>element.open),width>620);
-    if(name==='connections'||name==='plugin-authoring')await page.screenshot({path:path.join(output,name+'-'+width+'.png')});
+    if(name==='connections'||name==='plugin-authoring'||name==='developers')await page.screenshot({path:path.join(output,name+'-'+width+'.png')});
     const section=page.locator('.doc-content h2[id]').last();await section.scrollIntoViewIfNeeded();assert(await section.isVisible());assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),name+' lower section '+width);
    }
    await page.goto(origin+'/docs/connections.html');if(width<=620)await page.locator('.doc-toc summary').click();await page.locator('.doc-toc a[href="#file-protocols"]').click();assert(await page.locator('#file-protocols').evaluate(element=>element===document.activeElement&&element.getBoundingClientRect().top>=0&&element.getBoundingClientRect().top<150));if(width<=620)assert.equal(await page.locator('.doc-toc').evaluate(element=>element.open),false);await page.keyboard.press('Control+k');assert.equal(await page.locator('#doc-search').evaluate(element=>element===document.activeElement),true);
