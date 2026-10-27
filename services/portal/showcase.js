@@ -54,7 +54,7 @@
     document.getElementById('scene-image-link').href = img.src;
     document.getElementById('scene-description').textContent = scene[2];
     document.getElementById('scene-guide').href = '/docs/' + scene[3] + '.html';
-    const titles = {windows: '机器的每一面，都在同一桌面。', linux: '从目录到终端，操作各就其位。', extensions: '工具按需加入，工作方式由你决定。'};
+    const titles = {windows: '桌面与智能体', linux: '终端与文件', extensions: '扩展与应用'};
     document.getElementById('scene-title').textContent = titles[tab.dataset.scene];
     const index = tabs.indexOf(tab) + 1;
     document.querySelector('.scene-index').replaceChildren(document.createTextNode('0' + index + ' '), Object.assign(document.createElement('span'), {textContent: '/ 03'}));

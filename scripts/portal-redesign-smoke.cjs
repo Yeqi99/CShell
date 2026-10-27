@@ -10,6 +10,9 @@ const {chromium}=require('playwright'),http=require('node:http'),fs=require('nod
   const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
   for(const width of [1440,390,320]){
    await page.setViewportSize({width,height:1000});await page.goto(origin+'/?design=complete-20261024');
+   const firstScreen=await page.locator('#scene-image').boundingBox();
+   assert(firstScreen && firstScreen.y<400,'Product preview must be visible before platform/marketing sections');
+   assert(Math.min(firstScreen.y+firstScreen.height,1000)-Math.max(firstScreen.y,0)>=firstScreen.height*0.8,'First screen must show at least 80% of the product preview');
    const navigation=page.getByRole('navigation',{name:'主导航',exact:true});
    if(width<=700){
     const menu=page.getByRole('button',{name:'导航',exact:false});
