@@ -37,6 +37,11 @@ jobs:
       - run: pnpm build
       - run: pnpm test
       - if: matrix.platform == 'win'
+        name: Verify cancelled update and concurrent editor reload
+        run: |
+          pnpm exec tsx scripts/update-lifecycle-smoke.ts
+          pnpm exec tsx scripts/text-reload-race-smoke.ts
+      - if: matrix.platform == 'win'
         run: pnpm exec tsx scripts/ai-ui-smoke.ts
       - if: matrix.platform == 'win'
         name: Verify draft persistence recovery and per-conversation warnings
