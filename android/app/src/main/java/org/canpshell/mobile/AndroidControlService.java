@@ -204,18 +204,24 @@ public final class AndroidControlService extends AccessibilityService {
     editBusy=true;AccessibilityNodeInfo node=AccessibilityNodeInfo.obtain(original);
     inputHandler.post(new Runnable(){int attempts;
       public void run(){
-        boolean retry=false;
+        boolean retry=false,confirmed=false;
         try{
-          if(instance!=AndroidControlService.this||!node.refresh()||!node.isFocused())return;
+          if(instance!=AndroidControlService.this||!node.refresh()||!node.isFocused()){lastEditState="edit:focus-lost";return;}
           String actual=node.getText()==null?"":node.getText().toString();
           if(actual.equals(expected)){
-            if(node.getTextSelectionStart()==caret&&node.getTextSelectionEnd()==caret){lastEditState="edit:applied";return;}
+            if(node.getTextSelectionStart()==caret&&node.getTextSelectionEnd()==caret){confirmed=true;lastEditState="edit:applied";return;}
             Bundle selection=new Bundle();selection.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT,caret);selection.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT,caret);
             node.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION,selection);
           }
           retry=++attempts<8;
           if(!retry)lastEditState="edit:caret-unconfirmed";
-        }finally{if(retry)inputHandler.postDelayed(this,32);else{node.recycle();editBusy=false;}}
+        }finally{if(retry)inputHandler.postDelayed(this,32);else{
+          node.recycle();
+          // Later keystrokes depend on this edit's caret. If it was not
+          // confirmed, never execute them at a guessed or newly focused field.
+          if(!confirmed){synchronized(AndroidControlService.this){queue.clear();}reset();}
+          editBusy=false;
+        }}
       }
     });
   }
