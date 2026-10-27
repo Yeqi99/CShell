@@ -159,7 +159,9 @@ export function registerUpdateHandlers(
   });
   const initial=setTimeout(()=>void settingsReady.then(automatic),30000);initial.unref();
   const repeat=setInterval(()=>void settingsReady.then(automatic),6*60*60*1000);repeat.unref();
-  app.once('before-quit',()=>{clearTimeout(initial);clearInterval(repeat);});
+  // before-quit can be cancelled by the active-session close guard.
+  // Keep checking for updates until the application actually exits.
+  app.once('quit',()=>{clearTimeout(initial);clearInterval(repeat);});
   handle('update:install', async () => {
     if (busy || state.phase !== 'ready' || !file)
       throw new Error('Download and verify the update first');
