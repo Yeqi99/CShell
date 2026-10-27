@@ -91,7 +91,7 @@ test('actual MCP and REST keep visual permissions separate and deliver image byt
   };
   try {
     assert.equal(service.status().running, false);
-    await service.configure(settings);
+    assert.equal((await service.configure(settings)).running, true, JSON.stringify(service.status()));
     const token = await service.accessToken();
     const invoke = async (name: string, args: unknown) => {
       const r = await fetch('http://127.0.0.1:' + port + '/api/v1/invoke', {
@@ -102,6 +102,7 @@ test('actual MCP and REST keep visual permissions separate and deliver image byt
           Connection: 'close',
         },
         body: JSON.stringify({ name, arguments: args }),
+        signal: AbortSignal.timeout(10000),
       });
       return { status: r.status, body: (await r.json()) as any };
     };
@@ -117,7 +118,7 @@ test('actual MCP and REST keep visual permissions separate and deliver image byt
       403,
     );
     assert.equal(calls, 0);
-    await service.configure({ ...settings, capabilities: ['browser.read'] });
+    assert.equal((await service.configure({ ...settings, capabilities: ['browser.read'] })).running, true, JSON.stringify(service.status()));
     sessionId = (await invoke('connect', { profileId: profile.id })).body.result.sessionId;
     const rest = await invoke('invoke_connection', {
       sessionId,
