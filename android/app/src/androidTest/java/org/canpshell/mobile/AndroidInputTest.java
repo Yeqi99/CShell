@@ -41,6 +41,12 @@ final class AndroidInputTest implements AutoCloseable {
   void awaitReady()throws Exception{long end=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);while(!AndroidControlService.isAvailable()&&System.nanoTime()<end)Thread.sleep(50);check(AndroidControlService.isAvailable(),"Accessibility service did not bind");}
   String verify(AgentConnection connection)throws Exception {
     tap(connection,button);long end=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);while(clicks.get()==0&&System.nanoTime()<end)Thread.sleep(50);check(clicks.get()==1,"Remote native tap did not click fixture button; "+AndroidControlService.editState());
+    // Queue clicks without waiting for gesture callbacks. Each accepted click
+    // must run once; the service must not silently drop input while busy.
+    for(int i=0;i<3;i++)tap(connection,button);
+    end=System.nanoTime()+TimeUnit.SECONDS.toNanos(8);
+    while(clicks.get()<4&&System.nanoTime()<end)Thread.sleep(25);
+    check(clicks.get()==4,"Rapid remote taps lost or duplicated; clicks="+clicks.get()+", "+AndroidControlService.editState());
     tap(connection,editor);AtomicBoolean focused=new AtomicBoolean();end=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);
     while(!focused.get()&&System.nanoTime()<end){test.runOnMainSync(()->focused.set(editor.hasFocus()));Thread.sleep(50);}check(focused.get(),"Remote tap did not focus editor");
     input(connection,new JSONObject().put("kind","text").put("text","CAgent input check"));

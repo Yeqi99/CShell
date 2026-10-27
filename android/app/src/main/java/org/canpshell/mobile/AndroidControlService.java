@@ -5,7 +5,6 @@ import android.accessibilityservice.GestureDescription;
 import android.graphics.Path;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.Looper;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import org.json.JSONObject;
@@ -13,7 +12,6 @@ import org.json.JSONObject;
 /** Explicitly enabled Android accessibility controls; not a privileged input injector. */
 public final class AndroidControlService extends AccessibilityService {
   private static volatile AndroidControlService instance;
-  private final Handler main=new Handler(Looper.getMainLooper());
   private android.os.HandlerThread inputThread;
   private Handler inputHandler;
   private float x=.5f,y=.5f;
@@ -23,12 +21,14 @@ public final class AndroidControlService extends AccessibilityService {
   private final java.util.ArrayDeque<JSONObject> queue=new java.util.ArrayDeque<>();
   private boolean pending;
   private volatile boolean gestureBusy;
+  private volatile String gestureState="idle";
+  private long gestureSequence;
   private volatile boolean editBusy;
   private boolean shiftLeft,shiftRight,control,alt,caps;
   private static volatile String lastEditState="none";
   private volatile long processed;
   private volatile String phase="idle";
-  static String editState(){AndroidControlService s=instance;return lastEditState+(s==null?", disconnected":", processed="+s.processed+", phase="+s.phase+", editing="+s.editBusy);}
+  static String editState(){AndroidControlService s=instance;return lastEditState+(s==null?", disconnected":", processed="+s.processed+", phase="+s.phase+", editing="+s.editBusy+", gesture="+s.gestureState);}
   static boolean isEditing(){AndroidControlService s=instance;return s!=null&&s.editBusy;}
   @Override protected void onServiceConnected(){inputThread=new android.os.HandlerThread("cagent-accessibility-input");inputThread.start();inputHandler=new Handler(inputThread.getLooper());instance=this;AndroidAgentService.changed(this);}
   @Override public void onAccessibilityEvent(AccessibilityEvent event){}
@@ -51,8 +51,8 @@ public final class AndroidControlService extends AccessibilityService {
   }
   private void drainInputs(){
     if(instance!=this)return;
-    if(editBusy){inputHandler.postDelayed(this::drainInputs,16);return;}
-    for(int n=0;n<16;n++){JSONObject event;synchronized(this){event=queue.pollFirst();if(event==null){pending=false;return;}}apply(event);if(editBusy){inputHandler.postDelayed(this::drainInputs,16);return;}}
+    if(editBusy||gestureBusy){inputHandler.postDelayed(this::drainInputs,16);return;}
+    for(int n=0;n<16;n++){JSONObject event;synchronized(this){event=queue.pollFirst();if(event==null){pending=false;return;}}apply(event);if(editBusy||gestureBusy){inputHandler.postDelayed(this::drainInputs,16);return;}}
     inputHandler.post(this::drainInputs);
   }
   static void releaseAll(){AndroidControlService s=instance;if(s!=null){synchronized(s){s.queue.clear();}s.inputHandler.post(s::reset);}}
@@ -122,12 +122,30 @@ public final class AndroidControlService extends AccessibilityService {
     // System shortcuts and arbitrary scan codes cannot be injected by Accessibility.
   }
   private void gesture(Path path,long duration){
-    if(gestureBusy)return;gestureBusy=true;
-    boolean accepted=dispatchGesture(new GestureDescription.Builder().addStroke(new GestureDescription.StrokeDescription(path,0,duration)).build(),new GestureResultCallback(){
-      @Override public void onCompleted(GestureDescription g){gestureBusy=false;}
-      @Override public void onCancelled(GestureDescription g){gestureBusy=false;}
-    },main);
-    if(!accepted)gestureBusy=false;
+    if(gestureBusy)throw new IllegalStateException("Gesture queue was not serialized");
+    final long sequence=++gestureSequence;
+    gestureBusy=true;gestureState="submitted";
+    final Runnable watchdog=()->{
+      if(sequence!=gestureSequence||!gestureBusy)return;
+      // No completion is not proof of failure: discard dependent input, never
+      // replay an uncertain click or release stale queued actions on a new app.
+      gestureState="completion-unknown";gestureBusy=false;
+      synchronized(this){queue.clear();}reset();
+    };
+    inputHandler.postDelayed(watchdog,Math.max(5000,duration+2000));
+    try{
+      boolean accepted=dispatchGesture(new GestureDescription.Builder().addStroke(new GestureDescription.StrokeDescription(path,0,duration)).build(),new GestureResultCallback(){
+        private void finish(String outcome){
+          if(sequence!=gestureSequence||!gestureBusy)return;
+          inputHandler.removeCallbacks(watchdog);gestureState=outcome;gestureBusy=false;
+        }
+        @Override public void onCompleted(GestureDescription g){finish("completed");}
+        @Override public void onCancelled(GestureDescription g){finish("cancelled");}
+      },inputHandler);
+      if(!accepted){inputHandler.removeCallbacks(watchdog);gestureState="rejected";gestureBusy=false;}
+    }catch(RuntimeException error){
+      inputHandler.removeCallbacks(watchdog);gestureState="dispatch-error";gestureBusy=false;throw error;
+    }
   }
   private AccessibilityNodeInfo focused(){
     // Android 10 can temporarily return no global input focus while the IME
