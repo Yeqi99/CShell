@@ -18,6 +18,9 @@ final class AndroidInputTest implements AutoCloseable {
   private Button button;
   private EditText editor;
   private final AtomicInteger clicks=new AtomicInteger();
+  private final java.util.ArrayDeque<String> touchTrace=new java.util.ArrayDeque<>();
+  private void trace(String event){synchronized(touchTrace){if(touchTrace.size()==48)touchTrace.removeFirst();touchTrace.addLast(android.os.SystemClock.uptimeMillis()+":"+event);}}
+  private String inputDiagnostics(){synchronized(touchTrace){return AndroidControlService.editState()+", nativeTouches="+touchTrace;}}
   AndroidInputTest(Instrumentation test,MainActivity app)throws Exception {
     this.test=test;this.app=app;
     if(!android.os.Build.HARDWARE.equals("ranchu")&&!android.os.Build.HARDWARE.equals("goldfish"))throw new IllegalStateException("Emulator only");
@@ -32,7 +35,14 @@ final class AndroidInputTest implements AutoCloseable {
     }finally{automation.dropShellPermissionIdentity();}
     test.runOnMainSync(()->{
       panel=new LinearLayout(app);panel.setOrientation(LinearLayout.VERTICAL);panel.setBackgroundColor(0xffffffff);
-      button=new Button(app);button.setText("CAgent native input fixture");button.setOnClickListener(v->clicks.incrementAndGet());panel.addView(button,new LinearLayout.LayoutParams(-1,80));
+      button=new Button(app){
+        @Override public boolean dispatchTouchEvent(MotionEvent event){
+          // Observe the actual native target without consuming or manufacturing
+          // events. Never record production input, text, or screen contents.
+          trace("touch="+MotionEvent.actionToString(event.getActionMasked())+", eventTime="+event.getEventTime()+", downTime="+event.getDownTime()+", x="+event.getX()+", y="+event.getY()+", windowFocus="+hasWindowFocus());
+          boolean handled=super.dispatchTouchEvent(event);trace("handled="+handled);return handled;
+        }
+      };button.setText("CAgent native input fixture");button.setOnClickListener(v->{trace("click="+clicks.incrementAndGet());});panel.addView(button,new LinearLayout.LayoutParams(-1,80));
       editor=new EditText(app);editor.setSingleLine(true);editor.setHint("Native text fixture");panel.addView(editor,new LinearLayout.LayoutParams(-1,80));
       FrameLayout.LayoutParams placement=new FrameLayout.LayoutParams(-1,180);placement.topMargin=120;
       ((FrameLayout)app.findViewById(android.R.id.content)).addView(panel,placement);
@@ -40,13 +50,13 @@ final class AndroidInputTest implements AutoCloseable {
   }
   void awaitReady()throws Exception{long end=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);while(!AndroidControlService.isAvailable()&&System.nanoTime()<end)Thread.sleep(50);check(AndroidControlService.isAvailable(),"Accessibility service did not bind");}
   String verify(AgentConnection connection)throws Exception {
-    tap(connection,button);long end=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);while(clicks.get()==0&&System.nanoTime()<end)Thread.sleep(50);check(clicks.get()==1,"Remote native tap did not click fixture button; "+AndroidControlService.editState());
+    tap(connection,button);long end=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);while(clicks.get()==0&&System.nanoTime()<end)Thread.sleep(50);check(clicks.get()==1,"Remote native tap did not click fixture button; "+inputDiagnostics());
     // Queue clicks without waiting for gesture callbacks. Each accepted click
     // must run once; the service must not silently drop input while busy.
     for(int i=0;i<3;i++)tap(connection,button);
     end=System.nanoTime()+TimeUnit.SECONDS.toNanos(8);
     while(clicks.get()<4&&System.nanoTime()<end)Thread.sleep(25);
-    check(clicks.get()==4,"Rapid remote taps lost or duplicated; clicks="+clicks.get()+", "+AndroidControlService.editState());
+    check(clicks.get()==4,"Rapid remote taps lost or duplicated; clicks="+clicks.get()+", "+inputDiagnostics());
     tap(connection,editor);AtomicBoolean focused=new AtomicBoolean();end=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);
     while(!focused.get()&&System.nanoTime()<end){test.runOnMainSync(()->focused.set(editor.hasFocus()));Thread.sleep(50);}check(focused.get(),"Remote tap did not focus editor");
     input(connection,new JSONObject().put("kind","text").put("text","CAgent input check"));
