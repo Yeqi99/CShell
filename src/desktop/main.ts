@@ -209,7 +209,10 @@ else
       const emit = (event: SessionEvent) => {
         if (event.type === 'closed' && event.error) diagnostics.record('session.closed', event.error);
         if (event.type === 'transfer' && event.transfer.state === 'failed') diagnostics.record('transfer.failed', 'Transfer failed');
-        if (event.type === 'closed') connections?.closed(event.sessionId);
+        if (event.type === 'closed') {
+          transfers?.cancelSession(event.sessionId);
+          connections?.closed(event.sessionId);
+        }
         if (mcp?.event(event)) return;
         if (
           event.type === 'transfer' &&
