@@ -117,7 +117,7 @@ export function LinuxDesktop({
   machine: any;
   target: string;
   call: (method: AgentCall['method'], params?: unknown) => Promise<unknown>;
-  extraPanels?: { id: string; label: string; content: ReactNode | ((active: boolean, options: boolean, closeOptions: () => void) => ReactNode); icon?: typeof Monitor; color?: string; onOpen?: () => void }[];
+  extraPanels?: { id: string; label: string; content: ReactNode | ((active: boolean, options: boolean, closeOptions: () => void, windowClosed: boolean) => ReactNode); icon?: typeof Monitor; color?: string; onOpen?: () => void }[];
   active: boolean;
   closed?: boolean;
   onTerminal?: () => void;
@@ -560,7 +560,7 @@ export function LinuxDesktop({
                   ) : (
                     <button onClick={onTerminal}>打开 SSH 终端</button>
                   ))}
-                {extraPanels.filter(p => p.id === w.id).map(p => <div className={'desktop-extra-panel desktop-extra-' + p.id} key={p.id}>{typeof p.content === 'function' ? p.content(active && visible && front === w.id && !menu && !context && !closed, options === w.id, () => setOptions('')) : p.content}</div>)}
+                {extraPanels.filter(p => p.id === w.id).map(p => <div className={'desktop-extra-panel desktop-extra-' + p.id} key={p.id}>{typeof p.content === 'function' ? p.content(active && visible && front === w.id && !menu && !context && !closed, options === w.id, () => setOptions(''), w.closed) : p.content}</div>)}
                 {w.id === 'settings' && (
                   <div className="desktop-settings">
                     <nav aria-label="桌面设置分类">

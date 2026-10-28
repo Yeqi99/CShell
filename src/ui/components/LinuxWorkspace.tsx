@@ -1,4 +1,5 @@
 import { ErrorNotice } from './ErrorNotice';
+import { NativeDesktop } from './NativeDesktop';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Monitor, Terminal, ChevronRight, RefreshCw } from 'lucide-react';
 import type { AgentCall } from '../../shared/agent';
@@ -36,6 +37,8 @@ export function LinuxWorkspace({
     [error, setError] = useState(''),
     [machine, setMachine] = useState<any>();
   const target = 'ssh:' + session;
+  const [nativeInfo,setNativeInfo]=useState<Awaited<ReturnType<typeof window.cshell.nativeDesktopSetup>>>();
+  useEffect(()=>{let stale=false;setNativeInfo(undefined);if(!closed)void window.cshell.nativeDesktopSetup(session,'inspect').then(info=>{if(!stale)setNativeInfo(info);}).catch(()=>{});return()=>{stale=true;};},[session,closed]);
   const call = useCallback(
     (method: AgentCall['method'], params?: unknown) =>
       window.cshell.agentCall(target, { method, params }),
@@ -204,7 +207,7 @@ export function LinuxWorkspace({
   return <div className="linux-desktop-host" hidden={!active}>
     <LinuxDesktop name={name} machine={ready ? {...machine, deviceId: profileId} : {deviceId:profileId, platform:plan?.platform || 'unknown', sshOnly:true}} target={target} call={call} active={active} closed={closed} onRetry={onRetry} onTerminal={onTerminal}
       files={files} terminal={terminal || ((visible,theme)=><LinuxDesktopTerminal profileId={profileId} preferences={{...preferences,theme}} active={visible}/>)}
-      extraPanels={ready ? [] : [{id:'install-cagent',label:'安装 CAgent',content:setup}]}/>
+      extraPanels={[...(ready ? [] : [{id:'install-cagent',label:'安装 CAgent',content:setup}]),{id:'native-desktop',label:'原生桌面',icon:Monitor,content:(visible, _options, _closeOptions, windowClosed)=><NativeDesktop session={session} closed={closed || windowClosed} active={visible} initialInfo={nativeInfo}/>} ]}/>
   </div>;
 
 }

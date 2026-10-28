@@ -11,6 +11,11 @@ export type LinuxWorkspacePlan = {
   steps: string[];
 };
 export interface LinuxWorkspaceBridge {
+  nativeDesktopSetup(id:string,action:'inspect'|'start'|'install-start'|'stop'):Promise<{sessions?:{display:string}[];installed?:boolean;canInstall?:boolean;running?:boolean;socket:string;message?:string}>;
+  nativeDesktopOpen(id:string,endpoint:{port:number}|{socket:string}):Promise<string>;
+  nativeDesktopRead(id:string):Promise<Uint8Array|null>;
+  nativeDesktopWrite(id:string,data:Uint8Array):Promise<void>;
+  nativeDesktopClose(id:string):Promise<void>;
   linuxWorkspacePlan(id: string, directory?: string): Promise<LinuxWorkspacePlan>;
   linuxWorkspaceInstall(id: string, planId: string): Promise<import('./plugins').RemoteJob>;
   linuxWorkspaceJob(

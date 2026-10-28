@@ -1,6 +1,11 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { Bridge, SessionEvent } from '../shared/contracts';
 const bridge: Bridge = {
+  nativeDesktopSetup:(id,action)=>ipcRenderer.invoke('native-desktop:setup',id,action),
+  nativeDesktopOpen:(id,endpoint)=>ipcRenderer.invoke('native-desktop:open',id,endpoint),
+  nativeDesktopRead:id=>ipcRenderer.invoke('native-desktop:read',id),
+  nativeDesktopWrite:(id,data)=>ipcRenderer.invoke('native-desktop:write',id,data),
+  nativeDesktopClose:id=>ipcRenderer.invoke('native-desktop:close',id),
   platform: process.platform,
   desktopLookGet:(id,legacy)=>ipcRenderer.invoke('desktop-look:get',id,legacy),
   desktopLookSave:(id,value)=>ipcRenderer.invoke('desktop-look:save',id,value),
