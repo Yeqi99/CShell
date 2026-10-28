@@ -1,3 +1,4 @@
+import {NativeDesktopService} from './native-desktop';
 import {classroomDiscoveryLifecycle} from '../core/classroom-discovery-lifecycle';
 import {AgentLanService} from '../core/agent-lan';
 import {AgentLanEnrollment} from './agent-lan-enrollment';
@@ -580,6 +581,13 @@ else
       handle('http:cancel', id => http.cancel(id));
       const linuxWorkspace=new LinuxWorkspaceService(ssh,join(app.getAppPath(),'dist/agent/agent.cjs'));
       const machineBrowser=new MachineBrowser(window,ssh);
+      const nativeDesktop=new NativeDesktopService(ssh);
+      handle('native-desktop:setup',(id,action)=>nativeDesktop.setup(idSchema.parse(id),action));
+      handle('native-desktop:open',(id,endpoint)=>nativeDesktop.open(idSchema.parse(id),endpoint));
+      handle('native-desktop:read',id=>nativeDesktop.read(idSchema.parse(id)));
+      handle('native-desktop:write',(id,data)=>nativeDesktop.write(idSchema.parse(id),data));
+      handle('native-desktop:close',id=>nativeDesktop.close(idSchema.parse(id)));
+      window.once('closed',()=>nativeDesktop.dispose());
       handle('machine-browser:action',(id,action,value)=>machineBrowser.action(id,action,value));
       handle('linux:plan',(id,directory)=>linuxWorkspace.plan(idSchema.parse(id),directory));
       handle('linux:install',(id,plan)=>linuxWorkspace.install(idSchema.parse(id),idSchema.parse(plan)));

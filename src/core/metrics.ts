@@ -3,7 +3,10 @@ const baseMetricsCommand =
 export type CpuSample = { total: number; idle: number };
 export const metricsCommand =
   baseMetricsCommand +
-  "; printf '__DRIVES__\\n'; lsblk -b -d -n -o NAME,SIZE,TYPE 2>/dev/null; printf '__MODEL__\\n'; awk -F ': ' '/^(model name|Hardware|Processor)[[:space:]]*:/ {print $2; exit}' /proc/cpuinfo";
+  "; printf '__DRIVES__\\n'; lsblk -b -d -n -o NAME,SIZE,TYPE 2>/dev/null; printf '__MODEL__\\n'; " +
+  "model=$(awk -F: '/^model name[[:space:]]*:/ {sub(/^[[:space:]]+/,\"\",$2); print $2; exit}' /proc/cpuinfo); " +
+  "if [ -z \"$model\" ]; then model=$(lscpu 2>/dev/null | awk -F: '/^Model name[[:space:]]*:/ {sub(/^[[:space:]]+/,\"\",$2); if (!seen[$2]++) {printf \"%s%s\", sep, $2; sep=\" + \"}}'); fi; " +
+  "if [ -z \"$model\" ]; then model=$(awk -F: '/^(Hardware|Processor)[[:space:]]*:/ {sub(/^[[:space:]]+/,\"\",$2);print $2;exit}' /proc/cpuinfo); fi; printf '%s\\n' \"$model\"";
 export function parseMetrics(output: string, previous?: CpuSample) {
   const cpuLine = output.match(/^cpu\s+(.+)$/m);
   const values = cpuLine?.[1].trim().split(/\s+/).map(Number).slice(0, 8);
