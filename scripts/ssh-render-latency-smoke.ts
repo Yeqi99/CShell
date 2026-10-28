@@ -268,7 +268,7 @@ try {
   ).preferences.terminalSemanticColors;
   assert.equal(results.actualSemanticSetting, semantic);
   results.original = await measure('original');
-  await page.getByRole('button', { name: '打开可视化桌面', exact: true }).click();
+  await page.getByLabel('桌面与显示方式',{exact:true}).click();await page.getByRole('menuitem',{name:'CShell 可视化桌面',exact:true}).click();
   await page.locator('.linux-desktop:visible').waitFor();
   await page.locator('.linux-desktop:visible [data-desktop-icon="terminal"]').dblclick();
   await page.locator('.linux-desktop:visible .xterm-helper-textarea:visible').waitFor();
@@ -280,9 +280,9 @@ try {
   assert.equal(server.shellRequests(), requestsBefore);
   assert.equal(results.sameTextareaAfterVisual, true);
   results.visual = await measure('visual');
-  await page.getByRole('button', { name: '切换到 SSH 终端', exact: true }).focus();
+  await page.getByLabel('桌面与显示方式',{exact:true}).focus();
   await page.waitForTimeout(200);
-  await page.getByRole('button', { name: '切换到 SSH 终端', exact: true }).click();
+  await page.getByLabel('桌面与显示方式',{exact:true}).focus();await page.getByLabel('桌面与显示方式',{exact:true}).click();await page.getByRole('menuitem',{name:'SSH 终端',exact:true}).click();
   await page.locator('.terminals:visible .xterm-helper-textarea:visible').waitFor();
   results.originalAfter = await measure('restored');
   results.historyPreserved = await page.evaluate(() =>
@@ -345,7 +345,7 @@ try {
     );
     await page.waitForTimeout(500);
     results.pressureOriginal = await measure('pressureoriginal');
-    await page.getByRole('button', { name: '打开可视化桌面', exact: true }).click();
+    await page.getByLabel('桌面与显示方式',{exact:true}).click();await page.getByRole('menuitem',{name:'CShell 可视化桌面',exact:true}).click();
     await page.locator('.linux-desktop:visible').waitFor();
     await page.locator('.linux-desktop:visible [data-desktop-icon="terminal"]').dblclick();
     await page.locator('.linux-desktop:visible .xterm-helper-textarea:visible').waitFor();

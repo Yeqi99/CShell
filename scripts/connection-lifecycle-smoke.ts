@@ -137,7 +137,7 @@ try {
   assert.equal(await page.locator('.linux-desktop:visible').count(),0);
   assert.equal((await page.evaluate(()=>window.cshell.config())).preferences.defaultConnectionView,'original');
   const firstShellCount=server.shellRequests();
-  await page.getByRole('button',{name:'打开可视化桌面',exact:true}).click();
+  await page.getByLabel('桌面与显示方式',{exact:true}).click();await page.getByRole('menuitem',{name:'CShell 可视化桌面',exact:true}).click();
   await page.locator('.linux-desktop:visible .desktop-icons').getByRole('button',{name:'终端',exact:true}).dblclick();
   assert.equal(server.shellRequests(),firstShellCount);
   const terminal = page.locator('.terminal-host:visible');
