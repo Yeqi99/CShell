@@ -3,7 +3,7 @@
 <h2 id="section-1">获取与安装</h2>
 <p>从 <a href="/downloads.html">香港下载中心</a> 选择目标系统和架构对应的 CAgent 附件，按附件安装说明操作。程序、私有运行时和缓存放入选定专用目录；升级时保留身份、加密凭据和既有授权。</p>
 <p>Windows 使用原生配置窗口，macOS/Linux 使用系统浏览器配置界面。Android 被控能力在 CShell 扩展内按需启用，不需要假设存在另一个独立桌面版 CAgent 安装器。</p>
-<h2 id="section-2">连接到机器</h2>
+<h2 id="linux-command">Linux 快速安装</h2><pre><code>curl -fsSL https://shell.canp.ai/install.sh | sh -s -- cagent</code></pre><p>账号版追加 <code>--channel pro</code>。自动匹配 x64 / ARM64，校验香港发行附件，不修改系统软件源、全局 PATH、监听端口和权限。安装完成后按打印的命令启动 CAgent 配置界面；新安装数据位于专用目录，已有身份和配置保持原路径。需要 Python 3.9+、curl。<a href="/docs/linux.html#command-install">数据盘安装、预检和更新说明</a> · <a href="/downloads.html?product=cagent&amp;system=linux">下载安装包</a></p><h2 id="section-2">连接到机器</h2>
 <p>在目标 CAgent 配置连接地址、端口、密码与权限。复制连接信息后，在 CShell 新建连接中显式粘贴；复制内容不包含密码或私钥。首次核对目标身份后再认证。</p>
 <p>机器连接建立后，按需进入终端、文件、应用、智能体或设置。只开放实际支持和需要的能力；已有明确关闭的权限不应被更新或同步重新打开。</p>
 <h2 id="section-3">模型与账号</h2>

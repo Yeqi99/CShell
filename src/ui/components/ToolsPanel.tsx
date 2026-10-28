@@ -1,7 +1,7 @@
 import { DockerPanel } from './DockerPanel';
 import { Box } from 'lucide-react';
 import { useState, useEffect, type ReactNode } from 'react';
-import { ChevronDown, ChevronRight, Files, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Files, ArrowDownUp, X } from 'lucide-react';
 import type { Transfer } from '../../shared/contracts';
 import { useI18n } from '../i18n';
 import { FilePanel } from './FilePanel';
@@ -40,7 +40,6 @@ export function ToolsPanel({
   return (
     <aside className="tools-panel">
       <header className="files-title" title={`${t('toolsFor')} · ${sessionName}`}>
-        {dragHandle}
         <button
           className="file-panel-toggle"
           aria-expanded={filesOpen && !dockerVisible}
@@ -55,6 +54,7 @@ export function ToolsPanel({
           <Files size={14} />
           {t('files')}
         </button>
+        {dragHandle && <span className="tools-drag-handle">{dragHandle}</span>}
         {dockerEnabled && (
           <button
             className="docker-tool-tab"
@@ -79,8 +79,8 @@ export function ToolsPanel({
         <MonitorPanel key={sessionId || 'idle'} sessionId={sessionId} active={active} />
       )}
       <div className={`transfers ${queue ? 'expanded' : ''}`}>
-        <button className="queue-toggle" onClick={() => setQueue(!queue)}>
-          {queue ? <ChevronDown size={12} /> : <ChevronRight size={12} />} {t('transfers')}
+        <button className="queue-toggle" aria-expanded={queue} onClick={() => setQueue(!queue)}>
+          {queue ? <ChevronDown size={13} /> : <ChevronRight size={13} />} <ArrowDownUp size={14} />{t('transfers')}
           <span>{transfers.filter((x) => x.state === 'running').length}</span>
         </button>
         {queue && (

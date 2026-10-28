@@ -1,3 +1,4 @@
+import { CloudImportConflict, undoImportedFields } from './cloud-import';
 import {
   installedPluginSchema,
   pluginManifestSchema,
@@ -79,13 +80,35 @@ export class Store {
     }
     return result;
   }
-  async cloudImport(value: unknown, restoreHosts = false) {
+  cloudCheckpoint() { return JSON.stringify(this.data); }
+  async cloudImport(value: unknown, restoreHosts = false, expected = this.cloudCheckpoint()) {
+    const unchanged = () => { if (this.cloudCheckpoint() !== expected) throw new CloudImportConflict(); };
+    unchanged();
     const next = this.cloudValidate(value), secrets: Record<string,string> = {};
     for (const profile of next.profiles) if (next.secrets[profile.id]) secrets[profile.id] = await this.codec.encrypt(JSON.stringify(next.secrets[profile.id]));
-    const {extensions,...portable}=next;
-    if(extensions){this.data.tools.commandSuggestions=extensions.commandSuggestions;this.data.tools.dockerSocket=extensions.dockerSocket;this.data.plugins=this.plugins().map(p=>({...p,manifest:{...p.manifest,commands:extensions.commands[p.manifest.id]??p.manifest.commands}}));}
-    this.data = {...this.data, ...portable, secrets, hosts:restoreHosts?next.hosts:{...this.data.hosts,...next.hosts}};
-    await this.persist();
+    unchanged(); // OS credential encryption can overlap a local connection/group save.
+    const task = this.writes.catch(() => {}).then(async () => {
+      unchanged(); // Recheck at the same serialized boundary as ordinary saves.
+      const previous = structuredClone(this.data);
+      const {extensions,...portable}=next;
+      this.data = {...this.data, ...portable, secrets, hosts:restoreHosts?next.hosts:{...this.data.hosts,...next.hosts},
+        ...(extensions ? {tools:{...this.data.tools,commandSuggestions:extensions.commandSuggestions,dockerSocket:extensions.dockerSocket},
+          plugins:this.plugins().map(p=>({...p,manifest:{...p.manifest,commands:extensions.commands[p.manifest.id]??p.manifest.commands}}))} : {})};
+      const applied = structuredClone(this.data);
+      try {
+        await mkdir(this.directory, {recursive:true});
+        const temporary = join(this.directory, 'config.json.tmp');
+        await writeFile(temporary, JSON.stringify(applied, null, 2), {mode:0o600});
+        await rename(temporary, join(this.directory, 'config.json'));
+      } catch (error) {
+        const rollback = undoImportedFields(previous, applied, this.data);
+        this.data = rollback.value as Data;
+        if (rollback.conflict) throw new CloudImportConflict();
+        throw error;
+      }
+    });
+    this.writes = task.then(() => {}, () => {});
+    await task;
   }
   monitorViews(): MonitorView[] { return structuredClone(this.data.monitorViews); }
   async saveMonitorView(value: MonitorView) {

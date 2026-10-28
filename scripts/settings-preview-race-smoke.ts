@@ -29,6 +29,9 @@ await build({
       window.renders = 0;
       function Fixture() {
         const [preview, setPreview] = useState(defaults);
+        const [saved,setSaved] = useState(defaults);
+        const [hidden,setHidden] = useState(false);
+        window.externalSize = () => { setHidden(true); setSaved(v=>({...v,sidebarFontSize:18})); };
         const [request, setRequest] = useState(null);
         window.renders++;
         window.change = () => {
@@ -36,8 +39,8 @@ await build({
           setRequest({ theme: 'dark' });
         };
         window.result = preview;
-        return <Settings value={defaults} layout={preview.layout} themeRequest={request}
-          onPreview={setPreview} onSave={async () => {}} onClose={() => {}} />;
+        return <div hidden={hidden}><Settings value={saved} layout={preview.layout} themeRequest={request}
+          onPreview={setPreview} onSave={async () => {}} onClose={() => {}} /></div>;
       }
       createRoot(document.getElementById('root')).render(<Fixture />);
     `,
@@ -96,6 +99,11 @@ try {
   await page.waitForTimeout(200);
   assert.equal(await page.evaluate(() => (window as any).renders), settled);
   assert.deepEqual(errors, [], 'A saved layout must preview without being overwritten or looping');
+  await page.evaluate(() => (window as any).externalSize());
+  await page.waitForFunction(() => (window as any).result.sidebarFontSize === 18);
+  assert.equal(await page.evaluate(() => (window as any).result.layout.serverWidth),310);
+  assert.equal(await page.evaluate(() => (window as any).result.theme),'light');
+  assert.deepEqual(errors, [], 'External sidebar changes must update a hidden preview without discarding unrelated draft fields');
   console.log(
     'PASS simultaneous layout/theme changes converge; saved preset layouts preview and settle',
     result,

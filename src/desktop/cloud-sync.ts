@@ -1,3 +1,4 @@
+import { importCloudStages, type CloudImportStage } from '../core/cloud-import';
 import { app, net } from 'electron';
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -95,19 +96,31 @@ export async function registerCloudHandlers(
     }
     return data;
   };
-  const apply = async (value: unknown, rollback = false) => {
+  const apply = async (value: unknown) => {
+    const checkpoint = store.cloudCheckpoint();
     const data = validate(value);
-    if(data.desktopLooks!==undefined||rollback)await desktopLooks?.cloudImport(data.desktopLooks,rollback);
     await mkdir(join(directory, 'appearance'), { recursive: true });
     for (const [name, encoded] of Object.entries(data.assets))
       await writeFile(join(directory, 'appearance', name), Buffer.from(encoded, 'base64'));
-    await client.cloudImport(data.devices);
-    await http.cloudImport(data.http);
-    if(data.opencode!==undefined)await openCode.cloudImport(data.opencode);
-    if(data.tavily!==undefined||rollback)await tavily?.cloudImport(data.tavily,rollback);
-    await ai.cloudImport(data.ai);
-    await store.cloudImport(data.store,rollback);
-    if(data.browser!==undefined)await (rollback?browser.cloudRestore(data.browser):browser.cloudImport(data.browser));
+    const stages: CloudImportStage[] = [];
+    if (data.desktopLooks !== undefined && desktopLooks) stages.push({
+      read: () => desktopLooks.cloudExport(), value: desktopLooks.cloudValidate(data.desktopLooks),
+      apply: value => desktopLooks.cloudImport(value), restore: value => desktopLooks.cloudImport(value, true),
+    });
+    stages.push(
+      {read: () => client.cloudExport(), value: client.cloudValidate(data.devices), apply: value => client.cloudImport(value), restore: value => client.cloudImport(value)},
+      {read: () => http.cloudExport(), value: http.cloudValidate(data.http), apply: value => http.cloudImport(value), restore: value => http.cloudImport(value)},
+    );
+    if (data.opencode !== undefined) stages.push({read: () => openCode.cloudExport(), value: openCode.cloudValidate(data.opencode), apply: value => openCode.cloudImport(value), restore: value => openCode.cloudImport(value)});
+    if (data.tavily !== undefined && tavily) stages.push({read: () => tavily.cloudExport(), value: tavily.cloudValidate(data.tavily), apply: value => tavily.cloudImport(value), restore: value => tavily.cloudImport(value, true)});
+    stages.push({read: () => ai.cloudExport(), value: ai.cloudValidate(data.ai), apply: value => ai.cloudImport(value), restore: value => ai.cloudImport(value)});
+    if (data.browser !== undefined) {
+      const previousBrowser = await browser.cloudExport();
+      stages.push({read: () => browser.cloudExport(), value: {...previousBrowser,...browser.cloudValidate(data.browser)}, apply: value => browser.cloudImport(value), restore: value => browser.cloudRestore(value)});
+    }
+    // Connections and groups commit last, against the snapshot taken before any
+    // asynchronous module import. A concurrent local save aborts without touching it.
+    await importCloudStages(stages, () => store.cloudImport(data.store, false, checkpoint));
   };
   const cloud = new CloudSync(directory, clientCodec, {
     ...(profileOptions?{
@@ -124,14 +137,8 @@ export async function registerCloudHandlers(
     export: snapshot,
     validate,
     import: async (value) => {
-      const previous = await snapshot();
-      try {
-        await apply(value);
-      } catch (error) {
-        await apply(previous,true);
-        throw error;
-      }
-      publish();
+      try { await apply(value); }
+      finally { publish(); }
     },
   }, undefined, (url, options) => net.fetch(String(url), options));
   await cloud.load();

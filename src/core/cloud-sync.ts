@@ -1,3 +1,4 @@
+import { CloudImportConflict } from './cloud-import';
 import { mkdir, readFile, rename, writeFile, readdir, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -12,6 +13,7 @@ interface LocalState {
   revision: number;
   digest?: string;
   baseline?: unknown;
+  recoveryRequired?: boolean;
   lastSync?: string;
   membership?: CloudStatus["membership"];
   storage?:CloudStatus["storage"];
@@ -43,9 +45,20 @@ export class CloudSync {
   }
   async importLocal(accountId:string,prepare:(current:unknown)=>Promise<unknown>){
     return this.withAccountWorkspace(accountId,async()=>{
-      const next=await prepare(await this.adapter.export());
-      this.adapter.validate(next);
-      await this.adapter.import(next);
+      try {
+        const current = await this.adapter.export(), digest = vaultDigest(current);
+        await this.backup(current, 'local-import');
+        const next = await prepare(current);
+        this.adapter.validate(next);
+        if (vaultDigest(await this.adapter.export()) !== digest) throw new CloudImportConflict();
+        await this.adapter.import(next);
+      } catch (error) {
+        if (error instanceof CloudImportConflict) {
+          this.error = error.message; this.state = 'conflict'; this.data.recoveryRequired = true;
+          await this.persist().catch(() => {});
+        }
+        throw error;
+      }
     });
   }
   private handedOff=false;
@@ -91,7 +104,8 @@ export class CloudSync {
       this.data = JSON.parse(
         await this.codec.decrypt(await readFile(join(this.directory, 'cloud-sync.enc'), 'utf8')),
       );
-      this.state = !this.data.session ? 'signed-out' : this.data.key ? 'ready' : 'locked';
+      this.state = !this.data.session ? 'signed-out' : this.data.recoveryRequired ? 'conflict' : this.data.key ? 'ready' : 'locked';
+      if (this.data.recoveryRequired) this.error = '上次云端恢复遇到并发修改，自动同步已暂停，请核对本机与云端配置';
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== 'ENOENT') {
         this.data = { revision: 0 };
@@ -281,6 +295,7 @@ export class CloudSync {
   async sync(direction?: 'upload' | 'download') {
     if(this.handedOff)throw Error('正在打开账号工作区，请稍候');
     return this.exclusive(async () => {
+      if (this.data.recoveryRequired && !direction) throw new CloudImportConflict();
       if (!this.data.session || !this.data.key) throw new Error('请先登录并解锁保险库');
       this.state = 'syncing';
       this.error = undefined;
@@ -360,12 +375,17 @@ export class CloudSync {
           delete this.data.pending;
         }
         this.data.lastSync = new Date().toISOString();
+        delete this.data.recoveryRequired;
         await this.persist();
         this.state = 'ready';
         return this.status();
       } catch (e) {
         this.error = e instanceof Error ? e.message : '同步失败';
-        if (this.state !== 'conflict') this.state = 'error';
+        if (e instanceof CloudImportConflict) {
+          this.state = 'conflict'; this.data.recoveryRequired = true;
+          await this.persist().catch(() => {});
+        }
+        else if (this.state !== 'conflict') this.state = 'error';
         throw e;
       }
     });

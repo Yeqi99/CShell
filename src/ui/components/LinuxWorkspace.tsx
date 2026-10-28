@@ -11,6 +11,7 @@ import './linux-workspace.css';
 
 export function LinuxWorkspace({
   session,
+  nativeDesktopRequest,
   name,
   active,
   closed,
@@ -18,6 +19,7 @@ export function LinuxWorkspace({
   profileId,
   preferences, terminal, files, onRetry,
 }: {
+  nativeDesktopRequest?: number;
   terminal?: (active: boolean, theme: 'light' | 'dark') => ReactNode;
   files?: ReactNode | ((active: boolean) => ReactNode);
   onRetry?: () => void;
@@ -205,7 +207,7 @@ export function LinuxWorkspace({
     </section>
   );
   return <div className="linux-desktop-host" hidden={!active}>
-    <LinuxDesktop name={name} machine={ready ? {...machine, deviceId: profileId} : {deviceId:profileId, platform:plan?.platform || 'unknown', sshOnly:true}} target={target} call={call} active={active} closed={closed} onRetry={onRetry} onTerminal={onTerminal}
+    <LinuxDesktop initialApp={nativeDesktopRequest ? 'native-desktop' : undefined} initialAppRevision={nativeDesktopRequest} name={name} machine={ready ? {...machine, deviceId: profileId} : {deviceId:profileId, platform:plan?.platform || 'unknown', sshOnly:true}} target={target} call={call} active={active} closed={closed} onRetry={onRetry} onTerminal={onTerminal}
       files={files} terminal={terminal || ((visible,theme)=><LinuxDesktopTerminal profileId={profileId} preferences={{...preferences,theme}} active={visible}/>)}
       extraPanels={[...(ready ? [] : [{id:'install-cagent',label:'安装 CAgent',content:setup}]),{id:'native-desktop',label:'原生桌面',icon:Monitor,content:(visible, _options, _closeOptions, windowClosed)=><NativeDesktop session={session} closed={closed || windowClosed} active={visible} initialInfo={nativeInfo}/>} ]}/>
   </div>;

@@ -4,7 +4,7 @@
   const packages = Array.from(document.querySelectorAll('.download-package'));
   const products = {
     pro: {name: 'CShell Pro', description: '登录后同步连接、模型与设置。所有 Pro 安装包均从香港下载源获取。', guide: '/docs/cloud.html'},
-    opensource: {name: 'CShell 开源版', description: 'MIT 开源，无需账号即可使用本地工作台。安装包直接从 GitHub 正式发行页获取。', guide: '/docs/start.html'},
+    opensource: {name: 'CShell 开源版', description: 'MIT 开源，无需账号即可使用本地工作台。安装包从香港下载源获取，与 GitHub 正式发行附件一致。', guide: '/docs/start.html'},
     cagent: {name: 'CAgent', description: '安装在要连接的机器上。账号版支持登录 Pro；独立开源版可直接连接。安装包均从香港下载源获取。', guide: '/docs/cagent.html'}
   };
   const systems = {all: '全部系统', windows: 'Windows', macos: 'macOS', linux: 'Linux', android: 'Android'};
@@ -19,6 +19,12 @@
   function render(updateUrl = false) {
     const product = value('download-product');
     const system = value('download-system');
+    const commandPanel = document.getElementById('linux-command');
+    if (commandPanel) {
+      commandPanel.hidden = system !== 'linux';
+      document.getElementById('linux-install-command').textContent = 'curl -fsSL https://shell.canp.ai/install.sh | sh -s -- ' + (product === 'cagent' ? 'cagent' : 'cshell') + (product === 'pro' ? ' --channel pro' : '');
+      document.getElementById('linux-copy-status').textContent = '';
+    }
     const available = new Set(packages.filter(card => card.dataset.product === product && (system === 'all' || card.dataset.system === system)).map(card => card.dataset.arch));
     const selectable = ['x64', 'arm64'].filter(arch => available.has(arch));
     architecture.parentElement.hidden = selectable.length < 2;
@@ -58,6 +64,11 @@
   window.addEventListener('popstate', restoreLocation);
   window.addEventListener('hashchange', restoreLocation);
   root.addEventListener('change', () => render(true));
+  document.getElementById('copy-linux-install')?.addEventListener('click', async () => {
+    const status = document.getElementById('linux-copy-status');
+    try { await navigator.clipboard.writeText(document.getElementById('linux-install-command').textContent); status.textContent = '已复制'; }
+    catch { status.textContent = '复制未完成，请选择上方指令复制'; }
+  });
   restoreLocation();
   root.hidden = false;
 })();

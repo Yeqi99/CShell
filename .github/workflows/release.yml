@@ -48,7 +48,10 @@ jobs:
         run: pnpm exec tsx scripts/ai-draft-recovery-smoke.ts
       - if: matrix.platform == 'win'
         name: Verify settings preview and layout update convergence
-        run: pnpm exec tsx scripts/settings-preview-race-smoke.ts
+        run: |
+          pnpm exec tsx scripts/settings-preview-race-smoke.ts
+          pnpm exec tsx scripts/machine-tools-layout-smoke.ts
+          node scripts/test-native-desktop-ui.cjs
       - if: matrix.platform == 'win'
         name: Verify terminal parser UI update convergence
         run: pnpm exec tsx scripts/terminal-parsed-race-smoke.ts
