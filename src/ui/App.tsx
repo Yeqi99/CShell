@@ -1,3 +1,4 @@
+import { ConfigLoader } from './config-loader';
 import {ClassroomViewer} from '../extensions/classroom/View';
 import type {ClassroomSource,ClassroomStatus} from '../shared/classroom';
 import {FileConnectionWorkspace} from './components/FileConnectionWorkspace';
@@ -40,6 +41,7 @@ import { toolsDefaults } from '../shared/docker';
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   HardDrive,
+  Monitor,
   LayoutDashboard,
   Files,
   BarChart3,
@@ -112,13 +114,14 @@ export function App() {
     preferences: defaults,
     savedCredentials: [],
   });
+  const [configLoader] = useState(() => new ConfigLoader(() => window.cshell.config(), setConfig));
   return (
     <LocaleContext.Provider value={config.preferences.locale}>
-      <Workbench config={config} setConfig={setConfig} />
+      <Workbench config={config} configLoader={configLoader} />
     </LocaleContext.Provider>
   );
 }
-function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Config) => void }) {
+function Workbench({ config, configLoader }: { config: Config; configLoader: ConfigLoader }) {
   const { t } = useI18n();
   const importedPasswords = useRef(new Map<string, string>());
   const [localTargets, setLocalTargets] = useState<LocalConnectionTarget[]>([]);
@@ -280,6 +283,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
   const commandNumber = useRef(0);
   const newCommandTab = () => { const id = crypto.randomUUID(), name = `命令台 ${++commandNumber.current}`; setCommandTabs(v => [...v, {id, name}]); setCommandId(id); setSurface('command'); };
   const [linuxModes,setLinuxModes]=useState<Record<string,boolean>>({});
+  const [nativeDesktopRequests,setNativeDesktopRequests]=useState<Record<string,number>>({});
   const linuxRestored=useRef(new Set<string>());
   useEffect(()=>{for(const tab of tabs){if(tab.local||tab.client||linuxRestored.current.has(tab.id))continue;linuxRestored.current.add(tab.id);if(connectionUsesVisual(tab.profile,config.preferences)){setLinuxWorkspaces(v=>v.includes(tab.id)?v:[...v,tab.id]);setLinuxModes(v=>({...v,[tab.id]:true}));}}},[tabs]);
   const [machineSessionIds,setMachineSessionIds]=useState<Record<string,string[]>>({});
@@ -296,10 +300,10 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
   };
   async function openMachineDevice(device:ClientDevice){
     const existing=machines.find(m=>m.device.deviceId===device.deviceId);
-    const latest=await window.cshell.config();const opened=existing?.target??await window.cshell.agentMachineOpen(device.deviceId);
+    const latest=await configLoader.load();const opened=existing?.target??await window.cshell.agentMachineOpen(device.deviceId);
     const target={...opened,name:latest.profiles.find(p=>p.id===device.deviceId)?.name??device.name};
     setMachines(v=>v.some(m=>m.target.id===target.id)?v:[...v,{device,target}]);setMachineId(target.id);setSurface('machine');
-    setConfig(await window.cshell.config());
+    await configLoader.load();
   }
   async function closeMachine(id:string){await window.cshell.agentMachineClose(id);setMachineSessionCounts(v=>{const next={...v};delete next[id];return next;});setMachines(v=>v.filter(m=>m.target.id!==id));if(machineId===id){setMachineId('');setSurface('terminal');}}
   const wslReturnSurface = useRef<typeof surface>('terminal');
@@ -379,7 +383,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
       ),
     [],
   );
-  const refresh = useCallback(async () => setConfig(await window.cshell.config()), [setConfig]);
+  const refresh = useCallback(async () => { await configLoader.load(); }, [configLoader]);
   useEffect(() => {
     void refresh().catch(onError);
     return window.cshell.events((event) => {
@@ -532,8 +536,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
     shell: ClientShell,
     distribution?: string,
   ) {
-    const latest = await window.cshell.config();
-    setConfig(latest);
+    const latest = await configLoader.load();
     const saved = latest.profiles.find((p) => p.id === device.deviceId);
     setTabs((items) => [
       ...items,
@@ -606,19 +609,15 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
       setError(e.message);
     });
   }, [minimal, pinned]);
-  const preferenceRevision = useRef(0);
   const savePreferences = async (value: Preferences) => {
-    const revision = ++preferenceRevision.current;
-    // Subsequent controls must read the new draft while persistence is in flight.
-    setConfig({ ...config, preferences: value });
+    const revision = configLoader.previewPreferences(value);
     try {
       await window.cshell.preferences(value);
-      const latest = await window.cshell.config();
-      if (revision === preferenceRevision.current) setConfig(latest);
     } catch (error) {
-      if (revision === preferenceRevision.current) await refresh();
+      await configLoader.settlePreferences(revision).catch(() => {});
       throw error;
     }
+    await configLoader.settlePreferences(revision);
   };
   const layout = preferences.layout;
   const onLayout = (next: Preferences['layout']) => {
@@ -1037,10 +1036,14 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
                 </div>
               )}
             </TabStrip>
-            {surface === 'terminal' && current && !current.local && !current.client && !isFileConnection(current.profile) && <button className="icon" title={linuxModes[active] ? '切换到 SSH 终端' : '打开可视化桌面'} aria-label={linuxModes[active] ? '切换到 SSH 终端' : '打开可视化桌面'} onClick={() => {
-              setLinuxWorkspaces(v => v.includes(active) ? v : [...v, active]);
-              setLinuxModes(v => ({...v, [active]: !v[active]}));
-            }}>{linuxModes[active] ? <TerminalIcon size={17}/> : <LayoutDashboard size={17}/>}</button>}
+            {surface === 'terminal' && current && !current.local && !current.client && !isFileConnection(current.profile) && <details className="local-terminal-menu" onKeyDown={e=>{if(e.key==='Escape')e.currentTarget.open=false;}}>
+              <summary title="桌面与显示方式" aria-label="桌面与显示方式"><LayoutDashboard size={17}/></summary>
+              <div role="menu">
+                <button role="menuitem" onClick={e=>{e.currentTarget.closest('details')!.open=false;setLinuxModes(v=>({...v,[active]:false}));}}><TerminalIcon size={15}/>SSH 终端</button>
+                <button role="menuitem" onClick={e=>{e.currentTarget.closest('details')!.open=false;setLinuxWorkspaces(v=>v.includes(active)?v:[...v,active]);setLinuxModes(v=>({...v,[active]:true}));}}><LayoutDashboard size={15}/>CShell 可视化桌面</button>
+                <button role="menuitem" disabled={!!current.closed} onClick={e=>{e.currentTarget.closest('details')!.open=false;setLinuxWorkspaces(v=>v.includes(active)?v:[...v,active]);setLinuxModes(v=>({...v,[active]:true}));setNativeDesktopRequests(v=>({...v,[active]:(v[active]??0)+1}));}}><Monitor size={15}/>服务器原生桌面</button>
+              </div>
+            </details>}
             {navigator.platform.startsWith('Win') && (
               <details
                 className="local-terminal-menu"
@@ -1163,8 +1166,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
                       <HttpCreate
                         groups={config.groups}
                         onCreated={async (id) => {
-                          const latest = await window.cshell.config();
-                          setConfig(latest);
+                          const latest = await configLoader.load();
                           closeEditor('new');
                           openSaved(latest.profiles.find((p) => p.id === id)!);
                         }}
@@ -1324,7 +1326,7 @@ function Workbench({ config, setConfig }: { config: Config; setConfig: (c: Confi
             </div>
           )}
 
-          {tabs.filter(tab=>linuxWorkspaces.includes(tab.id)).map(tab=><LinuxWorkspace key={tab.id} session={tab.id} profileId={tab.profile.id} preferences={preferences} name={tab.profile.name} active={surface==='terminal'&&active===tab.id&&!!linuxModes[tab.id]} closed={!!tab.closed} onRetry={()=>openSaved(tab.profile)} onTerminal={()=>{}} files={visible=><div inert={!!tab.closed} style={{height:"100%"}}><ToolsPanel sessionId={tab.id} sessionName={tab.profile.name} closed={!!tab.closed} active={visible} dockerEnabled={pluginEnabled(config.plugins,'docker')} transfers={transfers.filter(t=>t.sessionId===tab.id)} onError={onError}/></div>} terminal={(visible)=><VisualSshTerminal active={visible} closed={!!tab.closed} tools={toolsActive=><ToolsPanel sessionId={tab.id} sessionName={tab.profile.name} closed={!!tab.closed} active={toolsActive} dockerEnabled={pluginEnabled(config.plugins,'docker')} transfers={transfers.filter(t=>t.sessionId===tab.id)} onError={onError}/>}><TerminalSlot id={tab.id} active={visible}/></VisualSshTerminal>}/>)}
+          {tabs.filter(tab=>linuxWorkspaces.includes(tab.id)).map(tab=><LinuxWorkspace key={tab.id} nativeDesktopRequest={nativeDesktopRequests[tab.id]} session={tab.id} profileId={tab.profile.id} preferences={preferences} name={tab.profile.name} active={surface==='terminal'&&active===tab.id&&!!linuxModes[tab.id]} closed={!!tab.closed} onRetry={()=>openSaved(tab.profile)} onTerminal={()=>{}} files={visible=><div inert={!!tab.closed} style={{height:"100%"}}><ToolsPanel sessionId={tab.id} sessionName={tab.profile.name} closed={!!tab.closed} active={visible} dockerEnabled={pluginEnabled(config.plugins,'docker')} transfers={transfers.filter(t=>t.sessionId===tab.id)} onError={onError}/></div>} terminal={(visible)=><VisualSshTerminal active={visible} closed={!!tab.closed} tools={toolsActive=><ToolsPanel sessionId={tab.id} sessionName={tab.profile.name} closed={!!tab.closed} active={toolsActive} dockerEnabled={pluginEnabled(config.plugins,'docker')} transfers={transfers.filter(t=>t.sessionId===tab.id)} onError={onError}/>}><TerminalSlot id={tab.id} active={visible}/></VisualSshTerminal>}/>)}
           {tabs.filter(tab=>isFileConnection(tab.profile)).map(tab=><div key={tab.id} className="file-workspace-host" hidden={surface!=='terminal'||active!==tab.id}><FileConnectionWorkspace sessionId={tab.id} profile={tab.profile} closed={!!tab.closed} transfers={transfers.filter(t=>t.sessionId===tab.id)} onError={onError} onRetry={()=>openSaved(tab.profile)}/></div>)}
           <AiExecution enabled={preferences.showAiExecution && !minimal} sessionId={current?.id} />
           {tabs.length ? (

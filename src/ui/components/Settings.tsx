@@ -48,6 +48,7 @@ export function Settings({
   const [busy, setBusy] = useState(false);
   const mcp = useMcpSettings();
   const observedLayout = useRef(value.layout);
+  const observedValue = useRef(value);
   useLayoutEffect(() => {
     if (themeRequest) {
       setDraft((current) => ({ ...current, theme: themeRequest.theme }));
@@ -73,6 +74,18 @@ export function Settings({
     };
   }, [onPreview]);
   useLayoutEffect(() => {
+    // Sidebar controls and cloud refreshes can update saved preferences while this
+    // editor remains mounted in a hidden tab. Refresh only externally changed
+    // fields, preserving unrelated unsaved edits before publishing the preview.
+    const previous = observedValue.current;
+    observedValue.current = value;
+    const changed = (Object.keys(value) as (keyof Preferences)[]).filter(
+      key => JSON.stringify(previous[key]) !== JSON.stringify(value[key]),
+    );
+    if (changed.length) {
+      setDraft(current => Object.assign({}, current, Object.fromEntries(changed.map(key => [key, value[key]]))));
+      return;
+    }
     // Synchronize the external layout before publishing a preview. A passive
     // layout update can otherwise chase the previous preview back from the
     // parent when a form change and a workspace resize happen together.
@@ -83,7 +96,7 @@ export function Settings({
       return;
     }
     onPreview(draft);
-  }, [draft, layout, onPreview]);
+  }, [draft, layout, onPreview, value]);
   const importBackground = async (token?: string) => {
     setBusy(true);
     setError('');

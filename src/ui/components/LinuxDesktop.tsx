@@ -106,10 +106,11 @@ export function LinuxDesktop({
   onTerminal,
   terminal,
   extraPanels = [],
-  files, onRetry, connectionLabel, initialApp, workbench = false,
+  files, onRetry, connectionLabel, initialApp, initialAppRevision, workbench = false,
 }: {
   workbench?: boolean;
   initialApp?: string;
+  initialAppRevision?: number;
   files?: ReactNode | ((active: boolean) => ReactNode);
   onRetry?: () => void;
   connectionLabel?: string;
@@ -272,7 +273,7 @@ export function LinuxDesktop({
       ...initialWindowBounds('terminal', size), z: 0,
     }]);
   }, [!!terminal]);
-  useEffect(()=>{if(initialApp)open(initialApp);},[initialApp]);
+  useEffect(()=>{if(initialApp)open(initialApp);},[initialApp,initialAppRevision]);
   const patch = (id: string, change: Partial<WindowState>) =>
     setWindows((v) => v.map((w) => (w.id === id ? { ...w, ...change } : w)));
   const queueGeometry = (id: string, change: Partial<WindowState>) => {

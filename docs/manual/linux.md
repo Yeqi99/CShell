@@ -13,6 +13,25 @@
 
 
 
+<h2 id="command-install">Linux 一条指令安装</h2>
+
+<p>以实际使用应用的普通账号执行，无需 sudo。自动识别 x64 / ARM64，只下载所选渠道已正式发布的附件，校验文件长度与 SHA256 后放入用户专用目录。需要已有的 Python 3.9+ 与 curl；不会自动安装系统依赖。</p>
+
+<h3>CShell 开源版</h3><pre><code>curl -fsSL https://shell.canp.ai/install.sh | sh -s -- cshell</code></pre>
+<h3>CShell Pro</h3><pre><code>curl -fsSL https://shell.canp.ai/install.sh | sh -s -- cshell --channel pro</code></pre>
+<h3>CAgent</h3><pre><code>curl -fsSL https://shell.canp.ai/install.sh | sh -s -- cagent</code></pre>
+<p>CAgent 账号版在末尾加 <code>--channel pro</code>。安装完成会打印可直接复制的启动命令；CShell 打开桌面客户端，CAgent 用 <code>app</code> 打开系统浏览器配置界面。安装不自动监听网络或修改防火墙、开机启动。</p>
+
+<h3>数据盘与安装前检查</h3><pre><code>curl -fsSL https://shell.canp.ai/install.sh | sh -s -- cagent --directory /data/my-cagent --dry-run</code></pre>
+<p>去掉 <code>--dry-run</code> 才执行安装。默认程序目录为 <code>~/.local/opt/cshell-opensource</code>、<code>~/.local/opt/cshell-pro</code> 或 <code>~/.local/opt/cagent-opensource</code>（账号版为 <code>cagent-pro</code>）。CAgent 私有运行时随包安装，新配置放在所选目录的 <code>data</code> 中；发现原有 CAgent 数据时继续使用原目录，保留设备身份、密码与授权，不自动迁移。CShell 继续使用原账号配置目录。不同渠道不能混装到同一目录。</p>
+
+<p>脚本不修改 PATH、系统依赖或软件源，更新也不结束正在运行的会话。下载失败或校验不通过不切换启动命令；成功后退出旧应用，再使用安装完成时显示的命令打开新版本。旧版本目录保留供恢复。已存在的同版本目录不会覆盖。</p>
+
+<p>桌面客户端采用 AppImage，需要图形环境及发行版支持的 AppImage/FUSE 运行条件；不要用禁用沙箱参数绕过启动错误。无图形环境请安装 CAgent；需要由系统包管理器安装桌面客户端时，仍可在下方下载 DEB。各发行版和实体设备的覆盖范围以发行说明为准。</p>
+
+<p><a href="https://shell.canp.ai/install.sh">查看完整安装脚本</a> · <a href="https://shell.canp.ai/downloads.html?system=linux">下载 Linux 完整安装包</a></p>
+
+
 <h2 id="section-2">桌面客户端与 CAgent</h2>
 
 <p>CShell 桌面客户端需要可用图形环境。CAgent 独立运行，可提供已授权的终端、文件、HTTP 和管理能力，不依赖 Electron 或捆绑 Chromium。</p>

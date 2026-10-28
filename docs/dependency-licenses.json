@@ -108,6 +108,12 @@
     "repository": "git+https://github.com/paulmillr/noble-hashes.git"
   },
   {
+    "name": "@novnc/novnc",
+    "version": "1.7.0",
+    "license": "MPL-2.0",
+    "repository": "git+https://github.com/novnc/noVNC.git"
+  },
+  {
     "name": "@peculiar/asn1-cms",
     "version": "2.10.0",
     "license": "MIT",

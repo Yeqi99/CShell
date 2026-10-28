@@ -17,6 +17,10 @@
 
 
 
+<h2 id="linux-command">Linux 快速安装</h2>
+<pre><code>curl -fsSL https://shell.canp.ai/install.sh | sh -s -- cagent</code></pre><p>账号版追加 <code>--channel pro</code>。自动匹配 x64 / ARM64，校验香港发行附件，不修改系统软件源、全局 PATH、监听端口和权限。安装完成后按打印的命令启动 CAgent 配置界面；新安装数据位于专用目录，已有身份和配置保持原路径。需要 Python 3.9+、curl。<a href="https://shell.canp.ai/docs/linux.html#command-install">数据盘安装、预检和更新说明</a> · <a href="https://shell.canp.ai/downloads.html?product=cagent&amp;system=linux">下载安装包</a></p>
+
+
 <h2 id="section-2">连接到机器</h2>
 
 <p>在目标 CAgent 配置连接地址、端口、密码与权限。复制连接信息后，在 CShell 新建连接中显式粘贴；复制内容不包含密码或私钥。首次核对目标身份后再认证。</p>
