@@ -129,7 +129,7 @@ try {
   await page.locator('.terminals:visible .xterm-helper-textarea:visible').waitFor();
   assert.equal(await page.locator('.linux-desktop:visible').count(),0);
   assert.equal((await page.evaluate(()=>window.cshell.config())).preferences.defaultConnectionView,'original');
-  const shellCount=server.shellRequests();await page.getByRole('button',{name:'打开可视化桌面',exact:true}).click();
+  const shellCount=server.shellRequests();await page.getByLabel('桌面与显示方式',{exact:true}).click();await page.getByRole('menuitem',{name:'CShell 可视化桌面',exact:true}).click();
   await page.locator('.linux-desktop:visible .desktop-icons').getByRole('button',{name:'文件',exact:true}).dblclick();
   assert.equal(server.shellRequests(),shellCount);
   await page.locator('.metric-cpu strong').getByText('10%', { exact: true }).waitFor();

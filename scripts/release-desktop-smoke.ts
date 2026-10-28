@@ -60,7 +60,7 @@ try {
   await page.waitForFunction(() => [...document.querySelectorAll('.xterm-rows')].some(el=>el.textContent?.includes('release-desktop-history')));
   const id = await page.locator('.session-tab.active').getAttribute('data-session');
   assert.ok(id); const requestCount = server.shellRequests();
-  await page.getByRole('button',{name:'打开可视化桌面',exact:true}).click();
+  await page.getByLabel('桌面与显示方式',{exact:true}).click();await page.getByRole('menuitem',{name:'CShell 可视化桌面',exact:true}).click();
   await page.locator('.linux-desktop:visible').waitFor();assert.equal(await page.locator('.linux-mode-bar').count(),0);
   const terminal = await desktopApp(page,'终端');await terminal.locator('.xterm-helper-textarea:visible').waitFor();
   assert.equal(server.shellRequests(),requestCount);
