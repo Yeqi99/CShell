@@ -1,3 +1,4 @@
+import { EmbeddedRdpService } from './embedded-rdp';
 import {NativeDesktopService} from './native-desktop';
 import {classroomDiscoveryLifecycle} from '../core/classroom-discovery-lifecycle';
 import {AgentLanService} from '../core/agent-lan';
@@ -20,7 +21,7 @@ import { visualToolSource } from '../core/visual-tools';
 import { visualCapabilities } from '../shared/visual-tools';
 import {localViewProfiles} from '../shared/monitor-views';
 import { Diagnostics } from '../core/diagnostics';
-import { openRdpProfile, rdpProfileSchema } from '../core/rdp';
+import { rdpProfileSchema } from '../core/rdp';
 import { installWindowPermissions } from './window-permissions';
 import { HttpWorkspaces } from '../core/http-workspaces';
 import { loadPrivateWechat } from '../core/custom-extensions';
@@ -462,10 +463,19 @@ else
         if(clear)await store.setSecret(profile.id,null);
         else if(secret!==undefined)await store.setSecret(profile.id,{password:secret});
       });
+      const embeddedRdp=new EmbeddedRdpService(join(app.getPath('userData'),'rdp-host'));
+      app.once('before-quit',()=>embeddedRdp.dispose());
       handle('connection:rdp', async (value) => {
         const profile=rdpProfileSchema.parse(store.profile(idSchema.parse(value)));
         const secret=await store.secret(profile.id);
-        await openRdpProfile(profile,secret?.password,join(app.getPath('userData'),'rdp'));
+        return embeddedRdp.open(profile,secret?.password||'',window.getNativeWindowHandle());
+      });
+      handle('connection:rdp-status',(id)=>embeddedRdp.status(idSchema.parse(id)));
+      handle('connection:rdp-close',(id)=>embeddedRdp.close(idSchema.parse(id)));
+      handle('connection:rdp-bounds',(id,value)=>{
+        const b=z.object({x:z.number().min(0),y:z.number().min(0),width:z.number().min(0).max(16000),height:z.number().min(0).max(16000),visible:z.boolean()}).strict().parse(value);
+        const scale=window.webContents.getZoomFactor()*screen.getDisplayMatching(window.getBounds()).scaleFactor;
+        embeddedRdp.send(idSchema.parse(id),{op:'bounds',visible:b.visible,x:Math.round(b.x*scale),y:Math.round(b.y*scale),width:Math.round(b.width*scale),height:Math.round(b.height*scale)});
       });
       handle('client:devices', () => clientProvider.list());
       handle('client:pair', async (text) => {
@@ -1135,3 +1145,4 @@ else
       app.quit();
     });
 app.on('window-all-closed', () => app.quit());
+

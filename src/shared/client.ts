@@ -77,7 +77,10 @@ export interface ClientBridge {
     relay?: AgentRelayConnection;
   }): Promise<ClientInfo>;
   clientPasswordPair(info: ClientInfo, password: string): Promise<ClientDevice>;
-  openRdp(profileId: string): Promise<void>;
+  openRdp(profileId: string): Promise<unknown>;
+  rdpStatus(id:string):Promise<{state:string;message:string}>;
+  rdpClose(id:string):Promise<void>;
+  rdpBounds(id:string,bounds:{x:number;y:number;width:number;height:number;visible:boolean}):Promise<void>;
   saveRdp(profile: Profile, password?: string, clearPassword?: boolean): Promise<void>;
   clientDownloadPage(platform?: 'windows'): Promise<void>;
   clientTheme(theme: 'light' | 'dark'): Promise<void>;

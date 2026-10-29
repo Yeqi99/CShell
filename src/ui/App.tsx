@@ -316,10 +316,6 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
   const [quickVisual, setQuickVisual] = useState<Record<string, boolean>>({});
   const openSaved = (profile: Profile, visual = connectionUsesVisual(profile,config.preferences)) => {
     setQuickVisual(v => ({...v, [profile.id]: visual}));
-    if (profile.protocol === 'rdp' && !visual) {
-      void window.cshell.openRdp(profile.id).catch(onError);
-      return;
-    }
     setQuickConnections((items) =>
       items.some((item) => item.id === profile.id) ? items : [...items, profile],
     );
@@ -1129,7 +1125,7 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
               className="workspace-editor"
               hidden={surface !== 'quick' || quickId !== profile.id}
             >
-              {profile.protocol === 'rdp' ? <RdpMachineWorkspace profile={profile} profiles={config.profiles} onOpen={openSaved}/> : profile.protocol === 'http' ? (
+              {profile.protocol === 'rdp' ? <RdpMachineWorkspace active={surface === 'quick' && quickId === profile.id} profile={profile} profiles={config.profiles} onOpen={openSaved}/> : profile.protocol === 'http' ? (
                 <HttpWorkbench
                   profile={config.profiles.find((p) => p.id === profile.id) ?? profile}
                   enabled={pluginEnabled(config.plugins, 'http')}
@@ -1190,7 +1186,7 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
                   />
                 </ConnectionEntry>
               ) : draft.protocol === 'rdp' ? (
-                <RdpConnectionForm profile={draft} saved={config.savedCredentials.includes(draft.id)} onSaved={refresh} />
+                <RdpConnectionForm profile={draft} saved={config.savedCredentials.includes(draft.id)} onSaved={refresh} onConnect={openSaved} />
               ) : draft.protocol === 'client' ? (
                 <ClientProfileEditor
                   profile={draft}

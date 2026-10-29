@@ -215,7 +215,7 @@ export function ConnectionEntry({
             {visited.includes('client') && <ClientConnectForm onConnect={onClient} />}
           </div>
           <div hidden={kind !== 'rdp'}>
-            {visited.includes('rdp') && <RdpConnectionForm embedded onSaved={onSaved} />}
+            {visited.includes('rdp') && <RdpConnectionForm embedded onSaved={onSaved} onConnect={onConnect} />}
           </div>
         </div>
       </div>
@@ -223,3 +223,4 @@ export function ConnectionEntry({
     </div>
   );
 }
+
