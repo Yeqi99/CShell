@@ -18,7 +18,8 @@ export type ConsoleRecoveryState = z.infer<typeof consoleRecoveryStateSchema>;
 export type ConsoleRecoveryPlan = ConsoleRecoveryState & {
   id: string;
   expires: number;
-  displayAvailable: boolean;
+  displayDetected: boolean;
+  actualFrameVerified: false;
   displayWidth?: number;
   displayHeight?: number;
 };
@@ -29,6 +30,22 @@ export type ConsoleRecoveryResult = {
   sessionId: number;
   consoleSessionId: number;
 };
+/** --probe initializes the capture source but never acquires a frame. */
+export function describeDisplayProbe(value: unknown) {
+  const probe = z
+    .object({
+      display: z
+        .object({ width: z.number().int().positive(), height: z.number().int().positive() })
+        .optional(),
+    })
+    .safeParse(value);
+  const display = probe.success ? probe.data.display : undefined;
+  return {
+    displayDetected: !!display,
+    actualFrameVerified: false as const,
+    ...(display ? { displayWidth: display.width, displayHeight: display.height } : {}),
+  };
+}
 export function nativeConsoleRecovery(executable: string) {
   const run = async (args: string[]) => {
     const { stdout } = await promisify(execFile)(executable, args, {
@@ -45,13 +62,9 @@ export function nativeConsoleRecovery(executable: string) {
     display: async () => {
       try {
         const info = await run(['--probe']);
-        return {
-          displayAvailable: !info.captureError && !!info.display,
-          displayWidth: info.display?.width,
-          displayHeight: info.display?.height,
-        };
+        return describeDisplayProbe(info);
       } catch {
-        return { displayAvailable: false };
+        return describeDisplayProbe(undefined);
       }
     },
     execute: async (state: ConsoleRecoveryState) =>
