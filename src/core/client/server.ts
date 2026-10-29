@@ -1,3 +1,4 @@
+import { clientAuthError } from './auth-error';
 import { executeHttp } from '../http-transport';
 import { httpWireSchema } from '../../shared/http';
 import { accessSchema, hashPassword, verifyPassword } from './password';
@@ -342,7 +343,7 @@ export class ClientServer {
               :error instanceof z.ZodError?'操作参数不完整或格式不正确，请检查输入或更新两端应用（INVALID_PARAMETERS）'
               :'CAgent 请求失败：请检查远端权限和服务状态';
             if (c.alive) send(socket, { id: req.id, error: req.op === 'auth'
-              ? 'CAgent 认证失败：配对已失效或密码不正确，请重新认证'
+              ? clientAuthError(error)
               : detail });
             if (!c.peer) socket.end();
           }
