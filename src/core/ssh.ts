@@ -25,6 +25,7 @@ export interface Session {
   parent?: string;
 }
 export class SshService {
+  jumpTransport?: (profile:Profile,signal:AbortSignal)=>Promise<{socket:import('node:stream').Duplex;close():void}>;
   private sessions = new Map<string, Session>();
   get size() {
     return this.sessions.size;
@@ -61,6 +62,7 @@ export class SshService {
     const decoder = new StringDecoder('utf8'),
       stderrDecoder = new StringDecoder('utf8');
     const controller = new AbortController();
+    let jump: {socket:import('node:stream').Duplex;close():void}|undefined;
     let established = false;
     let rejectPending: (error: Error) => void = () => {};
     const close = (error?: string) => {
@@ -71,6 +73,7 @@ export class SshService {
       session.sftp?.end();
       session.shell?.destroy();
       client.destroy();
+      jump?.close();
       this.emit({ type: 'closed', sessionId: session.id, error });
     };
     const abort = () => {
@@ -83,6 +86,7 @@ export class SshService {
     const timeoutMs = this.options.connectTimeoutMs ?? 120000;
     const timer = setTimeout(() => controller.abort(new Error(CONNECTION_TIMEOUT)), timeoutMs);
     try {
+      if(profile.jumpProfileId){if(!this.jumpTransport)throw Error('当前运行环境不支持跳板连接');jump=await this.jumpTransport(profile,controller.signal);if(controller.signal.aborted){jump.close();controller.signal.throwIfAborted();}}
       await new Promise<void>((resolve, reject) => {
         rejectPending = reject;
         client.once('ready', resolve);
@@ -95,6 +99,7 @@ export class SshService {
           close();
         });
         client.connect({
+          sock: jump?.socket,
           host: profile.host,
           port: profile.port,
           username: profile.username,

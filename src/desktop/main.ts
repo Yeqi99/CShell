@@ -1,3 +1,4 @@
+import { MachineNetworkRoute } from './machine-network-route';
 import { EmbeddedRdpService } from './embedded-rdp';
 import {NativeDesktopService} from './native-desktop';
 import {classroomDiscoveryLifecycle} from '../core/classroom-discovery-lifecycle';
@@ -590,6 +591,7 @@ else
       handle('http:history', id => http.histories(id));
       handle('http:cancel', id => http.cancel(id));
       const linuxWorkspace=new LinuxWorkspaceService(ssh,join(app.getAppPath(),'dist/agent/agent.cjs'));
+      ssh.jumpTransport=async(profile,signal)=>{const route=new MachineNetworkRoute(store,clientProvider,[profile.id]);const abort=()=>{void route.close();};signal.addEventListener('abort',abort,{once:true});try{signal.throwIfAborted();const socket=await route.tunnel(profile.jumpProfileId!,profile.host,profile.port);signal.throwIfAborted();return {socket,close:()=>{signal.removeEventListener('abort',abort);void route.close();}};}catch(e){signal.removeEventListener('abort',abort);await route.close();throw e;}};
       const machineBrowser=new MachineBrowser(window,ssh);
       const nativeDesktop=new NativeDesktopService(ssh);
       handle('native-desktop:setup',(id,action)=>nativeDesktop.setup(idSchema.parse(id),action));
@@ -651,6 +653,7 @@ else
         http,
         wechat,
         () => processExtensions.applicationTools(),
+        new MachineNetworkRoute(store, clientProvider),
       );
       registerPresetHandlers(handle, window, app.getPath('userData'), store, text);
       registerConnectionImport(handle, window, store);

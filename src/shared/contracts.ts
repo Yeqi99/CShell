@@ -33,6 +33,7 @@ export const profileSchema = z
     clientShell: clientShellSchema.optional(),
     clientDistribution: z.string().min(1).max(100).optional(),
     defaultConnectionView: z.enum(['visual', 'original']).optional(),
+    jumpProfileId: z.string().uuid().optional(),
     name: text,
     host: z.string().trim().max(8192),
     port: z.number().int().min(0).max(65535),
@@ -43,6 +44,7 @@ export const profileSchema = z
   })
   .strict()
   .superRefine((p, ctx) => {
+    if (p.jumpProfileId && (p.jumpProfileId === p.id || (p.protocol && p.protocol !== 'ssh' && p.protocol !== 'sftp'))) ctx.addIssue({code:'custom',message:'Jump host requires a different SSH/SFTP target'});
     if ((p.protocol === 'ftp' || p.protocol === 'ftps') && p.auth !== 'password')
       ctx.addIssue({ code: 'custom', message: 'FTP uses password authentication' });
     if (p.protocol === 'http') {

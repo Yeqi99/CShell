@@ -16,6 +16,7 @@ export class ApplicationNetworkRoute {
     list(): Promise<NetworkRouteStatus['machines']>;
     // Resolver must enforce entitlement, identity and forwarding permission.
     proxy(id: string): Promise<string>;
+    close?(): Promise<void>;
   };
   constructor(private directory: string, private store: Store) {}
   async load() {
@@ -93,5 +94,6 @@ export class ApplicationNetworkRoute {
     this.closed = true;
     await this.queue.catch(() => {});
     await this.current?.closeAllConnections();
+    await this.machine?.close?.();
   }
 }
