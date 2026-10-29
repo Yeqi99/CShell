@@ -72,6 +72,9 @@ const bridge: Bridge = {
   clientPasswordPair: (info, password) =>
     ipcRenderer.invoke('client:password-pair', info, password),
   saveRdp: (profile,password,clearPassword) => ipcRenderer.invoke('connection:rdp-save',profile,password,clearPassword),
+  rdpStatus: (id) => ipcRenderer.invoke('connection:rdp-status',id),
+  rdpClose: (id) => ipcRenderer.invoke('connection:rdp-close',id),
+  rdpBounds: (id,bounds) => ipcRenderer.invoke('connection:rdp-bounds',id,bounds),
   openRdp: (endpoint) => ipcRenderer.invoke('connection:rdp', endpoint),
   clientDownloadPage: platform => ipcRenderer.invoke('client:download-page', platform),
   clientTheme: (theme) => ipcRenderer.invoke('client:theme', theme),

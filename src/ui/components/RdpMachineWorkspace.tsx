@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Check, Copy, Download, Monitor, Package } from 'lucide-react';
 import type { Profile } from '../../shared/contracts';
-import { LinuxDesktop } from './LinuxDesktop';
+
 import './rdp-install-guide.css';
 
 const windowsDownloadPage = 'https://shell.canp.ai/downloads.html?product=cagent&system=windows';
@@ -34,27 +34,10 @@ export function RdpCagentInstallGuide({ name, address, busy, onOpenDesktop }: {
   </section>;
 }
 
-/** The native RDP viewer owns its connection status. */
-export function RdpMachineWorkspace({ profile }: {
-  profile: Profile;
-  profiles: Profile[];
-  onOpen: (profile: Profile) => void;
-}) {
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState('尚未打开远程桌面');
-  const launch = async () => {
-    if (busy) return;
-    setBusy(true);
-    try { await window.cshell.openRdp(profile.id); setMessage('已打开系统远程桌面，请在窗口内查看连接状态'); }
-    catch (error) { setMessage((error as Error).message); }
-    finally { setBusy(false); }
-  };
-  return <LinuxDesktop name={profile.name} target={'rdp:' + profile.id}
-    machine={{ platform: 'win32', deviceId: profile.id, desktopOnly: true, protocolLabel: 'RDP' }}
-    active closed onRetry={() => void launch()} connectionLabel={busy ? '正在打开远程桌面' : message}
-    call={async () => { throw Error('RDP 不提供管理通道'); }}
-    extraPanels={[
-      { id: 'remote-desktop', label: '远程桌面', icon: Monitor, content: <section className="machine-connection-card"><h2>{profile.name}</h2><p>{profile.host}:{profile.port}</p><button className="primary" disabled={busy} onClick={() => void launch()}>打开远程桌面</button><p role="status">{message}</p></section> },
-      { id: 'install-cagent', label: '安装 CAgent', icon: Package, content: <RdpCagentInstallGuide name={profile.name} address={`${profile.host}:${profile.port}`} busy={busy} onOpenDesktop={() => void launch()} /> },
-    ]} />;
+export function RdpMachineWorkspace({profile,active=true}:{profile:Profile;active?:boolean;profiles:Profile[];onOpen:(p:Profile)=>void}) {
+ const [guide,setGuide]=useState(false);const host=useRef<HTMLDivElement>(null);const [status,setStatus]=useState({state:'connecting',message:'正在连接远程桌面'});const [attempt,setAttempt]=useState(0);
+ useEffect(()=>{let alive=true,started=false;void window.cshell.openRdp(profile.id).then(()=>{started=true;}).catch(e=>{if(alive)setStatus({state:'failed',message:String(e.message||e)});});const timer=setInterval(()=>{if(!started)return;void window.cshell.rdpStatus(profile.id).then(s=>{if(alive)setStatus(s);}).catch(()=>{});},300);return()=>{alive=false;clearInterval(timer);void window.cshell.rdpClose(profile.id);};},[profile.id,attempt]);
+ useEffect(()=>{const update=()=>{const r=host.current?.getBoundingClientRect();if(r)void window.cshell.rdpBounds(profile.id,{x:Math.max(0,r.x),y:Math.max(0,r.y),width:r.width,height:r.height,visible:active&&!guide&&r.width>0&&r.height>0}).catch(()=>{});};update();const timer=setInterval(update,200);const observer=new ResizeObserver(update);if(host.current)observer.observe(host.current);window.addEventListener('resize',update);return()=>{clearInterval(timer);observer.disconnect();window.removeEventListener('resize',update);};},[active,guide,profile.id,attempt]);
+ return <section style={{height:'100%',display:'flex',flexDirection:'column',minHeight:0}} aria-label="远程桌面"><header style={{display:'flex',alignItems:'center',gap:12,padding:'8px 12px'}}><Monitor size={16}/><strong>{profile.name}</strong><span role="status">{status.message}</span><button onClick={()=>setGuide(v=>!v)}>{guide?'返回远程桌面':'安装 CAgent'}</button>{['failed','closed'].includes(status.state)&&<button onClick={()=>setAttempt(n=>n+1)}>重新连接</button>}</header>{guide&&<div style={{overflow:'auto'}}><RdpCagentInstallGuide name={profile.name} address={`${profile.host}:${profile.port}`} busy={false} onOpenDesktop={()=>setGuide(false)}/></div>}<div ref={host} style={{flex:1,minHeight:0,position:'relative',display:guide?'none':undefined}} /></section>;
 }
+

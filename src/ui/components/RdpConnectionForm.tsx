@@ -9,11 +9,13 @@ export function RdpConnectionForm({
   saved = false,
   embedded = false,
   onSaved,
+  onConnect,
 }: {
   profile?: Profile;
   saved?: boolean;
   embedded?: boolean;
   onSaved: () => Promise<void>;
+  onConnect?: (profile: Profile) => void;
 }) {
   const { locale } = useI18n(),
     cn = locale === 'zh-CN';
@@ -55,11 +57,11 @@ export function RdpConnectionForm({
       setPassword('');
       setClear(false);
       await onSaved();
-      if (open) await window.cshell.openRdp(next.id);
+      if (open && onConnect) onConnect(next);
       setMessage(
         open
           ? cn
-            ? '已保存并打开远程桌面客户端。'
+            ? '已保存并在标签页打开远程桌面。'
             : 'Saved and opened Remote Desktop.'
           : cn
             ? '已保存到左侧连接列表。'
