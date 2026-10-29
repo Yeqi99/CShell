@@ -1,3 +1,4 @@
+import { DesktopRecovery } from './DesktopRecovery';
 import { useEffect, useRef, useState } from 'react';
 import { Monitor, Square, SlidersHorizontal, Expand, Minimize, Maximize, MoreHorizontal } from 'lucide-react';
 import {
@@ -437,6 +438,7 @@ export function AgentDesktopView({
         )}
         {busy && <button onClick={() => void stop()}>取消连接</button>}
         {active && info?.secureAttention && <button disabled={!control} onClick={() => input({kind:'secure-attention'})} title="向远端发送 Ctrl+Alt+Delete；是否显示登录界面由 Windows 决定">Ctrl+Alt+Delete</button>}
+        <DesktopRecovery key={target} target={target} allowed={canControl&&!busy} beforeExecute={stop} onRecovered={start}/>
         {onFiles && <button onClick={onFiles} title="在当前机器选择目录，粘贴或拖入文件">传输文件</button>}
         <button className="desktop-quality-toggle" aria-expanded={qualityOpen} onClick={()=>setQualityOpen(v=>!v)} title="画质设置"><SlidersHorizontal size={16}/>画质</button>
         <button title={expanded?'还原工作区':'填满工作区'} aria-label={expanded?'还原工作区':'填满工作区'} aria-pressed={expanded} onClick={()=>{release();setExpanded(v=>!v);}}>{expanded?<Minimize size={16}/>:<Expand size={16}/>}</button>

@@ -308,6 +308,11 @@ void stream(){workerTrace(L"Worker stream entered");
 int wmain(int argc,wchar_t**argv){
  try{
 #ifdef CAGENT_EXPERIMENTAL_SYSTEM_BROKER
+  if(argc==2&&std::wstring(argv[1])==L"--recovery-plan"){std::cout<<brokerControl(4)<<std::endl;return 0;}
+  if(argc==4&&std::wstring(argv[1])==L"--recover-console"){
+   auto number=[](const wchar_t* s){std::wstring text(s);if(text.empty()||text.size()>10||!std::all_of(text.begin(),text.end(),[](wchar_t c){return c>=L'0'&&c<=L'9';}))throw std::runtime_error("Invalid recovery plan");return (DWORD)std::stoul(text);};
+   std::cout<<brokerControl(5,number(argv[2]),number(argv[3]))<<std::endl;return 0;
+  }
   if(argc>2&&std::wstring(argv[1])==L"--system-pipe"){bindSystemDesktop();connectSystemWorker(argv[2]);}
   else if(argc>1&&std::wstring(argv[1])==L"--stream"&&brokerStream())return 0;
 #else

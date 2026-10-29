@@ -54,14 +54,15 @@ static std::wstring tokenSid(HANDLE token){DWORD bytes=0;GetTokenInformation(tok
 static DWORD tokenSession(HANDLE token){DWORD value=0,bytes=0;need(GetTokenInformation(token,TokenSessionId,&value,sizeof(value),&bytes)!=0&&value!=0,"Interactive session required");return value;}
 static bool elevated(HANDLE token){TOKEN_ELEVATION value{};DWORD bytes=0;return GetTokenInformation(token,TokenElevation,&value,sizeof(value),&bytes)&&value.TokenIsElevated;}
 static DWORD parentPid(DWORD pid){Handle snapshot(CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS,0));need(snapshot.h!=INVALID_HANDLE_VALUE,"Process ancestry unavailable");PROCESSENTRY32W entry{};entry.dwSize=sizeof(entry);if(Process32FirstW(snapshot,&entry))do{if(entry.th32ProcessID==pid)return entry.th32ParentProcessID;}while(Process32NextW(snapshot,&entry));throw std::runtime_error("Process ancestry missing");}
-struct Identity{DWORD pid=0,session=0;bool worker=false;};
+struct Identity{DWORD pid=0,session=0;ULONGLONG created=0;bool worker=false;};
 static Identity authorize(HANDLE pipe,const std::wstring& owner,const std::wstring& proxy,BYTE action){
  need(ImpersonateNamedPipeClient(pipe)!=0,"Cannot identify broker client");Handle token;bool opened=OpenThreadToken(GetCurrentThread(),TOKEN_QUERY,TRUE,token.put())!=0;BOOL reverted=RevertToSelf();need(reverted&&opened,"Cannot read client identity");
  Identity identity;ULONG pid=0;need(GetNamedPipeClientProcessId(pipe,&pid)!=0,"Client process unavailable");identity.pid=pid;identity.session=tokenSession(token);
  Handle process(OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION|SYNCHRONIZE,FALSE,pid));need(process.h&&WaitForSingleObject(process,0)==WAIT_TIMEOUT,"Client exited");
+ identity.created=creationTime(process);
  auto sid=tokenSid(token);
  if(sid==L"S-1-5-18"){
-  need(action!=1,"Workers cannot start another worker");std::lock_guard<std::mutex> lock(workerMutex);auto found=liveWorkers.find(pid);
+  need(action==2||action==3,"Workers cannot route sessions or start another worker");std::lock_guard<std::mutex> lock(workerMutex);auto found=liveWorkers.find(pid);
   need(found!=liveWorkers.end()&&found->second.session==identity.session&&found->second.created==creationTime(process)&&WaitForSingleObject(found->second.process,0)==WAIT_TIMEOUT&&_wcsicmp(imagePath(process).c_str(),proxy.c_str())==0,"Not an active broker worker");identity.worker=true;return identity;
  }
  need(sid==owner,"Client is not broker owner");
@@ -72,6 +73,7 @@ static Identity authorize(HANDLE pipe,const std::wstring& owner,const std::wstri
  Handle runtimeToken;need(OpenProcessToken(runtime,TOKEN_QUERY,runtimeToken.put())!=0&&tokenSid(runtimeToken)==owner&&tokenSession(runtimeToken)==identity.session&&elevated(runtimeToken),"CAgent parent must be elevated in the same owner session");
  need(_wcsicmp(imagePath(runtime).c_str(),registryString(L"RuntimeImagePath").c_str())==0,"CAgent runtime changed; reinstall system desktop support");need(action!=3,"Secure attention is available only through an authorized worker input lease");return identity;
 }
+#include "desktop-session-recovery.hpp"
 static bool sasPolicyAllowsServices(){DWORD value=0,bytes=sizeof(value);return RegGetValueW(HKEY_LOCAL_MACHINE,L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System",L"SoftwareSASGeneration",RRF_RT_REG_DWORD,nullptr,&value,&bytes)==ERROR_SUCCESS&&(value==1||value==3);}
 static HMODULE sasLibrary(){return LoadLibraryExW(L"sas.dll",nullptr,LOAD_LIBRARY_SEARCH_SYSTEM32);}
 static bool sasAvailable(){if(!sasPolicyAllowsServices())return false;HMODULE library=sasLibrary();bool result=library&&GetProcAddress(library,"SendSAS");if(library)FreeLibrary(library);return result;}
@@ -88,8 +90,16 @@ static void copy(HANDLE from,HANDLE to,bool fromPipe=false,bool toPipe=false,HAN
 static void serve(HANDLE raw,const std::wstring owner,const std::wstring worker){
  Handle pipe(raw);TrackThread tracked;
  try{
-  BYTE action=0;DWORD received=0;need(pipeIo(pipe,&action,1,received,false,5000)&&received==1&&(action==1||action==2||action==3),"Invalid broker handshake");
+  BYTE action=0;DWORD received=0;need(pipeIo(pipe,&action,1,received,false,5000)&&received==1&&(action>=1&&action<=5),"Invalid broker handshake");
   Identity identity=authorize(pipe,owner,worker,action);DWORD session=identity.session;
+  if(action==4||action==5){
+   try{json result;
+    if(action==4)result=recoveryPlan(identity);
+    else{DWORD expected[2]{};DWORD offset=0;while(offset<sizeof(expected)){need(pipeIo(pipe,((BYTE*)expected)+offset,sizeof(expected)-offset,received,false,5000)&&received,"Recovery request missing");offset+=received;}result=recoverConsole(identity,expected[0],expected[1]);}
+    controlReply(pipe,result);
+   }catch(const std::exception&e){controlReply(pipe,{{"error",std::string(e.what()).substr(0,1024)}});}
+   DisconnectNamedPipe(pipe);clients--;return;
+  }
   if(action!=1){if(action==3)sendSas(identity);controlReply(pipe,{{"version",1},{"secureAttention",sasAvailable()},{"submitted",action==3},{"confirmed",false}});DisconnectNamedPipe(pipe);clients--;return;}
   {std::lock_guard<std::mutex> lock(workerMutex);need(activeSessions.insert(session).second,"A desktop worker already owns this Windows session");}
   struct SessionRelease{DWORD session;~SessionRelease(){std::lock_guard<std::mutex> lock(workerMutex);activeSessions.erase(session);}}sessionRelease{session};

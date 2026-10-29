@@ -39,3 +39,10 @@
 .agent-desktop-view .desktop-scalable{overflow:auto;align-items:flex-start;justify-content:flex-start;overscroll-behavior:contain}
 .agent-desktop-view .desktop-scalable canvas{max-width:none;max-height:none;margin:auto;object-fit:fill}
 .agent-desktop-view .desktop-pan canvas{cursor:grab}.agent-desktop-view .desktop-pan canvas:active{cursor:grabbing}
+
+.desktop-recovery { position:static; }
+.desktop-recovery-plan { position:absolute; z-index:30; top:calc(100% + 8px); right:12px; box-sizing:border-box; width:min(420px,calc(100% - 24px)); max-height:min(520px,70vh); overflow:auto; padding:16px; background:var(--panel,var(--bg,#fff)); color:var(--text); border:1px solid var(--border); border-radius:12px; box-shadow:0 12px 36px #0003; font-size:13px; line-height:1.55; }
+.desktop-recovery-heading { display:flex; align-items:center; justify-content:space-between; }
+.desktop-recovery-plan dl { display:grid; grid-template-columns:auto minmax(0,1fr); gap:6px 12px; }
+.desktop-recovery-plan dt { color:var(--muted); }.desktop-recovery-plan dd { margin:0; overflow-wrap:anywhere; }
+.desktop-recovery-plan label { display:flex; align-items:flex-start; gap:7px; margin:14px 0; white-space:normal; }
