@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { PingResult } from '../../core/icmp-ping';
+import type { PingResult } from '../../shared/icmp-ping';
 
 export function PingButton({ profileId, sessionId }: { profileId?: string; sessionId?: string }) {
   const [result, setResult] = useState<PingResult | null>(null);

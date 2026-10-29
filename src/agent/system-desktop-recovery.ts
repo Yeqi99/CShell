@@ -2,34 +2,8 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-export const consoleRecoveryStateSchema = z
-  .object({
-    sessionId: z.number().int().positive(),
-    consoleSessionId: z.number().int().nonnegative(),
-    sourceState: z.number().int(),
-    protocol: z.number().int(),
-    sourceUnlocked: z.boolean(),
-    consoleOccupied: z.boolean(),
-    canAttempt: z.boolean(),
-    reason: z.string().max(100),
-  })
-  .strict();
-export type ConsoleRecoveryState = z.infer<typeof consoleRecoveryStateSchema>;
-export type ConsoleRecoveryPlan = ConsoleRecoveryState & {
-  id: string;
-  expires: number;
-  displayDetected: boolean;
-  actualFrameVerified: false;
-  displayWidth?: number;
-  displayHeight?: number;
-};
-export type ConsoleRecoveryResult = {
-  accepted: boolean;
-  confirmed: boolean;
-  errorCode: number;
-  sessionId: number;
-  consoleSessionId: number;
-};
+import { consoleRecoveryStateSchema, type ConsoleRecoveryState, type ConsoleRecoveryPlan } from '../shared/desktop-recovery';
+export { consoleRecoveryStateSchema, type ConsoleRecoveryState, type ConsoleRecoveryPlan, type ConsoleRecoveryResult } from '../shared/desktop-recovery';
 /** --probe initializes the capture source but never acquires a frame. */
 export function describeDisplayProbe(value: unknown) {
   const probe = z

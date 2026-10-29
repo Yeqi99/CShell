@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import type {
   ConsoleRecoveryPlan,
   ConsoleRecoveryResult,
-} from '../../agent/system-desktop-recovery';
+} from '../../shared/desktop-recovery';
 const reasons: Record<string, string> = {
   ALREADY_CONSOLE: 'CAgent 已在本机控制台会话中，无需转换。',
   NO_CONSOLE: 'Windows 当前没有可连接的控制台会话。',
