@@ -6021,3 +6021,8 @@ input[type='radio']:focus-visible {
 .tools-panel .file-panel-toggle > svg, .tools-panel .resource-toggle > svg, .tools-panel .queue-toggle > svg { flex:none; width:14px; height:14px; }
 .tools-drag-handle { display:inline-flex; margin-left:auto; }
 .tools-panel .resource-categories button:hover { background:var(--hover); }
+
+/* Manual, bounded ICMP samples; keep server names the primary row content. */
+.ping-button { flex: none; font-size: 11px; padding: 3px 5px; min-height: 24px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.server-row .ping-button { max-width: 62px; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+.server-row .ping-button:hover { color: var(--accent); }

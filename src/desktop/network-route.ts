@@ -7,7 +7,7 @@ import type { Store } from '../core/store';
 
 /** Dedicated application requests; never changes the browser or OS proxy. */
 export class ApplicationNetworkRoute {
-  private route: NetworkRoute = { mode: 'direct' };
+  private route: NetworkRoute = { mode: 'system' };
   private current?: Session;
   private currentProxy?: string;
   private queue: Promise<unknown> = Promise.resolve();
@@ -74,7 +74,7 @@ export class ApplicationNetworkRoute {
       const connection = session.fromPartition('cshell-api-route-' + randomUUID(), { cache: false });
       connection.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
       connection.setPermissionCheckHandler(() => false);
-      await connection.setProxy(proxy ? { mode: 'fixed_servers', proxyRules: proxy, proxyBypassRules: '<-loopback>' } : { mode: 'direct' });
+      await connection.setProxy(proxy ? { mode: 'fixed_servers', proxyRules: proxy, proxyBypassRules: '<-loopback>' } : { mode: route.mode === 'system' ? 'system' : 'direct' });
       if (route !== this.route || this.closed) {
         await connection.closeAllConnections();
         throw new Error('网络出口已更改，请重新发送请求');

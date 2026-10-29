@@ -11,6 +11,7 @@ const bridge: Bridge = {
   desktopLookSave:(id,value)=>ipcRenderer.invoke('desktop-look:save',id,value),
   onDesktopLookChanged:listener=>{const fn=()=>listener();ipcRenderer.on('desktop-look:changed',fn);return()=>ipcRenderer.removeListener('desktop-look:changed',fn);},
   networkDiagnostics: () => ipcRenderer.invoke('network:diagnostics'),
+  networkPing: input => ipcRenderer.invoke('network:ping', input),
   networkProbe: input => ipcRenderer.invoke('network:probe', input),
   networkProbeCancel: id => ipcRenderer.invoke('network:probe-cancel', id),
   connectionImportText: text => ipcRenderer.invoke('connections:import-text', text),
