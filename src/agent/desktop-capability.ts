@@ -1,3 +1,4 @@
+import { ConsoleRecovery, nativeConsoleRecovery } from './system-desktop-recovery';
 import {readFile,access} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
 import {join,dirname} from 'node:path';
@@ -30,6 +31,7 @@ export async function createDesktopCapability(options:{identity:string;nativeExe
   }).finally(()=>{systemStatusPending=undefined;});
   return systemStatusPending;
  };
+ let recovery:ConsoleRecovery|undefined,recoveryProxy:string|undefined;
  let saved=(await options.vault.read('desktop-config',desktopConfigSchema))??desktopConfigSchema.parse({enabled:true,directListener:false,authenticatedPeers:true,local:{view:true,control:true}});
  const service=new DesktopService({identity:options.identity,nativeExecutable:()=>selectedSystemProxy??installedExecutable,authorize:(owner,permission)=>registered&&grants.includes(`desktop.${permission}`)&&options.authorize(owner),persist:async config=>{saved=config;await options.vault.write('desktop-config',config);}});
  const safeStatus=(owner:string)=>{const status=service.status(owner);if(owner==='local')return status;const {config,...safe}=status;void config;return safe;};
@@ -48,6 +50,14 @@ export async function createDesktopCapability(options:{identity:string;nativeExe
   extras.push({entry:createBundledCapabilityEntry(manifest,files),adapter});
  }
  const dispatch=async(method:string,params:unknown,owner:string,local:boolean)=>{
+  if(method==='desktop.recovery.plan'||method==='desktop.recovery.execute'){
+   if(!options.authorize(owner)||(!local&&owner==='local')||!registered||!service.status(owner).controlAllowed)throw new Error('转为独立远控需要管理与桌面控制权限');
+   await refreshSystemDesktop(true);
+   if(!selectedSystemProxy)throw new Error('请先安装系统桌面服务，并以管理员身份运行 CAgent');
+   if(!recovery||recoveryProxy!==selectedSystemProxy){recoveryProxy=selectedSystemProxy;recovery=new ConsoleRecovery(nativeConsoleRecovery(selectedSystemProxy),actor=>registered&&service.status(actor).controlAllowed&&options.authorize(actor));}
+   if(method==='desktop.recovery.plan'){z.object({}).strict().parse(params??{});return recovery.plan(owner);}
+   return recovery.execute(owner,params);
+  }
   if(method.startsWith('desktop.virtual-display.')){
    if(!options.authorize(owner)||(!local&&owner==='local'))throw new Error('虚拟显示需要此机器的管理权限');
    if(!registered)throw new Error('请先安装并授权远程桌面应用');

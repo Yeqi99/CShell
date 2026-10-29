@@ -106,7 +106,7 @@ if(process.platform==='win32'){
       child.once('error',reject);child.once('exit',code=>code===0?done():reject(new Error(`System desktop build failed: ${source}`)));
     });
     await nativeBuild('desktop.cpp','cagent-desktop.exe',['-ld3d11','-ldxgi','-lmfplat','-lmfuuid','-lmf','-lole32','-loleaut32','-luuid','-lwmcodecdspuuid','-luser32','-lgdi32','-ladvapi32'],['-DCAGENT_EXPERIMENTAL_SYSTEM_BROKER']);
-    await nativeBuild('desktop-broker.cpp','cagent-desktop-broker.exe',['-ladvapi32','-luserenv','-lole32']);
+    await nativeBuild('desktop-broker.cpp','cagent-desktop-broker.exe',['-ladvapi32','-luserenv','-lole32','-lwtsapi32']);
     for(const name of ['install-system-service.ps1','system-desktop-status.ps1'])await cp(join(root,'tools/cagent-desktop',name),join(output,name));
     await new Promise((done,reject)=>{const child=spawn(process.execPath,[join(root,'scripts/build-virtual-display.mjs'),join(output,'CAgentVirtualDisplay.exe')],{cwd:root,stdio:'inherit',windowsHide:true});child.once('error',reject);child.once('exit',code=>code===0?done():reject(new Error('Virtual display helper build failed')));});
     await cp(join(root,'tools/cagent-desktop/licenses/nlohmann-json.txt'),join(output,'LICENSE.desktop-json.txt'));
