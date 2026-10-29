@@ -1,3 +1,4 @@
+import { fetchAiProtocol } from './ai-protocol';
 import { readAiResponse } from './ai-response';
 
 // Keep active reasoning/tool streams alive, but bound silent and endless responses.
@@ -25,7 +26,7 @@ export async function requestAiReply(
     idle = setTimeout(() => timeout(false), limits.idleMs);
   };
   try {
-    const response = await transport(url, { ...init, signal: combined });
+    const response = await fetchAiProtocol(transport, url, { ...init, signal: combined });
     if (!response.ok) {
       await response.body?.cancel();
       if([400,413,415,422].includes(response.status)&&typeof init.body==='string'&&init.body.includes('"image_url"'))throw Error(`当前模型服务未接受图片输入（HTTP ${response.status}）。图片能力或大小可能不受支持；可改用 browser_snapshot 读取页面，或切换明确支持图片的模型。工具操作没有重放。`);

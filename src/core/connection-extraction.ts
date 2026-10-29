@@ -1,3 +1,4 @@
+import { fetchAiProtocol } from './ai-protocol';
 import { z } from 'zod';
 import { extractedConnectionSchema } from '../shared/connection-extraction';
 
@@ -7,7 +8,7 @@ export async function extractConnection(
 ) {
   const input = z.string().trim().min(1).max(24000).parse(text);
   const base = provider.url.replace(/\/+$/, '');
-  const response = await (provider.transport??fetch)(
+  const response = await fetchAiProtocol(provider.transport??fetch,
     base + (base.endsWith('/chat/completions') ? '' : '/chat/completions'),
     {
       method: 'POST',
