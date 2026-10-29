@@ -12,7 +12,7 @@ export class MachineNetworkRoute {
  private closed=false;
  constructor(private store:Store, private agents:ClientProvider, private ancestors:readonly string[] = []) {}
  async list(){return this.store.snapshot().profiles.filter(p=>!p.protocol||p.protocol==='ssh'||p.protocol==='client').map(p=>({id:p.id,name:p.name}));}
- private key(id:string){const p=this.store.profile(id);return JSON.stringify([p.id,p.protocol,p.host,p.port,p.username,p.jumpProfileId,this.store.host(`${p.host}:${p.port}`),p.protocol==='client'?this.agents.list().find(d=>d.deviceId===id):null]);}
+ private key(id:string){const p=this.store.profile(id);return JSON.stringify([p.id,p.protocol,p.host,p.port,p.username,p.jumpProfileId,this.store.host(`${p.host.toLowerCase()}:${p.port}`),p.protocol==='client'?this.agents.list().find(d=>d.deviceId===id):null]);}
  proxy(id:string):Promise<string>{const run=this.pending.catch(()=>{}).then(()=>this.prepare(id));this.pending=run;return run;}
  private async prepare(id:string){
   if(this.ancestors.includes(id)||this.ancestors.length>=8)throw Error('网络跳板存在循环或超过八层');
@@ -26,7 +26,7 @@ export class MachineNetworkRoute {
    forward=(host,port,done)=>{try{validate();void agentBrowserStream(transport.call,host,port).then(s=>done(null,s),e=>done(e));}catch(e){done(e as Error);}};
   }else{
    if(profile.protocol&&profile.protocol!=='ssh')throw Error('此连接不支持机器网络出口');
-   const pinned=this.store.host(`${profile.host}:${profile.port}`);if(!pinned)throw Error('请先连接这台 SSH 机器并核对身份，再选择网络出口');
+   const pinned=this.store.host(`${profile.host.toLowerCase()}:${profile.port}`);if(!pinned)throw Error('请先连接这台 SSH 机器并核对身份，再选择网络出口');
    const secret=await this.store.secret(id);if(!secret)throw Error('请先保存此 SSH 连接的认证信息');
    let nested:MachineNetworkRoute|undefined;let sock:import('node:stream').Duplex|undefined;
    if(profile.jumpProfileId){nested=new MachineNetworkRoute(this.store,this.agents,[...this.ancestors,id]);try{sock=await nested.tunnel(profile.jumpProfileId,profile.host,profile.port);}catch(e){await nested.close();throw e;}}

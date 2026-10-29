@@ -1,3 +1,4 @@
+import {remoteAppProxy,proxyShellCommand} from './remote-app-proxy';
 import { MachineNetworkRoute } from './machine-network-route';
 import { EmbeddedRdpService } from './embedded-rdp';
 import {NativeDesktopService} from './native-desktop';
@@ -476,7 +477,7 @@ else
       handle('connection:rdp-bounds',(id,value)=>{
         const b=z.object({x:z.number().min(0),y:z.number().min(0),width:z.number().min(0).max(16000),height:z.number().min(0).max(16000),visible:z.boolean()}).strict().parse(value);
         const scale=window.webContents.getZoomFactor()*screen.getDisplayMatching(window.getBounds()).scaleFactor;
-        embeddedRdp.send(idSchema.parse(id),{op:'bounds',visible:b.visible,x:Math.round(b.x*scale),y:Math.round(b.y*scale),width:Math.round(b.width*scale),height:Math.round(b.height*scale)});
+        embeddedRdp.send(idSchema.parse(id),{op:'bounds',visible:b.visible&&window.isVisible()&&!window.isMinimized(),x:Math.round(b.x*scale),y:Math.round(b.y*scale),width:Math.round(b.width*scale),height:Math.round(b.height*scale)});
       });
       handle('client:devices', () => clientProvider.list());
       handle('client:pair', async (text) => {
@@ -592,6 +593,10 @@ else
       handle('http:cancel', id => http.cancel(id));
       const linuxWorkspace=new LinuxWorkspaceService(ssh,join(app.getAppPath(),'dist/agent/agent.cjs'));
       ssh.jumpTransport=async(profile,signal)=>{const route=new MachineNetworkRoute(store,clientProvider,[profile.id]);const abort=()=>{void route.close();};signal.addEventListener('abort',abort,{once:true});try{signal.throwIfAborted();const socket=await route.tunnel(profile.jumpProfileId!,profile.host,profile.port);signal.throwIfAborted();return {socket,close:()=>{signal.removeEventListener('abort',abort);void route.close();}};}catch(e){signal.removeEventListener('abort',abort);await route.close();throw e;}};
+      const appProxies=new Set<()=>void>();
+      handle('network:remote-sources',()=>connections!.tools.activeTargets().filter(t=>t.providerId==='cshell.ssh').map(t=>({id:t.sessionId,name:t.label})));
+      handle('network:remote-open',async(raw)=>{const input=z.object({source:z.string().uuid(),exit:z.string().uuid()}).strict().parse(raw);const source=ssh!.get(input.source);if(source.profile.id===input.exit)throw Error('请选择另一台出口机器');if(appProxies.size>=8)throw Error('代理终端数量已达上限');const route=new MachineNetworkRoute(store,clientProvider,[source.profile.id]);let proxy:Awaited<ReturnType<typeof remoteAppProxy>>;try{proxy=await remoteAppProxy(source.client,route,input.exit);}catch(e){await route.close();throw e;}const close=()=>{proxy.close();appProxies.delete(close);};appProxies.add(close);try{const opened=await ssh!.openEnvironment(input.source,proxyShellCommand(proxy.port),undefined,id=>connections!.adopt('cshell.ssh',id));ssh!.get(opened.sessionId).shell?.once('close',close);window.webContents.send('ai:connected',{sessionId:opened.sessionId,profile:{...source.profile,name:source.profile.name+' · 应用代理'}});return {port:proxy.port};}catch(e){close();throw e;}});
+      window.once('closed',()=>{for(const close of appProxies)close();});
       const machineBrowser=new MachineBrowser(window,ssh);
       const nativeDesktop=new NativeDesktopService(ssh);
       handle('native-desktop:setup',(id,action)=>nativeDesktop.setup(idSchema.parse(id),action));
