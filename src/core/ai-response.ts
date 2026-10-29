@@ -19,6 +19,7 @@ const callSchema = z.object({
 });
 const replySchema = z.object({
   content: z.string().nullish(),
+  reasoning_content: z.string().max(2_000_000).optional(),
   tool_calls: z.array(callSchema).max(16).nullish(),
 });
 export const pseudoToolCall = (text: string) => /<tool_call\b|<function\s*=/i.test(text);
@@ -40,6 +41,7 @@ export async function readAiResponse(response: Response, onContent: (content: st
   let raw = '',
     pending = '',
     content = '',
+    reasoning = '',
     size = 0,
     finished = false;
   const calls = new Map<number, any>();
@@ -64,6 +66,7 @@ export async function readAiResponse(response: Response, onContent: (content: st
       finished = true;
     }
     const delta = choice.delta ?? {};
+    if (typeof delta.reasoning_content === 'string') reasoning += delta.reasoning_content;
     if (typeof delta.content === 'string') {
       content += delta.content;
       onContent(content);
@@ -113,6 +116,7 @@ export async function readAiResponse(response: Response, onContent: (content: st
     if (!finished) throw new Error('AI 响应中断，请重试；未执行未完成的工具调用。');
     return validateReply({
       content,
+      ...(reasoning ? {reasoning_content: reasoning} : {}),
       tool_calls: [...calls.entries()].sort((a, b) => a[0] - b[0]).map(([, c]) => c),
     });
   } finally {
