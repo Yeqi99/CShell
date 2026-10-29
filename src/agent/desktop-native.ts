@@ -14,7 +14,7 @@ export class NativeDesktop extends EventEmitter {
   if(!config.fps||!config.bitrate)throw new Error('Frame rate and bitrate required');
   const child=this.child=spawn(this.executable,['--stream'],{windowsHide:true,stdio:'pipe'});
   child.stdout.on('data',(data:Buffer)=>{try{this.read(data);}catch(error){this.emit('fault',error);void this.stop();}});
-  child.stderr.on('data',(data:Buffer)=>{this.errorText=(this.errorText+data.toString()).slice(-4096);});
+  child.stderr.on('data',(data:Buffer)=>{this.errorText=((this.errorText?this.errorText+'; ':'')+data.toString()).slice(0,4096);});
   child.on('error',error=>this.emit('fault',error));
   child.on('close',code=>{this.finished=true;this.pending=Buffer.alloc(0);this.emit('closed',{code,error:this.errorText});});
   child.stdin.on('error',error=>{if(!this.finished&&!this.stopping)this.emit('fault',error);});
@@ -34,6 +34,7 @@ export class NativeDesktop extends EventEmitter {
     if(!Number.isSafeInteger(meta.id)||meta.id<0||typeof meta.key!=='boolean'||!Number.isSafeInteger(meta.timestampUs)||!payload.length)throw new Error('Invalid native frame');
     this.emit('frame',{...meta,data:payload} satisfies NativeDesktopFrame);
    }else if(meta.type==='input-status')this.emit('input-status',meta);
+   else if(meta.type==='capture-error'){this.errorText=String(meta.message).slice(0,2048);}
    else if(meta.type==='input-error')this.emit('input-error',new Error(String(meta.message).slice(0,1024)));
    else throw new Error('Unknown native packet');
   }

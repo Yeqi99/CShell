@@ -328,7 +328,7 @@ int wmain(int argc,wchar_t**argv){
    std::cout<<json({{"hardware",e.hardware},{"encoder",e.name},{"frames",frames},{"elapsedUs",micros()-start},{"fixture",true}}).dump()<<std::endl;
   }else if(argc>1&&(std::wstring(argv[1])==L"--stream"||std::wstring(argv[1])==L"--system-pipe"))stream();
   else throw std::runtime_error("Usage: --probe | --test-encode output.h264 | --stream (private pipe)");
- }catch(const std::exception&e){std::cerr<<e.what()<<std::endl;MFShutdown();CoUninitialize();return 1;}
+ }catch(const std::exception&e){if(systemWorker){try{packet({{"type","capture-error"},{"message",std::string(e.what()).substr(0,2048)}});}catch(...){} std::wstring detail;for(const char* p=e.what();*p&&detail.size()<2048;++p)detail.push_back((unsigned char)*p);workerTrace(detail.c_str());}std::cerr<<e.what()<<std::endl;MFShutdown();CoUninitialize();return 1;}
  MFShutdown();CoUninitialize();return 0;
 }
 
