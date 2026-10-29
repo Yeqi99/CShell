@@ -1,3 +1,5 @@
+import { apiCapabilitySchema } from '../../shared/contracts';
+import { CapabilitySelection } from './CapabilitySelection';
 import { ApiTargetPolicies } from './ApiTargetPolicies';
 import { ApiLocalScopes } from './ApiLocalScopes';
 import { ApiFileRoots } from './ApiFileRoots';
@@ -170,6 +172,7 @@ export function McpSettings({
             <summary>
               {locale === 'zh-CN' ? '扩展能力授权' : 'Additional capability grants'}
             </summary>
+            <CapabilitySelection options={apiCapabilitySchema.options} value={draft.capabilities} change={capabilities=>setDraft({...draft,capabilities})} />
             {(
               [
                 ['files.read', '读取文件内容', 'Read file contents'],
@@ -383,6 +386,7 @@ export function McpSettings({
                   />
                   {locale === 'zh-CN' ? '执行命令' : 'Execute commands'}
                 </label>
+                <CapabilitySelection options={apiCapabilitySchema.options} value={client.capabilities} change={capabilities=>updateClient(client.id,{capabilities})} />
                 {(
                   [
                     ['files.read', '读取文件', 'Read files'],

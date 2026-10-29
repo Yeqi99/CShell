@@ -1,3 +1,4 @@
+import { CapabilitySelection } from './CapabilitySelection';
 import { useI18n } from '../i18n';
 export function ApiApplicationGrants({
   value = [],
@@ -11,6 +12,7 @@ export function ApiApplicationGrants({
   return (
     <details>
       <summary>{cn ? 'CShell 应用权限' : 'CShell application grants'}</summary>
+      <CapabilitySelection options={['plugins.read','plugins.manage'] as const} value={value} change={change} />
       {(['plugins.read', 'plugins.manage'] as const).map((id) => (
         <label className="checkbox" key={id}>
           <input
