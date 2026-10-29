@@ -1059,6 +1059,7 @@ else
       handle('transfer:cancel', (id) => transfers.cancel(idSchema.parse(id)));
       handle('monitor', (id) => ssh.monitor(idSchema.parse(id)));
       const resources = new ResourceInspection(ssh);
+      handle('resources:process-network', (id) => resources.processNetwork(idSchema.parse(id)));
       handle('resources:hardware', (id) => resources.hardware(idSchema.parse(id)));
       handle('resources:processes', (id) => resources.processes(idSchema.parse(id)));
       registerFileHandlers(handle, window, ssh, transfers, text);

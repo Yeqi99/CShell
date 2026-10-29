@@ -1,3 +1,4 @@
+import { NetworkDetails } from './NetworkDetails';
 import {PingButton} from './PingButton';
 import { useEffect, useState } from 'react';
 import {
@@ -183,7 +184,7 @@ export function MonitorPanel({
             );
           })}
           <div hidden={category !== 'disk'}>
-          {metrics?.disks?.map(disk => <div className="resource-row metric-disk" key={disk.device} title={`${disk.device} · ${disk.mount}`}>
+          {metrics?.disks?.map(disk => <div className="resource-row metric-disk" key={disk.device+disk.mount} title={`${disk.device} · ${disk.mount}`}>
             <span className="resource-name"><HardDrive size={13}/>{disk.mount}</span>
             <span className="resource-detail">{capacity(disk.used, locale)} / {capacity(disk.total, locale)}</span>
             <strong>{percent(disk.percent)}</strong>
@@ -203,6 +204,7 @@ export function MonitorPanel({
             <span className="resource-detail">本机 ICMP Ping</span>
             <PingButton key={sessionId} sessionId={sessionId}/>
           </div>
+          <NetworkDetails key={sessionId} sessionId={sessionId} network={metrics?.network}/>
           </div><ResourceDetails key={sessionId} sessionId={sessionId} mode={category === 'gpu' || category === 'processes' ? category : null} />
         </div>
       )}
