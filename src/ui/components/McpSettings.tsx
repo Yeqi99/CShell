@@ -1,3 +1,4 @@
+import { selectAllMcpPermissions } from './mcp-all-permissions';
 import { apiCapabilitySchema } from '../../shared/contracts';
 import { CapabilitySelection } from './CapabilitySelection';
 import { ApiTargetPolicies } from './ApiTargetPolicies';
@@ -86,6 +87,16 @@ export function McpSettings({
       <p className="muted">{t('mcpHint')}</p>
       {draft && (
         <fieldset disabled={busy || saving}>
+          <div className="capability-selection">
+            <strong>{locale === 'zh-CN' ? '全局权限' : 'Global permissions'}</strong>
+            <button type="button" onClick={() => void run(async () => {
+              const shells = await window.cshell.apiLocalShells();
+              setDraft(current => current ? selectAllMcpPermissions(current, profiles, shells) : current);
+            })}>{locale === 'zh-CN' ? '一键全选所有权限' : 'Select all permissions'}</button>
+          </div>
+          <p className="muted">{locale === 'zh-CN'
+            ? '包含当前所有可用连接、本机终端、全部能力、已添加目录的读写，以及独立客户端；取消机器级限制并设为授权范围内直接执行。保存后生效，服务与客户端启用状态保持不变。'
+            : 'Includes all current supported connections, local terminals, capabilities, configured folder mutations and API clients. Removes target overrides and enables execution within grants. Save to apply; service and client enabled states stay unchanged.'}</p>
           <label className="checkbox">
             <input
               type="checkbox"
