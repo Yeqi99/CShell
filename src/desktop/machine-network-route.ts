@@ -1,4 +1,4 @@
-import { Client } from 'ssh2';
+import ssh2 from 'ssh2';
 import { createHash } from 'node:crypto';
 import type { Store } from '../core/store';
 import type { ClientProvider } from '../core/client/provider';
@@ -30,7 +30,7 @@ export class MachineNetworkRoute {
    const secret=await this.store.secret(id);if(!secret)throw Error('请先保存此 SSH 连接的认证信息');
    let nested:MachineNetworkRoute|undefined;let sock:import('node:stream').Duplex|undefined;
    if(profile.jumpProfileId){nested=new MachineNetworkRoute(this.store,this.agents,[...this.ancestors,id]);try{sock=await nested.tunnel(profile.jumpProfileId,profile.host,profile.port);}catch(e){await nested.close();throw e;}}
-   const client=new Client();let alive=false;close=()=>{alive=false;client.destroy();void nested?.close();};validate=()=>{if(!alive)throw Error('机器网络出口已断开，未回退本机');};
+   const client=new ssh2.Client();let alive=false;close=()=>{alive=false;client.destroy();void nested?.close();};validate=()=>{if(!alive)throw Error('机器网络出口已断开，未回退本机');};
    client.on('error',()=>{alive=false;});client.on('close',()=>{alive=false;});
    try{await new Promise<void>((resolve,reject)=>{client.once('error',reject);client.once('close',()=>reject(Error('SSH 出口连接关闭')));client.once('ready',()=>{alive=true;resolve();});client.connect({sock,host:profile.host,port:profile.port,username:profile.username,...secret,readyTimeout:15000,keepaliveInterval:15000,keepaliveCountMax:3,hostVerifier:(key:Buffer)=>'SHA256:'+createHash('sha256').update(key).digest('base64').replace(/=+$/,'')===pinned});});}catch(e){close();throw e;}
    forward=(host,port,done)=>{try{validate();client.forwardOut('127.0.0.1',0,host,port,(e,s)=>done(e??null,s));}catch(e){done(e as Error);}};
