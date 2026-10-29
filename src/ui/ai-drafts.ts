@@ -30,7 +30,16 @@ export function useAiDrafts() {
           return next;
         });
       };
-      void window.cshell.aiDraftSave(id, text).then(() => settled(false), () => settled(true));
+      void window.cshell.aiDraftSave(id, text).then(async () => {
+        settled(false);
+        if (loadError && window.cshell.aiDrafts) {
+          try {
+            const restored = await window.cshell.aiDrafts();
+            current.current = { ...restored, ...current.current };
+            render(current.current); setLoadError('');
+          } catch { /* Preserve the recovery warning until a real read succeeds. */ }
+        }
+      }, () => settled(true));
     }
   };
   const error = loadError || (Object.keys(saveErrors).length ? '草稿未能保存；输入仍在当前窗口，请勿关闭窗口。' : '');

@@ -34,8 +34,18 @@ export async function registerAiHandlers(
   // A damaged draft file must not prevent opening existing conversations.
   let draftLoadError = false;
   try { await drafts.load(); } catch { draftLoadError = true; }
-  handle('ai:drafts', () => { if (draftLoadError) throw new Error('草稿读取失败'); return drafts.snapshot(); });
-  handle('ai:draft-save', (id, text) => { if (draftLoadError) throw new Error('草稿读取失败，原文件已保留'); return drafts.save(id, text); });
+  let draftRetry: Promise<void> | undefined;
+  const ensureDrafts = async () => {
+    if (!draftLoadError) return;
+    // A transient encryption failure or repaired file can recover without restart.
+    // Never save an empty replacement while the original cannot be read.
+    if (!draftRetry) draftRetry = drafts.load().then(() => { draftLoadError = false; })
+      .catch(() => { throw new Error('草稿读取失败，原文件已保留；下次操作会重新尝试'); })
+      .finally(() => { draftRetry = undefined; });
+    await draftRetry;
+  };
+  handle('ai:drafts', async () => { await ensureDrafts(); return drafts.snapshot(); });
+  handle('ai:draft-save', async (id, text) => { await ensureDrafts(); return drafts.save(id, text); });
   const network = new ApplicationNetworkRoute(directory, store);
   await network.load();
   ai.requestTransport = process.versions.electron ? network.fetch : undefined;
