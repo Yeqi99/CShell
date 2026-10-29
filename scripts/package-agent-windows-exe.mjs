@@ -26,7 +26,7 @@ VIAddVersionKey "LegalCopyright" "MIT - CAgent contributors"
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
-!define MUI_FINISHPAGE_TEXT "CAgent 已安装。若旧版正在运行，请正常退出后从开始菜单打开新版。自研远控已随程序提供，访问权限需在应用内配置。"
+!define MUI_FINISHPAGE_TEXT "CAgent 已安装。若旧版正在运行，请正常退出后从开始菜单打开新版。远程桌面组件已随程序提供，访问权限需在应用内配置。"
 !insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_LANGUAGE "SimpChinese"
 Section "Install"
