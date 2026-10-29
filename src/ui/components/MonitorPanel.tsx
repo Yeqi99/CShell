@@ -1,3 +1,4 @@
+import {PingButton} from './PingButton';
 import { useEffect, useState } from 'react';
 import {
   Activity,
@@ -199,8 +200,8 @@ export function MonitorPanel({
               <Activity size={13} />
               {t('latencyShort')}
             </span>
-            <span className="resource-detail">SSH RTT</span>
-            <strong>{metrics ? metrics.latency + ' ms' : '—'}</strong>
+            <span className="resource-detail">本机 ICMP Ping</span>
+            <PingButton key={sessionId} sessionId={sessionId}/>
           </div>
           </div><ResourceDetails key={sessionId} sessionId={sessionId} mode={category === 'gpu' || category === 'processes' ? category : null} />
         </div>

@@ -372,6 +372,7 @@ export interface Bridge
   classroom?: import('./classroom').ClassroomBridge;
   readonly platform: string;
   networkDiagnostics?(): Promise<import('./network-probe').NetworkDiagnostics>;
+  networkPing(input:{profileId?:string;sessionId?:string}):Promise<import('../core/icmp-ping').PingResult>;
   networkProbe?(input: { id: string; source: string; target: string }): Promise<import('./network-probe').NetworkProbeResult>;
   networkProbeCancel?(id: string): Promise<void>;
   connectionImportText?(text: string): Promise<import('./connection-batch').ConnectionImportPreview>;

@@ -1,3 +1,4 @@
+import {pingHost} from '../core/icmp-ping';
 import { z } from 'zod';
 import { probeNetwork } from '../core/network-probe';
 import { probeSshNetwork } from '../core/ssh-network-probe';
@@ -8,6 +9,15 @@ import type { ConnectionRegistry } from '../core/connections/registry';
 import { networkProbeResultSchema } from '../shared/network-probe';
 
 export function registerNetworkDiagnostics(handle: (name: string, fn: (...args: any[]) => any) => void, store: Store, ssh: SshService, client: ClientProvider, registry: ConnectionRegistry) {
+  const pendingPing=new Set<string>();
+  handle('network:ping',async raw=>{
+    const input=z.object({profileId:z.string().uuid().optional(),sessionId:z.string().min(1).max(100).optional()}).strict().parse(raw);
+    if(Boolean(input.profileId)===Boolean(input.sessionId))throw Error('请选择一个目标');
+    const profile=input.sessionId?ssh.get(input.sessionId).profile:store.profile(input.profileId!);
+    if(profile.protocol==='http')throw Error('请选择机器连接');
+    const host=profile.host;if(pendingPing.size>=2||pendingPing.has(host))throw Error('Ping 正在进行');
+    pendingPing.add(host);try{return await pingHost(host)}finally{pendingPing.delete(host)}
+  });
   const active = new Map<string, AbortController>();
   const sources = () => [
     { id: 'local', name: '本机 CShell' },

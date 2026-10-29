@@ -27,6 +27,7 @@ const bridge: Bridge = {
   cloudSync:direction=>ipcRenderer.invoke('cloud:sync',direction),
   cloudLogout:()=>ipcRenderer.invoke('cloud:logout'),
   networkDiagnostics: () => ipcRenderer.invoke('network:diagnostics'),
+  networkPing: input => ipcRenderer.invoke('network:ping', input),
   networkProbe: input => ipcRenderer.invoke('network:probe', input),
   networkProbeCancel: id => ipcRenderer.invoke('network:probe-cancel', id),
   connectionImportText: text => ipcRenderer.invoke('connections:import-text', text),

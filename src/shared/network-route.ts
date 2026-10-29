@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 export const networkRouteSchema = z.discriminatedUnion('mode', [
+  z.object({ mode: z.literal('system') }).strict(),
   z.object({ mode: z.literal('direct') }).strict(),
   z.object({ mode: z.literal('proxy'), url: z.string().max(2048).transform(value => {
     const url = new URL(value);

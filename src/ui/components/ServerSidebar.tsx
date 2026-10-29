@@ -1,3 +1,4 @@
+import {PingButton} from './PingButton';
 import type { LocalConnectionTarget } from '../../shared/local-terminal';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -380,7 +381,7 @@ export function ServerSidebar({
                   onClickCapture={e => {if(Date.now()<suppressClickUntil.current){e.preventDefault();e.stopPropagation();}}}
                   onDoubleClickCapture={e => {if(Date.now()<suppressClickUntil.current){e.preventDefault();e.stopPropagation();}}}
                   onPointerDown={e => {
-                    if (!onMove || working || e.button !== 0 || (e.target as HTMLElement).closest('.favorite-button,.server-more')) return;
+                    if (!onMove || working || e.button !== 0 || (e.target as HTMLElement).closest('.favorite-button,.server-more,.ping-button')) return;
                     pointerDrag.current = { id:profile.id, x:e.clientX, y:e.clientY, active:false };
                     ((e.target as HTMLElement).closest<HTMLElement>('.server-open') ?? e.currentTarget).setPointerCapture(e.pointerId);
                   }}
@@ -444,6 +445,7 @@ export function ServerSidebar({
                         <small>{profile.protocol === 'http' ? 'HTTP' : profile.host}</small>
                       </div>
                     </button>
+                    {profile.protocol!=='http'&&<PingButton key={profile.host} profileId={profile.id}/>}
                     <button
                       className={`icon favorite-button ${profile.favorite ? 'starred' : ''}`}
                       aria-label={`${t(profile.favorite ? 'unfavorite' : 'favorite')} ${profile.name}`}
