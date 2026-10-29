@@ -1,4 +1,5 @@
 import {_electron as electron} from 'playwright';
+import {expect} from 'playwright/test';
 import {mkdtemp,rm,readFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -10,7 +11,12 @@ try{
  const p=await app.firstWindow();p.setDefaultTimeout(15000);
  await app.evaluate(({ipcMain,BrowserWindow})=>{
   BrowserWindow.getAllWindows()[0].setSize(1280,850);
-  ipcMain.removeHandler('connection:rdp');ipcMain.handle('connection:rdp',(_e,id)=>{(globalThis as any).rdpOpened=id;});
+  const state=(globalThis as any).rdpFixture={opens:[] as string[],closes:[] as string[],bounds:null,status:{state:'connected',message:'fixture RDP connected'}};
+  for(const name of ['connection:rdp','connection:rdp-status','connection:rdp-close','connection:rdp-bounds'])ipcMain.removeHandler(name);
+  ipcMain.handle('connection:rdp',(_e,id)=>{state.opens.push(id);return state.status;});
+  ipcMain.handle('connection:rdp-status',()=>state.status);
+  ipcMain.handle('connection:rdp-close',(_e,id)=>{state.closes.push(id);});
+  ipcMain.handle('connection:rdp-bounds',(_e,id,bounds)=>{state.bounds={id,...bounds};});
  });
  await p.getByRole('button',{name:'新建连接',exact:true}).first().click();
  await p.getByRole('button',{name:'Windows 远程桌面',exact:true}).click();
@@ -25,22 +31,38 @@ try{
  assert(!(await readFile(join(data,'config.json'),'utf8')).includes('fixture-secret-7391'));
  await p.locator('.server-open').filter({hasText:'fixture.example'}).dblclick();
  assert.equal(config.preferences.defaultConnectionView,'original');
- await p.waitForFunction(()=>!!window.cshell);
- assert.equal(await app.evaluate(()=> (globalThis as any).rdpOpened),profile.id,'native default invokes the actual RDP launcher once');
- assert.equal(await p.locator('.linux-desktop:visible').count(),0);
- await app.evaluate(()=>{(globalThis as any).rdpOpened=undefined;});
+ const workspace=p.getByRole('region',{name:'远程桌面',exact:true});
+ await expect(workspace).toBeVisible();
+ await expect(workspace.getByRole('status')).toHaveText('fixture RDP connected');
+ await expect.poll(()=>app.evaluate(()=>(globalThis as any).rdpFixture.opens)).toEqual([profile.id]);
+ await p.locator('.server-open').filter({hasText:'fixture.example'}).dblclick();
+ assert.equal(await p.locator('.workspace-editor:visible').count(),1);
  await p.getByRole('button',{name:'连接操作 · fixture.example',exact:true}).click();
  await p.getByRole('menuitem',{name:'打开可视化桌面',exact:true}).click();
- assert.equal(await app.evaluate(()=> (globalThis as any).rdpOpened),undefined);
- await p.locator('.linux-desktop:visible .desktop-icons').getByRole('button',{name:'远程桌面',exact:true}).dblclick();
- await p.getByRole('button',{name:'打开远程桌面',exact:true}).click();
-
- assert.equal(await app.evaluate(()=> (globalThis as any).rdpOpened),profile.id);
+ await expect(workspace).toBeVisible();
+ assert.deepEqual(await app.evaluate(()=>(globalThis as any).rdpFixture.opens),[profile.id],'double click and visual entry reuse the same native session');
+ await workspace.getByRole('button',{name:'安装 CAgent',exact:true}).click();
+ await expect(p.getByRole('region',{name:'Windows CAgent 安装指引'})).toBeVisible();
+ await expect.poll(()=>app.evaluate(()=>(globalThis as any).rdpFixture.bounds?.visible)).toBe(false);
+ await workspace.getByRole('button',{name:'返回远程桌面',exact:true}).click();
+ await expect.poll(()=>app.evaluate(()=>(globalThis as any).rdpFixture.bounds?.visible)).toBe(true);
+ await p.evaluate(()=>{const menu=document.createElement('div');menu.id='rdp-overlay-fixture';menu.setAttribute('role','menu');menu.textContent='fixture overlay';document.body.append(menu);});
+ await expect.poll(()=>app.evaluate(()=>(globalThis as any).rdpFixture.bounds?.visible)).toBe(false);
+ await p.evaluate(()=>document.getElementById('rdp-overlay-fixture')?.remove());
+ await expect.poll(()=>app.evaluate(()=>(globalThis as any).rdpFixture.bounds?.visible)).toBe(true);
+ await app.evaluate(()=>{(globalThis as any).rdpFixture.status={state:'failed',message:'fixture authentication rejected (RDP 516)'};});
+ await expect(workspace.getByRole('status')).toHaveText('fixture authentication rejected (RDP 516)');
+ await workspace.getByRole('button',{name:'重新连接',exact:true}).click();
+ await expect.poll(()=>app.evaluate(()=>(globalThis as any).rdpFixture.opens.length)).toBe(2);
+ await p.locator('.tab.active').getByRole('button',{name:'关闭 fixture.example',exact:true}).click();
+ await expect(workspace).toHaveCount(0);
+ await expect.poll(()=>app.evaluate(()=>(globalThis as any).rdpFixture.closes.length)).toBe(2);
  await p.reload();await p.locator('.server-open').filter({hasText:'fixture.example'}).waitFor();
  await p.getByRole('button',{name:'连接操作 · fixture.example',exact:true}).click();
  await p.getByRole('menuitem',{name:'编辑连接',exact:true}).click();
  assert.equal(await p.locator('.rdp-connect-form').getByLabel('账号',{exact:true}).inputValue(),'DOMAIN\\tester');
  assert.equal(await p.locator('.rdp-connect-form').getByLabel('密码',{exact:true}).inputValue(),'');
  await p.screenshot({path:'test-results/rdp-saved.png'});
- console.log('PASS RDP save/reload/list/double-click routing/edit, encrypted password and no plaintext rehydration; system login not attempted');
+ console.log('PASS RDP save/reload/list/double-click routing/edit, encrypted password and no plaintext rehydration; embedded tab reuse, failure/retry/close and native visibility; real transport covered by rdp-embedded-smoke');
 }finally{await app.close();await rm(data,{recursive:true,force:true});}
+
