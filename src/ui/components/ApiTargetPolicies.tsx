@@ -1,3 +1,4 @@
+import { CapabilitySelection } from './CapabilitySelection';
 import { apiCapabilitySchema, type McpSettings } from '../../shared/contracts';
 import type { Profile } from '../../shared/contracts';
 import { useI18n } from '../i18n';
@@ -90,6 +91,7 @@ export function ApiTargetPolicies({
                     />
                     {cn ? '执行命令' : 'Execute commands'}
                   </label>
+                  <CapabilitySelection options={apiCapabilitySchema.options} value={policy.capabilities} change={capabilities=>update({...policy,capabilities})} />
                   {apiCapabilitySchema.options.map((capability) => (
                     <label key={capability}>
                       <input
