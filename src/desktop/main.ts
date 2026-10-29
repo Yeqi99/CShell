@@ -1,4 +1,5 @@
 import { EmbeddedRdpService } from './embedded-rdp';
+import { MachineNetworkRoute } from './machine-network-route';
 import {NativeDesktopService} from './native-desktop';
 import {classroomDiscoveryLifecycle} from '../core/classroom-discovery-lifecycle';
 import {AgentLanService} from '../core/agent-lan';
@@ -674,6 +675,7 @@ else
           block:(value:boolean)=>{accountTransition=value;if(value){classroomTasks?.dispose();enrollment?.clear();}},
         }:undefined, network, tavily, desktopLooks),
         () => processExtensions.applicationTools(),
+        new MachineNetworkRoute(store, clientProvider),
       );
       registerPresetHandlers(handle, window, app.getPath('userData'), store, text);
       registerConnectionImport(handle, window, store);

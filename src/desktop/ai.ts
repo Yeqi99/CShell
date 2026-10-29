@@ -29,6 +29,7 @@ export async function registerAiHandlers(
   wechat?: import('../core/wechat').WechatService,
   setupCloud?: (ai: AiService, openCode: OpenCodeExtension, network: ApplicationNetworkRoute, tavily:TavilyExtension) => Promise<void>,
   customTools?: () => readonly import('../core/connections/contracts').ConnectionTool[],
+  machineNetwork?: NonNullable<ApplicationNetworkRoute['machine']>,
 ) {
   const ai = new AiService(directory, store, connections, connectHost, { http, wechat });
   const drafts = new AiDrafts(directory, store);
@@ -48,6 +49,7 @@ export async function registerAiHandlers(
   handle('ai:drafts', async () => { await ensureDrafts(); return drafts.snapshot(); });
   handle('ai:draft-save', async (id, text) => { await ensureDrafts(); return drafts.save(id, text); });
   const network = new ApplicationNetworkRoute(directory, store);
+  network.machine = machineNetwork;
   await network.load();
   ai.requestTransport = process.versions.electron ? network.fetch : undefined;
   handle('network:status', () => network.status());

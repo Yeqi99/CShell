@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import {
   ArrowRight,
   Eye,
@@ -39,6 +39,8 @@ export function ConnectionForm({
 }) {
   const { t, locale } = useI18n();
   const attempt = useConnectionAttempt();
+  const [jumpMachines,setJumpMachines]=useState<{id:string;name:string}[]>([]);
+  useEffect(()=>{let active=true;void window.cshell.networkStatus?.().then(s=>{if(active)setJumpMachines(s.machines);}).catch(()=>{});return()=>{active=false;};},[]);
   const id = useId();
   const form = useRef<HTMLFormElement>(null);
   const [value, setValue] = useState<Profile>(
@@ -234,6 +236,7 @@ export function ConnectionForm({
               {fieldError('port')}
             </div>
           </div>
+          {!ftp && <details className="connection-extractor"><summary>{locale==='zh-CN'?'连接跳板':'Jump host'}</summary><label htmlFor={id+'-jump'}>{locale==='zh-CN'?'通过另一台机器连接':'Connect through another machine'}</label><select id={id+'-jump'} value={value.jumpProfileId??''} onChange={e=>setValue(v=>({...v,jumpProfileId:e.target.value||undefined}))}><option value="">{locale==='zh-CN'?'直接连接':'Direct connection'}</option>{jumpMachines.filter(m=>m.id!==value.id).map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></details>}
           {!ftp && <fieldset className="connection-auth">
             <legend>{t('auth')}</legend>
             <div className="connection-auth-options">
