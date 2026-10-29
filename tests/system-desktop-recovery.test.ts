@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   ConsoleRecovery,
+  describeDisplayProbe,
   consoleRecoveryEligible,
   type ConsoleRecoveryState,
 } from '../src/agent/system-desktop-recovery';
@@ -25,7 +26,7 @@ function fixture() {
   const service = new ConsoleRecovery(
     {
       inspect: async () => ({ ...state }),
-      display: async () => ({ displayAvailable: false }),
+      display: async () => ({ displayDetected: false, actualFrameVerified: false as const }),
       execute: async () => {
         calls++;
         return {
@@ -103,4 +104,22 @@ test('OS denial returns unconfirmed, consumes the plan and never retries', async
   assert.equal(f.calls, 1);
   await assert.rejects(f.service.execute('alice', { planId: p.id, confirm: true }));
   assert.equal(f.calls, 1);
+});
+
+test('display initialization never claims an acquired frame, including GDI fallback', () => {
+  const result = describeDisplayProbe({
+    capturePath: 'gdi',
+    captureFallback: 'DXGI failed',
+    display: { width: 1920, height: 1080 },
+  });
+  assert.equal(result.displayDetected, true);
+  assert.equal(result.actualFrameVerified, false);
+  assert.equal(
+    describeDisplayProbe({ captureError: 'GDI BitBlt failed: 5' }).displayDetected,
+    false,
+  );
+  assert.equal(
+    describeDisplayProbe({ display: { width: 0, height: 1080 } }).displayDetected,
+    false,
+  );
 });

@@ -83,7 +83,9 @@ export function DesktopRecovery({
       if (epoch === generation.current) {
         setPlan(undefined);
         setConfirmed(false);
-        setMessage('未能确认转换结果（不会自动重试）：' + (e instanceof Error ? e.message : String(e)));
+        setMessage(
+          '未能确认转换结果（不会自动重试）：' + (e instanceof Error ? e.message : String(e)),
+        );
       }
     } finally {
       if (epoch === generation.current) setBusy(false);
@@ -113,20 +115,29 @@ export function DesktopRecovery({
                 <dt>CAgent 所属会话</dt>
                 <dd>
                   {plan.sessionId} · {plan.protocol === 2 ? 'RDP' : '控制台/其他'} ·{' '}
-                  {plan.sourceUnlocked ? '未锁定' : '已锁定或未知'}
+                  {plan.sourceState === 0
+                    ? '活跃'
+                    : plan.sourceState === 4
+                      ? '已断开'
+                      : '非活跃/未知'}{' '}
+                  · {plan.sourceUnlocked ? '未锁定' : '已锁定或未知'}
                 </dd>
                 <dt>控制台</dt>
                 <dd>
                   {plan.consoleSessionId === 4294967295 ? '不可用' : plan.consoleSessionId} ·{' '}
                   {plan.consoleOccupied ? '已有用户' : '无人登录'}
                 </dd>
-                <dt>当前显示采集</dt>
+                <dt>显示设备检测</dt>
                 <dd>
-                  {plan.displayAvailable
-                    ? `${plan.displayWidth} × ${plan.displayHeight}`
-                    : '不可用；转换后仍需重新验证'}
+                  {plan.displayDetected
+                    ? `${plan.displayWidth} × ${plan.displayHeight}（检测到设备，尚未验证画面）`
+                    : '未取得显示设备信息；尚未验证画面'}
                 </dd>
               </dl>
+              <p>
+                仅支持活跃且未锁定的 RDP 会话。已经断开时，请先恢复原 RDP
+                连接；此操作不会解锁或自动登录。
+              </p>
               {!plan.canAttempt ? (
                 <p>{reasons[plan.reason] || '此状态暂不支持转换。'}</p>
               ) : (
