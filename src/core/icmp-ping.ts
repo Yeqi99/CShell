@@ -2,7 +2,8 @@ import { execFile } from 'node:child_process';
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 
-export type PingResult = { method: 'icmp'; elapsedMs: number | null; lessThan?: boolean; status: 'reply' | 'unreachable' | 'unsupported'; checkedAt: number };
+import type { PingResult } from '../shared/icmp-ping';
+export type { PingResult } from '../shared/icmp-ping';
 export function parsePingOutput(text: string): { elapsedMs: number; lessThan: boolean } | null {
   const match = /(?:time|时间|時間)\s*([=<])\s*(\d+(?:[.,]\d+)?)\s*(?:ms|毫秒)/i.exec(text);
   return match ? { elapsedMs: Number(match[2].replace(',', '.')), lessThan: match[1] === '<' } : null;
