@@ -96,7 +96,8 @@ export type AiMessage = {
   content: string;
   time: number;
   eventGenerated?: boolean;
-  tool?: { name: string; input: string; output: string; target?: string; image?: import('./ai-images').AiImageReference; imageRejected?: boolean };
+  reasoning_content?: string;
+  tool?: { reasoning_content?: string; name: string; input: string; output: string; target?: string; image?: import('./ai-images').AiImageReference; imageRejected?: boolean };
 };
 export type AiThread = {
   checkpoint?: import('./agent-continuity').AgentCheckpoint;

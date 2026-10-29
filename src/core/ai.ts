@@ -1006,8 +1006,9 @@ export class AiService {
         throw new Error('模型未返回有效工具调用，未执行任何操作。请重试或切换基座。');
       }
       messages.push({ role: 'assistant', ...reply });
+      if (inserted && reply.reasoning_content) Object.assign(streamed, {reasoning_content:reply.reasoning_content});
       if (reply.content && !inserted)
-        t.messages.push({ role: 'assistant', content: reply.content, time: Date.now() });
+        t.messages.push({ role: 'assistant', content: reply.content, time: Date.now(), ...(reply.reasoning_content?{reasoning_content:reply.reasoning_content}:{}) });
       if (!reply.tool_calls?.length) {
         if (!reply.content?.trim()) throw new Error('基座返回空回复且没有工具调用，本轮未完成。');
         if (available.length && progressOnly(reply.content)) {
@@ -1120,6 +1121,7 @@ export class AiService {
         t.messages.push({
           role: 'tool',
           tool: {
+            ...(reply.reasoning_content?{reasoning_content:reply.reasoning_content}:{}),
             name: call.function.name,
             input: auditArguments,
             output: result,
