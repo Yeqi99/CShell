@@ -29,3 +29,11 @@ Windows Core / Pro 0.8.15 成品已通过加密存储、沙箱、SSH 输入与�
 原生 Linux 桌面自动开启仅覆盖已存在的当前用户 X11 会话；Wayland 不自动开启。共享不开放 VNC TCP 端口，不自动设置开机启动、不绕过锁屏。
 
 Windows 未做发行者签名、macOS 未公证。Linux 安装器验证不代表所有发行版 GUI/FUSE 与 ARM64 实机验证。Android 模拟器不代替真机。当前未发布的平台不标记可下载。
+
+## 2026-10-29 本机 Terra 与代理收口补充
+
+本机新增功能基线已变更为 Core c672ff8 / Pro fef4444：真实 ICMP Ping、系统代理默认、官方 GPT-6 Responses 适配，以及非破坏性草稿读取重试。旧的 .local/release-0815-final-jobs.json 与 GitHub 草稿附件属于较早候选，不能直接按本次改动发布；跨平台正式发布前必须重新构建并核对新提交与摘要。未移动公开标签。
+
+本机 Core/Pro 0.8.15 已配置加密 Terra 基座和 system 路线；实际官方流式请求通过，Pro UI 返回 Terra 已就绪。真实 Electron + MachineBrowser + Terra 截图/工具闭环通过 11 次调用完成受控登录、表格读取、草稿保存；不是小红书真实登录/发布验收。详见 TERRA-AND-SYSTEM-PROXY.md。
+
+Pro 旧 ai-drafts.enc 无法由当前与备份上下文解密，原文件保留为 ai-drafts.unreadable-20261029-221243.enc，不声明内容已恢复。配置中机器/分组 ID 与升级前一致。机房官网入口及专用安装包已下架，私有归档保留，不改用户已安装环境。
