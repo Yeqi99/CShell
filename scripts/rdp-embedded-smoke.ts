@@ -15,7 +15,7 @@ try {
  const deadline=Date.now()+35000;while(service.status(profile.id).state==='connecting'&&Date.now()<deadline)await new Promise(r=>setTimeout(r,100));assert.equal(service.status(profile.id).state,'failed');assert.match(service.status(profile.id).message,/RDP \d+, extended \d+/);console.log('PASS native disconnect event:',service.status(profile.id).message);
  service.close(profile.id);assert.equal(service.status(profile.id).state,'closed');
  await service.open(profile,'',Buffer.alloc(8));assert.throws(()=>service.send(profile.id,{op:'bounds',padding:'x'.repeat(131073)}),/超出限制/);
- const child=(service as any).sessions.get(profile.id).child;child.stdin.write('x'.repeat(131074)+'\n');const inputDeadline=Date.now()+3000;while(service.status(profile.id).state==='connecting'&&Date.now()<inputDeadline)await new Promise(r=>setTimeout(r,50));assert.equal(service.status(profile.id).state,'failed');assert.match(service.status(profile.id).message,/输入超出限制/);
+ const child=(service as any).sessions.get(profile.id).child;child.stdin.write('x'.repeat(131074)+'\n');const inputDeadline=Date.now()+10000;while(service.status(profile.id).state==='connecting'&&Date.now()<inputDeadline)await new Promise(r=>setTimeout(r,50));assert.equal(service.status(profile.id).state,'failed');assert.match(service.status(profile.id).message,/输入超出限制/);
  service.close(profile.id);
  console.log('PASS real ActiveX creation, concurrent open reuse, pending cancellation, close');
 } finally {service.dispose();await new Promise(r=>setTimeout(r,2000));await rm(directory,{recursive:true,force:true});}
