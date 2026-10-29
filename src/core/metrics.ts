@@ -1,7 +1,8 @@
+import { networkMetricsCommand } from './network-metrics';
 const baseMetricsCommand =
   "LC_ALL=C; export LC_ALL; printf '__CPU__\\n'; awk '/^cpu / {print} /^cpu[0-9]+ / {n++} END {printf \"__CORES__ %d\\n\", n}' /proc/stat; printf '__MEM__\\n'; cat /proc/meminfo; printf '__DISK__\\n'; df -Pk";
 export type CpuSample = { total: number; idle: number };
-export const metricsCommand =
+const systemMetricsCommand =
   baseMetricsCommand +
   "; printf '__DRIVES__\\n'; lsblk -b -d -n -o NAME,SIZE,TYPE 2>/dev/null; printf '__MODEL__\\n'; " +
   "model=$(awk -F: '/^model name[[:space:]]*:/ {sub(/^[[:space:]]+/,\"\",$2); print $2; exit}' /proc/cpuinfo); " +
@@ -68,3 +69,5 @@ export function parseMetrics(output: string, previous?: CpuSample) {
     }),
   };
 }
+
+export const metricsCommand = systemMetricsCommand + networkMetricsCommand;

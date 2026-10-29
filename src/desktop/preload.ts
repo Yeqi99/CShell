@@ -292,6 +292,7 @@ const bridge: Bridge = {
   transferFiles: (sources, target, move) =>
     ipcRenderer.invoke('file:transfer', sources, target, move),
   monitor: (id) => ipcRenderer.invoke('monitor', id),
+  resourceProcessNetwork: (id) => ipcRenderer.invoke('resources:process-network', id),
   resourceHardware: (id) => ipcRenderer.invoke('resources:hardware', id),
   resourceProcesses: (id) => ipcRenderer.invoke('resources:processes', id),
   droppedFiles: (files) =>

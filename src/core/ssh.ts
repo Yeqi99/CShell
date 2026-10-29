@@ -1,3 +1,4 @@
+import { parseNetworkMetrics, type NetworkSample } from './network-metrics';
 import ssh2, { type Client, type ClientChannel, type ConnectConfig, type SFTPWrapper } from 'ssh2';
 import { createHash, randomUUID } from 'node:crypto';
 import { StringDecoder } from 'node:string_decoder';
@@ -16,6 +17,7 @@ export interface Session {
   sftp?: SFTPWrapper;
   sftpPending?: Promise<SFTPWrapper>;
   cpu?: CpuSample;
+  network?: NetworkSample;
   monitoring: boolean;
   closed: boolean;
   disconnecting?: boolean;
@@ -414,6 +416,8 @@ export class SshService {
       });
       const parsed = parseMetrics(output, session.cpu);
       session.cpu = parsed.sample;
+      const network = parseNetworkMetrics(output, session.network);
+      session.network = network.sample;
       return {
         cpu: parsed.cpu,
         cpuCount: parsed.cpuCount,
@@ -426,6 +430,7 @@ export class SshService {
         diskTotal: parsed.diskTotal,
         disks: parsed.disks,
         physicalDisks: parsed.physicalDisks,
+        network: network.network,
         latency: Math.round(performance.now() - start),
         ...(!parsed.sample ? { error: 'Linux /proc monitoring unavailable' } : {}),
       };

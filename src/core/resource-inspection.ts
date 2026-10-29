@@ -1,3 +1,4 @@
+import { parseProcessNetwork, processNetworkCommand } from './process-network';
 import type { HardwareInfo, ProcessSnapshot } from '../shared/resources';
 import { RemoteJobs } from './remote-jobs';
 import type { SshService } from './ssh';
@@ -82,6 +83,9 @@ export class ResourceInspection {
     } finally {
       this.pending.delete(key);
     }
+  }
+  async processNetwork(sessionId: string) {
+    return parseProcessNetwork(await this.run(sessionId, 'process-network', processNetworkCommand));
   }
   async hardware(sessionId: string) {
     return parseHardware(await this.run(sessionId, 'hardware', hardwareCommand));

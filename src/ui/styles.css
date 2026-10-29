@@ -6028,3 +6028,29 @@ input[type='radio']:focus-visible {
 .ping-button { flex: none; font-size: 11px; padding: 3px 5px; min-height: 24px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .server-row .ping-button { max-width: 62px; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
 .server-row .ping-button:hover { color: var(--accent); }
+
+/* Hardware data follows its content width, never the terminal's width. */
+.compact-monitor .metric-disk { grid-template-columns:minmax(0,1fr) auto; }
+.compact-monitor .metric-disk .resource-name { grid-column:1 / -1; grid-row:1; min-width:0; overflow-wrap:anywhere; }
+.compact-monitor .metric-disk .resource-detail { grid-column:1; grid-row:2; min-width:0; padding-left:18px; }
+.compact-monitor .metric-disk strong { grid-column:2; grid-row:2; align-self:start; }
+.network-details { font-size:12px; min-width:0; padding-top:8px; }
+.network-totals,.network-interface summary,.network-process-row { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:8px; align-items:center; padding:8px 0; font-variant-numeric:tabular-nums; }
+.network-totals strong { font-size:12px; font-weight:500; white-space:nowrap; }
+.network-totals small,.network-process-row small { display:block; color:var(--muted); font-size:11px; }
+.network-interface { border-top:1px solid var(--border); }
+.network-interface summary { cursor:pointer; }
+.network-interface summary>span:first-child,.network-process-row>span:first-child { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.network-interface summary>span:first-child:before { content:'›'; margin-right:6px; }
+.network-interface[open] summary>span:first-child:before { content:'⌄'; }
+.network-interface dl { margin:0 0 8px; color:var(--muted); display:grid; grid-template-columns:minmax(0,1fr) auto; gap:5px 8px; font-size:11px; }
+.network-interface dd { margin:0; overflow-wrap:anywhere; text-align:right; }
+.network-note { display:block; color:var(--muted); font-size:11px; line-height:1.5; margin:6px 0; }
+.process-network { border-top:1px solid var(--border); margin-top:10px; padding-top:8px; }
+.process-network>summary,.network-help>summary { cursor:pointer; }
+.network-process-heading { display:flex; justify-content:space-between; align-items:center; margin:6px 0; color:var(--muted); }
+.network-process-list { max-height:240px; overflow:auto; }
+.network-process-row { border-bottom:1px solid var(--border); }
+.network-help { margin-top:8px; font-size:11px; color:var(--muted); }
+.network-help p { line-height:1.5; }
+.network-help code { white-space:normal; overflow-wrap:anywhere; user-select:text; }

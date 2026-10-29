@@ -1,3 +1,4 @@
+import { networkMetricsSchema } from '../../shared/network-metrics';
 import { z } from 'zod';
 import { localShellSchema } from '../../shared/local-terminal';
 import { directoryPageOutput } from './directory-page';
@@ -42,6 +43,7 @@ const task = z
   .strict();
 export const metricsResult = z
   .object({
+    network: networkMetricsSchema.optional(),
     cpuModel: z.string().nullable().optional(),
     cpu: z.number().nullable(),
     cpuCount: z.number().nullable(),

@@ -335,6 +335,7 @@ export const fileRefSchema = z.discriminatedUnion('kind', [
 ]);
 export type FileRef = z.infer<typeof fileRefSchema>;
 export interface Metrics {
+  network?: import('./network-metrics').NetworkMetrics;
   physicalDisks?: { name: string; size: number }[];
   disks?: { device: string; mount: string; total: number; used: number; percent: number }[];
   cpuModel?: string | null;
@@ -452,6 +453,7 @@ export interface Bridge
   transferFiles(sources: FileRef[], target: FileRef, move: boolean): Promise<void>;
   monitor(sessionId: string): Promise<Metrics>;
   resourceHardware(sessionId: string): Promise<import('./resources').HardwareInfo>;
+  resourceProcessNetwork(sessionId: string): Promise<import('./network-metrics').ProcessNetworkSnapshot>;
   resourceProcesses(sessionId: string): Promise<import('./resources').ProcessSnapshot>;
   droppedFiles(files: File[]): string[];
   copyText(text: string): Promise<void>;
