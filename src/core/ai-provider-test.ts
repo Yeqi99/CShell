@@ -1,3 +1,4 @@
+import { fetchAiProtocol } from './ai-protocol';
 import { readAiResponse } from './ai-response';
 
 /** A real, isolated completion probe. No conversation, tools, or user context is sent. */
@@ -9,7 +10,7 @@ export async function testAiProvider(
   let firstTokenMs: number | null = null;
   const base = p.url.replace(/\/+$/, '');
   try {
-    const response = await (p.transport??fetch)(
+    const response = await fetchAiProtocol(p.transport??fetch,
       base + (base.endsWith('/chat/completions') ? '' : '/chat/completions'),
       {
         method: 'POST',
