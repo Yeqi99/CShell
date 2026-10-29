@@ -1,0 +1,19 @@
+import {Agent,createServer, request as httpRequest} from 'node:http';
+import type {Client} from 'ssh2';
+import type {Duplex} from 'node:stream';
+import type {MachineNetworkRoute} from './machine-network-route';
+/** Remote loopback listener only; valid for the lifetime of its dedicated terminal. */
+export async function remoteAppProxy(client:Client, route:MachineNetworkRoute, exitId:string){
+ await route.proxy(exitId);
+ const streams=new Set<Duplex>();let closed=false;let bound=0;
+ const server=createServer({maxHeaderSize:16384});
+ const track=(s:Duplex)=>{streams.add(s);s.once('close',()=>streams.delete(s));s.on('error',()=>{});return s;};
+ server.on('connect',(req,socket,head)=>{void(async()=>{try{const target=new URL('https://'+req.url);if(target.username||target.password||target.pathname!=='/'||target.search||target.hash)throw Error('Invalid CONNECT');const upstream=track(await route.tunnel(exitId,target.hostname,Number(target.port||443)));if(closed||socket.destroyed){upstream.destroy();return;}socket.write('HTTP/1.1 200 Connection Established\r\n\r\n');if(head.length)upstream.write(head);socket.pipe(upstream).pipe(socket);socket.once('close',()=>upstream.destroy());upstream.once('close',()=>socket.destroy());}catch{socket.end('HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n');}})();});
+ server.on('request',(req,res)=>{void(async()=>{try{const url=new URL(req.url??'');if(url.protocol!=='http:'||url.username||url.password)throw Error('Invalid proxy request');const upstream=track(await route.tunnel(exitId,url.hostname,Number(url.port||80)));if(closed||req.destroyed){upstream.destroy();return;}const headers:import('node:http').OutgoingHttpHeaders={...req.headers,host:url.host};delete headers['proxy-authorization'];delete headers['proxy-connection'];const agent=new Agent({keepAlive:false});agent.createConnection=()=>upstream as any;const request=httpRequest({method:req.method,path:url.pathname+url.search,host:url.hostname,port:Number(url.port||80),headers,agent},response=>{res.writeHead(response.statusCode??502,response.headers);response.pipe(res);});request.on('error',()=>{res.writeHead(502);res.end();});res.on('close',()=>{request.destroy();agent.destroy();upstream.destroy();});req.pipe(request);}catch{res.writeHead(502);res.end();}})();});
+ const incoming=(info:{destIP:string;destPort:number;srcIP:string},accept:()=>Duplex,reject:()=>void)=>{if(info.destPort!==bound)return;if(closed||info.destIP!=='127.0.0.1'||!['127.0.0.1','::1','::ffff:127.0.0.1'].includes(info.srcIP)||streams.size>=128){reject();return;}const stream=track(accept());server.emit('connection',stream);};
+ client.on('tcp connection',incoming);
+ try{bound=await new Promise<number>((resolve,reject)=>client.forwardIn('127.0.0.1',0,(error,port)=>error?reject(error):resolve(port)));}catch(e){client.removeListener('tcp connection',incoming);await route.close();throw e;}
+ const close=()=>{if(closed)return;closed=true;client.removeListener('tcp connection',incoming);client.unforwardIn('127.0.0.1',bound,()=>{});for(const s of streams)s.destroy();streams.clear();server.close();void route.close();};client.once('close',close);
+ return {port:bound,close:()=>{client.removeListener('close',close);close();}};
+}
+export function proxyShellCommand(port:number){if(!Number.isInteger(port)||port<1||port>65535)throw Error('Invalid proxy port');return `env HTTP_PROXY=http://127.0.0.1:${port} HTTPS_PROXY=http://127.0.0.1:${port} http_proxy=http://127.0.0.1:${port} https_proxy=http://127.0.0.1:${port} NO_PROXY= no_proxy= bash -l`;}
