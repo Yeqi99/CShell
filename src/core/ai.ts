@@ -1,3 +1,4 @@
+import { functionParameters } from './ai-function-schema';
 import {machineInspectionInstructions,toolAwareHistory} from './ai-tool-context';
 import {checkpointSchema,compactContext,continuityInstructions,RunBudget} from './agent-continuity';
 import {AgentJobs,jobQuery} from './agent-jobs';
@@ -890,7 +891,7 @@ export class AiService {
         .map((d) => {
           // Function parameters already carry their schema in a typed API field.
           // Repeating the dialect URI for every tool wastes event request budget.
-          const { $schema: _dialect, ...parameters } = z.toJSONSchema(d.input, { io: 'input' });
+          const parameters = functionParameters(d.input);
           return {
             type: 'function',
             function: {
