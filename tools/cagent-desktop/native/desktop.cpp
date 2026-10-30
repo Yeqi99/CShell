@@ -50,7 +50,8 @@ void bindSystemDesktop(){
  HANDLE token=nullptr;if(!OpenProcessToken(GetCurrentProcess(),TOKEN_QUERY,&token))throw std::runtime_error("System desktop token unavailable");
  DWORD n=0;GetTokenInformation(token,TokenUser,nullptr,0,&n);std::vector<BYTE> buffer(n);BOOL ok=GetTokenInformation(token,TokenUser,buffer.data(),n,&n);CloseHandle(token);
  if(!ok||!IsWellKnownSid(((TOKEN_USER*)buffer.data())->User.Sid,WinLocalSystemSid))throw std::runtime_error("System desktop worker requires the installed service");
- systemDesktop=OpenInputDesktop(0,FALSE,DESKTOP_READOBJECTS|DESKTOP_WRITEOBJECTS|DESKTOP_SWITCHDESKTOP);
+ // Request playback on the already-authorized input desktop; do not change its ACL or token.
+ systemDesktop=OpenInputDesktop(0,FALSE,DESKTOP_READOBJECTS|DESKTOP_WRITEOBJECTS|DESKTOP_JOURNALPLAYBACK|DESKTOP_SWITCHDESKTOP);
  if(!systemDesktop||!SetThreadDesktop(systemDesktop))throw std::runtime_error("CAPTURE_DESKTOP_UNAVAILABLE");systemWorker=true;
 }
 void checkCaptureDesktop(){
