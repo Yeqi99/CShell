@@ -25,12 +25,13 @@ public delegate bool E(IntPtr h,IntPtr p);
 [DllImport("user32.dll")]static extern bool EnumWindows(E f,IntPtr p);
 [DllImport("user32.dll")]static extern uint GetWindowThreadProcessId(IntPtr h,out uint p);
 [DllImport("user32.dll")]static extern int GetClassName(IntPtr h,StringBuilder s,int n);
+[DllImport("user32.dll",CharSet=CharSet.Unicode)]static extern int GetWindowText(IntPtr h,StringBuilder s,int n);
 [DllImport("user32.dll")]static extern bool IsWindowVisible(IntPtr h);
 [DllImport("user32.dll")]static extern IntPtr GetWindow(IntPtr h,uint cmd);
 [DllImport("user32.dll")]static extern int GetWindowLong(IntPtr h,int n);
 [DllImport("user32.dll")]static extern bool GetWindowRect(IntPtr h,out Rect r);
 [StructLayout(LayoutKind.Sequential)]public struct Rect{public int left,top,right,bottom;}
-public static string Read(uint target){string result="null";EnumWindows((h,p)=>{uint pid;GetWindowThreadProcessId(h,out pid);var name=new StringBuilder(256);GetClassName(h,name,256);if(pid==target&&name.ToString().StartsWith("WindowsForms10.Window.8.")){Rect r;GetWindowRect(h,out r);result="{\\"hwnd\\":\\""+h+"\\",\\"owner\\":\\""+GetWindow(h,4)+"\\",\\"visible\\":"+(IsWindowVisible(h)?"true":"false")+",\\"appWindow\\":"+((GetWindowLong(h,-20)&0x40000)!=0?"true":"false")+",\\"width\\":"+(r.right-r.left)+",\\"height\\":"+(r.bottom-r.top)+"}";return false;}return true;},IntPtr.Zero);return result;}
+public static string Read(uint target){string result="null";EnumWindows((h,p)=>{uint pid;GetWindowThreadProcessId(h,out pid);var name=new StringBuilder(256);GetClassName(h,name,256);var title=new StringBuilder(256);GetWindowText(h,title,256);if(pid==target&&title.ToString()=="CShell RDP surface"&&name.ToString().StartsWith("WindowsForms10.Window.8.")){Rect r;GetWindowRect(h,out r);result="{\\"hwnd\\":\\""+h+"\\",\\"owner\\":\\""+GetWindow(h,4)+"\\",\\"visible\\":"+(IsWindowVisible(h)?"true":"false")+",\\"appWindow\\":"+((GetWindowLong(h,-20)&0x40000)!=0?"true":"false")+",\\"width\\":"+(r.right-r.left)+",\\"height\\":"+(r.bottom-r.top)+"}";return false;}return true;},IntPtr.Zero);return result;}
 }
 '@
 [SurfaceProbe]::Read([uint32]$TargetPid)
@@ -48,9 +49,9 @@ try{
  const bounds=async(visible:boolean,width=800)=>{await app.evaluate(({}, {visible,width})=>{const f=(globalThis as any).fixture;f.service.send(f.id,{op:'bounds',x:20,y:70,width,height:500,visible});},{visible,width});await new Promise(r=>setTimeout(r,250));};
  await bounds(true);let first=read();assert.ok(first);assert.equal(first.owner,target.owner);assert.equal(first.appWindow,false);assert.equal(first.visible,true);assert.ok(first.width>400&&first.height>200);
  await bounds(false);assert.equal(read().visible,false,'inactive tab/menu hides native surface');
- await bounds(true,700);const restored=read();assert.equal(restored.hwnd,first.hwnd,'tab restoration reuses surface');assert.equal(restored.visible,true);assert.ok(restored.width<first.width);
+ await bounds(true,700);const restored=read();assert.equal(restored.hwnd,first.hwnd,'tab restoration reuses surface');assert.equal(restored.visible,true);assert.equal(restored.owner,target.owner,'restore preserves the actual Electron owner');assert.ok(restored.width<first.width);
  await app.evaluate(()=>{(globalThis as any).fixture.win.minimize();});await bounds(false);assert.equal(read().visible,false,'minimize hides surface');
- await app.evaluate(()=>{(globalThis as any).fixture.win.restore();});await bounds(true);assert.equal(read().visible,true,'restore shows same surface');
+ await app.evaluate(()=>{(globalThis as any).fixture.win.restore();});await bounds(true);const afterMinimize=read();assert.equal(afterMinimize.visible,true,'restore shows same surface');assert.equal(afterMinimize.owner,target.owner,'minimize/restore preserves Electron owner');
  await app.evaluate(()=>{const f=(globalThis as any).fixture;f.service.close(f.id);});await new Promise(r=>setTimeout(r,1800));assert.equal(read(),null,'close removes native surface');
  console.log('PASS real ActiveX owned surface: no taskbar entry, bounds, tab/menu hide, restore, minimize, close');
 }finally{await app.evaluate(async()=>{(globalThis as any).fixture?.service.dispose();await new Promise(r=>setTimeout(r,2000));}).catch(()=>{});await app.close();await rm(dir,{recursive:true,force:true,maxRetries:4,retryDelay:500});}
