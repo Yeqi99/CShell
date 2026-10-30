@@ -18,7 +18,7 @@
 - [WTSINFOEX_LEVEL1_W](https://learn.microsoft.com/en-us/windows/win32/api/wtsapi32/ns-wtsapi32-wtsinfoex_level1_w)：核对锁定与活动状态；Windows 7 / Server 2008 R2 锁定标志存在反转问题，因此不支持这些系统。
 - [tscon](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/tscon) 文档注明不能连接到 console。本实现不使用该命令，也不把控制台转换宣称为每个 Windows 系统都保证可用；以 WTS API 实际返回和后续控制台核验为准。
 
-## 当前验证
+## 早期隔离验证
 
 2026-10-30：Core/Pro 单元与现有桌面传输回归 31 项；原生 broker、带系统代理的 desktop helper 构建通过；隔离浏览器验证计划不执行、复选确认后执行一次、系统拒绝不重试。尚未在真实目标 Windows 执行会话转换，不能标为实机验收完成。测试没有操作用户当前 RDP 会话。
 
@@ -29,4 +29,12 @@ Windows 测试机已升级 CAgent 0.8.16，受保护系统桌面服务的 broker
 
 在同 SID 的活跃、未锁定 RDP 会话以及空闲 console 条件下，显式转换返回 accepted=true、confirmed=true、errorCode=0；实际 console 会话随后与原用户会话一致。RDP 断开后，正式 MCP 桌面截图连续取得 1024×768 的真实桌面，独立首帧已通过。未安装虚拟显示驱动，未自动登录或解锁，也未扩大权限。这不代表所有 Windows/无头硬件或重启后场景均已通过。
 
-键鼠控制尚未通过：交互工具返回完成，但右键和按键后未观察到对应画面变化，光标也未移动至请求位置。正在补充输入确认及连接关闭前的交付验证；不能把首帧成功等同完整控制成功。旧版窗口在后台退出后仍可能占用单实例锁，升级验收须核对真实运行版本，不能仅凭安装完成判断升级生效。
+早期键鼠验证未通过（已由下节复验更新）：交互工具返回完成，但右键和按键后未观察到对应画面变化，光标也未移动至请求位置。正在补充输入确认及连接关闭前的交付验证；不能把首帧成功等同完整控制成功。旧版窗口在后台退出后仍可能占用单实例锁，升级验收须核对真实运行版本，不能仅凭安装完成判断升级生效。
+
+### 2026-10-30 Windows 画面与输入完整实机复验
+
+在 Windows Server 2022 的已解锁 console 2 中，未重新连接 RDP，使用隔离主控源码 3e3435b 与受控候选 slot 0.8.16-6b543bd5a2a3726a 完成正式桌面工具验收：冷启动单次截图 frame 0 为真实 1024×768 画面；鼠标移动后独立 GetCursorPos 为 409,307；点击开始按钮出现开始菜单；文字“CShell input check 0816”完整出现在 Windows 搜索框，未发送 Enter；Escape 恢复原桌面。测试视图已停止。
+
+修复包括已授权桌面句柄所需的 JOURNALPLAYBACK 访问位、初始视频配置与媒体乱序门禁，以及跳过 DXGI LastPresentTime 为 0 的未更新桌面样本。没有按黑色像素判断有效性，没有更改 ACL、令牌、锁屏或机器权限。受控端身份、密码、访问配置与密钥保护文件与升级前一致。
+
+证据为 Pro 本地 .local/desktop-ack-acceptance-final.json 及其中四张截图的 SHA-256。此为指定 Windows Server 2022 未锁定控制台的真实结果；不代表所有 Windows、UAC 安全桌面、锁屏、无头硬件或重启后均可用。主控此次使用隔离开发构建，最终封装安装包仍需按最终源码和摘要验收；不表示公开发布。
