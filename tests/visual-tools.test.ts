@@ -199,3 +199,19 @@ test('desktop automation keeps authenticated view alive until every input acknow
  await assert.rejects(failed.tools.invoke('machine','interact',{action:'click',x:.2,y:.3},new AbortController().signal),/input rejected/);
  assert.equal(attempts,1);assert.equal(failed.state.stops,1);
 });
+
+
+test('desktop capture tolerates explicit capture recovery before first frame, but fatal errors fail immediately',async()=>{
+ for(const recoverable of [true,false]){
+  const f=desktopFixture();f.host.start=async(input)=>{queueMicrotask(()=>{for(const l of f.listeners)l({id:input.id,type:'error',message:'recovering',recoverable});if(recoverable)for(const l of f.listeners)l({id:input.id,type:'frame',key:true,sequence:'1',timestamp:1,data:new Uint8Array([1])});});return{control:input.control,generation:1};};
+  const task=f.tools.invoke('machine','capture',{},new AbortController().signal);
+  if(recoverable)assert.equal((await task as any).width,640);else await assert.rejects(task,/recovering/);
+  assert.equal(f.state.stops,1);
+ }
+});
+test('capture recovery after sending input aborts without sending later events',async()=>{
+ const f=desktopFixture();let attempts=0;
+ f.host.input=(id)=>{attempts++;for(const l of f.listeners)l({id,type:'error',message:'capture interrupted',recoverable:true});return new Promise<void>(()=>{});};
+ await assert.rejects(f.tools.invoke('machine','interact',{action:'click',x:.5,y:.5},new AbortController().signal),/capture interrupted/);
+ assert.equal(attempts,1);assert.equal(f.state.stops,1);
+});

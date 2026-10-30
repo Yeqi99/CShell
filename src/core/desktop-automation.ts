@@ -77,7 +77,8 @@ export class DesktopAutomation {
     let generation = 1,
       finished = false,
       processing = false,
-      settled = false;
+      settled = false,
+      inputSent = false;
     let resolveFrame!: (result: {
         frame: Frame;
         image?: { dataBase64: string; width: number; height: number };
@@ -106,7 +107,10 @@ export class DesktopAutomation {
         generation = event.generation ?? 1;
       }
       if (event.type === 'closed' || event.type === 'error') {
-        rejectFrame(Error(event.type === 'closed' ? event.reason : event.message));
+        if(event.type==='error'&&event.recoverable&&!inputSent)return;
+        const failure=Error(event.type === 'closed' ? event.reason : event.message);
+        controller.abort(failure);
+        rejectFrame(failure);
         return;
       }
       if (event.type !== 'frame') return;
@@ -163,6 +167,7 @@ export class DesktopAutomation {
         });
       const send = async (event: DesktopViewInput) => {
         guard();
+        inputSent = true;
         await abortable(Promise.resolve(this.host.input(id, event, generation)), signal);
         guard();
       };
