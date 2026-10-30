@@ -35,6 +35,10 @@ jobs:
       - run: pnpm exec tsx scripts/mcp-startup-smoke.ts
       - run: pnpm exec tsx scripts/settings-smoke.ts
       - run: pnpm exec tsx scripts/floating-smoke.ts
+      - name: Verify terminal parsing and scrollback stability
+        run: |
+          pnpm exec tsx scripts/terminal-parsed-race-smoke.ts
+          pnpm exec tsx scripts/terminal-stability-smoke.ts
       - run: pnpm exec tsx scripts/extraction-smoke.ts
       - run: pnpm exec tsx scripts/activity-smoke.ts
       - run: pnpm exec tsx scripts/update-smoke.ts

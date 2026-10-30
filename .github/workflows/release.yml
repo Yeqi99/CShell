@@ -54,7 +54,9 @@ jobs:
           node scripts/test-native-desktop-ui.cjs
       - if: matrix.platform == 'win'
         name: Verify terminal parser UI update convergence
-        run: pnpm exec tsx scripts/terminal-parsed-race-smoke.ts
+        run: |
+          pnpm exec tsx scripts/terminal-parsed-race-smoke.ts
+          pnpm exec tsx scripts/terminal-stability-smoke.ts
       - if: matrix.platform == 'win'
         run: pnpm exec tsx scripts/activity-smoke.ts
       - if: matrix.platform == 'win'
