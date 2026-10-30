@@ -196,6 +196,7 @@ export const mcpSettingsSchema = z
   })
   .strict();
 export type McpSettings = z.infer<typeof mcpSettingsSchema>;
+export interface FilePermissionInfo {mode:number;uid:number;gid:number;directory:boolean;}
 export interface McpStatus {
   revision: string;
   settings: McpSettings;
@@ -316,6 +317,9 @@ export interface Transfer {
   direction: 'upload' | 'download' | 'copy';
   done: number;
   total: number;
+  totalKnown?: boolean;
+  queued?: boolean;
+  bytesPerSecond?: number;
   state: 'running' | 'done' | 'cancelled' | 'failed';
   error?: string;
 }
@@ -437,6 +441,7 @@ export interface Bridge
   acknowledge(sessionId: string, characters: number): Promise<void>;
   resize(sessionId: string, cols: number, rows: number): Promise<void>;
   list(sessionId: string, path: string): Promise<{ path: string; entries: FileEntry[] }>;
+  filePermissions?(sessionId:string,path:string,change?:{mode:number;expectedMode:number}):Promise<FilePermissionInfo>;
   fileAction(
     sessionId: string,
     action: 'mkdir' | 'rename' | 'delete',

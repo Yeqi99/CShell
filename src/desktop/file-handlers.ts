@@ -1,3 +1,4 @@
+import {filePermissions} from '../core/file-permissions';
 import { BrowserWindow, dialog } from 'electron';
 import { lstat, rename } from 'node:fs/promises';
 import { join, posix, relative, sep } from 'node:path';
@@ -28,6 +29,7 @@ export function registerFileHandlers(
         cancelId: 0,
       })
     ).response === 1;
+  handle('file:permissions',async(sessionId,path,change)=>filePermissions(await ssh.sftp(id.parse(sessionId)),remotePath(z.string().parse(path)),change===undefined?undefined:z.object({mode:z.number().int().min(0).max(511),expectedMode:z.number().int().min(0).max(4095)}).strict().parse(change)));
   handle('local:choose', async () => {
     const result = await dialog.showOpenDialog(window, {
       title: text('选择本地工作目录', 'Choose local working directory'),

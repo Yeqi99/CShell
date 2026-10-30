@@ -1,3 +1,5 @@
+import {formatFileBytes} from '../../shared/transfer-progress';
+import {FilePermissions} from './FilePermissions';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import {
   ArrowUp,
@@ -41,6 +43,7 @@ export function FilePanel({
   disableEnvironment?: boolean;
 }) {
   const { t, locale } = useI18n();
+  const [permissionPath,setPermissionPath]=useState<string>();
   const [editors, setEditors] = useState<string[]>([]);
   const [activeEditor, setActiveEditor] = useState('');
   const [closingEditor, setClosingEditor] = useState('');
@@ -430,10 +433,7 @@ export function FilePanel({
             <small className="file-size">
               {entry.directory
                 ? '—'
-                : new Intl.NumberFormat(locale, {
-                    notation: 'compact',
-                    maximumFractionDigits: 1,
-                  }).format(entry.size) + ' B'}
+                : formatFileBytes(entry.size)}
             </small>
             <small className="file-date">
               {new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric' }).format(
@@ -509,6 +509,7 @@ export function FilePanel({
           >
             {t('rename')}
           </button>
+          {!localRoot && window.cshell.filePermissions && <button disabled={closed||selected.length!==1} onClick={()=>{setPermissionPath(selected[0]);setMenu(null);}}>{locale==='zh-CN'?'文件权限':'File permissions'}</button>}
           <button className="danger" onClick={() => run(remove())}>
             {t('delete')}
           </button>
@@ -525,6 +526,7 @@ export function FilePanel({
         <Upload size={16} />
         {t('dropHint')}
       </div>
+      {permissionPath&&!localRoot&&<FilePermissions key={sessionId+permissionPath} sessionId={sessionId} path={permissionPath} closed={closed} onClose={()=>setPermissionPath(undefined)}/>}
       {action && (
         <section
           className="inline-file-editor"
