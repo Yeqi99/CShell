@@ -98,6 +98,10 @@ struct Capture{
   checkCaptureDesktop();
   DXGI_OUTDUPL_FRAME_INFO info{};Com<IDXGIResource> resource;HRESULT hr=duplication->AcquireNextFrame(timeout,&info,resource.put());if(hr==DXGI_ERROR_WAIT_TIMEOUT)return false;check(hr,"capture frame");
   struct Release{IDXGIOutputDuplication*p;~Release(){p->ReleaseFrame();}}release{duplication.p};
+  // DXGI reports pointer-only updates with LastPresentTime == 0. They do not
+  // establish a desktop image, especially before the first actual presentation.
+  // Preserve frame credit and the bounded no-frame fallback; never inspect colors.
+  if(info.LastPresentTime.QuadPart==0)return false;
   Com<ID3D11Texture2D> texture;check(resource->QueryInterface(__uuidof(ID3D11Texture2D),(void**)texture.put()),"capture texture");consume(texture.p);return true;
  }
  bool frame(std::vector<uint8_t>&bgra,UINT timeout=16){
