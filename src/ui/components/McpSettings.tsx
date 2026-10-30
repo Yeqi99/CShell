@@ -1,3 +1,4 @@
+import { defaultMcpPort } from '../../shared/mcp-endpoint';
 import { selectAllMcpPermissions } from './mcp-all-permissions';
 import { apiCapabilitySchema } from '../../shared/contracts';
 import { CapabilitySelection } from './CapabilitySelection';
@@ -116,7 +117,8 @@ export function McpSettings({
             />
           </label>
           <p>
-            <code>http://127.0.0.1:{draft.port}/mcp</code>
+            {status?.running && status.endpoint ? <code>{status.endpoint}/mcp</code> : <span>{t('mcpStopped')}</span>}
+            <button type="button" onClick={() => setDraft({...draft,port:defaultMcpPort()})}>{locale === 'zh-CN' ? '使用本版默认端口' : 'Use edition default port'} {defaultMcpPort()}</button>
           </p>
           <p className="muted">{t('mcpScope')}</p>
           <div className="mcp-profiles">
@@ -244,7 +246,7 @@ export function McpSettings({
               {locale === 'zh-CN' ? 'API 与能力披露' : 'API and capability discovery'}
             </summary>
             <p>
-              <code>http://127.0.0.1:{draft.port}/api/v1/capabilities</code>
+              {status?.running && status.endpoint ? <code>{status.endpoint}/api/v1/capabilities</code> : <span>{t('mcpStopped')}</span>}
             </p>
             <label>
               {locale === 'zh-CN' ? '披露模式' : 'Discovery mode'}

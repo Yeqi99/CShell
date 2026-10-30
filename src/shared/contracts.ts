@@ -201,6 +201,7 @@ export interface McpStatus {
   settings: McpSettings;
   running: boolean;
   error?: string;
+  endpoint?: string;
   requests: number;
 }
 export const preferencesSchema = z

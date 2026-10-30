@@ -1,3 +1,5 @@
+import { isPro } from '../shared/edition';
+import { localMcpEndpoint } from '../shared/mcp-endpoint';
 import { readFile, writeFile, stat } from 'node:fs/promises';
 import { addAbortSignal } from 'node:stream';
 import { localApiTransport, runConsoleCommand } from '../core/command-client';
@@ -7,7 +9,7 @@ export async function runCli(argv: string[], output = process.stdout, errors = p
   const abort = new AbortController();
   const cancel = () => abort.abort(); process.once('SIGINT', cancel);
   try {
-    let endpoint = process.env.CSHELL_API_URL || 'http://127.0.0.1:3777', tokenFile = '', sessionId: string | undefined;
+    let endpoint = process.env.CSHELL_API_URL || localMcpEndpoint(), tokenFile = '', sessionId: string | undefined;
     let json = '', stdin = false, destination = '';
     const words: string[] = [];
     for (let i = 0; i < argv.length; i++) {
@@ -33,7 +35,7 @@ export async function runCli(argv: string[], output = process.stdout, errors = p
     const parsed = parseConsoleCommand(text);
     if (tokenFile && (await stat(tokenFile)).size > 8192) throw Error('访问令牌文件过大');
     const token = tokenFile ? (await readFile(tokenFile, 'utf8')).trim() : process.env.CSHELL_API_TOKEN || '';
-    const transport = parsed.type === 'help' || parsed.type === 'context' ? async () => undefined : localApiTransport(endpoint, token);
+    const transport = parsed.type === 'help' || parsed.type === 'context' ? async () => undefined : localApiTransport(endpoint, token, isPro ? 'pro' : 'opensource');
     const result = await runConsoleCommand(text, transport, sessionId, AbortSignal.any([abort.signal, AbortSignal.timeout(300000)]));
     if (destination) {
       const image = findImage(result.value);

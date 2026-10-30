@@ -1,3 +1,4 @@
+import { isPro, productName } from '../shared/edition';
 import {version as applicationVersion} from '../../package.json';
 import { createServer, type Server as HttpServer } from 'node:http';
 import { randomBytes, randomUUID, timingSafeEqual, createHash } from 'node:crypto';
@@ -162,6 +163,7 @@ export class McpService {
       settings: this.store.mcpSettings(),
       revision: this.configurationRevision(),
       running: !!this.http?.listening,
+      endpoint: this.http?.listening ? `http://127.0.0.1:${(this.http.address() as {port:number}).port}` : undefined,
       error: this.error,
       requests: this.requests,
     };
@@ -335,7 +337,13 @@ export class McpService {
       this.token = await this.accessToken();
       for (const client of settings.clients ?? [])
         if (client.enabled) await this.accessToken(client.id);
+      const identity = {edition:isPro ? 'pro' : 'opensource',productName,scope:createHash('sha256').update(this.directory).digest('hex').slice(0,16)};
       const http = createServer((req, res) => {
+        res.setHeader('X-CShell-Edition',identity.edition);
+        res.setHeader('X-CShell-Scope',identity.scope);
+        if(req.headers['x-cshell-edition'] && req.headers['x-cshell-edition'] !== identity.edition){
+          res.writeHead(409,{'Content-Type':'application/json'}).end(JSON.stringify({apiVersion:'1',error:{code:'EDITION_MISMATCH',message:'Wrong CShell edition endpoint; no operation was executed.'}}));return;
+        }
         void (async () => {
           if (
             !['/mcp', '/api/v1/capabilities', '/api/v1/call', '/api/v1/invoke'].includes(
@@ -480,7 +488,7 @@ export class McpService {
                 }
                 const result =
                   req.url === '/api/v1/capabilities'
-                    ? this.discover(body, owner)
+                    ? {...this.discover(body, owner),service:identity}
                     : await endpoint.call(body);
                 res
                   .writeHead(200, {
@@ -549,7 +557,9 @@ export class McpService {
         this.error = error.message;
       });
     } catch (error) {
-      this.error = (error as Error).message;
+      this.error = (error as NodeJS.ErrnoException).code === 'EADDRINUSE'
+        ? `MCP port ${settings.port} is occupied by another application. This edition is not running. Choose an unused port or restore this edition default; do not connect to this address.`
+        : (error as Error).message;
     }
   }
   private allowed(profileId: string, owner = 'legacy') {
