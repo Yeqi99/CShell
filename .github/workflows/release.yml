@@ -104,6 +104,9 @@ jobs:
       - if: matrix.platform == 'win'
         run: pnpm exec tsx scripts/saved-connect-smoke.ts
       - if: matrix.platform == 'win'
+        name: Verify native RDP surface lifecycle
+        run: pnpm exec tsx scripts/rdp-surface-smoke.ts
+      - if: matrix.platform == 'win'
         run: pnpm exec tsx scripts/connection-lifecycle-smoke.ts
       - if: matrix.platform == 'win'
         run: pnpm exec tsx scripts/ai-work-smoke.ts
