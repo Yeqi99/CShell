@@ -78,7 +78,8 @@ export class DesktopAutomation {
       finished = false,
       processing = false,
       settled = false,
-      inputSent = false;
+      inputSent = false,
+      waitingRecoveryConfig = false;
     let resolveFrame!: (result: {
         frame: Frame;
         image?: { dataBase64: string; width: number; height: number };
@@ -107,14 +108,15 @@ export class DesktopAutomation {
         generation = event.generation ?? 1;
       }
       if (event.type === 'closed' || event.type === 'error') {
-        if(event.type==='error'&&event.recoverable&&!inputSent)return;
+        if(event.type==='error'&&event.recoverable&&!inputSent){if(!event.resumed)waitingRecoveryConfig=true;return;}
         const failure=Error(event.type === 'closed' ? event.reason : event.message);
         controller.abort(failure);
         rejectFrame(failure);
         return;
       }
+      if(event.type==='config'){generation=event.generation??generation;waitingRecoveryConfig=false;return;}
       if (event.type !== 'frame') return;
-      if (processing || settled || !event.key) {
+      if (processing || settled || !event.key || waitingRecoveryConfig || (event.generation!==undefined&&event.generation!==generation)) {
         try {
           this.host.ack(id, event.sequence, false, 0, event.generation ?? generation);
         } catch {}

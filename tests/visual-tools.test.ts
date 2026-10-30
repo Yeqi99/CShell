@@ -203,7 +203,7 @@ test('desktop automation keeps authenticated view alive until every input acknow
 
 test('desktop capture tolerates explicit capture recovery before first frame, but fatal errors fail immediately',async()=>{
  for(const recoverable of [true,false]){
-  const f=desktopFixture();f.host.start=async(input)=>{queueMicrotask(()=>{for(const l of f.listeners)l({id:input.id,type:'error',message:'recovering',recoverable});if(recoverable)for(const l of f.listeners)l({id:input.id,type:'frame',key:true,sequence:'1',timestamp:1,data:new Uint8Array([1])});});return{control:input.control,generation:1};};
+  const f=desktopFixture();f.host.start=async(input)=>{queueMicrotask(()=>{for(const l of f.listeners)l({id:input.id,type:'error',message:'recovering',recoverable});if(recoverable)for(const l of f.listeners){l({id:input.id,type:'config',info:{width:640,height:480,sourceWidth:640,sourceHeight:480,fps:10,codec:'avc1.4d001e',encoder:'fixture',hardware:false}});l({id:input.id,type:'frame',key:true,sequence:'1',timestamp:1,data:new Uint8Array([1])});}});return{control:input.control,generation:1};};
   const task=f.tools.invoke('machine','capture',{},new AbortController().signal);
   if(recoverable)assert.equal((await task as any).width,640);else await assert.rejects(task,/recovering/);
   assert.equal(f.state.stops,1);
@@ -214,4 +214,21 @@ test('capture recovery after sending input aborts without sending later events',
  f.host.input=(id)=>{attempts++;for(const l of f.listeners)l({id,type:'error',message:'capture interrupted',recoverable:true});return new Promise<void>(()=>{});};
  await assert.rejects(f.tools.invoke('machine','interact',{action:'click',x:.5,y:.5},new AbortController().signal),/capture interrupted/);
  assert.equal(attempts,1);assert.equal(f.state.stops,1);
+});
+
+
+test('recovery ignores old frames until new config and current generation keyframe; resume is not fatal',async()=>{
+ const f=desktopFixture();const decoded:string[]=[];const rejected:string[]=[];
+ f.host.ack=(_id,sequence,ok)=>{if(!ok)rejected.push(sequence);};f.host.decode=async(frame)=>{decoded.push(frame.sequence);return{dataBase64:'/9j/2Q==',width:640,height:480};};
+ f.host.start=async input=>{queueMicrotask(()=>{const emit=(e:any)=>{for(const l of f.listeners)l({id:input.id,...e});};
+  emit({type:'error',message:'recovering',recoverable:true});
+  emit({type:'frame',generation:1,key:true,sequence:'1',timestamp:1,data:new Uint8Array([1])});
+  emit({type:'config',generation:2,info:{width:640,height:480,sourceWidth:640,sourceHeight:480,fps:10,codec:'avc1.4d001e',encoder:'fixture',hardware:false}});
+  emit({type:'error',message:'INPUT_RESUMED',recoverable:true,resumed:true});
+  emit({type:'frame',generation:1,key:true,sequence:'2',timestamp:2,data:new Uint8Array([2])});
+  emit({type:'frame',generation:2,key:false,sequence:'3',timestamp:3,data:new Uint8Array([3])});
+  emit({type:'frame',generation:2,key:true,sequence:'4',timestamp:4,data:new Uint8Array([4])});
+ });return{control:input.control,generation:1};};
+ await f.tools.invoke('machine','capture',{},new AbortController().signal);
+ assert.deepEqual(decoded,['4']);assert.deepEqual(rejected,['1','2','3']);assert.equal(f.state.stops,1);
 });
