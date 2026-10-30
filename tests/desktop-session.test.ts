@@ -66,3 +66,17 @@ test('one in-flight frame rejects another rather than queuing it',{timeout:5000}
 test('TCP media shares encrypted ordered stream without UDP and rejects invalid record bounds',{timeout:5000},async()=>{
  const {a,b,client}=await pair({transport:'tcp'});try{await start(a,b);assert.throws(()=>a.localPort);const received=once(b,'frame');const data=randomBytes(256*1024);assert.equal(await a.sendFrame({id:0n,timestamp:123n,key:true,data}),true);assert.deepEqual((await received)[0].data,data);const pong=once(a,'pong');a.ping();await pong;const closed=once(b,'closed');const invalid=Buffer.alloc(4);invalid.writeUInt32BE(0x80010000);client.write(invalid);assert.equal((await closed)[0],'CONTROL_LENGTH');}finally{await Promise.all([a.close(),b.close()]);}
 });
+
+
+test('confirmed input waits for actual remote completion and rejects close without replay',{timeout:10000},async()=>{
+ const {a,b}=await pair({transport:'tcp',idleMs:8000});await start(a,b);
+ try{
+  let reply!: (ok:boolean)=>void;const received=once(b,'confirmed-input');let completed=false;
+  const pending=a.inputConfirmed({kind:'move',x:.3,y:.4,generation:1,sequence:1}).then(()=>{completed=true;});
+  const [value,respond]=await received;reply=respond;assert.equal(value.sequence,1);assert.equal(completed,false);
+  reply(true);await pending;assert.equal(completed,true);
+  const rejected=once(b,'confirmed-input');const bad=a.inputConfirmed({kind:'key',code:30,down:false,generation:1,sequence:2});
+  const fail=assert.rejects(bad,/rejected/);(await rejected)[1](false);await fail;
+  const last=once(b,'confirmed-input');const lost=a.inputConfirmed({kind:'move',x:.5,y:.5,generation:1,sequence:3});const loss=assert.rejects(lost,/disconnected/);await last;await a.close();await loss;
+ }finally{await Promise.all([a.close(),b.close()]);}
+});

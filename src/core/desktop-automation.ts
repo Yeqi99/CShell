@@ -161,35 +161,36 @@ export class DesktopAutomation {
           target,
           frameId: frame.frame.sequence,
         });
-      const send = (event: DesktopViewInput) => {
+      const send = async (event: DesktopViewInput) => {
         guard();
-        return this.host.input(id, event, generation);
+        await abortable(Promise.resolve(this.host.input(id, event, generation)), signal);
+        guard();
       };
       if (input!.action === 'click') {
-        send({ kind: 'move', x: input!.x, y: input!.y });
+        await send({ kind: 'move', x: input!.x, y: input!.y });
         for (let i = 0; i < input!.count; i++) {
-          send({
+          await send({
             kind: 'button',
             button: { left: 0, right: 1, middle: 2 }[input!.button],
             down: true,
           });
-          send({
+          await send({
             kind: 'button',
             button: { left: 0, right: 1, middle: 2 }[input!.button],
             down: false,
           });
         }
-      } else if (input!.action === 'move') send({ kind: 'move', x: input!.x, y: input!.y });
+      } else if (input!.action === 'move') await send({ kind: 'move', x: input!.x, y: input!.y });
       else if (input!.action === 'scroll')
-        send({ kind: 'wheel', delta: input!.delta, horizontal: input!.horizontal });
-      else if (input!.action === 'text') send({ kind: 'text', text: input!.text });
+        await send({ kind: 'wheel', delta: input!.delta, horizontal: input!.horizontal });
+      else if (input!.action === 'text') await send({ kind: 'text', text: input!.text });
       else if (input!.action === 'key') {
-        for (const code of input!.modifiers) send({ kind: 'key', code, down: true });
-        send({ kind: 'key', code: input!.code, down: true });
-        send({ kind: 'key', code: input!.code, down: false });
+        for (const code of input!.modifiers) await send({ kind: 'key', code, down: true });
+        await send({ kind: 'key', code: input!.code, down: true });
+        await send({ kind: 'key', code: input!.code, down: false });
         for (const code of [...input!.modifiers].reverse())
-          send({ kind: 'key', code, down: false });
-      } else this.host.release(id, generation);
+          await send({ kind: 'key', code, down: false });
+      } else await this.host.release(id, generation);
       return { completed: true, target };
     } finally {
       finished = true;

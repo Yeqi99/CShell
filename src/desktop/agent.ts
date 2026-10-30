@@ -279,7 +279,7 @@ export async function registerAgent(
     validate:key=>{registry.describe(key);checkTarget(key);},
     start:async input=>{toolViews.add(input.id);try{targets.bind(input.id,input.target);return await views.start(input);}catch(error){targets.release(input.id);toolViews.delete(input.id);throw error;}},
     stop:async id=>{try{await views.stop(id);}finally{toolViews.delete(id);targets.release(id);}},
-    input:(id,input,generation)=>views.input(id,input,generation),release:(id,generation)=>views.release(id,generation),
+    input:(id,input,generation)=>views.inputConfirmed(id,input,generation),release:(id,generation)=>views.release(id,generation),
     ack:(id,sequence,decoded,decodeMs,generation)=>views.ack(id,sequence,decoded,decodeMs,generation),
     subscribe:listener=>{toolListeners.add(listener);return()=>{toolListeners.delete(listener);};},
     status:async(key,signal)=>{const raw=await registry.agent(key)({method:'desktop.status'},signal);return z.object({enabled:z.boolean(),viewAllowed:z.boolean(),controlAllowed:z.boolean(),busy:z.boolean(),implementation:z.string().max(100).optional(),lastFailure:z.union([z.string().max(2000),z.object({stage:z.string().max(100),code:z.string().max(100),message:z.string().max(2000),at:z.string().max(100)})]).optional()}).parse(raw);},
