@@ -73,6 +73,7 @@ function desktopFixture(mode: 'frame' | 'reconnect' | 'revoked' = 'frame') {
     start: async (input) => {
       queueMicrotask(() => {
         if (mode === 'revoked') state.allowed = false;
+        if(mode!=='reconnect')for(const listener of listeners)listener({id:input.id,type:'config',info:{width:640,height:480,sourceWidth:640,sourceHeight:480,fps:10,codec:'avc1.4d001e',encoder:'fixture',hardware:false}});
         for (const listener of listeners)
           listener(
             mode === 'reconnect'
@@ -231,4 +232,29 @@ test('recovery ignores old frames until new config and current generation keyfra
  });return{control:input.control,generation:1};};
  await f.tools.invoke('machine','capture',{},new AbortController().signal);
  assert.deepEqual(decoded,['4']);assert.deepEqual(rejected,['1','2','3']);assert.equal(f.state.stops,1);
+});
+
+
+test('initial media before configuration is ignored and late start response never regresses observed generation',async()=>{
+ const f=desktopFixture();const decoded:string[]=[];const generations:number[]=[];
+ f.host.decode=async(frame)=>{decoded.push(frame.sequence);return{dataBase64:'/9j/2Q==',width:640,height:480};};
+ f.host.start=async input=>{queueMicrotask(()=>{const emit=(e:any)=>{for(const l of f.listeners)l({id:input.id,...e});};
+  emit({type:'frame',generation:1,key:true,sequence:'0',timestamp:0,data:new Uint8Array([0])});
+  emit({type:'config',generation:2,info:{width:640,height:480,sourceWidth:640,sourceHeight:480,fps:10,codec:'avc1.4d001e',encoder:'fixture',hardware:false}});
+  emit({type:'frame',generation:2,key:true,sequence:'1',timestamp:1,data:new Uint8Array([1])});
+ });await Promise.resolve();return{control:input.control,generation:1};};
+ f.host.input=async(_id,_input,generation)=>{generations.push(generation);};
+ await f.tools.invoke('machine','interact',{action:'move',x:.4,y:.4},new AbortController().signal);
+ assert.deepEqual(generations,[2]);
+ const capture=await f.tools.invoke('machine','capture',{},new AbortController().signal) as any;
+ assert.equal(capture.frameId,'1');assert.deepEqual(decoded,['1']);
+});
+test('same-generation input resume reuses already validated configuration before any input',async()=>{
+ const f=desktopFixture();f.host.start=async input=>{queueMicrotask(()=>{const emit=(e:any)=>{for(const l of f.listeners)l({id:input.id,...e});};
+  emit({type:'config',generation:1,info:{width:640,height:480,sourceWidth:640,sourceHeight:480,fps:10,codec:'avc1.4d001e',encoder:'fixture',hardware:false}});
+  emit({type:'error',message:'INPUT_SUSPENDED: waiting',recoverable:true});
+  emit({type:'error',message:'INPUT_RESUMED',recoverable:true,resumed:true});
+  emit({type:'frame',generation:1,key:true,sequence:'1',timestamp:1,data:new Uint8Array([1])});
+ });return{control:input.control,generation:1};};
+ assert.equal((await f.tools.invoke('machine','capture',{},new AbortController().signal) as any).frameId,'1');
 });

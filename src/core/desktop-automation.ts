@@ -79,7 +79,9 @@ export class DesktopAutomation {
       processing = false,
       settled = false,
       inputSent = false,
-      waitingRecoveryConfig = false;
+      waitingRecoveryConfig = true,
+      configurationSeen = false,
+      generationObserved = false;
     let resolveFrame!: (result: {
         frame: Frame;
         image?: { dataBase64: string; width: number; height: number };
@@ -105,16 +107,16 @@ export class DesktopAutomation {
           controller.abort(Error('桌面连接中断，操作未重放'));
           return;
         }
-        generation = event.generation ?? 1;
+        if(event.generation!==undefined){generation=event.generation;generationObserved=true;}
       }
       if (event.type === 'closed' || event.type === 'error') {
-        if(event.type==='error'&&event.recoverable&&!inputSent){if(!event.resumed)waitingRecoveryConfig=true;return;}
+        if(event.type==='error'&&event.recoverable&&!inputSent){if(event.resumed){if(configurationSeen)waitingRecoveryConfig=false;}else waitingRecoveryConfig=true;return;}
         const failure=Error(event.type === 'closed' ? event.reason : event.message);
         controller.abort(failure);
         rejectFrame(failure);
         return;
       }
-      if(event.type==='config'){generation=event.generation??generation;waitingRecoveryConfig=false;return;}
+      if(event.type==='config'){if(event.generation!==undefined){generation=event.generation;generationObserved=true;}configurationSeen=true;waitingRecoveryConfig=false;return;}
       if (event.type !== 'frame') return;
       if (processing || settled || !event.key || waitingRecoveryConfig || (event.generation!==undefined&&event.generation!==generation)) {
         try {
@@ -155,7 +157,7 @@ export class DesktopAutomation {
         }),
         signal,
       );
-      generation = started.generation ?? generation;
+      if(!generationObserved)generation = started.generation ?? generation;
       guard();
       if (input && !started.control) throw Error('远端未授予键鼠控制权限');
       const frame = await abortable(ready, signal);
