@@ -50,6 +50,7 @@ final class AndroidInputTest implements AutoCloseable {
   }
   void awaitReady()throws Exception{long end=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);while(!AndroidControlService.isAvailable()&&System.nanoTime()<end)Thread.sleep(50);check(AndroidControlService.isAvailable(),"Accessibility service did not bind");}
   String verify(AgentConnection connection)throws Exception {
+    verifyGestureSettling();
     tap(connection,button);long end=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);while(clicks.get()==0&&System.nanoTime()<end)Thread.sleep(50);check(clicks.get()==1,"Remote native tap did not click fixture button; "+inputDiagnostics());
     // Queue clicks without waiting for gesture callbacks. Each accepted click
     // must run once; the service must not silently drop input while busy.
@@ -99,6 +100,28 @@ final class AndroidInputTest implements AutoCloseable {
     input(connection,new JSONObject().put("kind","text").put("text","Z"));
     awaitText("CAgent input checkZ");pressBackspace(connection);awaitText("CAgent input check");
     return "PASS encrypted remote input → real Accessibility tap, editable text, scan-code letter, repeated/Unicode/selection backspace, held Shift across tap, fail-stop gesture outcomes and fresh input recovery\n";
+  }
+  private void verifyGestureSettling()throws Exception {
+    Class<AndroidControlService> type=AndroidControlService.class;
+    java.lang.reflect.Field instance=type.getDeclaredField("instance");instance.setAccessible(true);
+    AndroidControlService service=(AndroidControlService)instance.get(null);check(service!=null,"Service disconnected");
+    java.lang.reflect.Field handlerField=type.getDeclaredField("inputHandler");handlerField.setAccessible(true);
+    android.os.Handler handler=(android.os.Handler)handlerField.get(service);
+    java.lang.reflect.Field sequence=type.getDeclaredField("gestureSequence");sequence.setAccessible(true);
+    java.lang.reflect.Field busy=type.getDeclaredField("gestureBusy");busy.setAccessible(true);
+    java.lang.reflect.Method settle=type.getDeclaredMethod("settleGesture",long.class);settle.setAccessible(true);
+    java.util.concurrent.CountDownLatch done=new java.util.concurrent.CountDownLatch(1);AtomicReference<Throwable> failure=new AtomicReference<>();
+    handler.post(()->{try{
+      check(!busy.getBoolean(service),"Previous gesture still active");long token=sequence.getLong(service)+1;sequence.setLong(service,token);busy.setBoolean(service,true);
+      final long started=android.os.SystemClock.uptimeMillis();settle.invoke(service,token);
+      check(busy.getBoolean(service),"Injection completion released input before settling");
+      handler.post(new Runnable(){public void run(){try{
+        long elapsed=android.os.SystemClock.uptimeMillis()-started;
+        if(busy.getBoolean(service)){check(elapsed<2000,"Settling did not end");handler.postDelayed(this,10);return;}
+        check(elapsed>=android.view.ViewConfiguration.getPressedStateDuration()+32,"Gesture released before real-clock settle deadline");
+      }catch(Throwable error){failure.set(error);}done.countDown();}});
+    }catch(Throwable error){failure.set(error);done.countDown();}});
+    check(done.await(5,TimeUnit.SECONDS),"Gesture settling check timed out");if(failure.get()!=null)throw new AssertionError("Gesture settling failed",failure.get());
   }
   private void failUnconfirmedEdit()throws Exception {
     Class<AndroidControlService> type=AndroidControlService.class;

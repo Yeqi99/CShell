@@ -137,7 +137,8 @@ public final class AndroidControlService extends AccessibilityService {
       boolean accepted=dispatchGesture(new GestureDescription.Builder().addStroke(new GestureDescription.StrokeDescription(path,0,duration)).build(),new GestureResultCallback(){
         private void finish(String outcome){
           if(sequence!=gestureSequence||!gestureBusy)return;
-          inputHandler.removeCallbacks(watchdog);finishGesture(sequence,outcome);
+          inputHandler.removeCallbacks(watchdog);
+          if(outcome.equals("completed"))settleGesture(sequence);else finishGesture(sequence,outcome);
         }
         @Override public void onCompleted(GestureDescription g){finish("completed");}
         @Override public void onCancelled(GestureDescription g){finish("cancelled");}
@@ -146,6 +147,20 @@ public final class AndroidControlService extends AccessibilityService {
     }catch(RuntimeException error){
       inputHandler.removeCallbacks(watchdog);finishGesture(sequence,"dispatch-error");throw error;
     }
+  }
+  private void settleGesture(long sequence){
+    if(sequence!=gestureSequence||!gestureBusy)return;
+    // Android reports injected motion completion before the target View's posted
+    // click / pressed-state cleanup necessarily runs. Keep subsequent input in
+    // order through a short bounded settle, without replay or claiming app ACK.
+    final long deadline=android.os.SystemClock.uptimeMillis()+android.view.ViewConfiguration.getPressedStateDuration()+32;
+    gestureState="injection-completed:settling";
+    inputHandler.post(new Runnable(){public void run(){
+      if(sequence!=gestureSequence||!gestureBusy)return;
+      long remaining=deadline-android.os.SystemClock.uptimeMillis();
+      if(remaining>0){inputHandler.postDelayed(this,remaining);return;}
+      finishGesture(sequence,"completed");
+    }});
   }
   private void finishGesture(long sequence,String outcome){
     if(sequence!=gestureSequence||!gestureBusy)return;
