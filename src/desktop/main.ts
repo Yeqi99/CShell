@@ -627,7 +627,7 @@ else
         if (event.type === 'state' && event.reason) diagnostics.record('desktop.' + event.state, event.reason);
         if (!window.isDestroyed()) window.webContents.send('desktop:view-event', event);
         monitorWindows.publish('desktop:view-event', event);
-      }, linuxWorkspace);
+      }, linuxWorkspace, transfer => emit({type:'transfer',transfer}));
       machineBrowser.setAgentTransport(agent.browserTarget);
       connections.tools.registerToolSource('cshell.visual',visualCapabilities,visualToolSource({
         browser:(id,action,input,signal,guard)=>machineBrowser.automation(connections.tools.describe(id).providerId==='cshell.client'?'agent-session:'+id:id,action,input,signal,guard),

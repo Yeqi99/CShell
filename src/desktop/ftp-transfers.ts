@@ -11,7 +11,7 @@ export function ftpTransfers(ftp:FtpService,transfers:Transfers){
       for(const source of sources){
         const name=basename(source),target=childPath(directory,name);
         transfers.enqueueOperation(id,name,async(state,signal,publish)=>{
-          state.direction='upload';publish();
+          state.direction='upload';state.totalKnown=true;publish();
           await ftp.upload(id,source,target,signal,(done,total)=>{state.done=done;state.total=total;publish();});
         });
       }
@@ -21,7 +21,7 @@ export function ftpTransfers(ftp:FtpService,transfers:Transfers){
       for(const source of sources){
         const name=safeName(posix.basename(source)),target=join(directory,name);
         transfers.enqueueOperation(id,name,async(state,signal,publish)=>{
-          state.direction='download';publish();
+          state.direction='download';state.totalKnown=true;publish();
           await ftp.download(id,source,target,signal,(done,total)=>{state.done=done;state.total=total;publish();});
         });
       }

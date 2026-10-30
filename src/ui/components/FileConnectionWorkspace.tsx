@@ -1,8 +1,9 @@
+import {transferDetail} from '../../shared/transfer-progress';
 import {useState} from 'react';
 import {ChevronDown,ChevronRight,Files,RefreshCw,ShieldCheck,Unplug,X} from 'lucide-react';
 import type {Profile,Transfer} from '../../shared/contracts';
 import {FilePanel} from './FilePanel';
-import {FtpFilePanel,formatFileBytes} from './FtpFilePanel';
+import {FtpFilePanel} from './FtpFilePanel';
 import './file-connection-workspace.css';
 
 export function FileConnectionWorkspace({sessionId,profile,closed,transfers,onError,onRetry}:{sessionId:string;profile:Profile;closed:boolean;transfers:Transfer[];onError:(error:unknown)=>void;onRetry:()=>void}) {
@@ -17,7 +18,7 @@ export function FileConnectionWorkspace({sessionId,profile,closed,transfers,onEr
       {error&&<p role="alert">{error}</p>}
       {queueOpen&&ownTransfers.length>0&&<div className="file-queue-items">{ownTransfers.slice(-50).reverse().map(item=><div className="file-transfer-item" key={item.id}>
         <div><span title={item.name}>{item.direction==='upload'?'↑':item.direction==='download'?'↓':'↔'} {item.name}</span><small>{({running:'传输中',done:'已完成',cancelled:'已取消',failed:'失败'} as const)[item.state]}</small>{item.state==='running'&&<button className="icon" title="取消传输" aria-label={`取消传输 ${item.name}`} disabled={closed} onClick={()=>void window.cshell.cancelTransfer(item.id).catch(reason=>setError(reason instanceof Error?reason.message:String(reason)))}><X size={14}/></button>}</div>
-        <progress aria-label={`${item.name} 传输进度`} max={Math.max(item.total,1)} value={item.state==='done'?Math.max(item.total,1):Math.min(item.done,Math.max(item.total,1))}/><small>{formatFileBytes(item.done)} / {formatFileBytes(item.total)}</small>{item.error&&<p role="alert">{item.error}</p>}
+        <progress aria-label={`${item.name} 传输进度`} max={Math.max(item.total,1)} value={item.state==='done'?Math.max(item.total,1):item.totalKnown?Math.min(item.done,item.total*.99):undefined}/><small>{transferDetail(item)}</small>{item.error&&<p role="alert">{item.error}</p>}
       </div>)}</div>}
     </section>
   </section>;
