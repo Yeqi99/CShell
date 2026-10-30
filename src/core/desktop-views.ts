@@ -284,6 +284,7 @@ export class DesktopViews {
     if(!view.request.control)throw new Error('此视图为仅观看');
     return view.client!.input(desktopViewInputSchema.parse(raw));
   }
+  inputConfirmed(id:unknown,raw:unknown,generation?:unknown){const view=this.get(id,generation);if(!view.request.control)throw Error('此视图为仅观看');return view.client!.inputConfirmed(desktopViewInputSchema.parse(raw));}
   release(id: unknown, generation?: unknown) {
     return this.get(id, generation).client!.releaseInput();
   }

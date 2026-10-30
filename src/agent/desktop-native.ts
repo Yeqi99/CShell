@@ -6,6 +6,7 @@ export type NativeDesktopInput={generation:number;sequence:number}&(
  {kind:'lease'}|{kind:'secure-attention'}|{kind:'text';text:string}|{kind:'key';code:number;down:boolean}|{kind:'button';button:number;down:boolean}|
  {kind:'move';x:number;y:number}|{kind:'wheel';delta:number;horizontal?:boolean});
 export class NativeDesktop extends EventEmitter {
+ private confirmedPending=0;
  private child?:ChildProcessWithoutNullStreams;private pending=Buffer.alloc(0);private errorText='';private finished=false;private stopping=false;
  constructor(private executable:string,private maxFrameBytes=32*1024*1024){super();}
  start(config:NativeDesktopConfig){
@@ -61,6 +62,17 @@ export class NativeDesktop extends EventEmitter {
   if(event.kind==='text'&&(typeof event.text!=='string'||!event.text.length||event.text.length>512||event.text.includes('\0')))throw new Error('Invalid text input');
   if(!['key','button','move','wheel','lease','text','secure-attention'].includes(event.kind))throw new Error('Unsupported input kind');
   this.send({op:'input-event',event});
+ }
+ async inputConfirmed(event:NativeDesktopInput){
+  if(this.confirmedPending>=32)throw Error('Too many unacknowledged native inputs');this.confirmedPending++;
+  try{await new Promise<void>((resolve,reject)=>{
+   const done=(error?:Error)=>{clearTimeout(timer);this.off('input-status',status);this.off('input-error',fail);this.off('closed',closed);error?reject(error):resolve();};
+   const status=(value:any)=>{if(value.generation===event.generation&&value.sequence===event.sequence)done();};
+   const fail=(error:Error)=>done(error);const closed=()=>done(Error('Native input acknowledgment lost'));
+   const timer=setTimeout(()=>done(Error('Native input acknowledgment timeout; input was not replayed')),5000);
+   this.on('input-status',status);this.on('input-error',fail);this.once('closed',closed);
+   try{this.input(event);}catch(error){done(error as Error);}
+  });}finally{this.confirmedPending--;}
  }
  async stop(){
   const child=this.child;if(!child||this.finished)return;this.stopping=true;

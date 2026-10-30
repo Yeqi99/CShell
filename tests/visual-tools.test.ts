@@ -187,3 +187,15 @@ test('MCP images are attached without embedding base64 into text, while REST res
     1,
   );
 });
+
+
+test('desktop automation keeps authenticated view alive until every input acknowledgment',async()=>{
+ const f=desktopFixture();let acknowledge!:()=>void;let reached!:()=>void;const queued=new Promise<void>(r=>{reached=r;});
+ f.host.input=()=>new Promise<void>(r=>{acknowledge=r;reached();});
+ const task=f.tools.invoke('machine','interact',{action:'move',x:.2,y:.3},new AbortController().signal);
+ await queued;assert.equal(f.state.stops,0);assert.equal(f.state.releases,0);
+ acknowledge();await task;assert.equal(f.state.stops,1);assert.equal(f.state.releases,1);
+ const failed=desktopFixture();let attempts=0;failed.host.input=async()=>{attempts++;throw Error('input rejected');};
+ await assert.rejects(failed.tools.invoke('machine','interact',{action:'click',x:.2,y:.3},new AbortController().signal),/input rejected/);
+ assert.equal(attempts,1);assert.equal(failed.state.stops,1);
+});

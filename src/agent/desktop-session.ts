@@ -14,7 +14,7 @@ export type DesktopSessionBinding = {
  sendControlKey:Buffer; receiveControlKey:Buffer; sendMediaKey:Buffer; receiveMediaKey:Buffer;
  peerAddress:string;
 };
-type Control = {op:'close';reason:string}|{op:'hello';identity:string;generation:string;port:number;transport?:'tcp'|'udp'}|{op:'ping'|'pong';sent?:number}|{op:'keyframe'|'release-input'}|{op:'feedback';value:Record<string,number>}|{op:'input';value:NativeDesktopInput}|{op:'quality';value:DesktopQuality}|{op:'video';value:DesktopVideoInfo}|{op:'ack';id:string}|{op:'notice';value:string};
+type Control = {op:'close';reason:string}|{op:'hello';identity:string;generation:string;port:number;transport?:'tcp'|'udp'}|{op:'ping'|'pong';sent?:number}|{op:'keyframe'|'release-input'}|{op:'feedback';value:Record<string,number>}|{op:'input';value:NativeDesktopInput;confirm?:string}|{op:'input-result';id:string;ok:boolean}|{op:'quality';value:DesktopQuality}|{op:'video';value:DesktopVideoInfo}|{op:'ack';id:string}|{op:'notice';value:string};
 export type DesktopSessionOptions = {
  binding:DesktopSessionBinding; control:Socket;transport?:'tcp'|'udp';
  /** Backend grant recheck, including identity/account/connection revocation. */
@@ -26,6 +26,7 @@ export type DesktopSessionOptions = {
 const CONTROL_LIMIT=8192;
 export class DesktopSession extends EventEmitter {
  private udp:DatagramSocket; private sender:MediaSender; private receiver:MediaReceiver;
+ private inputPending=new Map<string,{resolve:()=>void;reject:(e:Error)=>void;timer:ReturnType<typeof setTimeout>}>();
  private pending=Buffer.alloc(0); private tx=0n; private rx=0n; private peerPort?:number;
  private closed=false; private busy=false; private started=false; private lastSeen=performance.now();
  private pathVerified=false;private readyEmitted=false;
@@ -132,8 +133,10 @@ export class DesktopSession extends EventEmitter {
   else if(message.op==='feedback'){
    if(!message.value||Array.isArray(message.value)||Object.keys(message.value).length>16||Object.values(message.value).some(v=>typeof v!=='number'||!Number.isFinite(v)||v<0))throw new Error('Feedback');
    this.emit('feedback',message.value);
+  }else if(message.op==='input-result'){
+   if(typeof message.id!=='string'||!/^\d{1,16}$/.test(message.id)||typeof message.ok!=='boolean')throw Error('Invalid input acknowledgment');const pending=this.inputPending.get(message.id);if(pending){clearTimeout(pending.timer);this.inputPending.delete(message.id);message.ok?pending.resolve():pending.reject(Error('Remote input rejected; input was not replayed'));}
   }else if(message.op==='input'||message.op==='quality'||message.op==='video'){
-   if(!message.value||typeof message.value!=='object'||Array.isArray(message.value))throw new Error('Invalid control payload');this.emit(message.op,message.value);
+   if(!message.value||typeof message.value!=='object'||Array.isArray(message.value))throw new Error('Invalid control payload');if(message.op==='input'&&message.confirm!==undefined){if(typeof message.confirm!=='string'||!/^\d{1,16}$/.test(message.confirm))throw Error('Invalid input confirmation');this.emit('confirmed-input',message.value,(ok:boolean)=>this.send({op:'input-result',id:message.confirm!,ok}));}else this.emit(message.op,message.value);
   }else if(message.op==='ack'){
    if(typeof message.id!=='string'||!/^\d{1,10}$/.test(message.id))throw new Error('Invalid frame acknowledgment');this.emit('ack',message.id);
   }else if(message.op==='notice'){
@@ -146,6 +149,11 @@ export class DesktopSession extends EventEmitter {
  feedback(value:Record<string,number>){return this.ready&&this.send({op:'feedback',value});}
  releaseInput(){return this.ready&&this.send({op:'release-input'});}
  input(value:NativeDesktopInput){return this.ready&&this.send({op:'input',value});}
+ inputConfirmed(value:NativeDesktopInput){
+  if(!this.ready||this.inputPending.size>=32)return Promise.reject(Error('Desktop input unavailable'));
+  const id=String(value.sequence);if(this.inputPending.has(id))return Promise.reject(Error('Duplicate input sequence'));
+  return new Promise<void>((resolve,reject)=>{const timer=setTimeout(()=>{this.inputPending.delete(id);reject(Error('Remote input acknowledgment timeout; input was not replayed'));},7000);this.inputPending.set(id,{resolve,reject,timer});if(!this.send({op:'input',value,confirm:id})){clearTimeout(timer);this.inputPending.delete(id);reject(Error('Desktop input not sent'));}});
+ }
  quality(value:DesktopQuality){return this.ready&&this.send({op:'quality',value});}
  video(value:DesktopVideoInfo){return this.ready&&this.send({op:'video',value});}
  ack(id:bigint){return this.ready&&this.send({op:'ack',id:String(id)});}
@@ -176,7 +184,7 @@ export class DesktopSession extends EventEmitter {
  close(reason='CLOSED',notifyPeer=true):Promise<void>{
   if(this.releasing)return this.releasing;
   let sent=false;try{if(notifyPeer&&this.ready&&!this.options.control.destroyed)sent=this.send({op:'close',reason:/^[A-Z][A-Z0-9_]{0,79}$/.test(reason)?reason:'CLOSED'},true);}catch{}
-  this.closed=true;this.peerPort=undefined;clearInterval(this.timer);this.pending=Buffer.alloc(0);
+  this.closed=true;for(const item of this.inputPending.values()){clearTimeout(item.timer);item.reject(Error('Desktop disconnected before input acknowledgment'));}this.inputPending.clear();this.peerPort=undefined;clearInterval(this.timer);this.pending=Buffer.alloc(0);
   const socket=this.options.control;socket.off('data',this.read);
   if(sent){const deadline=setTimeout(()=>socket.destroy(),1000);deadline.unref();socket.once('close',()=>clearTimeout(deadline));socket.end();}else socket.destroy();
   try{this.udp.close();}catch{/* Not bound. */}

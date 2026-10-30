@@ -19,6 +19,7 @@ export class DesktopClient extends EventEmitter {
  }
  ack(id:string|bigint){if(!/^\d{1,10}$/.test(String(id)))throw new Error('Invalid frame ID');return this.session.ack(BigInt(id));}
  input(value:DesktopClientInput){if(!this.controlAllowed)throw new Error('远端未授予键鼠控制权限');if(this.closed||!this.videoReady)return;return this.session.input({...value,generation:1,sequence:++this.sequence} as NativeDesktopInput);}
+ inputConfirmed(value:DesktopClientInput){if(!this.controlAllowed||this.closed||!this.videoReady)throw Error('Desktop input unavailable');if(!this.videoInfo?.inputAcknowledgment)throw Error('请更新远端 CAgent 以确认键鼠操作结果');return this.session.inputConfirmed({...value,generation:1,sequence:++this.sequence} as NativeDesktopInput);}
  releaseInput(){return this.session.releaseInput();}
  quality(value:DesktopQuality){if(value.unlimited&&!this.videoInfo?.unlimitedQuality)throw new Error('无上限画质需要更新远端 CAgent');return this.session.quality(value);}
  requestKeyframe(){return this.session.requestKeyframe();}

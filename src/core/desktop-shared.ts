@@ -24,6 +24,7 @@ export class SharedDesktop {
   const lease=Object.assign(subscriber,{
    get videoInfo(){return undefined;},
    input:(value:DesktopClientInput)=>this.client.input(value),
+   inputConfirmed:(value:DesktopClientInput)=>this.client.inputConfirmed(value),
    releaseInput:()=>this.client.releaseInput(),
    quality:(value:DesktopQuality)=>this.client.quality(value),
    ack:(value:string|bigint)=>{const id=BigInt(value);if(id>this.acked){this.acked=id;return this.client.ack(id);}},
