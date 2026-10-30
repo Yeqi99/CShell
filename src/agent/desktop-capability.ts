@@ -67,9 +67,10 @@ export async function createDesktopCapability(options:{identity:string;nativeExe
     const helperAvailable=await access(virtualHelper).then(()=>true,()=>false);
     for(const [id,item] of virtualPlans)if(item.expires<Date.now())virtualPlans.delete(id);
     if(virtualPlans.size>=16)throw new Error('虚拟显示安装计划过多，请等待过期');
+    const preflight=helperAvailable&&plan.compatible?await backend.preflight():{executable:false,reason:"PREFLIGHT_UNAVAILABLE"};
     const id=randomUUID(),expires=Date.now()+10*60_000;
     virtualPlans.set(id,{owner,expires,input:{...input,confirm:true}});
-    return {...plan,id,expires,helperAvailable,width:input.width,height:input.height,experimentalServer:input.experimentalServer,executable:helperAvailable&&plan.compatible&&(!plan.experimental||input.experimentalServer)};
+    return {...plan,id,expires,helperAvailable,preflight,width:input.width,height:input.height,experimentalServer:input.experimentalServer,executable:preflight.executable&&helperAvailable&&plan.compatible&&(!plan.experimental||input.experimentalServer)};
    }
    if(method==='desktop.virtual-display.status'){
     const input=z.object({id:z.string().regex(/^[a-f0-9]{32}$/).optional()}).strict().parse(params??{});
@@ -88,6 +89,8 @@ export async function createDesktopCapability(options:{identity:string;nativeExe
      const readiness=(await virtualBackend()).plan();
      if(!readiness.compatible||(readiness.experimental&&!plan.input.experimentalServer))throw new Error('目标平台不支持此安装计划');
      await access(virtualHelper);
+     const preflight=await (await virtualBackend()).preflight();
+     if(!preflight.executable)throw new Error(preflight.reason);
      const downloaded=await prepareVirtualDisplayPackage();
      try{if(!options.authorize(owner))throw new Error('管理授权已撤销');return await (await virtualBackend(downloaded.directory)).install(plan.input);}finally{await downloaded.cleanup();}
     }

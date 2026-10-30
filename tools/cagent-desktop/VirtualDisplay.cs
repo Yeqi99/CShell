@@ -254,7 +254,23 @@ class VirtualDisplay {
     else if(Read(2).paths.Any(p=>Adapter(p).Contains(journal.device.ToUpperInvariant()))) throw new Exception("Owned target remains active after removal");
     journal.phase="removed"; Save(journal);
   }
+  public class Preflight { public bool elevated,consoleSession,topologyAvailable,executable; public uint sessionId,consoleSessionId; public string reason; }
+  static Preflight Inspect() {
+    var r=new Preflight();
+    r.elevated=new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator);
+    uint session; r.consoleSessionId=WTSGetActiveConsoleSessionId();
+    r.consoleSession=ProcessIdToSessionId(GetCurrentProcessId(),out session)&&session!=0&&session==r.consoleSessionId; r.sessionId=session;
+    if(!r.elevated) r.reason="ADMINISTRATOR_REQUIRED";
+    else if(!r.consoleSession) r.reason="CONSOLE_SESSION_REQUIRED";
+    else { IntPtr desktop=OpenInputDesktop(0,false,1); if(desktop==IntPtr.Zero) r.reason="INPUT_DESKTOP_UNAVAILABLE";
+      else { CloseDesktop(desktop); try { Read(2); r.topologyAvailable=true; } catch(Exception) { r.reason="TOPOLOGY_UNAVAILABLE"; } }
+    }
+    r.executable=r.elevated&&r.consoleSession&&r.topologyAvailable;
+    if(r.executable)r.reason="READY_NOT_FRAME_VERIFIED";
+    return r;
+  }
   static object Install(string package,int width,int height) {
+    var readiness=Inspect(); if(!readiness.executable)throw new Exception(readiness.reason);
     VerifyPackage(package); RejectExistingDriver();
     // Do not overwrite a user's global VDD configuration. The upstream default is used.
     if(Directory.Exists(@"C:\VirtualDisplayDriver") || Microsoft.Win32.Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\MikeTheTech\VirtualDisplayDriver","VDDPATH",null)!=null)
@@ -304,6 +320,7 @@ class VirtualDisplay {
     try {
       if(args.Length==1&&args[0]=="self-test") { SelfTest(); return 0; }
       if(!Environment.Is64BitProcess) throw new Exception("Windows x64 helper required");
+      if(args.Length==1&&args[0]=="preflight") { Console.WriteLine(Json.Serialize(Inspect())); return 0; }
       if(args.Length==1&&args[0]=="probe") { Snapshot state=Read(2); Console.WriteLine(Json.Serialize(new {activePaths=state.paths.Length,topology=state,mutated=false})); return 0; }
       if(!new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator)) throw new Exception("ADMINISTRATOR_REQUIRED: 请在目标机器以管理员身份运行 CAgent 后查看虚拟显示安装记录或执行安装；本次未读取记录、未安装驱动，不会自动提权");
       if(args.Length==1&&args[0]=="list") { Console.WriteLine(Json.Serialize(Directory.Exists(Root)?Directory.GetFiles(Root,"*.json").Select(path=>Load(Path.GetFileNameWithoutExtension(path))).Select(j=>new {id=j.id,phase=j.phase,error=j.error,device=j.device}).ToArray():new object[0])); return 0; }

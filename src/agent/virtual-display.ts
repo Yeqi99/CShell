@@ -85,6 +85,12 @@ export class VirtualDisplayBackend {
       requiresAdministrator: true, hardwareVerified: false,
       warning: '仅新增独立虚拟显示设备，保留原主屏；失败尝试回滚。真实安装与无头/重启验收尚未完成。Server 仅实验支持。' };
   }
+  async preflight() {
+    try { const result=z.object({elevated:z.boolean(),consoleSession:z.boolean(),topologyAvailable:z.boolean(),executable:z.boolean(),sessionId:z.number(),consoleSessionId:z.number(),reason:z.string()}).parse(await this.invoke(['preflight'],15_000));
+      const reasons:Record<string,string>={ADMINISTRATOR_REQUIRED:'请以管理员身份运行 CAgent',CONSOLE_SESSION_REQUIRED:'请先将当前用户会话转为 console；虚拟显示不能恢复断开的 RDP 会话',INPUT_DESKTOP_UNAVAILABLE:'当前输入桌面不可访问，请在当前用户解锁后重试',TOPOLOGY_UNAVAILABLE:'显示拓扑不可访问',READY_NOT_FRAME_VERIFIED:'安装前检查通过；尚未验证真实采集画面'};
+      return {...result,reason:reasons[result.reason]??result.reason}; }
+    catch { return {elevated:false,consoleSession:false,topologyAvailable:false,executable:false,reason:'无法完成显示安装预检，请更新完整 CAgent 后重试'}; }
+  }
   probe() { return this.invoke(['probe'], 15_000); }
   status(id: string) { return this.invoke(['status', taskId.parse(id)], 15_000); }
   list() { return this.invoke(['list'], 15_000); }
