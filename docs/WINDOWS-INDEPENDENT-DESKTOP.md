@@ -38,3 +38,11 @@ Windows 测试机已升级 CAgent 0.8.16，受保护系统桌面服务的 broker
 修复包括已授权桌面句柄所需的 JOURNALPLAYBACK 访问位、初始视频配置与媒体乱序门禁，以及跳过 DXGI LastPresentTime 为 0 的未更新桌面样本。没有按黑色像素判断有效性，没有更改 ACL、令牌、锁屏或机器权限。受控端身份、密码、访问配置与密钥保护文件与升级前一致。
 
 证据为 Pro 本地 .local/desktop-ack-acceptance-final.json 及其中四张截图的 SHA-256。此为指定 Windows Server 2022 未锁定控制台的真实结果；不代表所有 Windows、UAC 安全桌面、锁屏、无头硬件或重启后均可用。主控此次使用隔离开发构建，最终封装安装包仍需按最终源码和摘要验收；不表示公开发布。
+
+## 2026-10-31 正式发布与成品复验
+
+北京时间 2026-10-31 00:17 已公开发布：Core [v0.8.16](https://github.com/Yeqi99/CShell/releases/tag/v0.8.16)，release 429222483、源码 492fe7a6a9ee4f6a25d12c8ee2c31a81a82575e5；Pro [pro-v0.8.16](https://github.com/Yeqi99/CShell/releases/tag/pro-v0.8.16)，release 429222604、源码 cc9e9b7f2a23f10d6dc1daaa2159dec99256bff6。分别核验 16 / 14 个公开附件（含各自 SHA256SUMS），不移动旧标签。记录见 Pro 本地 .local/public-release-0816-receipt.json。
+
+正式 Pro win-unpacked 主控与正式 CI CAgent Windows 安装包重新完成验收：受控安装包 SHA-256 为 84cca14038fb7f3108ea41e0149c83917822525cddb389ee34bce8ede7e66a43，slot 0.8.16-ee01cde571f0c078；系统服务摘要匹配，身份、密码、访问配置与密钥保护文件保留。console 2 未重新连接 RDP，冷启动 frame 0 取得真实 1024×768 画面；鼠标独立读回 409,307；开始菜单点击、Windows 搜索完整文字“CShell input check 0816”（未 Enter）及 Escape 恢复均有可见证据。测试视图与隔离主控已关闭。证据为 .local/desktop-ack-formal-package-acceptance.json 和四张 ack-formal 截图；这更新了此前仅开发构建通过的状态。
+
+上述发布与指定目标成品验收不表示用户本机 Core/Pro 已完成升级，也不表示官网已经部署；安装与上线结果按对应收据另记。指定 Windows Server 2022 未锁定控制台的结果不外推锁屏、UAC、安全桌面或所有无头硬件。
