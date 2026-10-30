@@ -6,29 +6,35 @@ import {createInterface} from 'node:readline';
 import type {Profile} from '../shared/contracts';
 import {rdpProfileSchema} from '../core/rdp';
 
-// A real Microsoft RDP ActiveX control, hosted as a child HWND of Electron.
+// A real Microsoft RDP ActiveX control in an Electron-owned native surface.
+// The borderless owned HWND tracks the tab rectangle; cross-process WS_CHILD
+// surfaces are unreliable with Chromium composition and Windows activation.
 // Credentials use private stdin only. No mstsc process or public listener is used.
 const source=String.raw`
 using System; using System.Windows.Forms; using System.Runtime.InteropServices; using System.Threading; using System.Web.Script.Serialization;
 class Rdp:AxHost { public Rdp():base("A0C63C30-F08D-4AB4-907C-34905D770C7D"){} public dynamic Client {get{return GetOcx();}} }
 class Host:Form {
  [DllImport("user32.dll")] static extern bool SetProcessDpiAwarenessContext(IntPtr context);
- [DllImport("user32.dll")] static extern IntPtr SetParent(IntPtr child,IntPtr parent);
- [DllImport("user32.dll")] static extern int GetWindowLong(IntPtr h,int n);
- [DllImport("user32.dll")] static extern int SetWindowLong(IntPtr h,int n,int v);
+ [StructLayout(LayoutKind.Sequential)] struct Rect {public int Left,Top,Right,Bottom;}
+ [DllImport("user32.dll")] static extern bool GetClientRect(IntPtr window,out Rect rect);
+ [StructLayout(LayoutKind.Sequential)] struct Point {public int X,Y;}
+ [DllImport("user32.dll")] static extern bool ClientToScreen(IntPtr window,ref Point point);
+ [DllImport("user32.dll",EntryPoint="SetWindowLongPtrW")] static extern IntPtr SetWindowLongPtr(IntPtr window,int index,IntPtr value);
+ IntPtr owner=IntPtr.Zero; int lastX=int.MinValue,lastY,lastWidth,lastHeight;
  [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr h,IntPtr after,int x,int y,int w,int height,uint flags);
  Rdp r=new Rdp(); JavaScriptSerializer json=new JavaScriptSerializer(){MaxJsonLength=131072,RecursionLimit=8}; DateTime started; bool connected=false; string secret=""; readonly Guid events=new Guid("336d5562-efa8-482e-8cb3-c5c0fc7a7db6");
  void Disconnected(int reason){int extended=0;string description="远程桌面连接已结束";try{extended=(int)r.Client.ExtendedDisconnectReason;description=(string)r.Client.GetErrorDescription(reason,extended);}catch{}if(secret.Length>0)description=description.Replace(secret,"[redacted]");Emit(connected?"closed":"failed",description+" (RDP "+reason+", extended "+extended+")");BeginInvoke(new Action(()=>Close()));}
  string ReadCommand(){var b=new System.Text.StringBuilder();int n;while((n=Console.In.Read())!=-1){if(n==10)return b.ToString();if(b.Length>=131072)throw new InvalidOperationException();if(n!=13)b.Append((char)n);}return b.Length==0?null:b.ToString();}
  void Emit(string state,string message){Console.Out.WriteLine(json.Serialize(new {state=state,message=message}));Console.Out.Flush();}
  void Command(string line){try {var d=json.Deserialize<System.Collections.Generic.Dictionary<string,object>>(line); string op=(string)d["op"];
- if(op=="open") {SetParent(Handle,new IntPtr(long.Parse((string)d["parent"])));SetWindowLong(Handle,-16,(GetWindowLong(Handle,-16)|0x40000000)&~unchecked((int)0x80000000));
- dynamic c=r.Client; c.Server=(string)d["host"];c.UserName=(string)d["username"];c.AdvancedSettings9.RDPPort=Convert.ToInt32(d["port"]);c.AdvancedSettings9.EnableCredSspSupport=true;c.AdvancedSettings9.AuthenticationLevel=2;c.AdvancedSettings9.SmartSizing=true;
+ if(op=="open") {owner=new IntPtr(long.Parse((string)d["parent"]));SetWindowLongPtr(Handle,-8,owner);
+ Rect area;bool measured=GetClientRect(new IntPtr(long.Parse((string)d["parent"])),out area); dynamic c=r.Client; c.DesktopWidth=measured?Math.Max(640,Math.Min(3840,area.Right-area.Left)):1280;c.DesktopHeight=measured?Math.Max(480,Math.Min(2160,area.Bottom-area.Top)):800; ClientSize=new System.Drawing.Size((int)c.DesktopWidth,(int)c.DesktopHeight);r.PerformLayout();c.Server=(string)d["host"];c.UserName=(string)d["username"];c.AdvancedSettings9.RDPPort=Convert.ToInt32(d["port"]);c.AdvancedSettings9.EnableCredSspSupport=true;c.AdvancedSettings9.AuthenticationLevel=2;c.AdvancedSettings9.SmartSizing=true;
  ComEventsHelper.Combine(c,events,4,new Action<int>(Disconnected));ComEventsHelper.Combine(c,events,10,new Action<int>(code=>{Emit("failed","RDP fatal error "+code);BeginInvoke(new Action(()=>Close()));}));secret=(string)d["password"];c.AdvancedSettings9.ClearTextPassword=secret;started=DateTime.UtcNow;Emit("connecting","正在连接远程桌面");c.Connect();}
- else if(op=="bounds") {bool visible=Convert.ToBoolean(d["visible"]); SetWindowPos(Handle,IntPtr.Zero,Convert.ToInt32(d["x"]),Convert.ToInt32(d["y"]),Math.Max(1,Convert.ToInt32(d["width"])),Math.Max(1,Convert.ToInt32(d["height"])),(uint)(0x14|(visible?0x40:0x80)));}
+ else if(op=="bounds") {bool visible=Convert.ToBoolean(d["visible"]); if(visible){if(!Visible)Show();if(!r.Visible)r.Show();}else if(Visible)Hide(); Point point=new Point(){X=Convert.ToInt32(d["x"]),Y=Convert.ToInt32(d["y"])};ClientToScreen(owner,ref point);int width=Math.Max(1,Convert.ToInt32(d["width"])),height=Math.Max(1,Convert.ToInt32(d["height"]));if(point.X!=lastX||point.Y!=lastY||width!=lastWidth||height!=lastHeight){SetWindowPos(Handle,IntPtr.Zero,point.X,point.Y,width,height,0x10);lastX=point.X;lastY=point.Y;lastWidth=width;lastHeight=height;}}
  else if(op=="close"){Close();}
  }catch(Exception e){Emit("failed","RDP 操作失败 (HRESULT "+e.GetBaseException().HResult+")");Close();}}
- Host(){FormBorderStyle=FormBorderStyle.None;ShowInTaskbar=false;Width=1;Height=1;r.Dock=DockStyle.Fill;Controls.Add(r);
+ protected override bool ShowWithoutActivation {get{return true;}}
+ Host(){Text="CShell RDP surface";FormBorderStyle=FormBorderStyle.None;ShowInTaskbar=false;Width=1280;Height=800;r.Dock=DockStyle.Fill;Controls.Add(r);
  Shown+=(s,e)=>{Hide();var t=new Thread(()=>{try{string line;DateTime interval=DateTime.UtcNow;int count=0;while((line=ReadCommand())!=null){if((DateTime.UtcNow-interval).TotalSeconds>=1){interval=DateTime.UtcNow;count=0;}if(++count>1000)throw new InvalidOperationException();string v=line;try{Invoke(new Action(()=>Command(v)));}catch{return;}}try{BeginInvoke(new Action(()=>Close()));}catch{}}catch{try{BeginInvoke(new Action(()=>{Emit("failed","RDP 宿主输入超出限制");Close();}));}catch{}}});t.IsBackground=true;t.Start();};
  var timer=new System.Windows.Forms.Timer();timer.Interval=250;timer.Tick+=(s,e)=>{if(started==default(DateTime))return;try{int n=(int)r.Client.Connected;if(n==1&&!connected){connected=true;Emit("connected","远程桌面已连接");}else if(n==0&&connected){Emit("closed","远程桌面已断开");Close();}else if(!connected&&(DateTime.UtcNow-started).TotalSeconds>45){Emit("failed","远程桌面连接超时，请检查网络、凭据和目标远程桌面设置");Close();}}catch{}};timer.Start();
  FormClosing+=(s,e)=>{try{if((int)r.Client.Connected!=0)r.Client.Disconnect();}catch{}};}

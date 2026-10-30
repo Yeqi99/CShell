@@ -23,6 +23,7 @@ jobs:
       - run: pnpm test:desktop
       - run: pnpm exec tsx scripts/rdp-layout-smoke.ts
       - run: pnpm exec tsx scripts/rdp-saved-smoke.ts
+      - run: pnpm exec tsx scripts/rdp-surface-smoke.ts
       - run: pnpm exec tsx scripts/client-smoke.ts
       - run: pnpm exec tsx scripts/http-agent-smoke.ts
       - run: pnpm exec tsx scripts/minimal-pin-smoke.ts
