@@ -1,0 +1,12 @@
+/* Output and automatic editor detection must not resize the remote PTY. */
+.terminal-keybar { flex-wrap: nowrap; overflow-x: auto; min-height: 33px; }
+.terminal-keybar > * { flex-shrink: 0; white-space: nowrap; }
+.terminal-keybar .terminal-history-return { margin-left: auto; }
+/* xterm 6 hides its scrollbar after idle. History must remain discoverable and draggable. */
+.terminal-host.has-terminal-history .xterm-scrollable-element > .scrollbar.vertical {
+  opacity: 1; pointer-events: auto;
+}
+.terminal-host.has-terminal-history .xterm-scrollable-element > .scrollbar.vertical > .slider {
+  background: color-mix(in srgb, var(--text, #64748b) 38%, transparent);
+  border-radius: 5px;
+}

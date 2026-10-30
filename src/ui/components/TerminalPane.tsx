@@ -17,6 +17,7 @@ import { detectEditor, editorFromCommand, type EditorDetection } from '../editor
 import { EditorAssistant, type AssistantChoice } from './EditorAssistant';
 import { editorActionInput, editorPromptBusy, vimExitFromPrompt } from '../editor-actions';
 import '@xterm/xterm/css/xterm.css';
+import './terminal-surface.css';
 import { openTextAssist, analyzeSelection } from '../text-assist';
 import { useAiProviders } from '../use-ai-providers';
 import { editorFileFromCommand } from '../text-path';
@@ -61,6 +62,8 @@ export function TerminalPane({
   const aiAvailable = useAiProviders().providers.length > 0;
   const [zoom, setZoom] = useState(0);
   const [keysOpen, setKeysOpen] = useState(false);
+  const [editorToolsOpen, setEditorToolsOpen] = useState(false);
+  const [readingHistory, setReadingHistory] = useState(false);
   const [nativeKeys, setNativeKeys] = useState(false);
   const clipboardKeys = useRef(true);
   clipboardKeys.current = preferences.terminalClipboardKeys && !nativeKeys;
@@ -322,6 +325,7 @@ export function TerminalPane({
     });
     let parsedFrame: number | undefined;
     const syncParsedUi = () => {
+      syncHistory();
       parsedFrame = undefined;
       if (!detectionTimer) detectionTimer = setTimeout(scanEditor, 120);
       const buffer = terminal.buffer.active;
@@ -364,6 +368,15 @@ export function TerminalPane({
     // Parser callbacks can run synchronously while React is committing another
     // terminal update. Coalesce presentation updates outside that call stack;
     // terminal parsing, input, acknowledgements and snapshots remain immediate.
+    const syncHistory = () => {
+      const buffer = terminal.buffer.active;
+      const hasHistory = buffer.type === 'normal' && buffer.baseY > 0;
+      host.current?.classList.toggle('has-terminal-history', hasHistory);
+      setReadingHistory(hasHistory && buffer.viewportY < buffer.baseY);
+    };
+    const historyScroll = terminal.onScroll(() => {
+      parsedFrame ??= requestAnimationFrame(syncParsedUi);
+    });
     const parsed = terminal.onWriteParsed(() => {
       parsedFrame ??= requestAnimationFrame(syncParsedUi);
     });
@@ -503,6 +516,7 @@ export function TerminalPane({
       clearTimeout(detectionTimer);
       bufferChange.dispose();
       parsed.dispose();
+      historyScroll.dispose();
       if (parsedFrame !== undefined) cancelAnimationFrame(parsedFrame);
       restoreMeasurement();
       terminal.dispose();
@@ -563,9 +577,10 @@ export function TerminalPane({
               brightCyan: '#137c8c',
               brightWhite: '#8793a1',
             };
-      fit.current?.fit();
+      if (host.current?.clientWidth && host.current?.clientHeight) fit.current?.fit();
     }
-  }, [preferences, zoom]);
+  }, [preferences.terminalFont, preferences.fontSize, preferences.lineHeight,
+    preferences.theme, preferences.backgroundAsset, zoom]);
   useEffect(() => {
     if (active)
       requestAnimationFrame(() => {
@@ -591,13 +606,15 @@ export function TerminalPane({
     >
       <div className="terminal-keybar">
         <button className="terminal-key-toggle" aria-expanded={keysOpen} title="终端快捷键" onClick={() => setKeysOpen(value => !value)}><Keyboard size={15}/>快捷键</button>
+        {detected && pluginEnabled(plugins, detected.kind) && !closed && <button aria-expanded={editorToolsOpen} onClick={() => setEditorToolsOpen(value => !value)}>{detected.kind === 'nano' ? 'Nano' : 'Vim'} 工具</button>}
+        {readingHistory && <button className="terminal-history-return" onClick={() => { term.current?.scrollToBottom(); term.current?.focus(); }}><ArrowDown size={13}/>返回最新输出</button>}
         {keysOpen && <>
           <button onClick={copy}>复制</button><button disabled={closed} onClick={paste}>粘贴</button>
           {([['中断 · Ctrl+C', '\x03'], ['挂起 · Ctrl+Z', '\x1a'], ['结束输入 · Ctrl+D', '\x04'], ['原生 Ctrl+V', '\x16'], ['Esc', '\x1b']] as const).map(([label, value]) => <button key={label} disabled={closed} title={`发送 ${label} 到当前终端`} onClick={() => { if (!closed && active) { void window.cshell.input(id, value).catch(errorRef.current); term.current?.focus(); } }}>{label}</button>)}
           <label><input type="checkbox" checked={nativeKeys || !preferences.terminalClipboardKeys} disabled={!preferences.terminalClipboardKeys} onChange={event => setNativeKeys(event.target.checked)}/>原生按键</label>
         </>}
       </div>
-      {textEditingSupported && !!detected && !closed && <form className="text-editor-options" onSubmit={event => {event.preventDefault();if(textPath.startsWith('/')){setEditingPath(textPath);setShowTextEditor(true);}}}>
+      {textEditingSupported && editorToolsOpen && !!detected && !closed && <form className="text-editor-options" onSubmit={event => {event.preventDefault();if(textPath.startsWith('/')){setEditingPath(textPath);setShowTextEditor(true);}}}>
         <input aria-label="文件完整路径" placeholder="文件完整路径，如 /etc/config.conf" value={textPath} onChange={event => setTextPath(event.target.value)}/>
         <button disabled={!textPath.startsWith('/')}>内置编辑器</button>
         <small>先在终端编辑器保存修改；内置编辑器默认实时同步。</small>
@@ -701,7 +718,7 @@ export function TerminalPane({
       )}
       <EditorAssistant
         detected={closed || !detected || !pluginEnabled(plugins, detected.kind) ? null : detected}
-        choice={
+        choice={!editorToolsOpen ? 'off' :
           closed ||
           ((assistantChoice === 'vim' || assistantChoice === 'nano') &&
             !pluginEnabled(plugins, assistantChoice))
@@ -863,7 +880,7 @@ export function TerminalPane({
                 <button
                   key={choice}
                   aria-pressed={assistantChoice === choice}
-                  onClick={() => setAssistantChoice(choice)}
+                  onClick={() => { setAssistantChoice(choice); setEditorToolsOpen(choice !== 'off'); }}
                 >
                   {choice === 'auto'
                     ? t('automatic')
