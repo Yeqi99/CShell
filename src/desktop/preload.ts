@@ -285,6 +285,7 @@ const bridge: Bridge = {
   acknowledge: (id, characters) => ipcRenderer.invoke('acknowledge', id, characters),
   resize: (id, cols, rows) => ipcRenderer.invoke('resize', id, cols, rows),
   list: (id, path) => ipcRenderer.invoke('list', id, path),
+  filePermissions: (id,path,change) => ipcRenderer.invoke('file:permissions',id,path,change),
   fileAction: (id, action, path, destination) =>
     ipcRenderer.invoke('file:action', id, action, path, destination),
   upload: (id, path, tokens) => ipcRenderer.invoke('upload', id, path, tokens),
