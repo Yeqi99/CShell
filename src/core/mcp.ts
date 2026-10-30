@@ -342,7 +342,16 @@ export class McpService {
         res.setHeader('X-CShell-Edition',identity.edition);
         res.setHeader('X-CShell-Scope',identity.scope);
         if(req.headers['x-cshell-edition'] && req.headers['x-cshell-edition'] !== identity.edition){
-          res.writeHead(409,{'Content-Type':'application/json'}).end(JSON.stringify({apiVersion:'1',error:{code:'EDITION_MISMATCH',message:'Wrong CShell edition endpoint; no operation was executed.'}}));return;
+          // urllib sends headers and body separately with Connection: close. Closing
+          // before consuming the body can reset Windows TCP instead of delivering 409.
+          // Discard a bounded body only; never authenticate or execute a mismatched call.
+          let discarded=0;
+          const deadline=setTimeout(()=>req.destroy(),5000);deadline.unref();
+          const cleanup=()=>clearTimeout(deadline);
+          req.once('close',cleanup);req.once('error',cleanup);
+          req.on('data',(chunk:Buffer)=>{discarded+=chunk.length;if(discarded>65536)req.destroy();});
+          req.once('end',()=>{cleanup();if(!req.destroyed)res.writeHead(409,{'Content-Type':'application/json'}).end(JSON.stringify({apiVersion:'1',error:{code:'EDITION_MISMATCH',message:'Wrong CShell edition endpoint; no operation was executed.'}}));});
+          req.resume();return;
         }
         void (async () => {
           if (
