@@ -150,7 +150,7 @@ export class DesktopViews {
       if (current()) this.options.publish({ ...event, generation });
     };
     client.on('video', (info) => publish({ id, type: 'config', info }));
-    client.on('notice', (message) => {const text=String(message);const recoverable=text.startsWith('INPUT_SUSPENDED:')||/^桌面采集(?:未输出首帧|暂未更新)，正在切换兼容采集…$/.test(text);publish({id,type:'error',message:text,...(recoverable?{recoverable:true}:{})});});
+    client.on('notice', (message) => {const text=String(message);const resumed=text==='INPUT_RESUMED';const recoverable=resumed||text.startsWith('INPUT_SUSPENDED:')||/^桌面采集(?:未输出首帧|暂未更新)，正在切换兼容采集…$/.test(text);publish({id,type:'error',message:text,...(recoverable?{recoverable:true}:{}),...(resumed?{resumed:true}:{})});});
     client.on('closed', (reason) => {
       if (current()) void this.disconnected(id, view, reason);
     });
