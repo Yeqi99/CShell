@@ -46,7 +46,7 @@ export type DesktopViewEvent = { id: string; generation?: number } & (
   | { type: 'config'; info: DesktopVideoInfo }
   | { type: 'frame'; sequence: string; timestamp: number; key: boolean; data: Uint8Array }
   | { type: 'closed'; reason: string }
-  | { type: 'error'; message: string }
+  | { type: 'error'; message: string; recoverable?: boolean }
 );
 export interface DesktopViewBridge {
   desktopViewStart(
