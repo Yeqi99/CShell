@@ -1,3 +1,5 @@
+import {createTransferProgress} from '../shared/transfer-progress';
+import type {Transfer} from '../shared/contracts';
 import type {LinuxWorkspaceService} from '../core/linux-workspace';
 import { app,dialog } from 'electron';
 import {execFile} from 'node:child_process';
@@ -33,6 +35,7 @@ export async function registerAgent(
   registry: ConnectionRegistry,
   publish: (event: DesktopViewEvent) => void,
   linuxWorkspace?: LinuxWorkspaceService,
+  publishTransfer: (state: Transfer) => void = () => {},
 ) {
   const directory = process.env.CSHELL_AGENT_DATA;
   const bundledAvailable = false;
@@ -198,13 +201,16 @@ export async function registerAgent(
   };
   const checkTarget=(key:string)=>{if(key.startsWith('ssh:')&&linuxWorkspace){linuxWorkspace.validate(z.string().uuid().parse(key.slice(4)));return;}if(!activeTarget(key))throw new Error('机器连接已关闭');};
   const downloads=new Map<string,AbortController>();
+  const fileProgress=(id:string,target:string,name:string,direction:Transfer['direction'])=>{
+    return createTransferProgress(id,target,name,direction,publishTransfer);
+  };
   handle('agent:file-cancel',(id:unknown)=>{downloads.get(z.string().uuid().parse(id))?.abort();});
   handle('agent:file-paste',async(target:unknown,input:unknown)=>{
     const key=z.string().parse(target),p=z.object({id:z.string().uuid(),root:z.string().uuid(),path:z.string().max(4096)}).strict().parse(input);
     checkTarget(key);
     if(process.platform!=='win32')throw new Error('此系统请使用拖放或上传文件');
     if(downloads.size>=4||downloads.has(p.id))throw new Error('传输任务已满');
-    const controller=new AbortController();downloads.set(p.id,controller);const completed:string[]=[];let uploadId='';
+    const controller=new AbortController();downloads.set(p.id,controller);const completed:string[]=[];let uploadId='',sent=0;const progress=fileProgress(p.id,key,'剪贴板文件','upload');let finished=false;
     const call=(method:string,params:unknown)=>remoteCall(key,{method,params} as any,controller.signal);
     try{
       const {stdout}=await promisify(execFile)('powershell.exe',['-NoProfile','-NonInteractive','-STA','-Command',"[Console]::OutputEncoding=[Text.UTF8Encoding]::new(); Add-Type -AssemblyName System.Windows.Forms; $items=@([Windows.Forms.Clipboard]::GetFileDropList()); ConvertTo-Json -InputObject $items -Compress"],{windowsHide:true,timeout:10000,maxBuffer:1024*1024,signal:controller.signal});
@@ -216,24 +222,26 @@ export async function registerAgent(
           const start=await call('files.uploadStart',{root:p.root,path:(p.path==='/'?'':p.path)+'/'+name,size:stat.size}) as {id:string;chunkSize:number};uploadId=start.id;
           const buffer=Buffer.alloc(Math.min(65536,start.chunkSize));let offset=0;
           while(offset<stat.size){controller.signal.throwIfAborted();const {bytesRead}=await file.read(buffer,0,Math.min(buffer.length,stat.size-offset),offset);if(!bytesRead)throw new Error('本地文件已改变');
-            const r=await call('files.uploadChunk',{id:uploadId,offset,data:buffer.subarray(0,bytesRead).toString('base64')}) as {next:number};if(r.next!==offset+bytesRead)throw new Error('远端文件位置无效');offset=r.next;}
+            const r=await call('files.uploadChunk',{id:uploadId,offset,data:buffer.subarray(0,bytesRead).toString('base64')}) as {next:number};if(r.next!==offset+bytesRead)throw new Error('远端文件位置无效');offset=r.next;progress.update(sent+offset,0,false,name);}
+          sent+=stat.size;
           const after=await file.stat();if(after.size!==stat.size||after.mtimeMs!==stat.mtimeMs)throw new Error('本地文件已改变，请重新复制');
           await call('files.uploadFinish',{id:uploadId});uploadId='';completed.push(name);
         }finally{await file.close();}
       }
-      return {completed};
+      finished=true;return {completed};
     }catch(error){throw new Error((completed.length?'已完成 '+completed.length+' 个文件；':'')+(error as Error).message);}
-    finally{if(uploadId){await remoteCall(key,{method:'files.uploadCancel',params:{id:uploadId}}).catch(()=>{});}downloads.delete(p.id);}
+    finally{progress.finish(finished?'done':controller.signal.aborted?'cancelled':'failed');if(uploadId){await remoteCall(key,{method:'files.uploadCancel',params:{id:uploadId}}).catch(()=>{});}downloads.delete(p.id);}
   });
   handle('agent:file-download',async(target:unknown,input:unknown)=>{
     const key=z.string().parse(target),p=z.object({id:z.string().uuid(),root:z.string().uuid(),path:z.string().min(1).max(4096),name:z.string().min(1).max(255)}).strict().parse(input);safeName(p.name);
     checkTarget(key);
-    if(downloads.size>=4||downloads.has(p.id))throw new Error('下载任务已满');const controller=new AbortController();downloads.set(p.id,controller);let temporary='';
+    if(downloads.size>=4||downloads.has(p.id))throw new Error('下载任务已满');const controller=new AbortController();downloads.set(p.id,controller);let temporary='',finished=false;let progress:ReturnType<typeof fileProgress>|undefined;
     try{const save=await dialog.showSaveDialog({defaultPath:p.name,title:'下载远端文件'});if(save.canceled||!save.filePath)return {cancelled:true};controller.signal.throwIfAborted();
+      progress=fileProgress(p.id,key,p.name,'download');
       temporary=save.filePath+'.cagent-'+p.id+'.part';const h=await open(temporary,'wx',0o600);
-      try{let offset=0,version:string|undefined;for(;;){controller.signal.throwIfAborted();const raw=await remoteCall(key,{method:'files.read',params:{root:p.root,path:p.path,offset,version}},controller.signal);const r=z.object({data:z.string().max(349528),size:z.number().int().nonnegative(),version:z.string(),next:z.number().int().nonnegative(),done:z.boolean()}).parse(raw);const buffer=Buffer.from(r.data,'base64');if(r.next!==offset+buffer.length||(!r.done&&!buffer.length))throw new Error('远端文件分块无效');await h.writeFile(buffer);offset=r.next;version=r.version;if(r.done){if(offset!==r.size)throw new Error('远端文件长度不一致');break;}}await h.sync();}finally{await h.close();}
-      controller.signal.throwIfAborted();checkTarget(key);await link(temporary,save.filePath);return {};
-    }finally{downloads.delete(p.id);if(temporary)await unlink(temporary).catch(()=>{});}
+      try{let offset=0,version:string|undefined;for(;;){controller.signal.throwIfAborted();const raw=await remoteCall(key,{method:'files.read',params:{root:p.root,path:p.path,offset,version}},controller.signal);const r=z.object({data:z.string().max(349528),size:z.number().int().nonnegative(),version:z.string(),next:z.number().int().nonnegative(),done:z.boolean()}).parse(raw);const buffer=Buffer.from(r.data,'base64');if(r.next!==offset+buffer.length||(!r.done&&!buffer.length))throw new Error('远端文件分块无效');await h.writeFile(buffer);offset=r.next;version=r.version;progress.update(offset,r.size,true);if(r.done){if(offset!==r.size)throw new Error('远端文件长度不一致');break;}}await h.sync();}finally{await h.close();}
+      controller.signal.throwIfAborted();checkTarget(key);await link(temporary,save.filePath);finished=true;return {};
+    }finally{progress?.finish(finished?'done':controller.signal.aborted?'cancelled':'failed');downloads.delete(p.id);if(temporary)await unlink(temporary).catch(()=>{});}
   });
   handle('agent:machine-close',async(target)=>{await stopTarget(z.string().parse(target));machines.delete(target);});
   handle('agent:call', async (target, raw) => {

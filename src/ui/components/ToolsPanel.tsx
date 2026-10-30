@@ -1,3 +1,4 @@
+import {transferDetail} from '../../shared/transfer-progress';
 import { DockerPanel } from './DockerPanel';
 import { Box } from 'lucide-react';
 import { useState, useEffect, type ReactNode } from 'react';
@@ -33,6 +34,8 @@ export function ToolsPanel({
   const [tool, setTool] = useState<'files' | 'docker'>('files');
   const dockerVisible = dockerEnabled && tool === 'docker';
   const [queue, setQueue] = useState(false);
+  const transferCount = transfers.length;
+  useEffect(() => { if (transferCount) setQueue(true); }, [transferCount]);
   const [filesOpen, setFilesOpen] = useState(true);
   useEffect(() => {
     if (revealRevision > 0) { setTool('files'); setFilesOpen(true); }
@@ -93,7 +96,7 @@ export function ToolsPanel({
                 <div className="transfer" key={item.id} title={item.error}>
                   <div>
                     <span>
-                      {item.direction === 'upload' ? '↑' : '↓'} {item.name}
+                      {item.direction === 'upload' ? '↑' : item.direction === 'copy' ? '↔' : '↓'} {item.name}
                     </span>
                     <small className={item.state === 'failed' ? 'danger' : ''}>
                       {t(item.state)}
@@ -110,8 +113,10 @@ export function ToolsPanel({
                   </div>
                   <progress
                     max={Math.max(item.total, 1)}
-                    value={item.state === 'done' ? Math.max(item.total, 1) : item.done}
+                    value={item.state === 'done' ? Math.max(item.total, 1) : item.totalKnown ? Math.min(item.done,item.total * .99) : undefined}
+                    aria-label={`${item.name} 传输进度`}
                   />
+                  <small className="transfer-detail">{transferDetail(item)}</small>
                 </div>
               ))}
           </div>

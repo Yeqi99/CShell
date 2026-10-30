@@ -6052,3 +6052,5 @@ input[type='radio']:focus-visible {
 .network-help { margin-top:8px; font-size:11px; color:var(--muted); }
 .network-help p { line-height:1.5; }
 .network-help code { white-space:normal; overflow-wrap:anywhere; user-select:text; }
+
+.transfer-detail{display:block;color:var(--muted);font-variant-numeric:tabular-nums;line-height:1.6;overflow-wrap:anywhere}.machine-file-transfer{display:grid;gap:5px;padding:10px 0;font-variant-numeric:tabular-nums}.machine-file-transfer>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.machine-file-transfer progress{width:100%;height:4px;accent-color:var(--accent)}.machine-file-transfer small{color:var(--muted)}

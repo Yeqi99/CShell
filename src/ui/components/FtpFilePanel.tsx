@@ -2,11 +2,8 @@ import {useCallback,useEffect,useRef,useState} from 'react';
 import {ArrowUp,Check,Copy,Download,File,Folder,FolderPlus,Pencil,RefreshCw,Trash2,Upload,X} from 'lucide-react';
 import type {FileEntry,Transfer} from '../../shared/contracts';
 
-export function formatFileBytes(bytes:number):string {
-  const value=Math.max(0,Number.isFinite(bytes)?bytes:0),units=['B','KiB','MiB','GiB','TiB'];
-  const unit=Math.max(0,Math.min(units.length-1,Math.floor(Math.log2(value||1)/10)));
-  return `${new Intl.NumberFormat('zh-CN',{maximumFractionDigits:unit?1:0}).format(value/1024**unit)} ${units[unit]}`;
-}
+import {formatFileBytes} from '../../shared/transfer-progress';
+export {formatFileBytes} from '../../shared/transfer-progress';
 const errorMessage=(error:unknown)=>(error instanceof Error?error.message:String(error)).replace(/^Error invoking remote method '[^']+': Error: /,'');
 
 /** FTP deliberately exposes only the operations supported by its provider. */

@@ -8,6 +8,7 @@ import type { SFTPWrapper } from 'ssh2';
 import type { Transfer } from '../shared/contracts';
 import { childPath, safeName } from './paths';
 import { SshService } from './ssh';
+import { TransferMeter } from '../shared/transfer-progress';
 
 export class Transfers {
   get size() {
@@ -17,6 +18,9 @@ export class Transfers {
     string,
     { state: Transfer; controller: AbortController; sessions: Set<string> }
   >();
+  private meters = new Map<string, TransferMeter>();
+  private publish(state: Transfer) { this.meters.get(state.id)?.update(state); this.emit({ ...state }); }
+  private start(state: Transfer) { state.queued = false; this.meters.set(state.id, new TransferMeter()); this.publish(state); }
   private tail: Promise<void> = Promise.resolve();
   constructor(
     private ssh: SshService,
@@ -46,6 +50,7 @@ export class Transfers {
       done: 0,
       total: 0,
       state: 'running',
+      queued: true,
     };
     const controller = new AbortController();
     this.jobs.set(state.id, {
@@ -53,20 +58,22 @@ export class Transfers {
       controller,
       sessions: new Set([sessionId, ...relatedSessions]),
     });
-    this.emit({ ...state });
+    this.publish(state);
     this.tail = this.tail
       .catch(() => {})
       .then(async () => {
         try {
           controller.signal.throwIfAborted();
-          await operation(state, controller.signal, () => this.emit({ ...state }));
+          this.start(state);
+          await operation(state, controller.signal, () => this.publish(state));
           state.state = 'done';
         } catch (error) {
           state.state = controller.signal.aborted ? 'cancelled' : 'failed';
           state.error = (error as Error).message;
         } finally {
-          this.emit({ ...state });
+          this.publish(state);
           this.jobs.delete(state.id);
+          this.meters.delete(state.id);
         }
       });
     return state.id;
@@ -122,6 +129,8 @@ export class Transfers {
     } else {
       if (!stat.isFile()) throw new Error('Only regular files can be copied');
       state.total += stat.size;
+      if (depth === 0) state.totalKnown = true;
+      this.publish(state);
       const temporary = `${target}.cshell-${state.id}.part`;
       try {
         await pipeline(
@@ -152,15 +161,17 @@ export class Transfers {
       done: 0,
       total: 0,
       state: 'running',
+      queued: true,
     };
     const controller = new AbortController();
     this.jobs.set(state.id, { state, controller, sessions: new Set([sessionId]) });
-    this.emit({ ...state });
+    this.publish(state);
     this.tail = this.tail
       .catch(() => {})
       .then(async () => {
         try {
           controller.signal.throwIfAborted();
+          this.start(state);
           const sftp = await this.ssh.sftp(sessionId);
           if (direction === 'upload')
             await this.upload(
@@ -185,8 +196,9 @@ export class Transfers {
           state.state = controller.signal.aborted ? 'cancelled' : 'failed';
           state.error = (error as Error).message;
         } finally {
-          this.emit({ ...state });
+          this.publish(state);
           this.jobs.delete(state.id);
+          this.meters.delete(state.id);
         }
       });
     return state.id;
@@ -198,7 +210,7 @@ export class Transfers {
         state.done += chunk.length;
         if (Date.now() - last > 100) {
           last = Date.now();
-          this.emit({ ...state });
+          this.publish(state);
         }
         callback(null, chunk);
       },
@@ -244,6 +256,8 @@ export class Transfers {
         throw new Error('Overwrite declined');
       signal.throwIfAborted();
       state.total += stat.size;
+      if (depth === 0) state.totalKnown = true;
+      this.publish(state);
       const temporary = `${target}.cshell-${state.id}.part`;
       try {
         await pipeline(
@@ -314,6 +328,8 @@ export class Transfers {
         throw new Error('Overwrite declined');
       signal.throwIfAborted();
       state.total += stat.size;
+      if (depth === 0) state.totalKnown = true;
+      this.publish(state);
       const temporary = `${target}.cshell-${state.id}.part`;
       try {
         await pipeline(
