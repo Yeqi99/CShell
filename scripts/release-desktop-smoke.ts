@@ -128,5 +128,5 @@ try {
   try {
     await app.evaluate(({app})=>app.exit(0)).catch(()=>{}); await app.close().catch(()=>{});
   } finally { clearTimeout(cleanup); }
-  await server.close(); await rm(data,{recursive:true,force:true});
+  await server.close(); await rm(data,{recursive:true,force:true,maxRetries:20,retryDelay:300});
 }
