@@ -1,3 +1,4 @@
+import {isPro} from '../shared/edition';
 import { z } from 'zod';
 import type { McpService } from '../core/mcp';
 import { localApiTransport, runConsoleCommand } from '../core/command-client';
@@ -16,7 +17,7 @@ export function registerCommandConsole(handle: (name: string, fn: (...args: any[
     const controller = new AbortController(); pending.set(value.id, controller);
     try {
       const transport = noApi ? async () => { throw Error('此命令不访问 API'); }
-        : localApiTransport(`http://127.0.0.1:${status.settings.port}`, await mcp.accessToken());
+        : localApiTransport(`http://127.0.0.1:${status.settings.port}`, await mcp.accessToken(), isPro ? 'pro' : 'opensource');
       return await runConsoleCommand(value.text, transport, value.sessionId, AbortSignal.any([controller.signal, AbortSignal.timeout(300000)]));
     } finally { pending.delete(value.id); }
   });

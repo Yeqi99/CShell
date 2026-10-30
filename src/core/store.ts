@@ -1,3 +1,4 @@
+import { defaultMcpPort } from '../shared/mcp-endpoint';
 import { CloudImportConflict, undoImportedFields } from './cloud-import';
 import {
   installedPluginSchema,
@@ -41,7 +42,7 @@ const schema = z.object({
   presets: z.array(presetSchema).max(100).default([]),
   mcp: mcpSettingsSchema.default({
     enabled: false,
-    port: 3777,
+    port: defaultMcpPort(),
     allowedProfiles: [],
     allowCommands: false,
   }),
