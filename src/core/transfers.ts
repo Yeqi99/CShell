@@ -136,7 +136,7 @@ export class Transfers {
         await pipeline(
           from.createReadStream(source),
           this.progress(state),
-          to.createWriteStream(temporary, { flags: 'wx', mode: 0o600 }),
+          to.createWriteStream(temporary, { flags: 'wx', mode: 0o600, highWaterMark: 1024 * 1024 }),
           { signal },
         );
         signal.throwIfAborted();
@@ -263,7 +263,7 @@ export class Transfers {
         await pipeline(
           createReadStream(source),
           this.progress(state),
-          sftp.createWriteStream(temporary, { flags: 'wx', mode: 0o600 }),
+          sftp.createWriteStream(temporary, { flags: 'wx', mode: 0o600, highWaterMark: 1024 * 1024 }),
           { signal },
         );
         signal.throwIfAborted();
