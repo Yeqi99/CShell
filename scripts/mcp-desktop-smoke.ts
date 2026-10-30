@@ -213,7 +213,7 @@ export async function mcpDesktopSmoke(app: ElectronApplication, page: Page) {
   await page.locator('.settings-savebar').waitFor({ state: 'hidden' });
   await openSettings();
   assert.equal(await panel.getByLabel('在本机启用 MCP').isChecked(), false);
-  await panel.getByText('MCP 已停止', { exact: true }).waitFor();
+  await panel.getByRole('status').filter({ hasText: /^MCP 已停止$/ }).waitFor();
   await page
     .locator('.editor-page:visible')
     .getByRole('button', { name: '取消', exact: true })
