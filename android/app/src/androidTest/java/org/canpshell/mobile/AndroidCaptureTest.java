@@ -54,7 +54,7 @@ final class AndroidCaptureTest {
       inputFixture=new AndroidInputTest(test,app);inputFixture.awaitReady();
       StringBuilder result=new StringBuilder("PASS real Android system screen-sharing consent and foreground service\n");
       for(int attempt=0;attempt<2;attempt++){
-        if(attempt==1){check(test.getUiAutomation(android.app.UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES).setRotation(android.app.UiAutomation.ROTATION_FREEZE_90),"Emulator rotation request failed");Thread.sleep(700);}
+        if(attempt==1){check(test.getUiAutomation(android.app.UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES).setRotation(android.app.UiAutomation.ROTATION_FREEZE_90),"Emulator rotation request failed");awaitLandscape(test,context);}
         AtomicReference<Throwable> failure=new AtomicReference<>();AtomicInteger decoded=new AtomicInteger(),received=new AtomicInteger(),formats=new AtomicInteger(),inputWaits=new AtomicInteger();AtomicBoolean pixels=new AtomicBoolean();AtomicInteger width=new AtomicInteger(),height=new AtomicInteger();CountDownLatch frames=new CountDownLatch(4);
         final int markerStart=markerUpdates.get(),decodeAttempt=attempt+1;
         AtomicReference<MediaCodec> decoder=new AtomicReference<>();final AgentConnection[] reference=new AgentConnection[1];
@@ -76,17 +76,20 @@ final class AndroidCaptureTest {
               // This is a synchronous test decoder, not the production WebCodecs renderer.
               // A late output can occupy all buffers: release it before asking for more input.
               // INFO_TRY_AGAIN_LATER is transient backpressure, not a decoder failure.
-              drainDecoder(current,decoded,frames,pixels,0);
+              // Reconnect may first advertise the previous encoder format while quality/rotation
+              // reconfiguration is queued. Only new-size decoded frames satisfy this attempt.
+              CountDownLatch acceptedFrames=decodeAttempt==1||(width.get()<=320&&width.get()>height.get())?frames:new CountDownLatch(0);
+              drainDecoder(current,decoded,acceptedFrames,pixels,0);
               long inputDeadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(3);
               int input;
               while((input=current.dequeueInputBuffer(0))<0){
                 inputWaits.incrementAndGet();
                 check(System.nanoTime()<inputDeadline,"Decoder input unavailable after 3 seconds; attempt="+decodeAttempt+", codec="+current.getName()+", received="+received.get()+", decoded="+decoded.get()+", formats="+formats.get()+", inputWaits="+inputWaits.get()+", size="+width.get()+"x"+height.get());
-                drainDecoder(current,decoded,frames,pixels,10000);
+                drainDecoder(current,decoded,acceptedFrames,pixels,10000);
               }
               ByteBuffer buffer=current.getInputBuffer(input);check(buffer!=null,"Decoder input buffer missing");buffer.clear();check(buffer.remaining()>=data.length,"Decoder input too small");buffer.put(data);
               current.queueInputBuffer(input,0,data.length,frame.getLong("timestamp"),0);
-              drainDecoder(current,decoded,frames,pixels,10000);
+              drainDecoder(current,decoded,acceptedFrames,pixels,10000);
               reference[0].queueDesktopCommand(new JSONObject().put("op","ack").put("id",frame.getString("id")).toString());
             }
             if(type.equals("error")){failure.compareAndSet(null,new Exception(value));while(frames.getCount()>0)frames.countDown();}
@@ -95,10 +98,10 @@ final class AndroidCaptureTest {
         try {
           reference[0].connect("127.0.0.1",port,attempt==0?password:"",certificate->{try{return java.util.Arrays.equals(certificate,java.security.cert.CertificateFactory.getInstance("X.509").generateCertificate(new java.io.ByteArrayInputStream(invitation.getString("certificate").getBytes(java.nio.charset.StandardCharsets.US_ASCII))).getEncoded());}catch(Exception e){return false;}});
           reference[0].desktop(new JSONObject().put("fps",attempt==0?24:15).put("bitrate",attempt==0?2_000_000:1_000_000).put("adaptive",false).put("display",0).put("width",attempt==0?480:320).put("height",attempt==0?800:534),attempt==0);
-          check(frames.await(25,TimeUnit.SECONDS),"No 4 decoded frames within 25 seconds; attempt="+(attempt+1)+", received="+received.get()+", decoded="+decoded.get()+", formats="+formats.get()+", markerUpdates="+(markerUpdates.get()-markerStart)+", size="+width.get()+"x"+height.get()+", "+captureState(context));if(failure.get()!=null)throw new Exception("Capture decode failed; attempt="+decodeAttempt+", received="+received.get()+", decoded="+decoded.get()+", formats="+formats.get()+", inputWaits="+inputWaits.get()+", markerUpdates="+(markerUpdates.get()-markerStart)+", size="+width.get()+"x"+height.get()+", "+captureState(context),failure.get());
+          check(frames.await(25,TimeUnit.SECONDS),"No 4 decoded frames within 25 seconds; attempt="+(attempt+1)+", received="+received.get()+", decoded="+decoded.get()+", formats="+formats.get()+", markerUpdates="+(markerUpdates.get()-markerStart)+", size="+width.get()+"x"+height.get()+", "+displayState(context)+", "+captureState(context));if(failure.get()!=null)throw new Exception("Capture decode failed; attempt="+decodeAttempt+", received="+received.get()+", decoded="+decoded.get()+", formats="+formats.get()+", inputWaits="+inputWaits.get()+", markerUpdates="+(markerUpdates.get()-markerStart)+", size="+width.get()+"x"+height.get()+", "+captureState(context),failure.get());
           check(decoded.get()>=4,"Expected decoded pixel frames");check(pixels.get(),"Decoded screen contained no visible luma variation");check(width.get()>0&&height.get()>0,"Invalid video size");
           if(attempt==0)result.append(inputFixture.verify(reference[0]));
-          if(attempt==1){check(width.get()<=320,"Quality reconfiguration did not change output size");check(width.get()>height.get(),"Rotation did not update capture aspect ratio");}
+          if(attempt==1){check(width.get()<=320,"Quality reconfiguration did not change output size");check(width.get()>height.get(),"Rotation did not update capture aspect ratio: "+width.get()+"x"+height.get()+", "+displayState(context));}
           result.append("PASS MediaProjection → H264 → pinned TLS → native decode attempt ").append(attempt+1).append(": ").append(decoded.get()).append(" frames ").append(width.get()).append('x').append(height.get()).append("; inputWaits=").append(inputWaits.get()).append('\n');
         }finally{reference[0].close();Thread.sleep(300);MediaCodec old=decoder.getAndSet(null);if(old!=null){try{old.stop();}catch(Exception ignored){}old.release();}}
         Thread.sleep(300);
@@ -109,6 +112,21 @@ final class AndroidCaptureTest {
       boolean closed=false;for(int n=0;n<30;n++){try(java.net.Socket socket=new java.net.Socket()){socket.connect(new java.net.InetSocketAddress("127.0.0.1",port),100);}catch(java.io.IOException expected){closed=true;break;}Thread.sleep(100);}
       check(closed,"Listener still accepting after stop");return result.append("PASS sharing stop closes TCP listener\nOK (actual Android capture, H264 decode, same-consent reconnect, quality resize, stop)").toString();
     }finally{context.stopService(new Intent(context,AndroidAgentService.class));if(inputFixture!=null)inputFixture.close();test.getUiAutomation(android.app.UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES).setRotation(android.app.UiAutomation.ROTATION_FREEZE_0);test.getUiAutomation(android.app.UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES).setRotation(android.app.UiAutomation.ROTATION_UNFREEZE);AndroidAgentSettings.update(context,previous);MainActivity app=activity;if(app!=null)test.runOnMainSync(()->{compositor.removeCallbacksAndMessages(null);app.getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);android.view.View square=marker.get();if(square!=null&&square.getParent() instanceof android.view.ViewGroup)((android.view.ViewGroup)square.getParent()).removeView(square);app.finish();});}
+  }
+  private static String displayState(Context context){
+    android.view.Display display=context.getSystemService(android.view.WindowManager.class).getDefaultDisplay();
+    android.util.DisplayMetrics metrics=new android.util.DisplayMetrics();display.getRealMetrics(metrics);
+    return "displayRotation="+display.getRotation()+", displaySize="+metrics.widthPixels+"x"+metrics.heightPixels;
+  }
+  private static void awaitLandscape(Instrumentation test,Context context)throws Exception {
+    long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);
+    while(System.nanoTime()<deadline){
+      android.view.Display display=context.getSystemService(android.view.WindowManager.class).getDefaultDisplay();
+      android.util.DisplayMetrics metrics=new android.util.DisplayMetrics();display.getRealMetrics(metrics);
+      if(display.getRotation()==android.view.Surface.ROTATION_90&&metrics.widthPixels>metrics.heightPixels){test.waitForIdleSync();return;}
+      Thread.sleep(100);
+    }
+    throw new AssertionError("Emulator did not reach requested landscape rotation: "+displayState(context));
   }
   /** Release all available output, including delayed frames, without waiting indefinitely. */
   private static void drainDecoder(MediaCodec current,AtomicInteger decoded,CountDownLatch frames,AtomicBoolean pixels,long timeoutUs){
