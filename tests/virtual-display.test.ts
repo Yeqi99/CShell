@@ -26,3 +26,13 @@ test('virtual display operations serialize and never retry unknown outcomes', as
   await assert.rejects(pending, /unknown/);
   assert.equal(calls, 1);
 });
+
+test('display preflight fails closed for old helpers and exposes blocked session', async () => {
+  const old = new VirtualDisplayBackend(host, '', async () => ({}));
+  assert.equal((await old.preflight()).executable, false);
+  const detached = new VirtualDisplayBackend(host, '', async () => ({elevated:true,consoleSession:false,topologyAvailable:false,executable:false,sessionId:2,consoleSessionId:1,reason:'CONSOLE_SESSION_REQUIRED'}));
+  const state=await detached.preflight();
+  assert.equal(state.executable,false);
+  assert.equal(state.consoleSession,false);
+  assert.match(state.reason,/console/);
+});

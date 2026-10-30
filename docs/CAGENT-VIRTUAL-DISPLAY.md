@@ -58,3 +58,10 @@
 Windows Server 2022 仅实验候选，不能承诺可用；上游有未解决的 [无头 D3D 创建设备失败 #416](https://github.com/VirtualDrivers/Virtual-Display-Driver/issues/416) 与 [无 GPU 驱动重启 #354](https://github.com/VirtualDrivers/Virtual-Display-Driver/issues/354)。[IddCx 版本表](https://github.com/VirtualDrivers/Virtual-Display-Driver/wiki/IddCx-Info) 也不等于真实硬件兼容验证。
 
 [SetDisplayConfig](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setdisplayconfig) 管理已有路径，不能通用地创建虚拟显示适配器；通用纯无头支持仍需 [IddCx 驱动](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/indirect-display-driver-model-overview) 或目标机器已有的虚拟显示硬件。
+
+
+### 2026-10-30 安装前检查补充
+
+安装计划现在读取原生预检：管理员状态、CAgent 所属会话是否为 console、输入桌面可访问性及显示拓扑。缺少或旧版辅助程序一律不可执行；执行前及原生安装入口再次检查，避免计划生成后会话改变。预检不安装驱动、不切换会话、不解锁，也不证明已经能采集首帧。RDP 已断开时先恢复原用户会话，虚拟显示不能替代会话恢复。
+
+系统桌面服务状态比较当前包与 Program Files 中 broker、worker 的 SHA-256；不一致或文件缺失不再显示就绪，需显式更新系统桌面服务。主程序升级不能自动当作受保护系统服务已更新。
