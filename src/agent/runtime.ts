@@ -28,6 +28,7 @@ import { AgentRelayService } from './relay';
 import { AgentReverseRelayService } from './relay-reverse';
 import { hostingConfigSchema } from '../shared/agent-hosting';
 import { AgentApplicationService } from './applications';
+import { CagentAutomation } from './automation';
 import { CagentAssistant } from './assistant';
 import { CapabilityRuntime } from './capability-runtime';
 import { createDesktopCapability } from './desktop-capability';
@@ -165,6 +166,7 @@ export async function createAgentRuntime(
     if(previous.passwordConfigured&&previous.bind&&previous.port)try{await server.start({bind:previous.bind,port:previous.port,advertisedHost:previous.advertisedHost,advertisedPort:previous.advertisedPort});}catch{listenerStartupError='连接服务未启动，请检查本机地址和端口';}
   }
   const lanRegistration=await createLanRegistration({vault,status:()=>server.status(),version:agentVersion});
+  let automation:CagentAutomation;
   const assistant=new CagentAssistant(vault,{shells,applications:owner=>applications.list(owner),execute:(input,signal,owner,output)=>{
     if(owner!=='local'){
       const status=server.status(),peer=status.peers.find(p=>p.fingerprint===owner);
@@ -172,8 +174,10 @@ export async function createAgentRuntime(
       if(!peer?.shells.includes(shell)||!status.allowedShells?.includes(shell))throw new Error('控制端未获此 Shell 授权');
     }
     return terminal.execute(input,signal,output);
-  },allowed:owner=>server.managementAllowed(owner),capabilityTools:()=>packages.tools(),capabilityInvoke:(input,signal,owner)=>packages.invoke(input,owner,signal)});
+  },automation:async(action,input,owner)=>{if(action==='list')return automation.list(owner);if(action==='create')return automation.create(input,owner);return automation.change({...z.record(z.string(),z.unknown()).parse(input),action},owner);},allowed:owner=>server.managementAllowed(owner),capabilityTools:()=>packages.tools(),capabilityInvoke:(input,signal,owner)=>packages.invoke(input,owner,signal)});
   await assistant.load();
+  automation=new CagentAutomation(vault,assistant);await automation.load();
+  await automation.emit('agent','started',crypto.randomUUID(),{startedAt:new Date().toISOString()});
   const coding=new CodingService(vault,directory,owner=>owner==='local'||(server.managementAllowed(owner)&&server.status().peers.some(p=>p.fingerprint===owner&&p.shells.some(s=>server.status().allowedShells?.includes(s)))));
   await coding.load();
   const ide=new IdeService(vault,directory,owner=>owner==='local'||server.managementAllowed(owner));await ide.load();
@@ -351,6 +355,14 @@ export async function createAgentRuntime(
     }
     if(method==='environment.read'||method==='environment.save'){if(!admin)throw Error('未授权环境配置');return method==='environment.read'?managedEnvironment.snapshot():serialized(()=>managedEnvironment.save(params));}
     if(method.startsWith('management.script.')){if(!admin)throw Error('未授权批量命令');if(method==='management.script.start')return managedScripts.start(owner,params);return managedScripts.query(owner,params,method==='management.script.cancel');}
+    if(method.startsWith('automation.')){
+      if(!local)throw Error('自动化管理需在受控端操作');
+      if(method==='automation.list')return automation.list(owner);
+      if(method==='automation.create')return automation.create(params,owner);
+      if(method==='automation.change')return automation.change(params,owner);
+      if(method==='automation.event'){const e=z.object({source:z.string(),type:z.string(),id:z.string(),payload:z.unknown()}).strict().parse(params);return automation.emit(e.source,e.type,e.id,e.payload);}
+      throw Error('未知自动化操作');
+    }
     if(method.startsWith('assistant.')){
       if(!local&&owner==='local')throw new Error('缺少控制端身份');
       if(method==='assistant.start')return assistant.start(params,owner);
@@ -613,7 +625,7 @@ export async function createAgentRuntime(
     // A failed optional service must not leave the authenticated control socket
     // or listener half alive when an update needs to restore the old runtime.
     for(const stop of [()=>lanRegistration.close(),()=>visual.dispose(),()=>files.close(),()=>browserNetwork.close(),()=>coding.close(),()=>ide.close(),
-      ()=>managedScripts.close(),()=>assistant.close(),()=>control?.close(),()=>mutation,()=>packages.dispose(),()=>wechat?.shutdown(),()=>desktop.shutdown(),
+      ()=>managedScripts.close(),()=>automation.close(),()=>assistant.close(),()=>control?.close(),()=>mutation,()=>packages.dispose(),()=>wechat?.shutdown(),()=>desktop.shutdown(),
       ()=>applications.dispose(),()=>wsl.dispose(),()=>hosting.dispose(),()=>reverseRelay.stop(),()=>relay.stop(),()=>server.stop(),
       ()=>terminal.dispose(),()=>vault.flush(),()=>options.onClose?.()])try{await stop();}catch(error){failures.push(error);}
     if(failures.length)throw new AggregateError(failures,'部分后台服务清理失败');
