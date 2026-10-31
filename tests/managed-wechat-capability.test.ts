@@ -55,3 +55,21 @@ test('callback event normalization maps explicit direction, retains explicit own
   assert.equal(managedWechatEventData({text:'x'.repeat(1300)}).text?.toString().length,1200);
 });
 
+
+test('unknown validation blocks bind, configure, start and retries without replay',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'wechat-unknown-')),storage=new Map<string,unknown>();let calls=0,starts=0;
+ const f=await createManagedWechatCapability({entry:entry().entry,directory,vault:{read:async<T>(k:string,s:z.ZodType<T>)=>storage.has(k)?s.parse(storage.get(k)):undefined,write:async(k,v)=>{storage.set(k,v);}},authorize:()=>true,getGrants:()=>['wechat.api','wechat.events.read'],
+ initialize:async(_exe,path)=>{await writeFile(path,JSON.stringify({dataDir:join(dirname(path),'data'),permissions:{}}));},
+ nativeCommand:async(_exe,args)=>{calls++;if(args.includes('--validate'))throw Error('unknown native cleanup');return{bound:true,boundPid:123,liveEnabled:true,validation:{valid:false}};},
+ serviceFactory:()=>({verify:async()=>{},start:async()=>{starts++;},stop:async()=>{},health:async()=>({}),capabilities:async()=>({}),submit:async()=>({}),operation:async()=>({})})});
+ try{
+ await f.adapter.inspect(directory);await f.configure({apiEnabled:true,receiveTargets:['filehelper']});
+ await assert.rejects(f.validate(),/VALIDATION_UNKNOWN/);const before=calls;
+ await assert.rejects(f.validate(),/VALIDATION_UNKNOWN/);
+ await assert.rejects(f.bind(123),/VALIDATION_UNKNOWN/);
+ await assert.rejects(f.configure({apiEnabled:false}),/VALIDATION_UNKNOWN/);
+ await assert.rejects(f.adapter.register!(directory,['wechat.api','wechat.events.read']),/VALIDATION_UNKNOWN/);
+ assert.equal(calls,before);assert.equal(starts,0);assert.equal(f.status().validationUnknown,true);
+ assert.equal((await f.adapter.inspect(directory)).configured,false);
+ }finally{await f.shutdown();await rm(directory,{recursive:true,force:true});}
+});
