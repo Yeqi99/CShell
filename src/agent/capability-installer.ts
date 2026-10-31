@@ -9,6 +9,16 @@ const bundleSchema=z.object({protocol:z.literal(1),manifest:z.string().max(1024*
 export const capabilityInstallInput=z.object({id:z.string().min(1).max(100),confirm:z.literal(true)}).strict();
 /** Only caller-selected trusted catalog entries. No arbitrary URLs, scripts, archives or decompression. */
 export function capabilityDownloadTimeout(bytes:number){return Math.min(600000,Math.max(120000,Math.ceil(bytes/(512*1024))*1000+120000));}
+/** Linear scan avoids regexp backtracking stacks for native runtime binaries. */
+export function validCapabilityBase64(value:string){
+  if(value.length%4)return false;
+  const padding=value.endsWith('==')?2:value.endsWith('=')?1:0;
+  for(let i=0;i<value.length-padding;i++){
+    const c=value.charCodeAt(i);
+    if(!(c>=65&&c<=90||c>=97&&c<=122||c>=48&&c<=57||c===43||c===47))return false;
+  }
+  return true;
+}
 export async function stageCapabilityBundle(root:string,entry:CapabilityCatalogEntry,signal:AbortSignal,fetcher?:typeof fetch){
   signal.throwIfAborted();
   const budget=entry.maxBundleBytes??64*1024*1024;
@@ -43,7 +53,7 @@ export async function stageCapabilityBundle(root:string,entry:CapabilityCatalogE
   if(paths.length!==manifest.files.length||paths.some(path=>!manifest.files.some(file=>file.path===path)))throw new Error('Unexpected package file');
   const materialized=manifest.files.map(file=>{
     const base64=bundle.files[file.path];
-    if(!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(base64))throw new Error('Invalid package file encoding');
+    if(!validCapabilityBase64(base64))throw new Error('Invalid package file encoding');
     const content=Buffer.from(base64,'base64');if(content.length!==file.bytes||capabilityDigest(content)!==file.sha256)throw new Error('Package file digest mismatch');return {path:file.path,content};
   });
   await mkdir(root,{recursive:true});const canonical=await realpath(root),destination=await mkdtemp(join(canonical,'package-'));
