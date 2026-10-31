@@ -1,0 +1,135 @@
+/* One settings surface, shared by both editions. No permission or save behavior lives here. */
+.workspace-category-container .settings-studio {
+  grid-template-columns: 196px minmax(0, 1fr);
+  background: var(--bg);
+  --settings-control: 36px;
+}
+.settings-studio .settings-nav {
+  padding: 24px 12px;
+  background: color-mix(in srgb, var(--panel) 76%, var(--bg));
+}
+.settings-studio .settings-nav h2 { margin: 0 12px 18px; color: var(--text); font-weight: 600; }
+.settings-studio .settings-nav > button {
+  min-height: 40px; padding: 9px 12px; margin: 3px 0;
+  border-radius: 8px; gap: 11px; font-size: calc(var(--ui-font-size, 14px) * 13 / 14); font-weight: 500;
+}
+.settings-studio .settings-nav > button[aria-current='page'] {
+  color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, var(--bg));
+  box-shadow: inset 3px 0 var(--accent);
+}
+.settings-studio .settings-search {
+  display: flex; align-items: center; gap: 8px; margin: 0 2px 18px;
+  padding: 0 10px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--bg); color: var(--muted); min-width: 0;
+}
+.settings-studio .settings-search:focus-within { border-color: var(--accent); }
+.settings-studio .settings-search input {
+  width: 100%; min-width: 0; border: 0; background: transparent;
+  height: 34px; padding: 0; font-size: calc(var(--ui-font-size, 14px) * 12 / 14); box-shadow: none;
+}
+.settings-studio .settings-search > svg { flex-shrink: 0; }
+.settings-studio .settings-search-empty { font-size: calc(var(--ui-font-size, 14px) * 12 / 14); color: var(--muted); padding: 0 10px; line-height: 1.6; }
+.settings-studio .settings-content { padding: 30px clamp(20px, 4cqi, 56px) 40px; scrollbar-gutter: stable; background: var(--terminal); }
+.settings-studio .settings-content > :not(.settings-category-heading) { max-width: 860px; }
+.settings-studio .settings-category-heading { margin: 0 0 30px; max-width: 860px; }
+.settings-studio .settings-category-heading h1 { font-size: calc(var(--ui-font-size, 14px) * 25 / 14); letter-spacing: -.6px; line-height: 1.3; font-weight: 650; }
+.settings-studio .settings-category-heading p { margin: 8px 0 0; color: var(--muted); font-size: calc(var(--ui-font-size, 14px) * 13 / 14); }
+.settings-studio .settings-content h2 { margin: 26px 0 16px; font-size: calc(var(--ui-font-size, 14px) * 15 / 14); line-height: 1.5; }
+.settings-studio .settings-content h3 { margin: 18px 0 12px; font-size: calc(var(--ui-font-size, 14px) * 14 / 14); }
+.settings-studio .settings-content p { font-size: calc(var(--ui-font-size, 14px) * 13 / 14); line-height: 1.65; overflow-wrap: anywhere; }
+.settings-studio .settings-content label { font-size: calc(var(--ui-font-size, 14px) * 13 / 14); line-height: 1.5; }
+.settings-studio .settings-content :is(input:not([type='checkbox']):not([type='range']), select) {
+  min-height: var(--settings-control); height: var(--settings-control); padding: 7px 11px;
+  font-size: calc(var(--ui-font-size, 14px) * 13 / 14); border-radius: 7px; background: var(--bg); max-width: 100%;
+}
+.settings-studio .settings-content textarea { border-radius: 7px; font: inherit; padding: 10px 12px; min-height: 90px; max-width: 100%; }
+.settings-studio .settings-content input[type='number'] { max-width: 132px; font-variant-numeric: tabular-nums; }
+.settings-studio .settings-content input[type='checkbox'] { width: 16px; height: 16px; flex-shrink: 0; accent-color: var(--accent); margin: 2px 0; }
+.settings-studio .settings-content label:has(> input[type='checkbox']) {
+  display: flex; flex-direction: row; align-items: flex-start; gap: 10px;
+  padding: 9px 0; margin: 0; min-width: 0;
+}
+.settings-studio .settings-content button:not(.icon) { min-height: 34px; padding: 7px 12px; font-size: calc(var(--ui-font-size, 14px) * 13 / 14); border-radius: 7px; line-height: 1.4; }
+.settings-studio .settings-content button.secondary { border: 1px solid var(--border); background: var(--bg); }
+.settings-studio .settings-content button.secondary:hover { background: var(--hover); }
+.settings-studio .settings-content :is(button,input,select,textarea,summary):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.settings-studio .settings-content .form-grid { gap: 20px 28px; margin: 0 0 24px; grid-template-columns: repeat(2,minmax(0,1fr)); }
+.settings-studio .settings-content .form-grid > label { display: flex; flex-direction: column; gap: 8px; }
+.settings-studio .settings-content .form-grid > label:has(input[type='number']) { flex-direction: row; justify-content: space-between; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.settings-studio .settings-content .form-grid > label input[type='number'] { width: 88px; max-width: 88px; flex: 0 0 88px; }
+.settings-studio .settings-theme-row { padding-bottom: 24px; border-bottom: 1px solid var(--border); }
+.settings-studio .font-grid > div:not([hidden]) { max-width: none; }
+.settings-studio .font-picker { border: 0; padding: 0; background: transparent; box-shadow: none; }
+.settings-studio .font-picker .font-preview { background: var(--panel); border: 0; border-radius: 10px; padding: 20px; margin-top: 16px; }
+.settings-studio .settings-terminal-options { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px 24px; }
+.settings-studio .settings-terminal-options > label:has(input[type='checkbox']) { grid-column: 1/-1; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.settings-studio .settings-terminal-options > button { justify-self: start; grid-column: 1/-1; }
+.settings-studio .background-picker { background: var(--panel); border-radius: 10px; padding: 20px; }
+.settings-studio .background-actions { flex-wrap: wrap; gap: 12px; }
+.settings-studio .background-controls { gap: 20px; margin-top: 20px; }
+.settings-studio .settings-savebar { padding: 12px 28px; min-height: 62px; background: var(--terminal); gap: 10px; }
+.settings-studio .settings-savebar > button { min-height: 36px; padding: 7px 22px; border-radius: 7px; font-size: calc(var(--ui-font-size, 14px) * 13 / 14); }
+.settings-studio .settings-savebar > span { font-size: calc(var(--ui-font-size, 14px) * 12 / 14); line-height: 1.5; }
+.settings-studio .settings-content details { border: 0; border-top: 1px solid var(--border); padding: 0; margin: 16px 0 0; border-radius: 0; background: transparent; }
+.settings-studio .settings-content details > summary { padding: 16px 2px; min-height: 48px; cursor: pointer; font-size: calc(var(--ui-font-size, 14px) * 13 / 14); font-weight: 550; }
+.settings-studio .settings-content details[open] > summary { color: var(--accent); margin-bottom: 8px; }
+.settings-studio .mcp-settings > fieldset { display: block; margin: 0; padding: 0; min-width: 0; }
+.settings-studio .mcp-settings > fieldset > label:not(:has(input[type='checkbox'])) { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(120px, 280px); align-items: center; gap: 16px; margin: 16px 0; }
+.settings-studio .mcp-global-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-radius: 9px; background: color-mix(in srgb,var(--accent) 6%,var(--bg)); }
+.settings-studio .mcp-global-actions > button { border: 1px solid color-mix(in srgb,var(--accent) 25%,var(--border)); background: var(--bg); color: var(--accent); }
+.settings-studio .settings-content .mcp-global-help { margin: 0 0 18px; border: 0; }
+.settings-studio .settings-content .mcp-global-help > summary { font-size: calc(var(--ui-font-size, 14px) * 12 / 14); color: var(--muted); font-weight: 400; padding: 10px 2px; min-height: 0; }
+.settings-studio .mcp-profiles { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,230px),1fr)); gap: 4px 18px; padding: 10px 14px; background: var(--panel); border-radius: 9px; max-height: 280px; overflow: auto; }
+.settings-studio .mcp-profiles label.checkbox { align-items: center; padding: 10px 0; overflow-wrap: anywhere; }
+.settings-studio .mcp-profile-copy { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
+.settings-studio .mcp-profile-copy strong { font-weight: 500; }
+.settings-studio .mcp-profile-copy small { font-size: calc(var(--ui-font-size, 14px) * 11 / 14); color: var(--muted); }
+.settings-studio .capability-selection:not(.mcp-global-actions) { gap: 8px; flex-wrap: wrap; padding: 8px 0; background: transparent; }
+.settings-studio .mcp-settings code { display: inline-block; overflow-wrap: anywhere; padding: 7px 10px; border-radius: 6px; background: var(--panel); font-size: calc(var(--ui-font-size, 14px) * 12 / 14); }
+.settings-studio .mcp-settings p:has(code) { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.settings-studio .settings-extension-entry { padding: 24px 0; }
+.settings-studio .settings-extension-entry > svg { width: 32px; height: 32px; color: var(--accent); }
+.settings-studio .network-settings { max-width: none; padding: 0; }
+.settings-studio .network-heading { margin-bottom: 20px; }
+.settings-studio .network-heading h2 { margin-top: 0; }
+.settings-studio .network-modes { border: 0; padding: 4px; gap: 4px; background: var(--panel); border-radius: 9px; }
+.settings-studio .network-modes button[aria-pressed=true] { color: var(--accent); background: var(--bg); box-shadow: 0 1px 4px #0000000d; }
+.settings-studio .network-path { padding: 16px; border-radius: 8px; background: var(--panel); margin: 16px 0; }
+.settings-studio .network-note { margin-top: 14px; }
+.settings-studio .network-actions { border-top: 1px solid var(--border); padding-top: 18px; }
+.settings-studio .local-env-row { display: grid; grid-template-columns: minmax(100px,1fr) minmax(140px,2fr) 32px; gap: 8px; margin: 10px 0; }
+.settings-studio .local-env-actions { flex-wrap: wrap; padding: 16px 0; }
+.settings-studio .local-env-inherited dd { overflow-wrap: anywhere; }
+.settings-studio .update-settings > h2 { display: flex; gap: 12px; align-items: center; margin: 0 0 20px; }
+.settings-studio .update-version { font-size: calc(var(--ui-font-size, 14px) * 12 / 14); border: 0; border-radius: 5px; background: var(--panel); padding: 4px 8px; color: var(--muted); }
+.settings-studio .update-settings > p[role='status'] { background: var(--panel); padding: 16px 18px; border-radius: 9px; font-size: calc(var(--ui-font-size, 14px) * 14 / 14); }
+.settings-studio .update-settings .form-actions { justify-content: flex-start; gap: 10px; flex-wrap: wrap; margin: 20px 0; }
+.settings-studio .update-settings > .settings-section { border-top: 1px solid var(--border); margin-top: 28px; padding-top: 20px; }
+.settings-studio .settings-content progress { width: 100%; height: 6px; border: 0; accent-color: var(--accent); }
+.settings-studio .settings-content .account-page-content { margin: 0; max-width: 760px; padding: 0; }
+.settings-studio .account-page-content.signed-out { padding: 18px 0; }
+.settings-studio .account-page-content .auth-content { margin: 0; max-width: 420px; padding: 0; }
+.settings-studio .account-page-heading { display: none; }
+.settings-studio .account-section { padding: 20px 0; }
+.settings-studio .account-detail-row { gap: 16px; flex-wrap: wrap; }
+.settings-studio .account-detail-row > strong { overflow-wrap: anywhere; }
+@container category-workspace (max-width: 720px) {
+  .workspace-category-container .settings-studio { grid-template-columns: minmax(0,1fr); grid-template-rows: auto minmax(0,1fr) auto; }
+  .settings-studio .settings-nav { padding: 10px 12px; gap: 6px; }
+  .settings-studio .settings-nav > button { min-height: 36px; width: auto; padding: 8px 12px; margin: 0; }
+  .settings-studio .settings-nav > button[aria-current='page'] { box-shadow: inset 0 -2px var(--accent); }
+  .settings-studio .settings-search { width: 160px; flex: 0 0 160px; margin: 0 6px 0 0; }
+  .settings-studio .settings-content { padding: 24px 20px; }
+  .settings-studio .settings-savebar { grid-column: 1; padding: 12px 20px; }
+  .settings-studio .settings-category-heading { margin-bottom: 24px; }
+}
+@container category-workspace (max-width: 460px) {
+  .settings-studio .settings-content { padding: 20px 16px; }
+  .settings-studio .settings-content .form-grid, .settings-studio .settings-terminal-options { grid-template-columns: minmax(0,1fr); }
+  .settings-studio .mcp-settings > fieldset > label:not(:has(input[type='checkbox'])) { grid-template-columns: minmax(0,1fr); gap: 8px; }
+  .settings-studio .local-env-row { grid-template-columns: minmax(0,1fr) 32px; }
+  .settings-studio .local-env-row > input:nth-child(2) { grid-column: 1; grid-row: 2; }
+  .settings-studio .local-env-row > button { grid-column: 2; grid-row: 1/3; }
+  .settings-studio .settings-savebar { padding: 10px 16px; }
+  .settings-studio .settings-category-heading h1 { font-size: calc(var(--ui-font-size, 14px) * 22 / 14); }
+}
