@@ -1,3 +1,4 @@
+import { requestUpdateWithFallback } from '../shared/update-source-fallback';
 import {agentDownloads,type AgentDownload} from '../shared/agent-downloads';
 import { isPro } from '../shared/edition';
 import { app, shell, net, type BrowserWindow } from 'electron';
@@ -29,14 +30,14 @@ export function registerUpdateHandlers(
     busy = false, queued = false;
   const request = async (url: string, timeout = 30000) => {
     // Follow the OS proxy configuration, like the user's browser.
-    const response = await net.fetch(url, {
+    const response = await requestUpdateWithFallback(url, candidate => net.fetch(candidate, {
       headers: {
         'User-Agent': 'CShell/' + app.getVersion(),
         Accept: 'application/json',
       },
       signal: AbortSignal.timeout(timeout),
-      redirect: 'error',
-    });
+      redirect: 'manual',
+    }));
     if (!response.ok) throw new Error('香港更新服务 HTTP ' + response.status);
     return response;
   };
