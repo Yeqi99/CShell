@@ -1,0 +1,19 @@
+{
+  "at": "2026-10-31T15:06:00.057Z",
+  "check": {
+    "current": "0.8.16",
+    "available": true,
+    "version": "0.8.17"
+  },
+  "phase": "ready",
+  "size": 25587138,
+  "sha256": "6f41a6d5cc1fecd01ea5a053485fcc3e9021f1a35e2d3aa041d6f7a0574ed9bd",
+  "elapsedMs": 2534,
+  "progressSamples": [
+    "0 B / 24.4 MiB",
+    "79.7 KiB / 24.4 MiB",
+    "5.9 MiB / 24.4 MiB",
+    "14.5 MiB / 24.4 MiB"
+  ],
+  "installed": false
+}
