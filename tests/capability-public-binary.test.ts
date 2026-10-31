@@ -52,3 +52,11 @@ test('large downloads have a bounded size-aware deadline and stalled custom stre
  await assert.rejects(pending,/cancel test/);assert.equal(cancelled,true);
 });
 
+
+test('native binary base64 validation remains bounded without recursive regexp stacks',async()=>{
+ const {validCapabilityBase64}=await import('../src/agent/capability-installer');
+ const large=Buffer.alloc(32*1024*1024,91).toString('base64');
+ assert.equal(validCapabilityBase64(large),true);
+ for(const bad of ['A===','====','AA=A','AAA','AA\n=','AA-=',large.slice(0,-4)+'!!!!'])assert.equal(validCapabilityBase64(bad),false);
+ for(const good of ['', 'AA==','AAA=','AAAA'])assert.equal(validCapabilityBase64(good),true);
+});
