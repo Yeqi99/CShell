@@ -9,7 +9,7 @@ import { capabilityDigest, type CapabilityCatalogEntry } from '../src/agent/capa
 
 function entry(){const manifest=buildManagedWechatManifest({wechatVersion:'4.1.15.56',version:'0.1.0',methods:['status','send','contacts'],source:{repository:'https://github.com/Yeqi99/CShell',releaseTag:'toolkit-test',assetUrl:'https://github.com/Yeqi99/CShell/releases/download/toolkit-test/toolkit.json'},files:[{path:'WeixinToolkit.exe',bytes:4,sha256:capabilityDigest('test')}]});const manifestJson=JSON.stringify(manifest);return{manifest,entry:{id:manifest.id,name:manifest.name,description:manifest.description,version:manifest.version,permissions:manifest.permissions,source:'github',url:manifest.source.assetUrl,manifestJson,manifestSha256:capabilityDigest(manifestJson),bundleSha256:capabilityDigest('test'),bundleBytes:4} satisfies CapabilityCatalogEntry};}
 test('manifest separates reads, sends, and API grants and settings never infer broad targets',()=>{
- const {manifest}=entry();assert.equal(manifest.tools.find(x=>x.id==='wechat_send')?.sideEffect,true);assert.equal(manifest.tools.find(x=>x.id==='wechat_contacts')?.sideEffect,false);assert.deepEqual(manifest.tools.find(x=>x.id==='wechat_contacts')?.permissions,['wechat.api','wechat.contacts.read']);assert.deepEqual(managedWechatConfigureSchema.parse({}).sendTargets,[]);assert.throws(()=>managedWechatConfigureSchema.parse({subscriptionEnabled:true}));
+ const {manifest}=entry();assert.equal(manifest.compatibility.agentVersion.min,'0.8.17');assert.equal(manifest.tools.find(x=>x.id==='wechat_send')?.sideEffect,true);assert.equal(manifest.tools.find(x=>x.id==='wechat_contacts')?.sideEffect,false);assert.deepEqual(manifest.tools.find(x=>x.id==='wechat_contacts')?.permissions,['wechat.api','wechat.contacts.read']);assert.deepEqual(managedWechatConfigureSchema.parse({}).sendTargets,[]);assert.throws(()=>managedWechatConfigureSchema.parse({subscriptionEnabled:true}));
 });
 test('factory persists encrypted ownership before submissions; cross-owner queries, conflicts and unknown replay are refused',async()=>{
  const directory=await mkdtemp(join(tmpdir(),'wechat-factory-')),storage=new Map<string,unknown>();let submits=0,stops=0,fail=false;
@@ -42,3 +42,16 @@ test('explicit configuration and granted filehelper scope precede validation wit
   serviceFactory:()=>({verify:async()=>{},start:async()=>{starts++;},stop:async()=>{},health:async()=>({}),capabilities:async()=>({}),submit:async()=>({}),operation:async()=>({})})});
  try{await f.adapter.inspect(directory);await f.configure({apiEnabled:true,receiveTargets:['filehelper']});await assert.rejects(f.validate(),/requires/);granted=['wechat.api','wechat.events.read'];assert.deepEqual(await f.validate(),{validated:true});assert.equal(starts,1);assert.equal((await f.adapter.inspect(directory)).configured,true);}finally{await f.shutdown();await rm(directory,{recursive:true,force:true});}
 });
+
+
+test('callback event normalization maps explicit direction, retains explicit ownership and real conversation IDs',async()=>{
+  const {managedWechatEventData}=await import('../src/agent/managed-wechat-capability');
+  assert.deepEqual(managedWechatEventData({direction:'incoming',conversationId:'room'}),{direction:'incoming',conversationId:'room',isSelf:false});
+  assert.equal(managedWechatEventData({direction:'outgoing'}).isSelf,true);
+  assert.equal(managedWechatEventData({direction:'incoming',isSelf:true}).isSelf,true);
+  assert.equal(managedWechatEventData({direction:'outgoing',isSelf:false}).isSelf,false);
+  for(const input of [{},{direction:'unknown'},{direction:'Incoming'},{isSelf:'false'}])assert.equal(Object.hasOwn(managedWechatEventData(input),'isSelf'),false);
+  assert.equal(Object.hasOwn(managedWechatEventData({token:'secret',conversation:'wrong'}),'token'),false);
+  assert.equal(managedWechatEventData({text:'x'.repeat(1300)}).text?.toString().length,1200);
+});
+
