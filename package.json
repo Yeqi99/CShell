@@ -97,6 +97,7 @@
       "signExecutable": false
     },
     "nsis": {
+      "include": "scripts/windows-deployment/installer-update-page.nsh",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "perMachine": false

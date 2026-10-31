@@ -22,13 +22,35 @@ VIAddVersionKey "ProductName" "CAgent"
 VIAddVersionKey "FileDescription" "CAgent Installer"
 VIAddVersionKey "FileVersion" "${manifest.version}"
 VIAddVersionKey "LegalCopyright" "MIT - CAgent contributors"
+!define VERSION "${manifest.version}"
+!define PRODUCT_NAME "CAgent"
+!define CAGENT_INSTALLER
+!include "${quote(resolve('scripts/windows-deployment/installer-update-page.nsh'))}"
 !define MUI_ABORTWARNING
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY
+Page custom ShowInstallSummary
 !insertmacro MUI_PAGE_INSTFILES
 !define MUI_FINISHPAGE_TEXT "CAgent 已安装。若旧版正在运行，请正常退出后从开始菜单打开新版。远程桌面组件已随程序提供，访问权限需在应用内配置。"
 !insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_LANGUAGE "SimpChinese"
+Function .onInit
+  InitPluginsDir
+  SetOutPath "$PLUGINSDIR"
+  File /oname=Find-CAgent.ps1 "${quote(resolve('scripts/windows-deployment/Find-CAgent.ps1'))}"
+  \${GetParameters} $0
+  ClearErrors
+  \${GetOptions} $0 "/D=" $1
+  IfErrors 0 done
+  StrCmp $INSTDIR "$LOCALAPPDATA\\Programs\\CAgent" 0 done
+  nsExec::ExecToStack '\"$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe\" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"$PLUGINSDIR\\Find-CAgent.ps1\"'
+  Pop $0
+  Pop $1
+  StrCmp $0 "0" 0 done
+  StrCmp $1 "" done
+  StrCpy $INSTDIR $1
+  done:
+FunctionEnd
 Section "Install"
   InitPluginsDir
   SetOutPath "$PLUGINSDIR\\deployment"
