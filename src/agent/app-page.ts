@@ -78,7 +78,7 @@ $('install-app-update').onclick=action(async()=>{
  const button=$('install-app-update');button.disabled=true;
  try{
   await api('update.download');let status;
-  do{status=await api('update.status');$('app-update-status').textContent='下载并校验：'+(status.bytes||0)+' / '+(status.total||0)+' 字节';if(status.phase==='downloading')await new Promise(r=>setTimeout(r,700));}while(status.phase==='downloading');
+  do{status=await api('update.status');$('app-update-status').textContent='下载并校验：'+(status.progressText||'正在读取下载进度…');if(status.phase==='downloading')await new Promise(r=>setTimeout(r,700));}while(status.phase==='downloading');
   if(status.phase!=='ready')throw Error(status.error||'下载未完成');
   const result=await api('update.install',{confirm:true});$('app-update-status').textContent=result.message||'更新已准备，将在当前任务结束并空闲后自动完成。';
  }finally{button.disabled=false;}

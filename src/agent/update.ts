@@ -6,6 +6,7 @@ import {mkdir,writeFile,rename,rm,readFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {createHash} from 'node:crypto';
 import {trustedDownload} from '../shared/download-source';
+import {formatUpdateProgress} from '../shared/update-progress';
 export function newer(a:string,b:string){const x=a.split('.').map(Number),y=b.split('.').map(Number);for(let i=0;i<3;i++){if(x[i]!==y[i])return x[i]>y[i];}return false;}
 export function selectUpdate(releases:any[],current:string,arch:string,platform:NodeJS.Platform='win32'){
  return releases.filter(r=>!r.draft).flatMap(r=>(r.assets??[]).flatMap((a:any)=>{
@@ -59,7 +60,7 @@ export class AgentUpdater{
   }
   return prepareAgentReplacement(this.verified!.path,this.state.version,this.directory,identity);
  }
- status(){return {...this.state,automatic:this.automatic};}
+ status(){return {...this.state,automatic:this.automatic,progressText:formatUpdateProgress(this.state.bytes,this.state.total)};}
  async verify(){if(this.state.phase!=='ready'||!this.verified||createHash('sha256').update(await readFile(this.verified.path)).digest('hex')!==this.verified.digest)throw Error('更新文件已改变，请重新下载');return this.status();}
  start(){this.assertOpen();if(this.state.phase==='downloading')return this.state;if(!this.candidate)throw new Error('请先检查可用更新');const c=this.candidate;this.state={phase:'downloading',bytes:0,total:c.size};void this.download(c).catch(e=>{if(!this.lifetime.signal.aborted)this.state={phase:'failed',error:e.message};});return this.state;}
  private async download(c:NonNullable<typeof this.candidate>){
