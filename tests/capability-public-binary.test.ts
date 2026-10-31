@@ -36,3 +36,19 @@ test('native adapter rejects altered remote declaration and source before downlo
  assert.throws(()=>make(raw,'https://example.com/a.json'),/source mismatch/);
 });
 
+
+test('large downloads have a bounded size-aware deadline and stalled custom streams cancel',async()=>{
+ const {capabilityDownloadTimeout}=await import('../src/agent/capability-installer');
+ assert.equal(capabilityDownloadTimeout(256*1024*1024),600000);
+ assert.ok(capabilityDownloadTimeout(249850335)>500000);
+ assert.ok(capabilityDownloadTimeout(100)<=121000);
+ const base=capabilityCatalog()[0],controller=new AbortController();let cancelled=false;
+ const remote={...base,source:'github' as const,bundle:undefined,url:JSON.parse(JSON.parse(base.bundle!).manifest).source.assetUrl};
+ const pending=stageCapabilityBundle(tmpdir(),remote,controller.signal,(async(_url,init)=>{
+  assert.equal(init?.headers,undefined);assert.equal(init?.redirect,'manual');
+  setTimeout(()=>controller.abort(new Error('cancel test')),10);
+  return new Response(new ReadableStream({cancel(){cancelled=true;}}));
+ }) as typeof fetch);
+ await assert.rejects(pending,/cancel test/);assert.equal(cancelled,true);
+});
+

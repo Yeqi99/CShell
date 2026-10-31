@@ -1,17 +1,20 @@
 import { mkdir, mkdtemp, rm, writeFile, realpath } from 'node:fs/promises';
 import { dirname, join, relative, isAbsolute } from 'node:path';
 import { z } from 'zod';
+import { updateRequest } from './update-request';
 import { capabilityDigest, type CapabilityCatalogEntry } from './capability-catalog';
 import { parseCapabilityManifest, verifyCapabilityFiles } from './capability-packages';
 
 const bundleSchema=z.object({protocol:z.literal(1),manifest:z.string().max(1024*1024),files:z.record(z.string(),z.string())}).strict();
 export const capabilityInstallInput=z.object({id:z.string().min(1).max(100),confirm:z.literal(true)}).strict();
 /** Only caller-selected trusted catalog entries. No arbitrary URLs, scripts, archives or decompression. */
-export async function stageCapabilityBundle(root:string,entry:CapabilityCatalogEntry,signal:AbortSignal,fetcher:typeof fetch=fetch){
-  signal=AbortSignal.any([signal,AbortSignal.timeout(120000)]);
+export function capabilityDownloadTimeout(bytes:number){return Math.min(600000,Math.max(120000,Math.ceil(bytes/(512*1024))*1000+120000));}
+export async function stageCapabilityBundle(root:string,entry:CapabilityCatalogEntry,signal:AbortSignal,fetcher?:typeof fetch){
   signal.throwIfAborted();
   const budget=entry.maxBundleBytes??64*1024*1024;
   if(!Number.isSafeInteger(budget)||budget<1||budget>256*1024*1024||!Number.isSafeInteger(entry.bundleBytes)||entry.bundleBytes<1||entry.bundleBytes>budget)throw new Error('Package exceeds download budget');
+  signal=AbortSignal.any([signal,AbortSignal.timeout(capabilityDownloadTimeout(entry.bundleBytes))]);
+  const download=fetcher??((async(url,init)=>updateRequest(String(url),{signal:init!.signal!})) as typeof fetch);
   let bytes:Buffer;
   if(entry.source==='bundled'){
     if(entry.bundle===undefined)throw new Error('Bundled package missing');bytes=Buffer.from(entry.bundle);
@@ -19,17 +22,18 @@ export async function stageCapabilityBundle(root:string,entry:CapabilityCatalogE
     const url=new URL(entry.url??'');
     if(url.protocol!=='https:'||url.hostname!=='github.com'||url.username||url.password||url.search||url.hash||!/^\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/releases\/download\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(url.pathname))throw new Error('Expected trusted GitHub release asset');
     // GitHub's signed asset redirect is explicitly constrained; credentials are never forwarded.
-    let response=await fetcher(url,{signal,redirect:'manual'});
+    let response=await download(url,{signal,redirect:'manual'});
     if([301,302,303,307,308].includes(response.status)){
       const next=new URL(response.headers.get('location')??'',url);await response.body?.cancel();
       if(next.protocol!=='https:'||next.hostname!=='release-assets.githubusercontent.com'||next.username||next.password)throw new Error('Unexpected GitHub asset redirect');
-      response=await fetcher(next,{signal,redirect:'error'});
+      response=await download(next,{signal,redirect:'error'});
     }
     if(!response.ok||!response.body)throw new Error(`Package download failed: ${response.status}`);
     const length=response.headers.get('content-length');if(length&&Number(length)!==entry.bundleBytes){await response.body.cancel();throw new Error('Package download size mismatch');}
     const reader=response.body.getReader(),chunks:Uint8Array[]=[];let size=0;
-    try{while(true){signal.throwIfAborted();const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>entry.bundleBytes)throw new Error('Package download exceeds declared size');chunks.push(value);}bytes=Buffer.concat(chunks);}
-    catch(error){await reader.cancel().catch(()=>{});throw error;}finally{reader.releaseLock();}
+    const cancel=()=>{void reader.cancel(signal.reason).catch(()=>{});};signal.addEventListener('abort',cancel,{once:true});
+    try{while(true){signal.throwIfAborted();const {done,value}=await reader.read();signal.throwIfAborted();if(done)break;size+=value.byteLength;if(size>entry.bundleBytes)throw new Error('Package download exceeds declared size');chunks.push(value);}bytes=Buffer.concat(chunks);}
+    catch(error){await reader.cancel().catch(()=>{});throw error;}finally{signal.removeEventListener('abort',cancel);reader.releaseLock();}
   }
   if(bytes.byteLength!==entry.bundleBytes||capabilityDigest(bytes)!==entry.bundleSha256)throw new Error('Package bundle digest or size mismatch');
   const bundle=bundleSchema.parse(JSON.parse(bytes.toString('utf8'))),manifest=parseCapabilityManifest(bundle.manifest,entry.manifestSha256);
