@@ -31,6 +31,8 @@ import { AgentReverseRelayService } from './relay-reverse';
 import { hostingConfigSchema } from '../shared/agent-hosting';
 import { AgentApplicationService } from './applications';
 import { CagentAutomation } from './automation';
+import { createManagedWechatCapability } from './managed-wechat-capability';
+import { managedWechatCatalog } from './managed-wechat-catalog';
 import { CagentAssistant } from './assistant';
 import { CapabilityRuntime } from './capability-runtime';
 import { createDesktopCapability } from './desktop-capability';
@@ -132,10 +134,16 @@ export async function createAgentRuntime(
   await applications.load();
   const desktopIdentity=server.status().deviceId;
   const desktop=await createDesktopCapability({identity:desktopIdentity,nativeExecutable:options.desktopExecutable??join(dirname(resolve(process.argv[1]??process.execPath)),'cagent-desktop.exe'),vault,authorize:owner=>!updateAdmissionClosed&&server.status().deviceId===desktopIdentity&&(owner==='local'||server.managementAllowed(owner))});
+  let automation:CagentAutomation;
+  const managedWechat=await Promise.all(managedWechatCatalog.map(entry=>createManagedWechatCapability({entry,directory,vault,getGrants:()=>packages.list().find(p=>p.id===entry.id)?.grants??[],authorize:owner=>!updateAdmissionClosed&&(owner==='local'||server.managementAllowed(owner)),onEvent:async(source,type,id,payload)=>{
+    if(!automation)throw Error('自动化仍在启动，请稍后重试事件');
+    if(source!=='extension.wechat'||!['message.received','payment.transfer','payment.red_packet','subscription.gap','operation.completed'].includes(type))throw Error('未知扩展事件');
+    return automation.emit(source,type,id,payload);
+  }})));
   const privateWechat=await loadPrivateWechat();
   const wechat=privateWechat ? await privateWechat.module.createWechatCapability({directory,runtime:privateWechat.runtime,authorize:owner=>owner==='local'||server.managementAllowed(owner)}) : undefined;
   const customProcesses=await loadProcessExtensions(undefined,id=>process.stderr.write(`CAgent: custom extension ${id} failed verification; reinstall its package.\n`));
-  const packages=new CapabilityRuntime({directory,vault,applications,agentVersion,extraPackages:[...desktop.extraPackages,...(wechat?.extraPackages??[]),...customProcesses,...options.extraPackages??[]]});
+  const packages=new CapabilityRuntime({directory,vault,applications,agentVersion,extraPackages:[...desktop.extraPackages,...managedWechat,...(wechat?.extraPackages??[]),...customProcesses,...options.extraPackages??[]]});
   await packages.load();
   const processProvisioned=await vault.read('process-provisioned',z.record(z.string(),z.string()))??{};
   for(const pack of customProcesses){
@@ -170,7 +178,6 @@ export async function createAgentRuntime(
     if(previous.passwordConfigured&&previous.bind&&previous.port)try{await server.start({bind:previous.bind,port:previous.port,advertisedHost:previous.advertisedHost,advertisedPort:previous.advertisedPort});}catch{listenerStartupError='连接服务未启动，请检查本机地址和端口';}
   }
   const lanRegistration=await createLanRegistration({vault,status:()=>server.status(),version:agentVersion});
-  let automation:CagentAutomation;
   const assistant=new CagentAssistant(vault,{shells,applications:owner=>applications.list(owner),execute:(input,signal,owner,output)=>{
     if(owner!=='local'){
       const status=server.status(),peer=status.peers.find(p=>p.fingerprint===owner);
@@ -335,6 +342,18 @@ export async function createAgentRuntime(
       if(!local&&(owner==='local'||!server.managementAllowed(owner)))throw new Error('未授权控制端管理远程桌面');
       if(server.status().deviceId!==desktopIdentity)throw new Error('设备身份已迁移，请重启 cagent 后使用远程桌面');
       return desktop.dispatch(method,params,owner,admin);
+    }
+    if(method.startsWith('managedWechat.')){
+      if(!local)throw Error('微信服务配置需在受控端本机操作');
+      const input=z.object({id:z.string(),settings:z.unknown().optional(),pid:z.number().int().positive().optional()}).strict().parse(params);
+      const pack=managedWechat.find(p=>p.entry.id===input.id);if(!pack)throw Error('没有此已验证微信能力包');
+      if(method==='managedWechat.status')return pack.status();
+      if(!packages.list().some(p=>p.id===input.id))throw Error('请先安装此能力包');
+      if(method==='managedWechat.processes')return pack.processes();
+      if(method==='managedWechat.configure'){const result=await pack.configure(input.settings);await packages.refresh({id:input.id});return result;}
+      if(method==='managedWechat.bind'){if(!input.pid)throw Error('请选择实际微信进程');const result=await pack.bind(input.pid);await packages.refresh({id:input.id});return result;}
+      if(method==='managedWechat.validate'){if(!input.pid)throw Error('请选择实际微信进程');const result=await pack.validate(input.pid);await packages.refresh({id:input.id});return result;}
+      throw Error('未知微信配置操作');
     }
     if(method.startsWith('wechat.')){
       if(!wechat)throw new Error('请先导入微信自定义扩展并重新启动 CAgent');
@@ -630,7 +649,7 @@ export async function createAgentRuntime(
     // A failed optional service must not leave the authenticated control socket
     // or listener half alive when an update needs to restore the old runtime.
     for(const stop of [()=>lanRegistration.close(),()=>visual.dispose(),()=>files.close(),()=>accountNetwork.close(),()=>account.close(),()=>accountReverse.stop(),()=>browserNetwork.close(),()=>coding.close(),()=>ide.close(),
-      ()=>managedScripts.close(),()=>automation.close(),()=>assistant.close(),()=>control?.close(),()=>mutation,()=>packages.dispose(),()=>wechat?.shutdown(),()=>desktop.shutdown(),
+      ()=>managedScripts.close(),()=>automation.close(),()=>assistant.close(),()=>control?.close(),()=>mutation,()=>packages.dispose(),...managedWechat.map(pack=>()=>pack.shutdown()),()=>wechat?.shutdown(),()=>desktop.shutdown(),
       ()=>applications.dispose(),()=>wsl.dispose(),()=>hosting.dispose(),()=>reverseRelay.stop(),()=>relay.stop(),()=>server.stop(),
       ()=>terminal.dispose(),()=>vault.flush(),()=>options.onClose?.()])try{await stop();}catch(error){failures.push(error);}
     if(failures.length)throw new AggregateError(failures,'部分后台服务清理失败');
@@ -653,3 +672,4 @@ export async function createAgentRuntime(
   };
 }
 import { probeNetwork } from '../core/network-probe';
+

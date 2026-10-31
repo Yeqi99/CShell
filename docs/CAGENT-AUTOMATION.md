@@ -25,3 +25,25 @@
 ## 验证范围
 
 单元回归覆盖持久化预约、重启未知状态、作用域、撤权、审核、保存故障、重复事件、连续事件排队、重启保留等待项、队列容量/过期、字段筛选、暂停撤权清理及取消。实际本机 HTTP 页面在 1000 和 360 像素宽度完成新建、启用、暂停、无横向溢出和无脚本异常验证；UI 使用隔离模拟 vault/能力，不代表真实第三方扩展端到端已验收。
+
+## 受管扩展入口
+
+已安装且有真实校验目录的微信版本包在市场详情提供本机 API 配置、显式进程选择、绑定及验证。API 默认关闭，监听仅本机回环；业务范围设置和工具能力授权取交集。验证要求用户明确授权 API、事件读取及 filehelper 接收范围，不自动填写或放开范围。
+
+扩展的可信回调桥将已验证事件交给通用自动化，固定来源 `extension.wechat`；正文仍标记不可信。只保留有限身份/会话/方向字段和有界文本摘要。原始事件明确提供 `isSelf` 布尔值时才保留，缺少时不会推断。市场详情可跳转通用任务页，不把订阅与定时任务写死为某个业务。
+
+公开目录未包含已构建且核验的对应包时，不显示安装入口。绑定、版本隔离、验证失败或权限不足都不应显示业务能力可用。配置 UI 的隔离模拟验收不等于真实微信消息收发验收。
+
+## CLI
+
+现有 `cagent call METHOD` 从标准输入读取 JSON，经本机认证控制通道调用同一后端，不需要另一套微信 CLI 实现。例如 PowerShell：
+
+```powershell
+'{"id":"cagent.wechat.v411556"}' | cagent call managedWechat.status
+'{"id":"cagent.wechat.v411556"}' | cagent call managedWechat.processes
+'{"id":"cagent.wechat.v411556","pid":1234}' | cagent call managedWechat.bind
+'{"id":"cagent.wechat.v411556","pid":1234}' | cagent call managedWechat.validate
+'{}' | cagent call automation.list
+```
+
+PID 必须替换为进程列表中明确选择的真实 PID。`managedWechat.configure` 接受 `{id,settings}` 完整设置对象，服务端严格校验；配置结果不包含 API token。自动化还支持 `automation.create` 和 `automation.change`，与页面执行同一授权、持久化和取消路径。
