@@ -1,0 +1,33 @@
+{
+  "checkedAt": "2026-10-31T08:34:34.252Z",
+  "results": [
+    {
+      "path": "/downloads/opensource/v0.8.16/SHA256SUMS.txt",
+      "status": 200,
+      "bytes": 1442,
+      "noClientRedirect": true,
+      "sha256Verified": true
+    },
+    {
+      "path": "/downloads/opensource/v0.8.16/CAgent-Setup-0.8.16-win-x64.exe",
+      "status": 206,
+      "bytes": 1024,
+      "noClientRedirect": true,
+      "sha256Verified": false
+    },
+    {
+      "path": "/downloads/pro/v0.8.16/SHA256SUMS.txt",
+      "status": 200,
+      "bytes": 1283,
+      "noClientRedirect": true,
+      "sha256Verified": true
+    },
+    {
+      "path": "/downloads/pro/v0.8.16/CAgent-Setup-0.8.16-win-x64.exe",
+      "status": 206,
+      "bytes": 1024,
+      "noClientRedirect": true,
+      "sha256Verified": false
+    }
+  ]
+}
