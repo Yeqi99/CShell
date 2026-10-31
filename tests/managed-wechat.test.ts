@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash, createHmac } from 'node:crypto';
 import { createServer } from 'node:http';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, writeFile, rm, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { EventEmitter } from 'node:events';
@@ -10,7 +10,7 @@ import type { ChildProcess } from 'node:child_process';
 import { ManagedWechatService, ManagedWechatCallbacks } from '../src/agent/managed-wechat';
 
 test('managed service verifies package, uses loopback Bearer, does not replay writes, and stops only its own executable',async()=>{
-  const root=await mkdtemp(join(tmpdir(),'managed-wechat-'));const token='s'.repeat(40);const calls:unknown[]=[];let authorized=true;
+  const root=await realpath(await mkdtemp(join(tmpdir(),'managed-wechat-')));const token='s'.repeat(40);const calls:unknown[]=[];let authorized=true;
   const server=createServer(async(req,res)=>{assert.equal(req.headers.authorization,'Bearer '+token);let text='';for await(const b of req)text+=b;calls.push({path:req.url,body:text?JSON.parse(text):undefined});res.writeHead(req.method==='POST'?202:200,{'Content-Type':'application/json'});res.end(JSON.stringify({id:'a'.repeat(32),version:'verified'}));});
   await new Promise<void>(r=>server.listen(0,'127.0.0.1',r));const address=server.address();assert(address&&typeof address!=='string');await new Promise<void>(r=>server.close(()=>r()));
   const executable=join(root,'WeixinToolkit.exe'),configPath=join(root,'config.json');await writeFile(executable,'verified binary');await writeFile(configPath,JSON.stringify({host:'127.0.0.1',port:address.port,apiToken:token,dataDir:root,permissions:{enabled:true}}));
@@ -44,7 +44,7 @@ test('callbacks bound payloads and concurrent duplicate delivery without acknowl
 });
 
 test('invalid listener configuration and unverified executable cannot launch or expand authority',async()=>{
-  const root=await mkdtemp(join(tmpdir(),'managed-wechat-invalid-'));const executable=join(root,'WeixinToolkit.exe'),configPath=join(root,'config.json');await writeFile(executable,'binary');await writeFile(configPath,JSON.stringify({host:'0.0.0.0',port:8765,apiToken:'x'.repeat(40),dataDir:root,permissions:{enabled:true}}));let launches=0;
+  const root=await realpath(await mkdtemp(join(tmpdir(),'managed-wechat-invalid-')));const executable=join(root,'WeixinToolkit.exe'),configPath=join(root,'config.json');await writeFile(executable,'binary');await writeFile(configPath,JSON.stringify({host:'0.0.0.0',port:8765,apiToken:'x'.repeat(40),dataDir:root,permissions:{enabled:true}}));let launches=0;
   const service=new ManagedWechatService({executable,configPath,files:{'WeixinToolkit.exe':createHash('sha256').update('binary').digest('hex')},authorize:()=>true,launch:()=>{launches++;throw Error('must not launch');}});
   try{await assert.rejects(service.start());assert.equal(launches,0);assert.throws(()=>service.operation('../config'));assert.throws(()=>service.submit('arbitrary_exec',{},'key-12345'));assert.throws(()=>service.events(-1));}finally{await rm(root,{recursive:true,force:true});}
 });
