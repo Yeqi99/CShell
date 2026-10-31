@@ -73,3 +73,20 @@ test('unknown validation blocks bind, configure, start and retries without repla
  assert.equal((await f.adapter.inspect(directory)).configured,false);
  }finally{await f.shutdown();await rm(directory,{recursive:true,force:true});}
 });
+
+
+test('4.2 exact build only exposes text chat and remains isolated from earlier version settings',async()=>{
+ const {managedWechatModuleHashes,assertManagedWechatPackage}=await import('../src/agent/managed-wechat-capability');
+ const old=entry();const manifest=buildManagedWechatManifest({wechatVersion:'4.2.0.12',version:'0.1.1',methods:['status','capabilities','send','receive'],source:old.manifest.source,files:old.manifest.files});
+ assert.equal(manifest.id,'cagent.wechat.v42012');assert.deepEqual(manifest.tools.map(t=>t.id),['wechat_status','wechat_capabilities','wechat_send','wechat_receive','wechat_operation']);
+ assert(!manifest.permissions.some(p=>/contacts|history|payments|transfers|redpackets/.test(p)));assert(!manifest.events.some(e=>e.id.startsWith('payment.')));
+ assertManagedWechatPackage('4.2.0.12',managedWechatModuleHashes['4.2.0.12'],manifest);
+ assert.throws(()=>assertManagedWechatPackage('4.2.0.12',managedWechatModuleHashes['4.1.15.56'],manifest),/mismatch/);
+ assert.throws(()=>assertManagedWechatPackage('4.1.15.56',managedWechatModuleHashes['4.1.15.56'],manifest),/mismatch/);
+ assert.throws(()=>buildManagedWechatManifest({wechatVersion:'4.2.0.12',version:'0.1.1',methods:['contacts'],source:old.manifest.source,files:old.manifest.files}),/text chat only/);
+ const store=new Map<string,unknown>();const vault={read:async<T>(key:string,schema:z.ZodType<T>)=>store.has(key)?schema.parse(store.get(key)):undefined,write:async(key:string,value:unknown)=>{store.set(key,structuredClone(value));}};
+ const directory=await mkdtemp(join(tmpdir(),'wechat-version-'));
+ const manifestJson=JSON.stringify(manifest),catalog={...old.entry,id:manifest.id,manifestJson,manifestSha256:capabilityDigest(manifestJson)};
+ const a=await createManagedWechatCapability({entry:old.entry,directory,vault,authorize:()=>true});const b=await createManagedWechatCapability({entry:catalog,directory,vault,authorize:()=>true});
+ try{await a.configure({port:8765,sendTargets:['old-peer']});await b.configure({port:8766,sendTargets:['new-peer']});assert.deepEqual(a.status().settings.sendTargets,['old-peer']);assert.deepEqual(b.status().settings.sendTargets,['new-peer']);assert.equal(a.status().settings.port,8765);assert.equal(b.status().settings.port,8766);assert.notEqual((store.get('managed-'+old.entry.id) as any).apiToken,(store.get('managed-'+manifest.id) as any).apiToken);}finally{await a.shutdown();await b.shutdown();await rm(directory,{recursive:true,force:true});}
+});
