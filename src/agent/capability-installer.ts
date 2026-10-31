@@ -10,7 +10,8 @@ export const capabilityInstallInput=z.object({id:z.string().min(1).max(100),conf
 export async function stageCapabilityBundle(root:string,entry:CapabilityCatalogEntry,signal:AbortSignal,fetcher:typeof fetch=fetch){
   signal=AbortSignal.any([signal,AbortSignal.timeout(120000)]);
   signal.throwIfAborted();
-  if(!Number.isSafeInteger(entry.bundleBytes)||entry.bundleBytes<1||entry.bundleBytes>64*1024*1024)throw new Error('Package exceeds 64 MiB download budget');
+  const budget=entry.maxBundleBytes??64*1024*1024;
+  if(!Number.isSafeInteger(budget)||budget<1||budget>256*1024*1024||!Number.isSafeInteger(entry.bundleBytes)||entry.bundleBytes<1||entry.bundleBytes>budget)throw new Error('Package exceeds download budget');
   let bytes:Buffer;
   if(entry.source==='bundled'){
     if(entry.bundle===undefined)throw new Error('Bundled package missing');bytes=Buffer.from(entry.bundle);

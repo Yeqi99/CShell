@@ -18,7 +18,7 @@ export const capabilityProcessSchema = z.object({
 }).strict();
 export const agentCapabilityManifestSchema = z.object({
   protocol: z.literal(1), id: name, name: z.string().min(1).max(80), version,
-  license: z.literal('MIT'), description: z.string().max(1000),
+  license: z.enum(['MIT', 'Proprietary']), description: z.string().max(1000),
   source: z.object({
     repository: z.string().regex(/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/),
     releaseTag: z.string().regex(/^[A-Za-z0-9_.-]{1,100}$/),
@@ -32,7 +32,7 @@ export const agentCapabilityManifestSchema = z.object({
   adapterId: name,
   process: capabilityProcessSchema.optional(),
   systemApplication: z.object({ id: name, version: capabilityVersionRangeSchema }).strict().optional(),
-  files: z.array(z.object({ path: relativeFile, sha256: z.string().regex(/^[a-f0-9]{64}$/), bytes: z.number().int().min(0).max(2 ** 31) }).strict()).min(1).max(128),
+  files: z.array(z.object({ path: relativeFile, sha256: z.string().regex(/^[a-f0-9]{64}$/), bytes: z.number().int().min(0).max(2 ** 31) }).strict()).min(1).max(2048),
   permissions: z.array(name).max(64),
   tools: z.array(z.object({ id: callableName, description: z.string().min(1).max(1000), inputSchema: schema, outputSchema: schema, permissions: z.array(name).max(64), sideEffect: z.boolean() }).strict()).max(100),
   events: z.array(z.object({ id: callableName, description: z.string().min(1).max(1000), payloadSchema: schema, permissions: z.array(name).max(64) }).strict()).max(100).default([]),
