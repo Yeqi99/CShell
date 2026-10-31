@@ -13,7 +13,7 @@ for(const agent of [false,true]){
 !include "MUI2.nsh"
 !define VERSION "0.8.17"
 !define PRODUCT_NAME "${agent?'CAgent':'CShell'}"
-${agent?'!define CAGENT_INSTALLER':'!define APP_EXECUTABLE_FILENAME "CShell.exe"'}
+${agent?'!define CAGENT_INSTALLER':'!define PRODUCT_FILENAME "CShell"'}
 Name "Fixture"
 OutFile "${join(root,agent?'agent.exe':'desktop.exe')}"
 RequestExecutionLevel user
@@ -24,7 +24,7 @@ ${agent?'Page custom ShowInstallSummary':'!insertmacro customPageAfterChangeDir'
 Section
 SectionEnd
 `);
- const p=spawnSync(tool.path,['/V2',script],{env:{...process.env,...tool.env},encoding:'utf8',windowsHide:true});assert.equal(p.status,0,p.stdout+p.stderr);
+ const p=spawnSync(tool.path,['/WX','/V2',script],{env:{...process.env,...tool.env},encoding:'utf8',windowsHide:true});assert.equal(p.status,0,p.stdout+p.stderr);
 }
 const deployment=join(root,'deployment');await mkdir(deployment);
 await writeFile(join(deployment,'deployment.json'),JSON.stringify({platform:'win32',arch:'x64',version:'0.8.17'}));
@@ -36,7 +36,7 @@ const selectionReceipt=join(root,'selected.ini'),selectionExe=join(root,'selecti
 let selection=await readFile(join(root,'cagent-installer.nsi'),'utf8');
 selection=selection.replace(/^OutFile .+$/m,`OutFile "${selectionExe}"`).replace(/Section "Install"[\s\S]*?SectionEnd/,`Section "Probe"\n WriteINIStr "${selectionReceipt}" "Probe" "Directory" "$INSTDIR"\nSectionEnd`);
 const selectionScript=join(root,'selection.nsi');await writeFile(selectionScript,selection);
-let run=spawnSync(tool.path,['/V2',selectionScript],{env:{...process.env,...tool.env},encoding:'utf8',windowsHide:true});assert.equal(run.status,0,run.stdout+run.stderr);
+let run=spawnSync(tool.path,['/WX','/V2',selectionScript],{env:{...process.env,...tool.env},encoding:'utf8',windowsHide:true});assert.equal(run.status,0,run.stdout+run.stderr);
 let detectedDirectory;
 for(const explicit of [undefined,join(root,'chosen-directory')]){
  run=spawnSync(selectionExe,explicit?['/S',`/D=${explicit}`]:['/S'],{encoding:'utf8',windowsHide:true,timeout:30000});assert.equal(run.status,0,run.stderr);
