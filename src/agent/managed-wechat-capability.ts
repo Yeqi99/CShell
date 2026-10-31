@@ -50,7 +50,7 @@ export async function createManagedWechatCapability(options:{entry:CapabilityCat
     const s=stored.settings;active=true;
     const subscription=s.subscriptionEnabled&&allowed('wechat.events.read');
     try{callbacks=new ManagedWechatCallbacks({secret:stored.callbackSecret,authorize:()=>subscription&&allowed('wechat.events.read'),onEvent:async({event})=>{
-      if(!options.onEvent)return;const data:Record<string,unknown>={};for(const k of ['accountId','conversationId','conversationType','senderId','recipientId','messageId','direction','operationId','method','reason','contentStatus']){const v=event.data[k];if(typeof v==='string')data[k]=v.slice(0,200);else if(typeof v==='number')data[k]=v;}
+      if(!options.onEvent)return;const data:Record<string,unknown>={};for(const k of ['accountId','conversationId','conversationType','senderId','recipientId','messageId','direction','isSelf','operationId','method','reason','contentStatus']){const v=event.data[k];if(typeof v==='string')data[k]=v.slice(0,200);else if(typeof v==='number'||(k==='isSelf'&&typeof v==='boolean'))data[k]=v;}
       if(typeof event.data.text==='string'){data.text=event.data.text.slice(0,1200);data.truncated=event.data.text.length>1200;}
       await options.onEvent('extension.wechat',event.type,manifest.id+':'+event.id,{trust:'untrusted',packageId:manifest.id,...data});
     }});
