@@ -2,7 +2,7 @@ import {UsageConsent} from './UsageStats';
 import { LocalEnvironmentSettings } from './LocalEnvironmentSettings';
 import { CloudSettings } from './CloudSettings';
 import { NetworkSettings } from './NetworkSettings';
-import { Globe } from 'lucide-react';
+import { Search, Globe } from 'lucide-react';
 import { Palette, Terminal, PanelsTopLeft, Blocks, ShieldCheck, Download } from 'lucide-react';
 import { UpdateSettings } from './UpdateSettings';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -12,6 +12,7 @@ import { PresetControls } from './PresetControls';
 import { McpSettings, useMcpSettings } from './McpSettings';
 import { FontPicker } from './FontPicker';
 import './category-workspace.css';
+import './settings-studio.css';
 export function Settings({
   value,
   onSave,
@@ -42,6 +43,19 @@ export function Settings({
     ['security', ShieldCheck, cn ? 'AI 与安全' : 'AI & security'],
     ['updates', Download, cn ? '关于与更新' : 'About & updates'],
   ] as const;
+  const [query, setQuery] = useState('');
+  const categoryHelp: Record<string, [string, string, string]> = {
+    cloud: ['账号、同步与本机数据', 'Account, sync and local data', '登录 邮箱 导入 缓存 会员 sync import account'],
+    appearance: ['调整界面、字体与背景，修改即时预览', 'Preview interface, typography and background changes', '主题 字号 侧边栏 字体 背景 theme font sidebar'],
+    terminal: ['字体、行距与键盘操作', 'Typography, spacing and keyboard behavior', '复制 粘贴 配色 快捷键 font clipboard keyboard'],
+    local: ['管理新建本机终端的环境变量', 'Environment variables for new local terminals', '环境变量 CMD PowerShell environment'],
+    workspace: ['默认连接视图与外观方案', 'Default connection view and appearance presets', 'SSH 可视化 默认 导入 导出 方案 preset desktop'],
+    network: ['选择网络出口，并检查连接状态', 'Choose an outbound route and diagnose connectivity', '代理 proxy 网络 system machine ping'],
+    extensions: ['按需启用功能与管理自定义扩展', 'Manage optional features and custom extensions', '插件 市场 plugin extension'],
+    security: ['管理智能体和外部工具可访问的范围', 'Control access for agents and external tools', 'MCP API 权限 全选 基座 authorization permissions'],
+    updates: ['版本、自动更新与诊断日志', 'Version, automatic updates and diagnostic logs', '下载 日志 统计 download version logs'],
+  };
+  const visibleCategories = categories.filter(([id, , label]) => !query.trim() || `${label} ${categoryHelp[id].join(' ')}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
   const [category, setCategory] = useState<string>('appearance');
   const [draft, setDraft] = useState(value),
     [error, setError] = useState('');
@@ -113,18 +127,20 @@ export function Settings({
   };
   return (
     <div className="workspace-category-container"><section
-      className="editor-page preferences-page categorized-settings"
+      className="editor-page preferences-page categorized-settings settings-studio"
       aria-label={t('settingsTitle')}
     >
       <nav className="settings-nav" aria-label={cn ? '设置分类' : 'Settings categories'} onFocus={event => {
         if (event.target instanceof HTMLButtonElement) event.target.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
       }}>
         <h2>{t('settingsTitle')}</h2>
-        {categories.map(([id, Icon, label]) => (
+        <label className="settings-search"><Search size={15} aria-hidden="true"/><input type="search" aria-label={cn ? '查找设置分类' : 'Find settings categories'} placeholder={cn ? '查找设置' : 'Find settings'} value={query} onChange={event => setQuery(event.target.value)}/></label>
+        {visibleCategories.length === 0 && <p className="settings-search-empty" role="status">{cn ? '未找到分类，试试其他关键词' : 'No categories found. Try another keyword.'}</p>}
+        {visibleCategories.map(([id, Icon, label]) => (
           <button
             key={id}
             aria-current={category === id ? 'page' : undefined}
-            onClick={() => setCategory(id)}
+            onClick={() => { setCategory(id); }}
           >
             <Icon size={15} />
             <span>{label}</span>
@@ -134,6 +150,7 @@ export function Settings({
       <div className="settings-content">
         <header className="settings-category-heading">
           <h1>{categories.find(([id]) => id === category)?.[2]}</h1>
+          <p>{categoryHelp[category]?.[cn ? 0 : 1]}</p>
         </header>
         <div hidden={category !== 'updates'}>
           <UpdateSettings english={!cn} />
@@ -174,7 +191,8 @@ export function Settings({
           }}
         >
           <fieldset disabled={busy}>
-            <div className="form-grid" hidden={category !== 'appearance'}>
+            <h2 hidden={category !== 'appearance'}>{cn ? '主题与语言' : 'Theme & language'}</h2>
+            <div className="form-grid settings-theme-row" hidden={category !== 'appearance'}>
               <label>
                 {t('theme')}
                 <select
@@ -219,6 +237,7 @@ export function Settings({
               <div hidden={category !== 'appearance'}>
                 <FontPicker
                   label={t('uiFont')}
+                  previewSize={draft.uiFontSize}
                   value={draft.uiFont}
                   asset={draft.uiFontAsset}
                   fonts={fonts}
@@ -242,7 +261,7 @@ export function Settings({
                 />
               </div>
             </div>
-            <div className="font-size-row" hidden={category !== 'terminal'}>
+            <div className="font-size-row settings-terminal-options" hidden={category !== 'terminal'}>
               <label><input type="checkbox" checked={draft.terminalClipboardKeys} onChange={event => setDraft({ ...draft, terminalClipboardKeys: event.target.checked })}/>{cn ? 'Ctrl+C / Ctrl+V 复制粘贴（原生按键在快捷键栏）' : 'Ctrl+C / Ctrl+V copy and paste (native keys in toolbar)'}</label>
               <label><input type="checkbox" checked={draft.terminalSemanticColors} onChange={event => setDraft({ ...draft, terminalSemanticColors: event.target.checked })}/>{cn ? '提示符与链接辅助配色' : 'Highlight prompts and links'}</label>
               <label>
@@ -416,7 +435,7 @@ export function Settings({
           form="workspace-preferences-form"
           disabled={busy || mcp.busy || (category === 'security' && !mcp.draft)}
         >
-          {t('save')}
+          {busy ? (cn ? '正在保存…' : 'Saving…') : t('save')}
         </button>
       </footer>
     </section></div>

@@ -46,7 +46,7 @@ await build({
     createRoot(document.getElementById('root')).render(<Fixture/>);
   `, loader: 'tsx', resolveDir: process.cwd() },
   outfile: join(directory, 'app.js'), bundle: true, jsx: 'automatic',
-  loader: { '.woff2': 'dataurl', '.svg': 'dataurl' },
+  loader: { '.woff2': 'dataurl', '.svg': 'dataurl', '.ps1': 'text' },
 });
 const server = createServer(async (request, response) => {
   const name = request.url === '/app.js' ? 'app.js' : request.url === '/app.css' ? 'app.css' : undefined;

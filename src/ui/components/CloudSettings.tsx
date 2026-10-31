@@ -1,3 +1,4 @@
+import '../account.css';
 import {AccountMemory} from './AccountMemory';
 import {AccountImports} from './AccountImports';
 import { useEffect, useState } from 'react';

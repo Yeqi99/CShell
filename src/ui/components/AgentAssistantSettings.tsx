@@ -10,6 +10,6 @@ export function AgentAssistantSettings({call,onSaved}:{onSaved?:()=>void;call:(m
  <label>API Key<input type="password" value={key} placeholder={draft.keyConfigured?'已保存，留空保留':''} onChange={e=>setKey(e.target.value)}/></label>
  <label><input type="checkbox" checked={draft.commands} onChange={e=>setDraft({...draft,commands:e.target.checked})}/>允许执行命令</label>
  <label><input type="checkbox" checked={draft.review} onChange={e=>setDraft({...draft,review:e.target.checked})}/>执行前审核</label>
- <label>允许委派的控制端（* 表示所有已认证控制端）<textarea value={draft.delegates.join('\n')} onChange={e=>setDraft({...draft,delegates:e.target.value.split(/\s+/).filter(Boolean)})}/></label><button>保存</button></fieldset>}
+ <label>允许委派的控制端（* 表示所有已认证控制端）<textarea value={draft.delegates.join('\n')} onChange={e=>setDraft({...draft,delegates:e.target.value.split(/\s+/).filter(Boolean)})}/></label><button className="primary">{busy ? "正在保存…" : "保存"}</button></fieldset>}
  </form>
 }
