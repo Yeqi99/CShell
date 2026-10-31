@@ -5,13 +5,15 @@ import {resolve,join,relative,isAbsolute} from 'node:path';
 import {z} from 'zod';
 import {capabilityDigest,createBundledCapabilityEntry} from '../src/agent/capability-catalog';
 import {agentCapabilityManifestSchema} from '../src/shared/agent-capability-packages';
+import {managedWechatVersions,assertManagedWechatPackage} from '../src/agent/managed-wechat-capability';
 import {verifyCapabilityFiles} from '../src/agent/capability-packages';
 
 const [runtimeArg,declarationArg,outputArg]=process.argv.slice(2);
 if(!runtimeArg||!declarationArg||!outputArg)throw Error('Usage: tsx scripts/package-managed-wechat.ts <verified binary directory> <capability declaration.json> <output directory>');
 const runtime=resolve(runtimeArg),output=resolve(outputArg);
-const record=z.object({entry:z.literal('WeixinToolkit.exe'),wechatVersion:z.enum(['4.1.15.50','4.1.15.56']),files:z.record(z.string(),z.string().regex(/^[a-f0-9]{64}$/))}).passthrough().parse(JSON.parse(await readFile(join(runtime,'manifest.json'),'utf8')));
+const record=z.object({entry:z.literal('WeixinToolkit.exe'),wechatVersion:z.enum(managedWechatVersions),moduleSha256:z.string().regex(/^[a-f0-9]{64}$/),files:z.record(z.string(),z.string().regex(/^[a-f0-9]{64}$/))}).passthrough().parse(JSON.parse(await readFile(join(runtime,'manifest.json'),'utf8')));
 const declaration=agentCapabilityManifestSchema.parse(JSON.parse(await readFile(resolve(declarationArg),'utf8')));
+assertManagedWechatPackage(record.wechatVersion,record.moduleSha256,declaration);
 if(declaration.license!=='Proprietary'||!declaration.id.startsWith('cagent.wechat.'))throw Error('Expected closed-source WeChat declaration');
 const files:Record<string,Buffer>={};let bytes=0;
 for(const [path,digest] of Object.entries(record.files)){
