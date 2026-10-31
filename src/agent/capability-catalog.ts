@@ -8,6 +8,9 @@ export interface CapabilityCatalogEntry {
   id: string; name: string; version: string; description: string; permissions: string[];
   manifestSha256: string; bundleSha256: string; bundleBytes: number;
   source: 'bundled' | 'github'; bundle?: string; url?: string;
+  /** Host-pinned declaration for a downloaded native capability; never supplied by a caller. */
+  manifestJson?: string;
+  maxBundleBytes?: number;
 }
 export interface CapabilityBundle { protocol: 1; manifest: string; files: Record<string, string> }
 const contract = (schema: z.ZodType) => z.toJSONSchema(schema, { io: 'input' }) as AgentCapabilityManifest['tools'][number]['inputSchema'];

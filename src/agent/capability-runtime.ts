@@ -58,9 +58,11 @@ export class CapabilityRuntime {
     this.adapters.set('cagent.system-apps',system);
     for(const extra of options.extraPackages??[]){
       if(this.entries.some(entry=>entry.id===extra.entry.id))throw new Error('Duplicate capability catalog ID');
-      if(extra.entry.source!=='bundled'||!extra.entry.bundle)throw new Error('Injected adapters require a bundled verified manifest');
-      const manifest=parseCapabilityManifest(JSON.parse(extra.entry.bundle).manifest,extra.entry.manifestSha256);
-      if(manifest.id!==extra.entry.id||this.adapters.has(manifest.adapterId))throw new Error('Duplicate or mismatched adapter ID');
+      const raw=extra.entry.source==='bundled'&&extra.entry.bundle?JSON.parse(extra.entry.bundle).manifest:extra.entry.manifestJson;
+      if(!raw)throw new Error('Injected adapters require a host-pinned verified manifest');
+      const manifest=parseCapabilityManifest(raw,extra.entry.manifestSha256);
+      if(extra.entry.source==='github'&&extra.entry.url!==manifest.source.assetUrl)throw new Error('Injected adapter source mismatch');
+      if(manifest.id!==extra.entry.id||manifest.version!==extra.entry.version||this.adapters.has(manifest.adapterId))throw new Error('Duplicate or mismatched adapter ID');
       this.entries.push(structuredClone(extra.entry));this.adapters.set(manifest.adapterId,extra.adapter);
     }
     this.manager=new CapabilityPackages({environment:{platform:process.platform,architecture:process.arch,agentVersion:options.agentVersion},
@@ -88,11 +90,11 @@ export class CapabilityRuntime {
       save:async records=>{await options.vault.write('capability-packages',records);this.roots=new Map(records.map(record=>[record.id,record.root]));this.installedManifestDigests=new Map(records.map(record=>[record.id,record.manifestSha256]));},
     });
   }
-  private manifestFor(id:string){const entry=this.entries.find(item=>item.id===id);if(!entry?.bundle)return undefined;return parseCapabilityManifest(JSON.parse(entry.bundle).manifest,entry.manifestSha256);}
+  private manifestFor(id:string){const entry=this.entries.find(item=>item.id===id);if(!entry)return undefined;const raw=entry.bundle?JSON.parse(entry.bundle).manifest:entry.manifestJson;return raw?parseCapabilityManifest(raw,entry.manifestSha256):undefined;}
   private mutate<T>(action:()=>Promise<T>):Promise<T>{const operation=this.mutation.then(()=>{if(this.closing)throw new Error('Capability runtime closing');return action();});this.mutation=operation.catch(()=>{});return operation;}
   async load(){await this.manager.init();for(const item of this.manager.list())await this.manager.refresh(item.id);}
   list(){return this.manager.list();}
-  catalog(){return this.entries.map(({bundle:_,url:__,manifestSha256:___,bundleSha256:____,bundleBytes:_____,...entry})=>{
+  catalog(){return this.entries.map(({bundle:_,url:__,manifestSha256:___,bundleSha256:____,bundleBytes:_____,manifestJson:______,maxBundleBytes:_______,...entry})=>{
     const installed=this.manager.list().find(item=>item.id===entry.id);return {...entry,installed:!!installed,status:installed?.status??'not-installed',reason:installed?.reason,grants:installed?.grants??[]};
   });}
   install(input:unknown,signal:AbortSignal=new AbortController().signal){return this.mutate(async()=>{
