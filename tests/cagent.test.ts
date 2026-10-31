@@ -57,7 +57,12 @@ test('local app checks host, origin, bearer token and fixed method surface',asyn
  assert.equal((await send({Origin:'https://evil.invalid','X-Cagent-Token':token})).status,403);
  assert.equal(await new Promise(resolve=>{const r=httpRequest(origin,{headers:{Host:'evil.invalid'}},res=>{res.resume();resolve(res.statusCode);});r.end();}),403);
  assert.equal((await send({Origin:origin,'X-Cagent-Token':token},'relay.revealCredential')).status,400);
- assert.equal((await send({Origin:origin,'X-Cagent-Token':token})).status,200);assert.equal(calls,1);for(const method of ['update.check','update.download','update.status'])assert.equal((await send({Origin:origin,'X-Cagent-Token':token},method)).status,200);
+ assert.equal((await send({Origin:origin,'X-Cagent-Token':token})).status,200);assert.equal(calls,1);for(const method of ['update.check','update.download','update.status','update.verify','update.install','update.settings'])assert.equal((await send({Origin:origin,'X-Cagent-Token':token},method)).status,200);
+ assert.equal(calls,7,'native and browser update operations reach the authenticated local runtime');
+ assert.equal((await send({Origin:origin},'update.verify')).status,403);
+ assert.equal((await send({Origin:'https://evil.invalid','X-Cagent-Token':token},'update.verify')).status,403);
+ assert.equal((await send({Origin:origin,'X-Cagent-Token':token},'update.commit')).status,400);
+ assert.equal(calls,7,'internal commit and unauthenticated verification never reach runtime');
  }finally{await app.close();}
 });
 
