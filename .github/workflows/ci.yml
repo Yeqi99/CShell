@@ -1,7 +1,7 @@
 name: Windows checks
 on:
   push:
-    branches-ignore: ['codex/android-diagnostic-0.8.18']
+    branches-ignore: ['codex/android-diagnostic-0.8.18', 'codex/candidate-ci-cleanup']
   pull_request:
 permissions:
   contents: read
@@ -56,3 +56,4 @@ jobs:
           path: |
             release/**/*.exe
             test-results/*.png
+
