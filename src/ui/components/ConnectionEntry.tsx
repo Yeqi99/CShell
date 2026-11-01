@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { RdpConnectionForm } from './RdpConnectionForm';
 import { ConnectionImport } from './ConnectionImport';
 import { ClientConnectForm, type ClientConnected } from './ClientConnectForm';
@@ -156,7 +157,7 @@ export function ConnectionEntry({
                 </button>
               ))}
             </div>
-            {localError && <p role="alert">{localError}</p>}
+            {localError && <ErrorNotice title="连接未完成" error={localError}/>}
           </section>
         )}
         {!!profiles.length && (

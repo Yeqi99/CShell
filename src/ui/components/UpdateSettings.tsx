@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { useEffect, useState } from 'react';
 import { RefreshCw, Download } from 'lucide-react';
 import type { UpdateState } from '../../shared/updates';
@@ -147,9 +148,7 @@ export function UpdateSettings({ english }: { english: boolean }) {
         </button>
       </section>
       {(error || state?.error) && (
-        <p role="alert" className="error">
-          {failureHint}
-        </p>
+        <ErrorNotice title="更新未完成" error={failureHint}/>
       )}
     </section>
   );

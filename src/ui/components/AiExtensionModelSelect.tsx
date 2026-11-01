@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { useState } from 'react';
 import { useExtensionCatalog } from '../use-extension-catalog';
 import './AiExtensionModelSelect.css';
@@ -50,7 +51,7 @@ export function AiExtensionModelSelect({
       </label>
       {query && !filtered.length && <small>没有其他匹配模型</small>}
       {!loading && current?.reason && <small role="status">{current.reason}</small>}
-      {error && <small role="alert">{error}</small>}
+      {error && <ErrorNotice title="模型列表暂不可用" error={error}/>}
       <button type="button" disabled={loading} onClick={refresh}>刷新模型目录</button>
     </div>
   );

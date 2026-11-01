@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { useEffect, useMemo, useState } from 'react';
 import {
   BarChart3,
@@ -207,9 +208,7 @@ export function ActivityPage({ active, servers }: { active: boolean; servers: nu
         </div>
 
         {(error || snapshot.error) && (
-          <p role="alert" className="form-error">
-            {error || snapshot.error}
-          </p>
+          <ErrorNotice title="统计记录暂不可用" error={error || snapshot.error || ''}/>
         )}
         {!snapshot.enabled && (
           <p className="activity-notice">

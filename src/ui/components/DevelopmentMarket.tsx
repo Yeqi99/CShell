@@ -207,7 +207,7 @@ export function DevelopmentMarket({
               </button>
             </div>
           )}
-          {selected === 'ide' && ide?.installError && <p role="alert">{ide.installError}</p>}
+          {selected === 'ide' && ide?.installError && <ErrorNotice title="安装未完成" error={ide.installError}/>}
           {selected === 'ide' && ide?.installing && <p role="status">正在下载并安装代码编辑器…</p>}
           {selected !== 'ide' &&
             coding?.installs?.map((job: any) => (

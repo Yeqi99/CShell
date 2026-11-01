@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { useEffect, useState } from 'react';
 import { WslNetwork } from './WslNetwork';
 import { Terminal, RefreshCw, Copy, ShieldCheck } from 'lucide-react';
@@ -63,9 +64,7 @@ export function WslPlugin({ onOpen }: { onOpen: (shell: LocalShell) => Promise<v
       </div>
       <p className="muted">使用本机 Windows Subsystem for Linux，终端运行在所选发行版中。</p>
       {error && (
-        <p role="alert" className="form-error">
-          {error}
-        </p>
+        <ErrorNotice title="WSL 操作未完成" error={error}/>
       )}
       {setup.message && (
         <p role="status" className={setup.phase === 'error' ? 'form-error' : 'muted'}>

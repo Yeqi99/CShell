@@ -247,7 +247,7 @@ function HostingEditor({ call, target }: Props) {
                 </button>
               </div>
             )}
-            {active?.error && <p role="alert">{active.error}</p>}
+            {active?.error && <ErrorNotice title="托管服务未完成" error={active.error}/>}
             {showLogs ? (
               <div className="hosting-logs">
                 <button type="button" onClick={() => setShowLogs(false)}>
@@ -260,7 +260,7 @@ function HostingEditor({ call, target }: Props) {
                       {new Date(log.time).toLocaleTimeString()} · {log.method} {log.path} ·{' '}
                       {log.status} · {log.durationMs} ms
                     </summary>
-                    {log.error && <p>{log.error}</p>}
+                    {log.error && <ErrorNotice title="服务请求未完成" error={log.error}/>}
                     {log.body !== undefined && (
                       <pre>
                         {log.body}

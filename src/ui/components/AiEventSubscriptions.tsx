@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { useState } from 'react';
 import { ArrowLeft, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { aiEventRuleSchema, type AiEventRule, type AiEventSnapshot } from '../../shared/ai-events';
@@ -117,9 +118,7 @@ export function AiEventSubscriptions(props: AiEventSubscriptionsProps) {
         </div>
       </div>
       {(error || props.error) && (
-        <p role="alert" className="form-error">
-          {error || props.error}
-        </p>
+        <ErrorNotice title="事件订阅未完成" error={error || props.error || ''}/>
       )}
       {notice && (
         <p role="status" className="ai-section-note">
