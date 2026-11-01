@@ -1,0 +1,97 @@
+{
+  "artifacts": [
+    {
+      "archive": "core-final-linux-arm64.zip",
+      "bytes": 287436423,
+      "sha256": "7e5757f414b9847511b80e56c98d5c50d54d1c3081703778e53f6e10e58eec78",
+      "packages": [
+        {
+          "name": "0.8.18/CAgent-0.8.18-linux-arm64.tar.gz",
+          "bytes": 44507457,
+          "sha256": "f2f9a1e8842decc9a644deef162db968f1ee153542c16ae81fd8518c40b23c99"
+        },
+        {
+          "name": "0.8.18/CShell-0.8.18-linux-arm64.AppImage",
+          "bytes": 140723398,
+          "sha256": "37614f7ac18d9e4d1daa1905e663e9230e2021bafbaf5af0ef7035282cb4ca35"
+        },
+        {
+          "name": "0.8.18/CShell-0.8.18-linux-arm64.deb",
+          "bytes": 103036564,
+          "sha256": "06fbd2a7a00379cb2fe6ee9f49001916f18fc92e1d6e7406dcdfb09c6258c611"
+        }
+      ]
+    },
+    {
+      "archive": "core-final-linux-x64.zip",
+      "bytes": 292376047,
+      "sha256": "6780b61bd62ff8ef032d2a5c46fda07c817a240f3c323fb35750d8a9c9df574f",
+      "packages": [
+        {
+          "name": "0.8.18/CAgent-0.8.18-linux-x64.tar.gz",
+          "bytes": 44818066,
+          "sha256": "5a8dd55265be9202dc33444a836cd746a7147433aff2576764fa5e273c9598b2"
+        },
+        {
+          "name": "0.8.18/CShell-0.8.18-linux-amd64.deb",
+          "bytes": 108875880,
+          "sha256": "fde1dd4c6907d031c15e1045f473b39c6f87367e453f4ccb665794292782e94b"
+        },
+        {
+          "name": "0.8.18/CShell-0.8.18-linux-x86_64.AppImage",
+          "bytes": 139464113,
+          "sha256": "893a7afaaac7be67a37d825dff85700b6e82c271c38f16c6ff31a9a217f82a79"
+        }
+      ]
+    },
+    {
+      "archive": "core-final-mac-arm64.zip",
+      "bytes": 322982645,
+      "sha256": "57817698260e0b732195ac4d8396164d847876effa0c2d20060444eafe05cf9f",
+      "packages": [
+        {
+          "name": "0.8.18/CAgent-0.8.18-mac-arm64.tar.gz",
+          "bytes": 39500170,
+          "sha256": "793d001158f43d4ce37429d99fe60aed6dea3f918a0fc50ffe8c5e85e584b54c"
+        },
+        {
+          "name": "0.8.18/CShell-0.8.18-mac-arm64.dmg",
+          "bytes": 142334443,
+          "sha256": "09d1d272fcd449778f4e1612b4d2755d5a2b0f0fa3fcd8c247da949cb9fd2ac7"
+        },
+        {
+          "name": "0.8.18/CShell-0.8.18-mac-arm64.zip",
+          "bytes": 142173978,
+          "sha256": "d5c87736706e3b086e9b7086095a64bababb523a5852d60f3bbc3040101d5de5"
+        }
+      ]
+    },
+    {
+      "archive": "core-final-mac-x64.zip",
+      "bytes": 331863190,
+      "sha256": "04dbaf48cc4596bee73661c2c9865da93fd6e0aff3807be80eb191cbf60ab90a",
+      "packages": [
+        {
+          "name": "0.8.18/CAgent-0.8.18-mac-x64.tar.gz",
+          "bytes": 40730627,
+          "sha256": "8e44980679de56370ee3f2d5cc2ae02f40483947cc93dea5997332ec03b80546"
+        },
+        {
+          "name": "0.8.18/CShell-0.8.18-mac-x64.dmg",
+          "bytes": 146136616,
+          "sha256": "136319fc31e52c46c3c304a6ac4bb10a05fa6d057d45e1bf60db6d629b3cfe58"
+        },
+        {
+          "name": "0.8.18/CShell-0.8.18-mac-x64.zip",
+          "bytes": 146015429,
+          "sha256": "646cb93b244b71ef1c54e18e8c21c7c596df5afe1da4dd69b5c3ced23801ef66"
+        }
+      ]
+    }
+  ],
+  "remoteSource": "6defedb073b00fbbd74b3e1b930d3a9f18b3932a",
+  "status": "superseded-by-terminal-focus-fix",
+  "source": "cf476c02882ebcf1cdac669b06aac5c5af81ba03",
+  "run": 41288451105,
+  "verifiedArtifactDigests": true
+}
