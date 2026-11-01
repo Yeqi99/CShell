@@ -48,6 +48,11 @@ final class AndroidInputTest implements AutoCloseable {
       StackTraceElement[] stack=android.os.Looper.getMainLooper().getThread().getStackTrace();
       StringBuilder value=new StringBuilder().append(android.os.SystemClock.uptimeMillis());
       for(int i=0;i<Math.min(stack.length,16);i++)value.append(" > ").append(stack[i]);
+      for(java.util.Map.Entry<Thread,StackTraceElement[]> entry:Thread.getAllStackTraces().entrySet()){
+        if(entry.getKey()==android.os.Looper.getMainLooper().getThread())continue;
+        boolean relevant=false;for(StackTraceElement frame:entry.getValue())if(frame.getClassName().contains("AccessibilityInteractionClient")||frame.getClassName().contains("AccessibilityCache")){relevant=true;break;}
+        if(relevant){value.append(" [thread=").append(entry.getKey().getName()).append(",state=").append(entry.getKey().getState());for(int i=0;i<Math.min(entry.getValue().length,22);i++)value.append(" > ").append(entry.getValue()[i]);value.append(']');}
+      }
       synchronized(editStacks){if(editStacks.size()>=8)editStacks.removeFirst();editStacks.addLast(value.toString());}
     },500,500,TimeUnit.MILLISECONDS);
     test.runOnMainSync(()->{
