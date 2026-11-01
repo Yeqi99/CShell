@@ -1,0 +1,21 @@
+{
+  "version": "0.8.18",
+  "status": "candidate-not-published",
+  "sources": {
+    "opensource": {
+      "sha": "1d318a5e04b8f5de7a9b70e0e3cdaf180f6134b4",
+      "local": "3202d564c86a9e8969deff4e9324e15f8508787f",
+      "tree": "aff71761fbf6c91fd89d00c47b54678ed2c7ba6d"
+    },
+    "pro": {
+      "sha": "d1ad08ea9bde9328821dcad974cecf62ecdf1f89",
+      "local": "ba02475a97734ac112abdf16d87a049deeffd153",
+      "tree": "a17285be0aa71d383058d5c4f4c776944ab19823"
+    }
+  },
+  "runtimeProductionEquivalent": {
+    "opensource": "3202d564c86a9e8969deff4e9324e15f8508787f",
+    "pro": "c53e8f14fb9c09d4974a75518f831850c43c3191"
+  },
+  "note": "Remote Git Data trees were verified exactly equal to local committed trees. Pro changes after runtime production commit are documentation, receipts, and portal downloads only. Update control metadata is committed separately after source fixation; no tags or releases created."
+}
