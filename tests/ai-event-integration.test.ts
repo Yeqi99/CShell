@@ -14,8 +14,9 @@ import { aiEventRuleSchema } from '../src/shared/ai-events';
 import { WechatService } from '../src/core/wechat';
 import { builtinPlugins } from '../src/shared/plugins';
 
-test('plugin event reaches configured AI without prior history; duplicate and revoked events never call model', async () => {
+test('plugin event reaches configured AI without prior history; duplicate and revoked events never call model', async (t) => {
   const directory = await mkdtemp(join(tmpdir(), 'cshell-event-integration-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
   const store = new Store(directory, { encrypt: async s => Buffer.from(s).toString('base64'), decrypt: async s => Buffer.from(s, 'base64').toString() });
   const requests: any[] = [];
   const server = createServer(async (req, res) => {
@@ -28,6 +29,7 @@ test('plugin event reaches configured AI without prior history; duplicate and re
       : { content: 'Recorded event.' };
     res.end(JSON.stringify({ choices: [{ message }] }));
   });
+  t.after(async () => { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); });
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   let permitted = true;
   const definitions = new WechatService(directory, { plugins: () => [...builtinPlugins,wechatManifest].map(manifest => ({manifest, enabled:true, source:'builtin'})) } as any).tools();
@@ -40,7 +42,9 @@ test('plugin event reaches configured AI without prior history; duplicate and re
   const handlers = new Map<string, (...args: any[]) => any>();
   const call = (name: string, ...args: any[]) => handlers.get(name)!(...args);
   const register = () => registerAiHandlers((name, fn) => handlers.set(name, fn), directory, store, new ConnectionRegistry(() => undefined), undefined, undefined, undefined, wechat);
-  let dispose = await register();
+  let dispose: (() => Promise<void>) | undefined;
+  t.after(async () => { await dispose?.(); });
+  dispose = await register();
   const wait = async (condition: () => boolean) => {
     for (let i = 0; i < 250; i++) { if (condition()) return; await new Promise(r => setTimeout(r, 20)); }
     throw new Error('Integration timed out: ' + JSON.stringify({events:call('ai:events-snapshot'),threadErrors:call('ai:snapshot').threads.map((thread:any)=>({id:thread.id,state:thread.state,error:thread.error}))}));
@@ -102,6 +106,6 @@ test('plugin event reaches configured AI without prior history; duplicate and re
     await new Promise(resolve => setTimeout(resolve, 80));
     assert.equal(requests.length, callsPerRun * 3, 'restart retains deduplication');
   } finally {
-    await dispose(); await new Promise<void>(resolve => server.close(() => resolve())); await rm(directory, { recursive: true, force: true });
+    await dispose?.(); dispose = undefined;
   }
 });
