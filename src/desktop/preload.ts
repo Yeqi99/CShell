@@ -41,6 +41,8 @@ const bridge: Bridge = {
   networkRemoteSources: () => ipcRenderer.invoke('network:remote-sources'),
   networkRemoteOpen: input => ipcRenderer.invoke('network:remote-open',input),
   networkStatus: () => ipcRenderer.invoke('network:status'),
+  networkSystemStatus:()=>ipcRenderer.invoke('network:system-status'),
+  networkSystemSet:enabled=>ipcRenderer.invoke('network:system-set',enabled),
   networkSave: route => ipcRenderer.invoke('network:save', route),
   machineBrowser:(id,action,value)=>ipcRenderer.invoke('machine-browser:action',id,action,value),
   onMachineBrowserFocus:listener=>{const fn=(_e:unknown,id:string)=>listener(id);ipcRenderer.on('machine-browser:focus',fn);return()=>{ipcRenderer.removeListener('machine-browser:focus',fn);};},

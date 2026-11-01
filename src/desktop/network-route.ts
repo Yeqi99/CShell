@@ -16,9 +16,13 @@ export class ApplicationNetworkRoute {
     list(): Promise<NetworkRouteStatus['machines']>;
     // Resolver must enforce entitlement, identity and forwarding permission.
     proxy(id: string): Promise<string>;
+    systemProxySupported?(id:string):boolean;
+    tunnel?(id:string,host:string,port:number):Promise<import('node:stream').Duplex>;
     close?(): Promise<void>;
   };
   constructor(private directory: string, private store: Store) {}
+  async prepareSystemProxy(){if(this.route.mode!=='machine'||!this.machine?.tunnel)throw Error('请先选择可用的机器出口，再开启系统代理');if(this.machine.systemProxySupported?.(this.route.id)===false)throw Error('此账号中继出口暂不支持系统代理，请选择直连 SSH 或 CAgent');await this.machine.proxy(this.route.id);}
+  async systemTunnel(host:string,port:number){if(this.route.mode!=='machine'||!this.machine?.tunnel)throw Error('所选机器出口不可用，未回退直连');if(this.machine.systemProxySupported?.(this.route.id)===false)throw Error('当前出口不支持系统代理，已阻止回退直连');return this.machine.tunnel(this.route.id,host,port);}
   async load() {
     try {
       this.route = networkRouteSchema.parse(JSON.parse(await this.store.decryptPrivate(

@@ -167,6 +167,15 @@ export async function registerCloudHandlers(
     const proxies = new Map<string, Awaited<ReturnType<typeof createSshBrowserProxy>>>();
     const savedMachineNetwork=network.machine;
     network.machine = {
+      systemProxySupported:id=>!client.cloudExport().some(device=>device.deviceId===id&&device.accountManaged),
+      tunnel:async(id,host,port)=>{
+        if(!client.cloudExport().some(device=>device.deviceId===id&&device.accountManaged)){
+          if(savedMachineNetwork?.tunnel&&(await savedMachineNetwork.list()).some(device=>device.id===id))return savedMachineNetwork.tunnel(id,host,port);
+          throw Error('所选出口不可用，未回退本机');
+        }
+        await cloud.accountRequest('/v1/devices/lease',{deviceId:id});const transport=await client.browserTransport(id);
+        try{const stream=await agentBrowserStream(transport.call,host,port);stream.once('close',()=>transport.close());return stream;}catch(error){transport.close();throw error;}
+      },
       close:async()=>{await savedMachineNetwork?.close?.();},
       list: async () => [...new Map([...(await savedMachineNetwork?.list()??[]),...client.cloudExport().filter(device => device.accountManaged).map(device => ({ id: device.deviceId, name: device.name }))].map(item=>[item.id,item])).values()],
       proxy: async id => {
