@@ -7,7 +7,23 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { EventEmitter } from 'node:events';
 import type { ChildProcess } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { ManagedWechatService, ManagedWechatCallbacks } from '../src/agent/managed-wechat';
+
+test('a terminated real service is not running and its exit is not a native cleanup confirmation',async()=>{
+  const root=await realpath(await mkdtemp(join(tmpdir(),'managed-wechat-exit-')));
+  const probe=createServer();await new Promise<void>(r=>probe.listen(0,'127.0.0.1',r));
+  const address=probe.address();assert(address&&typeof address!=='string');await new Promise<void>(r=>probe.close(()=>r()));
+  const executable=join(root,'WeixinToolkit.exe'),configPath=join(root,'config.json');
+  await writeFile(executable,'exit fixture');await writeFile(configPath,JSON.stringify({host:'127.0.0.1',port:address.port,apiToken:'x'.repeat(40),dataDir:root,permissions:{enabled:true}}));
+  let owned:ChildProcess|undefined;
+  const service=new ManagedWechatService({executable,configPath,files:{'WeixinToolkit.exe':createHash('sha256').update('exit fixture').digest('hex')},authorize:()=>true,stopTimeoutMs:2000,launch:(_file,args)=>{
+    if(args[0]==='--stop'){assert(owned);owned.kill('SIGTERM');return owned;}
+    owned=spawn(process.execPath,['-e',`require('http').createServer((q,s)=>s.end('{}')).listen(${address.port},'127.0.0.1')`],{stdio:'ignore',windowsHide:true});return owned;
+  }});
+  try{await service.start();await assert.rejects(service.stop(),/EXITED_WITHOUT_CLEANUP_CONFIRMATION/);await assert.rejects(service.health(),/NOT_RUNNING/);}
+  finally{if(owned&&owned.exitCode===null&&owned.signalCode===null){await new Promise<void>(r=>{owned!.once('exit',()=>r());owned!.kill();});}await rm(root,{recursive:true,force:true});}
+});
 
 test('managed service verifies package, uses loopback Bearer, does not replay writes, and stops only its own executable',async()=>{
   const root=await realpath(await mkdtemp(join(tmpdir(),'managed-wechat-')));const token='s'.repeat(40);const calls:unknown[]=[];let authorized=true;

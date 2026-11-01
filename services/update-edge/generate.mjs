@@ -2,6 +2,11 @@ import {readFile,writeFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 const root=new URL('./',import.meta.url);
+export function verifyReleaseAssets(release,expected){
+ if(expected.status!==undefined&&expected.status!=='candidate-not-published')throw Error('Verified inventory is blocked or superseded');
+ if(release.target_commitish!==expected.sha)throw Error('Final source changed');
+ for(const a of release.assets){const e=expected.assets.find(e=>e.name===a.name);if(!e||a.size!==e.size||a.digest!=='sha256:'+e.sha256)throw Error('Final package differs from verified manifest');}
+}
 export function mergeRelease(previous,releases,version='0.8.17'){
  if(!/^\d+\.\d+\.\d+$/.test(version)||!/^\d+\.\d+\.\d+$/.test(previous.version))throw Error('Invalid release version');
  const prior=previous.version;
@@ -37,7 +42,7 @@ async function main(){
   const r=await fetch(`https://api.github.com/repos/Yeqi99/CShell/releases/tags/${tag}`,{headers:{'User-Agent':'CShell-update-edge'},signal:AbortSignal.timeout(30000)});
   if(r.status!==200)throw Error('Public release unavailable: '+r.status);releases[edition]=await r.json();
  }
- for(const edition of ['opensource','pro']){const expected=JSON.parse(await readFile(new URL('verified-'+edition+'-'+version.replaceAll('.','')+'.json',root),'utf8'));if(releases[edition].target_commitish!==expected.sha)throw Error('Final source changed');for(const a of releases[edition].assets){const e=expected.assets.find(e=>e.name===a.name);if(!e||a.size!==e.size||a.digest!=='sha256:'+e.sha256)throw Error('Final package differs from verified manifest');}}
+ for(const edition of ['opensource','pro']){const expected=JSON.parse(await readFile(new URL('verified-'+edition+'-'+version.replaceAll('.','')+'.json',root),'utf8'));verifyReleaseAssets(releases[edition],expected);}
  const manifest=mergeRelease(previous,releases,version);
  // Require the actual published SHA256SUMS body to agree with every API digest.
  const {createHandler}=await import('./worker.mjs');const handler=createHandler(manifest);

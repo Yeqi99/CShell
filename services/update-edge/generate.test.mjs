@@ -1,5 +1,13 @@
-import {test} from 'node:test';import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';import {mergeRelease} from './generate.mjs';
+import {test} from 'node:test';import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';import {mergeRelease,verifyReleaseAssets} from './generate.mjs';
 const previous=JSON.parse(await readFile(new URL('previous-manifest.json',import.meta.url),'utf8'));
+test('matching public assets cannot revive an explicitly blocked candidate inventory',()=>{
+ const expected={sha:'source',status:'candidate-not-published',assets:[{name:'package',size:10,sha256:'a'.repeat(64)}]};
+ const release={target_commitish:'source',assets:[{name:'package',size:10,digest:'sha256:'+'a'.repeat(64)}]};
+ assert.doesNotThrow(()=>verifyReleaseAssets(release,expected));
+ for(const status of ['blocked-runtime-rebuild-required','superseded','unknown'])assert.throws(()=>verifyReleaseAssets(release,{...expected,status}),/blocked or superseded/);
+ assert.throws(()=>verifyReleaseAssets({...release,target_commitish:'other'},expected),/source changed/);
+ assert.throws(()=>verifyReleaseAssets({...release,assets:[{...release.assets[0],size:11}]},expected),/differs/);
+});
 function fixture(){return Object.fromEntries(['opensource','pro'].map(e=>{const tag=e==='pro'?'pro-v0.8.17':'v0.8.17';return[e,{tag_name:tag,published_at:'2026-10-31T00:00:00Z',draft:false,prerelease:false,assets:Object.entries(previous.files).filter(([p])=>p.startsWith(`/downloads/${e}/v0.8.16/`)).map(([,a])=>({...a,name:a.name.replaceAll('0.8.16','0.8.17').replace('CShell-0.8.17-android-test.apk','CShell-0.8.17-android.apk'),browser_download_url:`https://github.com/Yeqi99/CShell/releases/download/${tag}/${a.name.replaceAll('0.8.16','0.8.17').replace('CShell-0.8.17-android-test.apk','CShell-0.8.17-android.apk')}`}))}]}));}
 test('all thirty old assets retained byte-for-byte; new catalogs stay in correct channels',()=>{const m=mergeRelease(previous,fixture());for(const[p,a]of Object.entries(previous.files))assert.deepEqual(m.files[p],a);assert.equal(Object.keys(m.files).length,60);for(const e of ['opensource','pro'])for(const a of m.catalogs[`/downloads/${e}/releases.json`][0].assets)assert.ok(a.browser_download_url.includes(`/downloads/${e}/v0.8.17/`));assert.equal(previous.version,'0.8.16');});
 test('draft, incomplete, duplicate, foreign URL or missing digest never become deployable',()=>{for(const mutate of [r=>r.pro.draft=true,r=>r.pro.assets.pop(),r=>r.pro.assets[1]=r.pro.assets[0],r=>r.pro.assets[0].browser_download_url='https://evil.test/x',r=>r.pro.assets[0].digest=null]){const r=fixture();mutate(r);assert.throws(()=>mergeRelease(previous,r));}});

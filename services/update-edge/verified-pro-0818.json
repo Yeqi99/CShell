@@ -1,7 +1,7 @@
 {
   "edition": "pro",
-  "sha": "f1a18b459d4b216cfa93a6a49bebee5ebaa1e8d8",
-  "status": "candidate-not-published",
+  "sha": "c88f9801bf1c9ff9a5569975546c49eccecbd0fb",
+  "status": "blocked-runtime-rebuild-required",
   "version": "0.8.18",
   "verification": "All local asset sizes and SHA-256 checked against the final 30-file inventory. Source targets fixed before committing this publication-control metadata. This file does not publish, deploy, or switch an update channel.",
   "assets": [
@@ -75,5 +75,6 @@
       "size": 1283,
       "sha256": "6d9b00fc9565dfc542a6f1b161d10004cf24b087bef60a483ceacda8c3d2e7db"
     }
-  ]
+  ],
+  "blockReason": "ManagedWechatService shutdown fix Core cd6ddfd / Pro d3be149 changes embedded and standalone agent.cjs; all 26 desktop/CAgent binaries and both SHA256SUMS require replacement. The 2 semantic-freshness Android APKs are unaffected. Do not publish this inventory."
 }

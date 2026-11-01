@@ -8,6 +8,7 @@ import { createServer as createPortProbe } from 'node:net';
 import { z } from 'zod';
 
 const configSchema = z.object({host:z.literal('127.0.0.1'),port:z.number().int().min(1).max(65535),apiToken:z.string().min(32).max(4096),dataDir:z.string().refine(isAbsolute),permissions:z.record(z.string(),z.unknown()),subscription:z.record(z.string(),z.unknown()).optional(),webhook:z.record(z.string(),z.unknown()).optional(),tls:z.unknown().optional()});
+const exited = (child:ChildProcess) => child.exitCode !== null || child.signalCode != null;
 export const managedWechatMethods = ['status','capabilities','contacts','conversations','history','moments','moment_detail','moments_interactions','send','send_file','receive','remark_read','remark_set','moments_publish','payment_parse','transfer_receive','red_packet_receive','payment_result'] as const;
 export type ManagedWechatOptions = {
   executable:string; configPath:string; files:Record<string,string>; authorize:()=>boolean;
@@ -42,7 +43,7 @@ export class ManagedWechatService {
     this.pending=this.startOwned().finally(()=>{this.pending=undefined;});return this.pending;
   }
   private async startOwned(){
-    this.guard();if(this.child&&this.child.exitCode===null){await this.health();return;}
+    this.guard();if(this.child&&!exited(this.child)){await this.health();return;}
     await this.verify();
     const info=await lstat(this.options.configPath);if(!info.isFile()||info.isSymbolicLink()||info.size>131072)throw Error('WECHAT_CONFIG_INVALID');
     const cfg=configSchema.parse(JSON.parse(await readFile(this.options.configPath,'utf8')));
@@ -54,23 +55,24 @@ export class ManagedWechatService {
     const child=this.launch(['--serve','--config',this.options.configPath]);this.child=child;
     let failed=false;child.once('error',()=>{failed=true;if(this.child===child){this.child=undefined;this.config=undefined;}});
     const until=Date.now()+(this.options.startupTimeoutMs??15000);
-    try{while(Date.now()<until){this.guard();if(failed||child.exitCode!==null)throw Error('WECHAT_SERVICE_START_FAILED');try{await this.health();return;}catch{if(failed||child.exitCode!==null)break;}await new Promise(r=>setTimeout(r,100));}throw Error('WECHAT_SERVICE_NOT_READY');}
+    try{while(Date.now()<until){this.guard();if(failed||exited(child))throw Error('WECHAT_SERVICE_START_FAILED');try{await this.health();return;}catch{if(failed||exited(child))break;}await new Promise(r=>setTimeout(r,100));}throw Error('WECHAT_SERVICE_NOT_READY');}
     catch(error){if(!failed)await this.stopOwned();throw error;}
   }
   async stop(){if(this.pending)await this.pending.catch(()=>{});await this.stopOwned();}
   private async stopOwned(){
     const owned=this.child;if(!owned)return;
-    if(owned.exitCode!==null){this.child=undefined;this.config=undefined;return;}
+    if(exited(owned)){this.child=undefined;this.config=undefined;if(owned.exitCode!==0)throw Error('WECHAT_SERVICE_EXITED_WITHOUT_CLEANUP_CONFIRMATION');return;}
     // The executable uses its same-user named event. Never kill WeChat or force native hook teardown.
     await this.verify();const stopper=this.launch(['--stop','--config',this.options.configPath]);
     let error=false;stopper.once('error',()=>{error=true;});
     const until=Date.now()+(this.options.stopTimeoutMs??15000);
-    while(owned.exitCode===null&&Date.now()<until&&!error)await new Promise(r=>setTimeout(r,50));
-    if(owned.exitCode===null)throw Error('WECHAT_SERVICE_STOP_UNCONFIRMED');
+    while(!exited(owned)&&Date.now()<until&&!error)await new Promise(r=>setTimeout(r,50));
+    if(!exited(owned))throw Error('WECHAT_SERVICE_STOP_UNCONFIRMED');
     this.child=undefined;this.config=undefined;
+    if(owned.exitCode!==0)throw Error('WECHAT_SERVICE_EXITED_WITHOUT_CLEANUP_CONFIRMATION');
   }
   private async call(path:string,body?:unknown):Promise<unknown>{
-    this.guard();const cfg=this.config;if(!cfg||!this.child||this.child.exitCode!==null)throw Error('WECHAT_SERVICE_NOT_RUNNING');
+    this.guard();const cfg=this.config;if(!cfg||!this.child||exited(this.child))throw Error('WECHAT_SERVICE_NOT_RUNNING');
     const payload=body===undefined?undefined:Buffer.from(JSON.stringify(body));if(payload&&payload.length>131072)throw Error('WECHAT_REQUEST_TOO_LARGE');
     return new Promise((ok,fail)=>{
       const req=request({host:'127.0.0.1',port:cfg.port,path,method:payload?'POST':'GET',agent:false,headers:{Authorization:'Bearer '+cfg.apiToken,...(payload?{'Content-Type':'application/json','Content-Length':payload.length}:{})}},res=>{

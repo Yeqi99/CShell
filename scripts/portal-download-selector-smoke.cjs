@@ -4,7 +4,13 @@ const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),
  const root=path.resolve('services/portal');fs.mkdirSync('test-results/download-selector',{recursive:true});
  const source=fs.readFileSync(path.join(root,'downloads.html'),'utf8'),previous=execFileSync('git',['show','HEAD:services/portal/downloads.html'],{encoding:'utf8'});
  const assets=html=>[...html.matchAll(/<article class="download-package"[\s\S]*?<\/article>/g)].map(m=>({url:m[0].match(/class="secondary" href="([^"]+)"/)[1],digest:m[0].match(/sha256:([a-f0-9]{64})/)[1]}));
- assert.deepEqual(assets(source),assets(previous),'Existing attachments and checksums must remain identical');
+ const version=assets(source)[0].url.match(/\/v([0-9.]+)\//)[1];
+ const inventoryPath=path.resolve('docs/release-evidence/final-'+version+'-inventory.json');
+ if(fs.existsSync(inventoryPath)){
+  const inventory=JSON.parse(fs.readFileSync(inventoryPath,'utf8'));
+  for(const asset of assets(source)){const [,edition,,name]=asset.url.split('/').slice(1);const file=inventory.files.find(f=>f.edition===edition&&f.name===name);assert(file,'Missing verified artifact: '+asset.url);assert.equal(asset.digest,file.sha256,'Artifact checksum: '+name);}
+  assert.deepEqual(assets(source).map(a=>a.url.replace(/\d+\.\d+\.\d+/g,'VERSION')),assets(previous).map(a=>a.url.replace(/\d+\.\d+\.\d+/g,'VERSION')),'Preserve platform coverage and architecture selection');
+ }else assert.deepEqual(assets(source),assets(previous),'Existing attachments and checksums must remain identical');
  const server=http.createServer((q,r)=>{const file=path.resolve(root,'.'+new URL(q.url,'http://local').pathname);if(!file.startsWith(root+path.sep)){r.writeHead(403).end();return;}try{r.setHeader('Content-Type',({'.html':'text/html;charset=utf-8','.css':'text/css','.js':'text/javascript','.svg':'image/svg+xml'})[path.extname(file)]||'application/octet-stream');r.end(fs.readFileSync(file));}catch{r.writeHead(404).end();}});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const origin=process.env.PORTAL_ORIGIN||'http://127.0.0.1:'+server.address().port;
  const bs=await chromium.launchServer({channel:'msedge'});let browser;
@@ -24,6 +30,6 @@ const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),
  }
  await page.goto(origin+'/downloads.html?product=cagent&system=linux');assert((await page.locator('#linux-install-command').textContent()).endsWith('-- cagent'));await page.getByRole('radio',{name:/开源版/}).check();assert((await page.locator('#linux-install-command').textContent()).endsWith('-- cshell'));
  const nojs=await browser.newContext({javaScriptEnabled:false});try{const page=await nojs.newPage();await page.goto(origin+'/downloads.html');assert.equal(await page.locator('.download-package:visible').count(),assets(source).length);}finally{await nojs.close();}
- assert.deepEqual(errors,[]);console.log('PASS: unchanged attachment URLs/digests; Linux/macOS architecture selection, share/reload, Windows reset, CAgent Android empty state, invalid query fallback, no-JS all packages; 1440/700/390/320px and expanded checksums; no JS errors');
+ assert.deepEqual(errors,[]);console.log('PASS: verified inventory attachment URLs/digests; Linux/macOS architecture selection, share/reload, Windows reset, CAgent Android empty state, invalid query fallback, no-JS all packages; 1440/700/390/320px and expanded checksums; no JS errors');
  }finally{await bs.kill();server.closeAllConnections();await new Promise(r=>server.close(r));}
 })().catch(e=>{console.error(e);process.exitCode=1});

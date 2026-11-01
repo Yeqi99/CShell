@@ -1,6 +1,6 @@
 {
   "version": "0.8.18",
-  "status": "candidate-not-published",
+  "status": "blocked-runtime-rebuild-required",
   "verifiedAt": "2026-11-01T09:44:42.840Z",
   "files": [
     {
@@ -212,6 +212,161 @@
       "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\final-checksums\\pro\\SHA256SUMS.txt",
       "size": 1283,
       "sha256": "6d9b00fc9565dfc542a6f1b161d10004cf24b087bef60a483ceacda8c3d2e7db"
+    }
+  ],
+  "blockReason": "ManagedWechatService shutdown fix Core cd6ddfd / Pro d3be149 changes embedded and standalone agent.cjs; all 26 desktop/CAgent binaries and both SHA256SUMS require replacement. The 2 semantic-freshness Android APKs are unaffected. Do not publish this inventory.",
+  "invalidated": [
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.18-linux-arm64.AppImage",
+      "reason": "Embedded or standalone CAgent runtime changed"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.18-linux-arm64.deb",
+      "reason": "Embedded or standalone CAgent runtime changed"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.18-mac-x64.dmg",
+      "reason": "Embedded or standalone CAgent runtime changed"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.18-linux-amd64.deb",
+      "reason": "Embedded or standalone CAgent runtime changed"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.18-linux-x86_64.AppImage",
+      "reason": "Embedded or standalone CAgent runtime changed"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.18-mac-arm64.dmg",
+      "reason": "Embedded or standalone CAgent runtime changed"
+    },
+    {
+      "edition": "opensource",
+      "name": "CAgent-0.8.18-mac-x64.tar.gz",
+      "reason": "Embedded or standalone CAgent runtime changed"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-mac-x64.dmg",
+      "reason": "Embedded or standalone CAgent runtime changed"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-mac-x64.zip",
+      "reason": "Embedded or standalone CAgent runtime changed"
+    },
+    {
+      "edition": "opensource",
+      "name": "CAgent-0.8.18-mac-arm64.tar.gz",
+      "reason": "Embedded or standalone CAgent runtime changed"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-mac-arm64.dmg",
+      "reason": "Embedded or standalone CAgent runtime changed"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-mac-arm64.zip",
+      "reason": "Embedded or standalone CAgent runtime changed"
+    },
+    {
+      "edition": "opensource",
+      "name": "CAgent-0.8.18-linux-arm64.tar.gz",
+      "reason": "Embedded or standalone CAgent runtime changed"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-linux-arm64.AppImage",
+      "reason": "Embedded or standalone CAgent runtime changed"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-linux-arm64.deb",
+      "reason": "Embedded or standalone CAgent runtime changed"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-linux-amd64.deb",
+      "reason": "Embedded or standalone CAgent runtime changed"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-linux-x86_64.AppImage",
+      "reason": "Embedded or standalone CAgent runtime changed"
+    },
+    {
+      "edition": "opensource",
+      "name": "CAgent-0.8.18-linux-x64.tar.gz",
+      "reason": "Embedded or standalone CAgent runtime changed"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-win-x64.exe",
+      "reason": "Embedded or standalone CAgent runtime changed"
+    },
+    {
+      "edition": "opensource",
+      "name": "CAgent-Setup-0.8.18-win-x64.exe",
+      "reason": "Embedded or standalone CAgent runtime changed"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.18-win-x64.exe",
+      "reason": "Embedded or standalone CAgent runtime changed"
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-Setup-0.8.18-win-x64.exe",
+      "reason": "Embedded or standalone CAgent runtime changed"
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-0.8.18-mac-arm64.tar.gz",
+      "reason": "Embedded or standalone CAgent runtime changed"
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-0.8.18-linux-arm64.tar.gz",
+      "reason": "Embedded or standalone CAgent runtime changed"
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-0.8.18-mac-x64.tar.gz",
+      "reason": "Embedded or standalone CAgent runtime changed"
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-0.8.18-linux-x64.tar.gz",
+      "reason": "Embedded or standalone CAgent runtime changed"
+    },
+    {
+      "edition": "opensource",
+      "name": "SHA256SUMS.txt",
+      "reason": "Recompute after rebuilt binary hashes"
+    },
+    {
+      "edition": "pro",
+      "name": "SHA256SUMS.txt",
+      "reason": "Recompute after rebuilt binary hashes"
+    }
+  ],
+  "unaffected": [
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-android.apk",
+      "sha256": "ba932a8f7a64d5893fd42cbf416331501d853640ed71d92f33e93f3be875772c"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.18-android.apk",
+      "sha256": "3ba6032307c67f135477eedd876dafbb9fa17237126bc4cf174fbcaf34a72032"
     }
   ]
 }
