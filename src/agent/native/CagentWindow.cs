@@ -272,7 +272,7 @@ public class CagentWindow : Window {
 
   async Task VerifyCapabilityRuntime(string report){
     try{
-      string data=Environment.GetEnvironmentVariable("CSHELL_AGENT_DATA")??"";if(!data.Contains("native-ui-acceptance-data"))throw new Exception("Isolated acceptance data directory required");if(!connected)throw new Exception("Runtime did not connect");
+      if(!IsIsolatedAcceptanceData())throw new Exception("Isolated acceptance data directory required");if(!connected)throw new Exception("Runtime did not connect");
       string connection=json.Serialize(await Api("connection.settings"));var original=D(await Api("assistant.settings"));
       original.Remove("keyConfigured");original["endpoint"]="https://example.invalid/v1/chat/completions";original["model"]="acceptance-model";original["key"]="fixture-not-a-real-key";original["commands"]=false;original["review"]=true;original["automation"]=false;await Api("assistant.configure",original);
       var models=A(await Api("account.models"));string id="";foreach(var raw in models){var model=D(raw);if(S(model,"model")=="acceptance-model")id=S(model,"id");}if(id=="")throw new Exception("Saved model not listed");await Api("account.model.select",Obj("id",id));var settings=D(await Api("assistant.settings"));if(B(settings,"commands")||!B(settings,"review")||B(settings,"automation"))throw new Exception("Model selection overwrote permissions");
@@ -281,7 +281,7 @@ public class CagentWindow : Window {
       var appearance=D(await Api("account.appearance"));ApplyCloudAppearance(appearance);if(S(appearance,"theme")!="dark"||!darkAppearance)throw new Exception("Persisted cloud theme not applied");
       if(connection!=json.Serialize(await Api("connection.settings")))throw new Exception("Appearance changed connection settings");var finalSettings=D(await Api("assistant.settings"));finalSettings.Remove("keyConfigured");finalSettings["automation"]=false;await Api("assistant.configure",finalSettings);
       File.WriteAllText(report,json.Serialize(Obj("packagedRuntime",true,"modelListedAndSelected",true,"explicitPermissionsPreserved",true,"automationCreatedUpdatedDeletedPaused",true,"nativePanelsReached",true,"cloudThemeApplied",true,"connectionSettingsUnchanged",true,"modelCalled",false,"wechatUsed",false)),Encoding.UTF8);
-    }catch(Exception error){File.WriteAllText(report,json.Serialize(Obj("failure",error.ToString())),Encoding.UTF8);}try{await Api("agent.shutdown",Obj("confirm",true));}catch{}exiting=true;Close();
+    }catch(Exception error){File.WriteAllText(report,json.Serialize(Obj("failure",error.ToString())),Encoding.UTF8);}if(IsIsolatedAcceptanceData()){try{await Api("agent.shutdown",Obj("confirm",true));}catch{}}exiting=true;Close();
   }
   async Task Models(){
     var menu=ModelMenu(A(await Api("account.models")));menu.PlacementTarget=modelChip;menu.IsOpen=true;
@@ -552,7 +552,10 @@ public class CagentWindow : Window {
     if(B(s,"running"))ActionButton(p,"停止连接服务",async()=>{await Api("client.stop");await Remote();});
   }
   void SaveImage(string path){var bitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);bitmap.Render(this);var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bitmap));using(var output=File.Create(path))encoder.Save(output);}
+  static bool IsIsolatedAcceptanceData(){try{string raw=Environment.GetEnvironmentVariable("CSHELL_AGENT_DATA");if(String.IsNullOrWhiteSpace(raw))return false;string data=Path.GetFullPath(raw).TrimEnd(Path.DirectorySeparatorChar,Path.AltDirectorySeparatorChar);string temp=Path.GetFullPath(Path.GetTempPath()).TrimEnd(Path.DirectorySeparatorChar,Path.AltDirectorySeparatorChar);return String.Equals(Path.GetDirectoryName(data),temp,StringComparison.OrdinalIgnoreCase)&&Path.GetFileName(data).StartsWith("native-ui-acceptance-data-",StringComparison.Ordinal)&&Directory.Exists(data)&&(File.GetAttributes(data)&FileAttributes.ReparsePoint)==0;}catch{return false;}}
   [STAThread]public static void Main(string[] args){
+    if(args.Length>0&&args[0]=="--verify-capability-runtime"&&!IsIsolatedAcceptanceData()){if(args.Length>1)File.WriteAllText(args[1],"{\"blockedBeforeRuntime\":true}",Encoding.UTF8);return;}
+
     if(args.Length>0){new Application().Run(new CagentWindow(args));return;}
     string scope=System.Security.Principal.WindowsIdentity.GetCurrent().User.Value;
     using(var mutex=new System.Threading.Mutex(false,"Local\\CAgent.Window."+scope)){

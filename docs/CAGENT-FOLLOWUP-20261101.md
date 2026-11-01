@@ -42,3 +42,6 @@
 - 原生窗口：实际Models菜单、AutomationRules页面可达；真实API创建暂停间隔规则、更新记忆与秒级间隔、删除、重新显示列表；未启用规则执行。
 - 从隔离加密云快照恢复dark/字号偏好并经account.appearance应用；前后connection.settings等值。关闭重启后identity.enc摘要不变。
 - 临时数据在测试结束清理，不接触真实账号/设备数据；没有发送微信消息、短信、电话或模型请求。此验收证明本机包/UI/API链路，不替代用户账号云端登录、真实事件交付或自动化任务效果。报告 test-results/cagent-native-runtime-capabilities.json。
+
+实际微信事件验收补充：正式.56包监听进入listening，限定filehelper及指定测试文字，等待600秒后未收到匹配事件（匹配0、任务0）。已正常停止服务并恢复隔离订阅配置，没有发送任何消息。此项仍未通过，不能以synthetic event测试代替。
+原生验收测试入口进一步限制：Main启动后端前要求显式系统临时目录直属的native-ui-acceptance-data-随机目录且非重解析点；未设变量/工作区伪装前缀均在运行时启动前拒绝。误调用不会连默认CAgent或执行shutdown。重复实际包验收及两种误调用测试通过。
