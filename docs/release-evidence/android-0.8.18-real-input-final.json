@@ -15,7 +15,7 @@
     35
   ],
   "input": {
-    "device": "ea6fe3c",
+    "device": "physical-android-device",
     "transport": "USB forward + real mutual TLS",
     "inputInjected": true,
     "paired": true,
@@ -133,7 +133,7 @@
     "ok": true
   },
   "restored": {
-    "device": "ea6fe3c",
+    "device": "physical-android-device",
     "transport": "USB forward + real mutual TLS",
     "inputInjected": true,
     "paired": true,
