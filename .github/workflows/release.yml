@@ -37,6 +37,7 @@ jobs:
         run: node scripts/prepare-pty.mjs
       - run: pnpm build
       - run: pnpm test
+        timeout-minutes: 8
       - if: matrix.platform == 'win'
         name: Verify cancelled update and concurrent editor reload
         run: |
