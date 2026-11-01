@@ -38,6 +38,7 @@ export class CagentCloud {
       const selected=[...previous.filter(p=>p.id!==id),...(installed&&current?[current]:[])];
       const value={...this.cached,store:{...this.cached.store,capabilityPackages:selected}};
       await this.vault.write('cloud-bundle',value);this.cached=value;
+      if(Array.isArray(this.capabilityRestore))this.capabilityRestore=this.capabilityRestore.filter(p=>p.id!==id);
       }finally{this.paused=wasPaused;}
     });this.accountWrites=next;return next;
   }
