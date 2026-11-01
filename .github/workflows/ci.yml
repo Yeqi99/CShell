@@ -19,6 +19,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm test
+        timeout-minutes: 8
       - run: ./scripts/agent-native-exit-smoke.ps1
       - run: pnpm test:desktop
       - run: pnpm exec tsx scripts/rdp-layout-smoke.ts
