@@ -1,0 +1,39 @@
+{
+  "verification": "GitHub artifact SHA256, apksigner verify --print-certs and aapt2 package/version verified. Core filename from CI android-test is signed assembleRelease app (not instrumentation); copied unchanged to release filename. API29/35 latest unchanged production passed run41290463479. Physical-phone final update pending; not published.",
+  "files": [
+    {
+      "edition": "opensource",
+      "packageId": "org.canpshell.mobile",
+      "run": 41289862842,
+      "artifact": 13076438896,
+      "folder": "android-core-final",
+      "original": "CShell-0.8.18-android-test.apk",
+      "name": "CShell-0.8.18-android.apk",
+      "commit": "015163f8208fe08bd0437bcf613085b3a2f5ecb2",
+      "zipSha": "ad2e85f2ebb28f956cb3ccc536494a859e59961786cc01d933841a946e80d248",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\android-core-final\\CShell-0.8.18-android.apk",
+      "bytes": 4897262,
+      "sha256": "4572e18c6d9b6d85618b0efe12411c8a85472ed3c4f5193dded53e6dfb470ec3",
+      "certificateSha256": "34cc1c9a0eacafc512a0837c3d286081879822f047e5637a65cdbc5b525914c5",
+      "versionCode": 8018,
+      "versionName": "0.8.18"
+    },
+    {
+      "edition": "pro",
+      "packageId": "org.canpshell.mobile.pro",
+      "run": 41289864141,
+      "artifact": 13075949676,
+      "folder": "android-pro-final",
+      "original": "CShell-Pro-0.8.18-android.apk",
+      "name": "CShell-Pro-0.8.18-android.apk",
+      "commit": "d7125cc6905293fb63764ee14595297b71057255",
+      "zipSha": "8e092234dcb5ba3ad34563c893261348b124517e2f5d5e4bd6f6e2a0323fde34",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\android-pro-final\\CShell-Pro-0.8.18-android.apk",
+      "bytes": 4922658,
+      "sha256": "8eeda8df907a9cc131a5295e940850789b2406aa02318adafa1b6800250325cb",
+      "certificateSha256": "34cc1c9a0eacafc512a0837c3d286081879822f047e5637a65cdbc5b525914c5",
+      "versionCode": 8018,
+      "versionName": "0.8.18"
+    }
+  ]
+}

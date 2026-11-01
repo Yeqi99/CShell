@@ -1,0 +1,46 @@
+{
+  "version": "0.8.18",
+  "edition": "pro",
+  "sourceCommit": "d7fa33a6bcab7c10e39192e41f8f655cd5a43b1f",
+  "candidateCommit": "4a39eabc413485e4592760471fad38067449b9c4",
+  "workflowRun": 41291268681,
+  "verification": "Native runner packaged PTY/TLS and account.status/guest appearance restart; archive GitHub digest and embedded cloud implementation checked. Unsigned/not notarized. Not yet published.",
+  "files": [
+    {
+      "name": "CAgent-0.8.18-mac-arm64.tar.gz",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\pro-cagent-mac-arm64-final\\CAgent-0.8.18-mac-arm64.tar.gz",
+      "bytes": 39550085,
+      "sha256": "81cb8ad2298dcf26d522c8d1c876b5c0e9bd8952cb024044f5adf5f458a33dea",
+      "artifactId": 13077417406,
+      "artifactSha256": "1b7edcf555c6350e0b3ac5e30971b598ed8012b63ab1cf82a88c30da3e027fdb",
+      "runtimeCloudVerified": true
+    },
+    {
+      "name": "CAgent-0.8.18-linux-arm64.tar.gz",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\pro-cagent-linux-arm64-final\\CAgent-0.8.18-linux-arm64.tar.gz",
+      "bytes": 44560276,
+      "sha256": "0713f0f973831f05b3bb5d4ac1cd72a344cc9179ea470b1b250932105171723e",
+      "artifactId": 13077072819,
+      "artifactSha256": "907ff8d89649be6498afc92c918577232c0b35fb79578da8a3566f690dabacb9",
+      "runtimeCloudVerified": true
+    },
+    {
+      "name": "CAgent-0.8.18-mac-x64.tar.gz",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\pro-cagent-mac-x64-final\\CAgent-0.8.18-mac-x64.tar.gz",
+      "bytes": 40782709,
+      "sha256": "63a1a22c3342c2c89ead74a9021eed32e4a4b9cc26b34a1318d0bb9b9460cff6",
+      "artifactId": 13076733546,
+      "artifactSha256": "5cefc1babcf25bf7edd735bf5d5c2403252c0d86b12d61441a41b328d22d924d",
+      "runtimeCloudVerified": true
+    },
+    {
+      "name": "CAgent-0.8.18-linux-x64.tar.gz",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\pro-cagent-linux-x64-final\\CAgent-0.8.18-linux-x64.tar.gz",
+      "bytes": 44875055,
+      "sha256": "0049d23aa175d7f0d64826dc01d25c8691a20b5d1127025197fdbb5fd86acf3a",
+      "artifactId": 13076588898,
+      "artifactSha256": "0f65259992fa81164faa8a0e8999773f3fee453ce7b9a3898995e7029fd58d98",
+      "runtimeCloudVerified": true
+    }
+  ]
+}

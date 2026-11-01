@@ -1,0 +1,209 @@
+{
+  "base": "/opt/cshell-release-staging/0.8.18-focus-ca92",
+  "status": "private-staged-superseded-candidate-do-not-publish",
+  "verifiedAt": "2026-11-01T09:09:31.249Z",
+  "count": 22,
+  "totalBytes": 2319076328,
+  "productionUntouched": true,
+  "files": [
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.18-linux-arm64.AppImage",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-Pro-0.8.18-linux-arm64.AppImage",
+      "bytes": 140957092,
+      "sha256": "5c81106e1d15a995c3b93cfcd1b24609f00f212c6d8e9071205c40de556e8172",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-focus-ca92/pro/CShell-Pro-0.8.18-linux-arm64.AppImage",
+      "result": "uploaded-verified"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.18-linux-arm64.deb",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-Pro-0.8.18-linux-arm64.deb",
+      "bytes": 103283076,
+      "sha256": "e78e058ad0f1da0828fc3863243abf6eefad9f10c0d1a9d0da3837e0e733e201",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-focus-ca92/pro/CShell-Pro-0.8.18-linux-arm64.deb",
+      "result": "uploaded-verified"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.18-linux-amd64.deb",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-Pro-0.8.18-linux-amd64.deb",
+      "bytes": 107782568,
+      "sha256": "5fb50f58a15639b5a6cc01af9fc3b68fe6ee6215cdbe1d8175c1da8e2548a072",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-focus-ca92/pro/CShell-Pro-0.8.18-linux-amd64.deb",
+      "result": "uploaded-verified"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.18-linux-x86_64.AppImage",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-Pro-0.8.18-linux-x86_64.AppImage",
+      "bytes": 139701886,
+      "sha256": "14c14d334f0816e57eeba4f2f55ab5a16cf354f2f4b8d874c219a8fb8bc14d1e",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-focus-ca92/pro/CShell-Pro-0.8.18-linux-x86_64.AppImage",
+      "result": "uploaded-verified"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.18-mac-arm64.dmg",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-Pro-0.8.18-mac-arm64.dmg",
+      "bytes": 142614148,
+      "sha256": "a2a4ff3179ab49e0ea4d0dc16c1812ddb47c420f95c65aed0f75f7dcc9d460e6",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-focus-ca92/pro/CShell-Pro-0.8.18-mac-arm64.dmg",
+      "result": "uploaded-verified"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.18-mac-x64.dmg",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-Pro-0.8.18-mac-x64.dmg",
+      "bytes": 146425713,
+      "sha256": "32b8a2fc2c8581918eced6d19a5e661cd00ec035bd141a8ae7c2ce87bcab8ace",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-focus-ca92/pro/CShell-Pro-0.8.18-mac-x64.dmg",
+      "result": "uploaded-verified"
+    },
+    {
+      "edition": "opensource",
+      "name": "CAgent-0.8.18-linux-arm64.tar.gz",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CAgent-0.8.18-linux-arm64.tar.gz",
+      "bytes": 44504556,
+      "sha256": "9aa0249b69e28850635b6e49d26d4cdab997124eb828a4c2cfe8d2a4c2ebfd99",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-focus-ca92/opensource/CAgent-0.8.18-linux-arm64.tar.gz",
+      "result": "uploaded-verified"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-linux-arm64.AppImage",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-0.8.18-linux-arm64.AppImage",
+      "bytes": 140723396,
+      "sha256": "78df02bbc820df4abc92301ffa5c74ba7b581d53f55df2896cd52ffdbad3fc77",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-focus-ca92/opensource/CShell-0.8.18-linux-arm64.AppImage",
+      "result": "uploaded-verified"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-linux-arm64.deb",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-0.8.18-linux-arm64.deb",
+      "bytes": 103036108,
+      "sha256": "38f3b9410b4c75f1cdcc7f6b56772bd38d18f6ec255db11dfc5eb4b1885d7192",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-focus-ca92/opensource/CShell-0.8.18-linux-arm64.deb",
+      "result": "uploaded-verified"
+    },
+    {
+      "edition": "opensource",
+      "name": "CAgent-0.8.18-linux-x64.tar.gz",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CAgent-0.8.18-linux-x64.tar.gz",
+      "bytes": 44818057,
+      "sha256": "9bcc386a3a9d124faeefc8a42cf26c7bb5f62d1466f60f14e6ad5b463d062924",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-focus-ca92/opensource/CAgent-0.8.18-linux-x64.tar.gz",
+      "result": "uploaded-verified"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-linux-amd64.deb",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-0.8.18-linux-amd64.deb",
+      "bytes": 108875084,
+      "sha256": "368de47e39454ec5cb0892b5366e4e59dfc09ad0b43f1b6c536395a56cc27bee",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-focus-ca92/opensource/CShell-0.8.18-linux-amd64.deb",
+      "result": "uploaded-verified"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-linux-x86_64.AppImage",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-0.8.18-linux-x86_64.AppImage",
+      "bytes": 139464087,
+      "sha256": "10c5b36395e0c11f153ce2c290b59619d619636f0cb507f43c9761b496e4fcf0",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-focus-ca92/opensource/CShell-0.8.18-linux-x86_64.AppImage",
+      "result": "uploaded-verified"
+    },
+    {
+      "edition": "opensource",
+      "name": "CAgent-0.8.18-mac-arm64.tar.gz",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CAgent-0.8.18-mac-arm64.tar.gz",
+      "bytes": 39500212,
+      "sha256": "53c17fdbec07ffee242e9c94233fec78b42ce6e8335c81d432d11ff28a9947ae",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-focus-ca92/opensource/CAgent-0.8.18-mac-arm64.tar.gz",
+      "result": "uploaded-verified"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-mac-arm64.dmg",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-0.8.18-mac-arm64.dmg",
+      "bytes": 142331149,
+      "sha256": "7057cc2eb6f9dd53432681b385c165f0ec552ce7155c0dc86866551f892c472c",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-focus-ca92/opensource/CShell-0.8.18-mac-arm64.dmg",
+      "result": "uploaded-verified"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-mac-arm64.zip",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-0.8.18-mac-arm64.zip",
+      "bytes": 142174011,
+      "sha256": "3edcbeba5311aefc5514e33eaeaf13a73083f10090dfa78b446d687687ae2f29",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-focus-ca92/opensource/CShell-0.8.18-mac-arm64.zip",
+      "result": "uploaded-verified"
+    },
+    {
+      "edition": "opensource",
+      "name": "CAgent-0.8.18-mac-x64.tar.gz",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CAgent-0.8.18-mac-x64.tar.gz",
+      "bytes": 40730624,
+      "sha256": "55d73fc47ace14b387058214ab1d0623162a2996aada94d2dc52e1358adeb2fb",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-focus-ca92/opensource/CAgent-0.8.18-mac-x64.tar.gz",
+      "result": "uploaded-verified"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-mac-x64.dmg",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-0.8.18-mac-x64.dmg",
+      "bytes": 146124842,
+      "sha256": "c352e0b0d1ac7a3e000858971a12b91d1c078f11017a1c8a150e80937a9811b1",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-focus-ca92/opensource/CShell-0.8.18-mac-x64.dmg",
+      "result": "uploaded-verified"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-mac-x64.zip",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-0.8.18-mac-x64.zip",
+      "bytes": 146015462,
+      "sha256": "c44125c147b648318b2ff92c934275a3757d808d66178b33e1be9bfdaa1e471b",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-focus-ca92/opensource/CShell-0.8.18-mac-x64.zip",
+      "result": "uploaded-verified"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-win-x64.exe",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\release\\0.8.18\\CShell-0.8.18-win-x64.exe",
+      "bytes": 123697131,
+      "sha256": "96f433234ffffbb2958100c0d013d081e5fe97f09b1df36f2cfcbea685e8597c",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-focus-ca92/opensource/CShell-0.8.18-win-x64.exe",
+      "result": "uploaded-verified"
+    },
+    {
+      "edition": "opensource",
+      "name": "CAgent-Setup-0.8.18-win-x64.exe",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\release\\0.8.18\\CAgent-Setup-0.8.18-win-x64.exe",
+      "bytes": 26178012,
+      "sha256": "b615b4f17a069005fc363ec77d906fb0eef16f796c5bdd54aaba7aa23edfcf2b",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-focus-ca92/opensource/CAgent-Setup-0.8.18-win-x64.exe",
+      "result": "uploaded-verified"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.18-win-x64.exe",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\release\\pro-0.8.18\\CShell-Pro-0.8.18-win-x64.exe",
+      "bytes": 123907652,
+      "sha256": "81dafe0c9ef8f100e962ab5bafb15bf655439d9abab80f9f9a9984c1904659ec",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-focus-ca92/pro/CShell-Pro-0.8.18-win-x64.exe",
+      "result": "uploaded-verified"
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-Setup-0.8.18-win-x64.exe",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\CAgent-Setup-0.8.18-win-x64-final.exe",
+      "bytes": 26231462,
+      "sha256": "e3663e4a6821aaa8f1a11edb88e91f4466dec9039dae3dff43c47f6307aff61d",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-focus-ca92/pro/CAgent-Setup-0.8.18-win-x64.exe",
+      "result": "uploaded-verified"
+    }
+  ],
+  "releaseHold": "Final source audit requires Core desktop/CAgent and Pro desktop rebuild; keep this receipt only as historical private-staging evidence. No new POSIX/Android/checksum append performed."
+}
