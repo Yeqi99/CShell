@@ -258,6 +258,7 @@ export class AiService {
   }
   async load(initializeNewInstallation = false) {
     this.untouchedInstallationPolicy = false;
+    this.policy = emptyAiPolicy();
     try {
       const data = JSON.parse(
         await this.store.decryptPrivate(await readFile(join(this.directory, 'ai.enc'), 'utf8')),

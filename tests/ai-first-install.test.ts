@@ -32,6 +32,10 @@ test('only explicitly fresh desktop installation initializes known AI capabiliti
   legacy.policy=newInstallationAiPolicy();delete legacy.untouchedInstallationPolicy;
   await writeFile(join(dir,'ai.enc'),JSON.stringify(legacy));
   assert.deepEqual((await open(true)).ai.registrationPolicy(),emptyAiPolicy(),'legacy identical grants do not imply first-install origin');
+  await first.ai.savePolicy(newInstallationAiPolicy());
+  await rm(join(dir,'ai.enc'));
+  await first.ai.load(false);
+  assert.deepEqual(first.ai.snapshot().policy,emptyAiPolicy(),'same instance reload with missing account file does not retain earlier grants');
  }finally{services.forEach(ai=>ai.dispose());await rm(dir,{recursive:true,force:true});}
 });
 
