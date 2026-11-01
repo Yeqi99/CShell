@@ -45,16 +45,12 @@ final class AndroidInputTest implements AutoCloseable {
     if(android.os.Build.VERSION.SDK_INT>=31){
       test.getUiAutomation(UiAutomation.FLAG_DONT_USE_ACCESSIBILITY|UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES);
     }else{
-      // API29 ignores the later DONT_USE flag. Its still-running UiAutomation
-      // thread was observed holding AccessibilityCache while awaiting the main
-      // thread, which itself waited for that cache lock. Stop only the test
-      // driver's event subscription; keep the product service fully enabled.
-      android.accessibilityservice.AccessibilityServiceInfo info=automation.getServiceInfo();
-      check(info!=null,"Test driver accessibility settings unavailable");
-      info.packageNames=new String[]{"org.canpshell.instrumentation.no-accessibility-target"};
-      info.eventTypes=0;automation.setServiceInfo(info);
-      android.accessibilityservice.AccessibilityServiceInfo applied=automation.getServiceInfo();
-      check(applied!=null&&applied.eventTypes==0&&java.util.Arrays.equals(applied.packageNames,info.packageNames),"Test driver event filter not applied");
+      // API29 delivers cache-maintenance events even with eventTypes=0.
+      // Destroy only the instrumentation driver's connection via its TestApi;
+      // retaining that connection deadlocks its shared node cache against the
+      // application's main thread. No product permission/service is changed.
+      UiAutomation.class.getMethod("destroy").invoke(automation);
+      check(Boolean.TRUE.equals(UiAutomation.class.getMethod("isDestroyed").invoke(automation)),"Test driver remained connected");
     }
     sampler.scheduleAtFixedRate(()->{
       if(!AndroidControlService.isEditing())return;
