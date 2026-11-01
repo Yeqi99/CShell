@@ -22,3 +22,9 @@
 两渠道公开附件和 source 逐一确认后，运行 `services/update-edge/generate.mjs --released --version 0.8.18 --previous manifest.json`。它必须验证正式 public release 与精确清单一致，然后才允许部署边缘更新路由和切换两份版本目录。官网、文档及下载入口使用同一摘要库存；完成实际检查/完整下载/摘要与安装入口验收，再更新本机对应版本。
 
 本流程不部署新下载服务、不公开私有微信实现、不更改用户会话或安装现有机器，也不把准备好的工作流当作已发布结果。
+
+## 微信能力包独立发行
+
+`verified-wechat-012.json` 固定六个附件，取自香港私有暂存收据 `54b6715` 的精确名称、大小和 SHA256。只允许 4.1.15.56 / 4.2.0.12 两组 capability JSON、manifest JSON 和 frozen runtime ZIP，不接受实现源码归档。当前该清单仍被阻止；开始正式发布前固定公共仓库的精确 source SHA。
+
+正式开始后才把这六个已授权公开的二进制附件放到现有站点 `/downloads/toolkit/v0.1.2/`，不包含私有目录或凭据。专用分支 `codex/publish-wechat-0.1.2-stage` 调用 `--market-stage`，完整下载与摘要核验后在 `Yeqi99/CShell` 创建 `wechat-toolkit-v0.1.2` draft。复核后 `codex/publish-wechat-0.1.2-publish` 执行 `--market-publish`。既有已公开同 tag 只允许精确校验后保持不变，绝不覆盖。市场实际下载仍走已固定的 GitHub Release URL，不修改能力下载 allowlist。
