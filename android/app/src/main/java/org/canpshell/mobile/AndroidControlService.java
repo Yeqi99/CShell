@@ -31,7 +31,7 @@ public final class AndroidControlService extends AccessibilityService {
         result.complete(new org.json.JSONObject().put("nodes",nodes).put("available",root!=null).put("truncated",nodes.length()>=300)
           .put("input",new org.json.JSONObject().put("width",metrics.widthPixels).put("height",metrics.heightPixels)
             .put("processed",service.processed).put("phase",service.phase).put("gesture",service.gestureState)
-            .put("editing",service.editBusy)));
+            .put("editing",service.editBusy).put("editState",lastEditState)));
       }catch(Exception error){result.completeExceptionally(error);}finally{if(root!=null)root.recycle();}
     });
     try{return result.get(3,java.util.concurrent.TimeUnit.SECONDS);}
@@ -227,28 +227,50 @@ public final class AndroidControlService extends AccessibilityService {
     }
   }
   private AccessibilityNodeInfo focused(){
+    // WebView focus and caret snapshots can remain stale after a real gesture
+    // or ACTION_SET_TEXT. Input must not depend on a later semantic read to
+    // invalidate that cache; obtain current OS focus for every edit/settle step.
+    if(android.os.Build.VERSION.SDK_INT>=33)clearCache();
     // Android 10 can temporarily return no global input focus while the IME
     // updates. Only fall back to a focused application window's actual input
     // focus, never an arbitrary editable field or a remembered node.
     {
       AccessibilityNodeInfo node=findFocus(AccessibilityNodeInfo.FOCUS_INPUT);
-      if(node!=null){if(node.isFocused())return node;node.recycle();}
-      for(android.view.accessibility.AccessibilityWindowInfo window:getWindows()){
-        try{
+      if(node!=null){if(node.isFocused()&&node.isEditable())return node;node.recycle();}
+      java.util.List<android.view.accessibility.AccessibilityWindowInfo> windows=getWindows();
+      try{for(android.view.accessibility.AccessibilityWindowInfo window:windows){
           if(window.getType()!=android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION||!window.isFocused())continue;
           AccessibilityNodeInfo root=window.getRoot();if(root==null)continue;
-          try{node=root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);if(node!=null){if(node.isFocused())return node;node.recycle();}}finally{root.recycle();}
-        }finally{window.recycle();}
-      }
+          try{node=root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);if(node!=null){if(node.isFocused()&&node.isEditable())return node;node.recycle();}node=focusedDescendant(root);if(node!=null)return node;}finally{root.recycle();}
+      }}finally{for(android.view.accessibility.AccessibilityWindowInfo window:windows)window.recycle();}
     }
     return null;
   }
+  // Embedded virtual editors may not implement findFocus, despite reporting
+  // actual input focus on their child. Require one visible focused editor in
+  // the currently focused application window; never choose an arbitrary field.
+  private AccessibilityNodeInfo focusedDescendant(AccessibilityNodeInfo root){
+    java.util.ArrayList<AccessibilityNodeInfo> matches=new java.util.ArrayList<>();
+    int[] remaining={300};collectFocused(root,0,remaining,matches);
+    if(matches.size()==1&&remaining[0]>0)return matches.get(0);
+    for(AccessibilityNodeInfo node:matches)node.recycle();return null;
+  }
+  private void collectFocused(AccessibilityNodeInfo node,int depth,int[] remaining,java.util.ArrayList<AccessibilityNodeInfo> matches){
+    if(depth>24){remaining[0]=0;return;}if(remaining[0]--<=0||matches.size()>1||!node.isVisibleToUser())return;
+    if(node.isFocused()&&node.isEditable())matches.add(AccessibilityNodeInfo.obtain(node));
+    if(node.isPassword())return;
+    for(int i=0;i<node.getChildCount()&&remaining[0]>0&&matches.size()<2;i++){
+      AccessibilityNodeInfo child=node.getChild(i);if(child==null)continue;
+      try{collectFocused(child,depth+1,remaining,matches);}finally{child.recycle();}
+    }
+  }
   private void insert(String text){
-    if(text.length()>4096)return;AccessibilityNodeInfo node=focused();if(node==null)return;
-    try{if(!node.isEditable()||node.isPassword())return;String old=node.isShowingHintText()||node.getText()==null?"":node.getText().toString();if(old.length()>1_000_000)return;
-      int start=node.getTextSelectionStart(),end=node.getTextSelectionEnd();if(start<0||end<0){start=old.length();end=start;}int lo=Math.min(start,end),hi=Math.max(start,end);if(hi>old.length())return;
+    if(text.length()>4096)return;AccessibilityNodeInfo node=focused();if(node==null){lastEditState="text:no-input-focus";return;}
+    try{if(!node.isEditable()||node.isPassword()){lastEditState="text:target-unavailable:editable="+node.isEditable()+",password="+node.isPassword()+",class="+node.getClassName();return;}String old=node.isShowingHintText()||node.getText()==null?"":node.getText().toString();if(old.length()>1_000_000)return;
+      int start=node.getTextSelectionStart(),end=node.getTextSelectionEnd();if(start<0||end<0){start=old.length();end=start;}int lo=Math.min(start,end),hi=Math.max(start,end);if(hi>old.length()){lastEditState="text:invalid-selection";return;}
       Bundle args=new Bundle();args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,old.substring(0,lo)+text+old.substring(hi));
       if(node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT,args))settleEdit(node,old.substring(0,lo)+text+old.substring(hi),lo+text.length());
+      else lastEditState="text:rejected";
     }finally{node.recycle();}
   }
   private void backspace(){AccessibilityNodeInfo node=focused();if(node==null){lastEditState="backspace:no-input-focus";return;}

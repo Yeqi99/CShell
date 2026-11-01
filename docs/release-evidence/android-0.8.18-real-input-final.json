@@ -1,0 +1,256 @@
+{
+  "schema": 1,
+  "date": "2026-11-01",
+  "candidate": "8309398bce833b857057b36e08c0f3ac619e4f23",
+  "version": "0.8.18",
+  "apkSha256": "7f9f866c1767f991370e4171619e29c53b29cf41487a08413c39ed7205adbd78",
+  "apkBytes": 4923366,
+  "installedApkRehashed": true,
+  "installedAt": "2026-11-01 21:08:21",
+  "androidApi": 36,
+  "transport": "USB forward and actual mutually authenticated CAgent TLS",
+  "instrumentationRun": 41309477156,
+  "instrumentationApis": [
+    29,
+    35
+  ],
+  "input": {
+    "device": "ea6fe3c",
+    "transport": "USB forward + real mutual TLS",
+    "inputInjected": true,
+    "paired": true,
+    "status": {
+      "enabled": true,
+      "listening": true,
+      "viewAllowed": true,
+      "controlAllowed": true,
+      "busy": false,
+      "reason": "",
+      "recoverable": false,
+      "qualityModes": [
+        "bounded"
+      ],
+      "packageReady": true,
+      "nativeAvailable": true,
+      "inputFeatures": [
+        "unicode-text"
+      ],
+      "implementation": "android-mediaprojection-mediacodec",
+      "relay": false,
+      "config": {
+        "enabled": true,
+        "authenticatedPeers": true,
+        "directListener": false
+      }
+    },
+    "tools": [
+      "android_sms_read",
+      "android_sms_send",
+      "android_call",
+      "android_call_answer",
+      "android_ui_read"
+    ],
+    "frames": 50,
+    "notices": [],
+    "video": {
+      "width": 1080,
+      "height": 2400,
+      "sourceWidth": 1080,
+      "sourceHeight": 2400,
+      "fps": 10,
+      "codec": "avc1.640032",
+      "encoder": "c2.qti.avc.encoder",
+      "hardware": true
+    },
+    "passwordHidden": true,
+    "textInputVerified": true,
+    "deletionMs": 3371,
+    "deletionEventsProcessed": 16,
+    "searchRestored": true,
+    "inputDiagnostics": {
+      "width": 1080,
+      "height": 2400,
+      "processed": 56,
+      "phase": "idle",
+      "gesture": "completed",
+      "editing": false,
+      "editState": "edit:applied"
+    },
+    "safeUi": [
+      {
+        "text": "扩展",
+        "bounds": [
+          55,
+          335,
+          199,
+          424
+        ],
+        "clickable": false
+      },
+      {
+        "text": "连接",
+        "bounds": [
+          199,
+          2193,
+          372,
+          2340
+        ],
+        "clickable": true
+      },
+      {
+        "text": "文件",
+        "bounds": [
+          538,
+          2193,
+          711,
+          2340
+        ],
+        "clickable": true
+      },
+      {
+        "text": "扩展",
+        "bounds": [
+          708,
+          2193,
+          879,
+          2340
+        ],
+        "clickable": true
+      },
+      {
+        "text": "设置",
+        "bounds": [
+          876,
+          2193,
+          1050,
+          2340
+        ],
+        "clickable": true
+      }
+    ],
+    "reconnectSameIdentity": true,
+    "reconnectedViewAllowed": true,
+    "ok": true
+  },
+  "restored": {
+    "device": "ea6fe3c",
+    "transport": "USB forward + real mutual TLS",
+    "inputInjected": true,
+    "paired": true,
+    "status": {
+      "enabled": true,
+      "listening": true,
+      "viewAllowed": true,
+      "controlAllowed": true,
+      "busy": false,
+      "reason": "",
+      "recoverable": false,
+      "qualityModes": [
+        "bounded"
+      ],
+      "packageReady": true,
+      "nativeAvailable": true,
+      "inputFeatures": [
+        "unicode-text"
+      ],
+      "implementation": "android-mediaprojection-mediacodec",
+      "relay": false,
+      "config": {
+        "enabled": true,
+        "authenticatedPeers": true,
+        "directListener": false
+      }
+    },
+    "tools": [
+      "android_sms_read",
+      "android_sms_send",
+      "android_call",
+      "android_call_answer",
+      "android_ui_read"
+    ],
+    "frames": 5,
+    "notices": [],
+    "video": {
+      "width": 1080,
+      "height": 2400,
+      "sourceWidth": 1080,
+      "sourceHeight": 2400,
+      "fps": 10,
+      "codec": "avc1.640032",
+      "encoder": "c2.qti.avc.encoder",
+      "hardware": true
+    },
+    "passwordHidden": true,
+    "contextRestored": true,
+    "inputDiagnostics": {
+      "width": 1080,
+      "height": 2400,
+      "processed": 59,
+      "phase": "idle",
+      "gesture": "completed",
+      "editing": false,
+      "editState": "edit:applied"
+    },
+    "safeUi": [
+      {
+        "text": "CAgent",
+        "bounds": [
+          55,
+          335,
+          312,
+          424
+        ],
+        "clickable": false
+      },
+      {
+        "text": "连接",
+        "bounds": [
+          199,
+          2193,
+          372,
+          2340
+        ],
+        "clickable": true
+      },
+      {
+        "text": "文件",
+        "bounds": [
+          538,
+          2193,
+          711,
+          2340
+        ],
+        "clickable": true
+      },
+      {
+        "text": "扩展",
+        "bounds": [
+          708,
+          2193,
+          879,
+          2340
+        ],
+        "clickable": true
+      },
+      {
+        "text": "设置",
+        "bounds": [
+          876,
+          2193,
+          1050,
+          2340
+        ],
+        "clickable": true
+      }
+    ],
+    "reconnectSameIdentity": true,
+    "reconnectedViewAllowed": true,
+    "ok": true
+  },
+  "limits": [
+    "SMS/calls not sent; SIM and OS permission requirements remain",
+    "Eight validated backspaces completed in 3371 ms; not instant key latency",
+    "Read-only semantic diagnostics observed completion; independent API29/35 WebView regression has no semantic reads between edits",
+    "Projection kept running; new process/projection consent is not bypassed"
+  ]
+}

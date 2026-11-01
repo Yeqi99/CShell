@@ -1,0 +1,42 @@
+name: Publish verified release inventory
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Stage both drafts or publish both verified drafts
+        type: choice
+        options: [stage, publish, market-stage, market-publish]
+        default: stage
+        required: true
+  push:
+    branches:
+      - codex/publish-verified-0.8.18-stage
+      - codex/publish-verified-0.8.18-publish
+      - codex/publish-wechat-0.1.2-stage
+      - codex/publish-wechat-0.1.2-publish
+permissions:
+  contents: write
+concurrency:
+  group: verified-publication-0.8.18
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.repository == 'Yeqi99/CShell'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.22.1
+      - run: node --test scripts/publish-verified-candidates.test.mjs
+      - name: Verify both complete channels before publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_MODE: ${{ github.event.inputs.mode }}
+        run: |
+          MODE=stage
+          if [ "$REQUESTED_MODE" = publish ] || [ "$GITHUB_REF_NAME" = codex/publish-verified-0.8.18-publish ]; then MODE=publish; fi
+          if [ "$REQUESTED_MODE" = market-stage ] || [ "$GITHUB_REF_NAME" = codex/publish-wechat-0.1.2-stage ]; then MODE=market-stage; fi
+          if [ "$REQUESTED_MODE" = market-publish ] || [ "$GITHUB_REF_NAME" = codex/publish-wechat-0.1.2-publish ]; then MODE=market-publish; fi
+          node scripts/publish-verified-candidates.mjs --"$MODE"

@@ -152,15 +152,60 @@ final class AndroidInputTest implements AutoCloseable {
     AtomicReference<android.webkit.WebView> semantic=new AtomicReference<>();
     test.runOnMainSync(()->{
       android.webkit.WebView view=new android.webkit.WebView(app);view.getSettings().setJavaScriptEnabled(true);
-      ((FrameLayout)app.findViewById(android.R.id.content)).addView(view,new FrameLayout.LayoutParams(-1,100));semantic.set(view);
+      ((FrameLayout)app.findViewById(android.R.id.content)).addView(view,new FrameLayout.LayoutParams(-1,300));semantic.set(view);
       view.loadDataWithBaseURL(null,"<html><body><button>CAgent semantic page one</button></body></html>","text/html","UTF-8",null);
     });
     try{
       awaitSemanticText("CAgent semantic page one","CAgent semantic page two");
       test.runOnMainSync(()->semantic.get().evaluateJavascript("document.body.innerHTML='<button>CAgent semantic page two</button>'",null));
       awaitSemanticText("CAgent semantic page two","CAgent semantic page one");
+      test.runOnMainSync(()->semantic.get().evaluateJavascript("document.body.style='margin:0;height:100vh';document.body.innerHTML='<input id=remoteEdit aria-label=RemoteEdit style=width:100%;height:100%;box-sizing:border-box>'",null));
+      awaitWebValue(semantic.get(),"document.getElementById('remoteEdit')!==null","true");
+      // Cache the unfocused virtual editor, then exercise actual remote focus and
+      // typing without semantic reads that could hide stale input caches.
+      AndroidControlService.snapshot();tap(connection,semantic.get());
+      awaitWebValue(semantic.get(),"document.activeElement.id", "\"remoteEdit\"");
+      input(connection,new JSONObject().put("kind","text").put("text","CAgent42"));
+      awaitWebValue(semantic.get(),"document.getElementById('remoteEdit').value","\"CAgent42\"");
+      for(int i=0;i<8;i++)pressBackspace(connection);
+      awaitWebValue(semantic.get(),"document.getElementById('remoteEdit').value","\"\"");
+      long settledDeadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(3);
+      while(AndroidControlService.isEditing()&&System.nanoTime()<settledDeadline)Thread.sleep(25);
+      check(!AndroidControlService.isEditing(),"WebView edit did not settle before fixture navigation");
+      // Multiple available editors without input focus are not permission to
+      // select the first one. A rejected request must leave both DOM values.
+      test.runOnMainSync(()->semantic.get().evaluateJavascript("document.activeElement.blur();document.body.innerHTML='<input id=first value=first><input id=second value=second>'",null));
+      awaitWebValue(semantic.get(),"document.activeElement.tagName","\"BODY\"");
+      long before=processedInputs();input(connection,new JSONObject().put("kind","text").put("text","MUST-NOT-TYPE"));
+      long unfocusedDeadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(3);
+      while(processedInputs()==before&&System.nanoTime()<unfocusedDeadline)Thread.sleep(25);
+      check(processedInputs()>before,"Unfocused edit request was not processed");
+      awaitWebValue(semantic.get(),"document.getElementById('first').value+'|'+document.getElementById('second').value","\"first|second\"");
     }finally{test.runOnMainSync(()->{android.webkit.WebView view=semantic.get();((ViewGroup)view.getParent()).removeView(view);view.destroy();});}
     return "PASS encrypted remote input → real Accessibility tap, editable text, scan-code letter, repeated/Unicode/selection backspace, held Shift across tap, fail-stop gesture outcomes, fresh input recovery and current semantic content; productEvents="+actualEvents+"\n";
+  }
+  private void awaitWebValue(android.webkit.WebView view,String expression,String expected)throws Exception {
+    long end=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);String actual="";
+    do{java.util.concurrent.CountDownLatch done=new java.util.concurrent.CountDownLatch(1);AtomicReference<String> value=new AtomicReference<>();
+      test.runOnMainSync(()->view.evaluateJavascript(expression,result->{value.set(result);done.countDown();}));
+      check(done.await(2,TimeUnit.SECONDS),"WebView value query timed out");actual=value.get();
+      if(expected.equals(actual))return;Thread.sleep(50);
+    }while(System.nanoTime()<end);
+    throw new AssertionError("Remote WebView input mismatch: expected="+expected+", actual="+actual+", service="+AndroidControlService.editState()+", focus="+webFocusDiagnostics(view));
+  }
+  private long processedInputs()throws Exception {
+    java.lang.reflect.Field instance=AndroidControlService.class.getDeclaredField("instance");instance.setAccessible(true);
+    java.lang.reflect.Field processed=AndroidControlService.class.getDeclaredField("processed");processed.setAccessible(true);
+    return processed.getLong(instance.get(null));
+  }
+  private String webFocusDiagnostics(android.webkit.WebView view)throws Exception {
+    AtomicReference<String> report=new AtomicReference<>("");
+    test.runOnMainSync(()->{try{
+      java.lang.reflect.Field instance=AndroidControlService.class.getDeclaredField("instance");instance.setAccessible(true);
+      java.lang.reflect.Method focused=AndroidControlService.class.getDeclaredMethod("focused");focused.setAccessible(true);
+      android.view.accessibility.AccessibilityNodeInfo node=(android.view.accessibility.AccessibilityNodeInfo)focused.invoke(instance.get(null));
+      try{report.set("nativeEditor="+editor.hasFocus()+",webView="+view.hasFocus()+",node="+(node==null?"none":node.getClassName()+",focused="+node.isFocused()+",editable="+node.isEditable()+",window="+node.getWindowId()));}finally{if(node!=null)node.recycle();}
+    }catch(Exception e){report.set(e.getClass().getSimpleName());}});return report.get();
   }
   private void awaitSemanticText(String expected,String stale)throws Exception {
     long end=System.nanoTime()+TimeUnit.SECONDS.toNanos(3);boolean found=false,old=false;
@@ -260,7 +305,7 @@ final class AndroidInputTest implements AutoCloseable {
     input(connection,new JSONObject().put("kind","key").put("code",14).put("down",true));
     input(connection,new JSONObject().put("kind","key").put("code",14).put("down",false));
   }
-  private void awaitText(String expected)throws Exception {AtomicReference<String> actual=new AtomicReference<>("");AtomicReference<String> selection=new AtomicReference<>("");long end=System.nanoTime()+TimeUnit.SECONDS.toNanos(15);while((!expected.equals(actual.get())||AndroidControlService.isEditing())&&System.nanoTime()<end){test.runOnMainSync(()->{actual.set(editor.getText().toString());selection.set(editor.getSelectionStart()+":"+editor.getSelectionEnd()+", focused="+editor.hasFocus());});Thread.sleep(50);}check(expected.equals(actual.get()),"Remote edit mismatch: "+actual.get()+", expected="+expected+", selection="+selection.get()+", service="+AndroidControlService.editState());}
+  private void awaitText(String expected)throws Exception {AtomicReference<String> actual=new AtomicReference<>("");AtomicReference<String> selection=new AtomicReference<>("");long end=System.nanoTime()+TimeUnit.SECONDS.toNanos(15);while((!expected.equals(actual.get())||AndroidControlService.isEditing())&&System.nanoTime()<end){test.runOnMainSync(()->{actual.set(editor.getText().toString());selection.set(editor.getSelectionStart()+":"+editor.getSelectionEnd()+", focused="+editor.hasFocus());});Thread.sleep(50);}check(expected.equals(actual.get())&&!AndroidControlService.isEditing(),"Remote edit mismatch: "+actual.get()+", expected="+expected+", selection="+selection.get()+", service="+AndroidControlService.editState());}
   private void tap(AgentConnection connection,View target)throws Exception {
     AtomicReference<double[]> point=new AtomicReference<>();test.runOnMainSync(()->{int[] at=new int[2];target.getLocationOnScreen(at);android.util.DisplayMetrics metrics=new android.util.DisplayMetrics();app.getSystemService(WindowManager.class).getDefaultDisplay().getRealMetrics(metrics);point.set(new double[]{(at[0]+target.getWidth()/2.0)/metrics.widthPixels,(at[1]+target.getHeight()/2.0)/metrics.heightPixels});});
     input(connection,new JSONObject().put("kind","move").put("x",point.get()[0]).put("y",point.get()[1]));

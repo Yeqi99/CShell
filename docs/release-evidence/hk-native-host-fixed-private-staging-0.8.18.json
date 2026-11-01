@@ -1,0 +1,28 @@
+{
+  "base": "/opt/cshell-release-staging/0.8.18-trusted-final",
+  "status": "private-staged-not-published",
+  "verifiedAt": "2026-11-01T12:45:11.375Z",
+  "count": 2,
+  "totalBytes": 52418247,
+  "productionUntouched": true,
+  "files": [
+    {
+      "edition": "opensource",
+      "name": "CAgent-Setup-0.8.18-win-x64.exe",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\release\\0.8.18\\CAgent-Setup-0.8.18-win-x64.exe",
+      "bytes": 26187452,
+      "sha256": "59dc9978ae2193cbfca6a705e07c90b9af0815e6cf364ec9df6b3de982249572",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-trusted-final/opensource/CAgent-Setup-0.8.18-win-x64.exe",
+      "result": "uploaded-verified"
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-Setup-0.8.18-win-x64.exe",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\release\\0.8.18\\CAgent-Setup-0.8.18-win-x64.exe",
+      "bytes": 26230795,
+      "sha256": "7f60ff4c4d297586487bac9c604e150a0aa438a786b3fc6bf11d17dc681cffe3",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-trusted-final/pro/CAgent-Setup-0.8.18-win-x64.exe",
+      "result": "uploaded-verified"
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 {
   "version": "0.8.18",
   "status": "candidate-not-published",
-  "verifiedAt": "2026-11-01T11:23:36.663Z",
+  "verifiedAt": "2026-11-01T13:18:57.571Z",
   "files": [
     {
       "edition": "opensource",
@@ -168,8 +168,8 @@
       "edition": "opensource",
       "name": "CAgent-Setup-0.8.18-win-x64.exe",
       "path": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\release\\0.8.18\\CAgent-Setup-0.8.18-win-x64.exe",
-      "size": 26184977,
-      "sha256": "923df9ef48db38eaf32aa6ce5d4fc0c2e61230348a8f4250ea024cdd1ab5a513"
+      "size": 26187452,
+      "sha256": "59dc9978ae2193cbfca6a705e07c90b9af0815e6cf364ec9df6b3de982249572"
     },
     {
       "edition": "pro",
@@ -182,49 +182,38 @@
       "edition": "pro",
       "name": "CAgent-Setup-0.8.18-win-x64.exe",
       "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\release\\0.8.18\\CAgent-Setup-0.8.18-win-x64.exe",
-      "size": 26231769,
-      "sha256": "631530736500dfe19405022f9b9b6b3fdba0c33d39d7ec7cbb26aa29b2030d85"
+      "size": 26230795,
+      "sha256": "7f60ff4c4d297586487bac9c604e150a0aa438a786b3fc6bf11d17dc681cffe3"
     },
     {
       "edition": "opensource",
       "name": "CShell-0.8.18-android.apk",
-      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\android-core-semantic-final\\CShell-0.8.18-android.apk",
-      "size": 4897354,
-      "sha256": "ba932a8f7a64d5893fd42cbf416331501d853640ed71d92f33e93f3be875772c"
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\android-core-focused-final\\CShell-0.8.18-android.apk",
+      "size": 4897942,
+      "sha256": "b958ccd6b618ced4b1bb564d4274d95ec66cd647978aa316e740ffea7d037495"
     },
     {
       "edition": "pro",
       "name": "CShell-Pro-0.8.18-android.apk",
-      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\ci-artifacts\\android-semantic\\CShell-Pro-0.8.18-android.apk",
-      "size": 4922450,
-      "sha256": "3ba6032307c67f135477eedd876dafbb9fa17237126bc4cf174fbcaf34a72032"
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\ci-artifacts\\android-focused-final\\CShell-Pro-0.8.18-android.apk",
+      "size": 4923366,
+      "sha256": "7f9f866c1767f991370e4171619e29c53b29cf41487a08413c39ed7205adbd78"
     },
     {
       "edition": "opensource",
       "name": "SHA256SUMS.txt",
       "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\final-checksums\\opensource\\SHA256SUMS.txt",
       "size": 1437,
-      "sha256": "232488efc7eb5312b56506afe5061c759ed924a13becd83d4259db03424739d7"
+      "sha256": "2f92e96ec5a3ad05501a5c2342f40b4d955b567d48ddaef71b3b33b1b12d0289"
     },
     {
       "edition": "pro",
       "name": "SHA256SUMS.txt",
       "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\final-checksums\\pro\\SHA256SUMS.txt",
       "size": 1283,
-      "sha256": "63087653d4f713afa8303d889f654bdc3e77c7aff1afd783a93bfc685ac646fb"
+      "sha256": "e3a4260e2ff26a85f065912b4c31e19ef6a0fa5da34dd9787a80289a1f02fcf6"
     }
   ],
-  "sources": {
-    "opensource": {
-      "productionCommit": "3202d564c86a9e8969deff4e9324e15f8508787f",
-      "candidateRemoteCommit": "1d318a5e04b8f5de7a9b70e0e3cdaf180f6134b4",
-      "tree": "aff71761fbf6c91fd89d00c47b54678ed2c7ba6d"
-    },
-    "pro": {
-      "productionCommit": "c53e8f14fb9c09d4974a75518f831850c43c3191",
-      "candidateRemoteCommit": "83e335f55db5dc71c858249311300701e0eaf926",
-      "tree": "1c5951f4d00fe6610ea2dcb7050a7f172726bc8d"
-    }
-  },
-  "note": "26 desktop/CAgent runtimes rebuilt against final SSL-fixed 0.1.2 catalog; original two verified semantic-fix Android APKs retained unchanged; both checksum lists regenerated. Update-channel verified metadata remains blocked until final publication-source and private HK staging reconciliation."
+  "publicationGate": "blocked-pending-final-physical-and-hk-receipts",
+  "verification": "All 30 local files rehashed after final Windows native host reconnect and Android focused WebView/replay fixes; 22 POSIX and 2 CShell Windows binaries retained by exact production source impact audit. Does not assert physical phone or Lenovo acceptance."
 }
