@@ -1,0 +1,321 @@
+{
+  "status": "candidate-not-published",
+  "artifacts": [
+    {
+      "id": 13081910223,
+      "name": "desktop-linux-x64",
+      "digest": "sha256:040f7a5f83df05b2af68148cb4fd583cba0505d48f6377b7a7235627ea57263f",
+      "edition": "opensource",
+      "run": 41300796296,
+      "source": "3202d564c86a9e8969deff4e9324e15f8508787f",
+      "remoteCommit": "1d318a5e04b8f5de7a9b70e0e3cdaf180f6134b4",
+      "zipPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-desktop-linux-x64.zip",
+      "files": [
+        {
+          "name": "CAgent-0.8.18-linux-x64.tar.gz",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-desktop-linux-x64\\CAgent-0.8.18-linux-x64.tar.gz",
+          "bytes": 44818935,
+          "sha256": "3ca8f4e639ffe708138c2a55eff6d269f630e05e48f73733b150fb3319e6e4e6",
+          "embeddedCatalogVerified": true,
+          "editionImplementationVerified": true
+        },
+        {
+          "name": "CShell-0.8.18-linux-amd64.deb",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-desktop-linux-x64\\CShell-0.8.18-linux-amd64.deb",
+          "bytes": 108878404,
+          "sha256": "d113287a05c499e294d6b6898e4fdcc068fc57eebebefdf8652cb7776f913b9b"
+        },
+        {
+          "name": "CShell-0.8.18-linux-x86_64.AppImage",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-desktop-linux-x64\\CShell-0.8.18-linux-x86_64.AppImage",
+          "bytes": 139463969,
+          "sha256": "4b89b95b20e9b9816809eb1b489146130199bbbdfcbfd2831c8a9022965843e7"
+        }
+      ]
+    },
+    {
+      "id": 13081326402,
+      "name": "desktop-linux-arm64",
+      "digest": "sha256:69aa7bb18d49c0581de9c343d279c1c4d16e5909af4a50f58702355cceb834a0",
+      "edition": "opensource",
+      "run": 41300796296,
+      "source": "3202d564c86a9e8969deff4e9324e15f8508787f",
+      "remoteCommit": "1d318a5e04b8f5de7a9b70e0e3cdaf180f6134b4",
+      "zipPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-desktop-linux-arm64.zip",
+      "files": [
+        {
+          "name": "CAgent-0.8.18-linux-arm64.tar.gz",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-desktop-linux-arm64\\CAgent-0.8.18-linux-arm64.tar.gz",
+          "bytes": 44504621,
+          "sha256": "2ca667d2f497d791c99087d6cc91b71eaed87a4a05b3e0e46c6ab9477af964a7",
+          "embeddedCatalogVerified": true,
+          "editionImplementationVerified": true
+        },
+        {
+          "name": "CShell-0.8.18-linux-arm64.AppImage",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-desktop-linux-arm64\\CShell-0.8.18-linux-arm64.AppImage",
+          "bytes": 140723265,
+          "sha256": "7153ced0ecc4e8308c94a6f40af9e6185c08a751b66926c30408f1a6183a754a"
+        },
+        {
+          "name": "CShell-0.8.18-linux-arm64.deb",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-desktop-linux-arm64\\CShell-0.8.18-linux-arm64.deb",
+          "bytes": 103039944,
+          "sha256": "b056997c5661a30f233526183a0ca53d441471afb8aa34e712e86267e7e0d41c"
+        }
+      ]
+    },
+    {
+      "id": 13080904204,
+      "name": "desktop-mac-arm64",
+      "digest": "sha256:d99ef8419656914e0d70b439817880bc1cb604e06723828bf927cb2a21678a27",
+      "edition": "opensource",
+      "run": 41300796296,
+      "source": "3202d564c86a9e8969deff4e9324e15f8508787f",
+      "remoteCommit": "1d318a5e04b8f5de7a9b70e0e3cdaf180f6134b4",
+      "zipPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-desktop-mac-arm64.zip",
+      "files": [
+        {
+          "name": "CAgent-0.8.18-mac-arm64.tar.gz",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-desktop-mac-arm64\\CAgent-0.8.18-mac-arm64.tar.gz",
+          "bytes": 39500398,
+          "sha256": "c41bc10b4888950c1be7b0c529b61d2cc7d7b5ae49ccf86bd4a1925590773e3b",
+          "embeddedCatalogVerified": true,
+          "editionImplementationVerified": true
+        },
+        {
+          "name": "CShell-0.8.18-mac-arm64.dmg",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-desktop-mac-arm64\\CShell-0.8.18-mac-arm64.dmg",
+          "bytes": 142332957,
+          "sha256": "fb172b70d8bab55d2e34819a23b633978ec28a47c30765a111bfc876975877b2"
+        },
+        {
+          "name": "CShell-0.8.18-mac-arm64.zip",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-desktop-mac-arm64\\CShell-0.8.18-mac-arm64.zip",
+          "bytes": 142176193,
+          "sha256": "f22797676143133f06b1a8ff862f246c60f5a9fe492fe231856f60f9991c5d87"
+        }
+      ]
+    },
+    {
+      "id": 13081850011,
+      "name": "pro-cagent-linux-arm64",
+      "digest": "sha256:335b371f6cabe0c03700822e214082e95e4e69f10061701ea58632d20b2626a4",
+      "edition": "pro",
+      "run": 41300827199,
+      "source": "c53e8f14fb9c09d4974a75518f831850c43c3191",
+      "remoteCommit": "83e335f55db5dc71c858249311300701e0eaf926",
+      "zipPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-pro-cagent-linux-arm64.zip",
+      "files": [
+        {
+          "name": "CAgent-0.8.18-linux-arm64.tar.gz",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-pro-cagent-linux-arm64\\CAgent-0.8.18-linux-arm64.tar.gz",
+          "bytes": 44560384,
+          "sha256": "ef2f5877681716f302470cae617d20b6a51054e16233b0a9676f1d03dc7afd94",
+          "embeddedCatalogVerified": true,
+          "editionImplementationVerified": true
+        }
+      ]
+    },
+    {
+      "id": 13081825547,
+      "name": "pro-mac-x64",
+      "digest": "sha256:d24830f0f72f910a91df126b3fa9611446826ed8d8f2e0c929f5937e2a62f500",
+      "edition": "pro",
+      "run": 41300827199,
+      "source": "c53e8f14fb9c09d4974a75518f831850c43c3191",
+      "remoteCommit": "83e335f55db5dc71c858249311300701e0eaf926",
+      "zipPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-pro-mac-x64.zip",
+      "files": [
+        {
+          "name": "CShell-Pro-0.8.18-mac-x64.dmg",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-pro-mac-x64\\CShell-Pro-0.8.18-mac-x64.dmg",
+          "bytes": 146425630,
+          "sha256": "30eb20ab03beb3364d4a677d4e639b304b791ab1c89bd3d2cb1aea92c3bedf65"
+        }
+      ]
+    },
+    {
+      "id": 13081535762,
+      "name": "pro-cagent-mac-arm64",
+      "digest": "sha256:e0d0d2c2bd7f2923251e909f158ff7d1e5c52e87a3da2ba7d9d3aae4ed79370a",
+      "edition": "pro",
+      "run": 41300827199,
+      "source": "c53e8f14fb9c09d4974a75518f831850c43c3191",
+      "remoteCommit": "83e335f55db5dc71c858249311300701e0eaf926",
+      "zipPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-pro-cagent-mac-arm64.zip",
+      "files": [
+        {
+          "name": "CAgent-0.8.18-mac-arm64.tar.gz",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-pro-cagent-mac-arm64\\CAgent-0.8.18-mac-arm64.tar.gz",
+          "bytes": 39550110,
+          "sha256": "61f9e2bdc0246cdb82b39df141f8220f5a79f0d5e441d188a25d5b25afb49e46",
+          "embeddedCatalogVerified": true,
+          "editionImplementationVerified": true
+        }
+      ]
+    },
+    {
+      "id": 13081391010,
+      "name": "pro-cagent-mac-x64",
+      "digest": "sha256:894cb4863687a363d0a34b5328a319d3936756fd43ac004346fabf0443c70a64",
+      "edition": "pro",
+      "run": 41300827199,
+      "source": "c53e8f14fb9c09d4974a75518f831850c43c3191",
+      "remoteCommit": "83e335f55db5dc71c858249311300701e0eaf926",
+      "zipPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-pro-cagent-mac-x64.zip",
+      "files": [
+        {
+          "name": "CAgent-0.8.18-mac-x64.tar.gz",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-pro-cagent-mac-x64\\CAgent-0.8.18-mac-x64.tar.gz",
+          "bytes": 40782689,
+          "sha256": "b7bcbc3c9c0ebae2230fefa8e551ba495fe8e8ce3ee59517536573b1c462dac3",
+          "embeddedCatalogVerified": true,
+          "editionImplementationVerified": true
+        }
+      ]
+    },
+    {
+      "id": 13081366098,
+      "name": "pro-mac-arm64",
+      "digest": "sha256:2d4d8957f2046275f27cd977d2aba71bf238d73da1b54ded9e0276fab516b631",
+      "edition": "pro",
+      "run": 41300827199,
+      "source": "c53e8f14fb9c09d4974a75518f831850c43c3191",
+      "remoteCommit": "83e335f55db5dc71c858249311300701e0eaf926",
+      "zipPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-pro-mac-arm64.zip",
+      "files": [
+        {
+          "name": "CShell-Pro-0.8.18-mac-arm64.dmg",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-pro-mac-arm64\\CShell-Pro-0.8.18-mac-arm64.dmg",
+          "bytes": 142614496,
+          "sha256": "99416cb712779672d3cd4a4d7892470a2e121b8c396afd314089b675656b5679"
+        }
+      ]
+    },
+    {
+      "id": 13081047159,
+      "name": "pro-linux-x64",
+      "digest": "sha256:d6df202bb7cb496c0ccda913c3ee8811e99567795d6f1c16d9f926c649eec3c8",
+      "edition": "pro",
+      "run": 41300827199,
+      "source": "c53e8f14fb9c09d4974a75518f831850c43c3191",
+      "remoteCommit": "83e335f55db5dc71c858249311300701e0eaf926",
+      "zipPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-pro-linux-x64.zip",
+      "files": [
+        {
+          "name": "CShell-Pro-0.8.18-linux-amd64.deb",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-pro-linux-x64\\CShell-Pro-0.8.18-linux-amd64.deb",
+          "bytes": 107782788,
+          "sha256": "60ee644374a3a4138b59c635fa59491258aa41719e014d376a717ff249913011"
+        },
+        {
+          "name": "CShell-Pro-0.8.18-linux-x86_64.AppImage",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-pro-linux-x64\\CShell-Pro-0.8.18-linux-x86_64.AppImage",
+          "bytes": 139701759,
+          "sha256": "251036bd4b39184ff0fd2e1474ca6b0084ddbc8eba3cd23b6e0852479c888d7d"
+        }
+      ]
+    },
+    {
+      "id": 13080993631,
+      "name": "pro-linux-arm64",
+      "digest": "sha256:6da0dabe773cd6607b36667e14b5094282362b3a25a186b052731c52095e18b6",
+      "edition": "pro",
+      "run": 41300827199,
+      "source": "c53e8f14fb9c09d4974a75518f831850c43c3191",
+      "remoteCommit": "83e335f55db5dc71c858249311300701e0eaf926",
+      "zipPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-pro-linux-arm64.zip",
+      "files": [
+        {
+          "name": "CShell-Pro-0.8.18-linux-arm64.AppImage",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-pro-linux-arm64\\CShell-Pro-0.8.18-linux-arm64.AppImage",
+          "bytes": 140957008,
+          "sha256": "a04c96f7c244e7e09eee247382f4473b591238f9bace53f5b98d6442861dfc09"
+        },
+        {
+          "name": "CShell-Pro-0.8.18-linux-arm64.deb",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-pro-linux-arm64\\CShell-Pro-0.8.18-linux-arm64.deb",
+          "bytes": 103283032,
+          "sha256": "4e00f767a22ecdf846a50c1f2a75bdd79a4f2411bbdae988c84fa89163381ae1"
+        }
+      ]
+    },
+    {
+      "id": 13080889052,
+      "name": "pro-cagent-linux-x64",
+      "digest": "sha256:74b14ec6c0fe7dd0469c7f55d6d172d7ba4a6030628d22ab08753b8ec16a24a2",
+      "edition": "pro",
+      "run": 41300827199,
+      "source": "c53e8f14fb9c09d4974a75518f831850c43c3191",
+      "remoteCommit": "83e335f55db5dc71c858249311300701e0eaf926",
+      "zipPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-pro-cagent-linux-x64.zip",
+      "files": [
+        {
+          "name": "CAgent-0.8.18-linux-x64.tar.gz",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-pro-cagent-linux-x64\\CAgent-0.8.18-linux-x64.tar.gz",
+          "bytes": 44874504,
+          "sha256": "a3367334b43ba769b27ee60c11cb0664287eea21b5f0294c00d11d4edadff1c7",
+          "embeddedCatalogVerified": true,
+          "editionImplementationVerified": true
+        }
+      ]
+    },
+    {
+      "id": 13081019482,
+      "name": "desktop-mac-x64",
+      "digest": "sha256:cf7d65702437d2e32be9af7368c4b66197111a3098919dabe9425786bb10a165",
+      "edition": "opensource",
+      "run": 41300796296,
+      "source": "3202d564c86a9e8969deff4e9324e15f8508787f",
+      "remoteCommit": "1d318a5e04b8f5de7a9b70e0e3cdaf180f6134b4",
+      "zipPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-desktop-mac-x64.zip",
+      "files": [
+        {
+          "name": "CAgent-0.8.18-mac-x64.tar.gz",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-desktop-mac-x64\\CAgent-0.8.18-mac-x64.tar.gz",
+          "bytes": 40730782,
+          "sha256": "4928a33c8e76fe66e90da1b3abbfbac61e434e08d464fa72207365fa8c2721db",
+          "embeddedCatalogVerified": true,
+          "editionImplementationVerified": true
+        },
+        {
+          "name": "CShell-0.8.18-mac-x64.dmg",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-desktop-mac-x64\\CShell-0.8.18-mac-x64.dmg",
+          "bytes": 146128145,
+          "sha256": "6da41db0647350bf9f443ccd78d396d5056604a8700a93572777ffaed3064059"
+        },
+        {
+          "name": "CShell-0.8.18-mac-x64.zip",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-desktop-mac-x64\\CShell-0.8.18-mac-x64.zip",
+          "bytes": 146017644,
+          "sha256": "2f9bb6477d7687bb6082ddea04443c0ddad6e64d5dd52acacb3aa88cce477707"
+        }
+      ]
+    }
+  ],
+  "version": "0.8.18",
+  "verification": "All 12 native CI jobs succeeded. Each of 12 artifact ZIP digests and 22 extracted runtime SHA-256 values checked. Eight standalone CAgent archives contain both final SSL-fixed WeChat manifest digests, abnormal-exit cleanup guard, and the correct edition cloud implementation. Native PTY/TLS/package tests ran on matching target architectures. No publication or user installation.",
+  "limitations": [
+    "Windows installers unsigned; macOS packages unsigned/not notarized. CI native runners are not physical-user-device acceptance.",
+    "WeChat 4.2 frozen transport verified but no live 4.2 native-hook test; see wechat-final-native-lifecycle.json for separate genuine-event and synthetic evidence."
+  ],
+  "catalogManifestSha256": [
+    "d9d2f2d8b51032c78e06d36d4ced77e7115b208029568ce1f1c1906d80ca88b4",
+    "98b558f680746112d09c6b76e78ebf219dd514585cbacfb7526edd70210ed0d5"
+  ],
+  "workflowRuns": [
+    {
+      "id": 41300796296,
+      "edition": "opensource",
+      "jobs": 4,
+      "conclusion": "success"
+    },
+    {
+      "id": 41300827199,
+      "edition": "pro",
+      "jobs": 8,
+      "conclusion": "success"
+    }
+  ]
+}
