@@ -1,0 +1,23 @@
+{
+  "wechatVersion": "4.1.15.56",
+  "toolkitVersion": "0.1.2",
+  "nativeShortListener": {
+    "ready": true,
+    "stopMs": 3140,
+    "nativeCleanupConfirmed": true,
+    "memoryClosed": true,
+    "receiveLockReleased": true,
+    "workerFinallyReturned": true,
+    "workerExitCode": 0,
+    "serviceExitCode": 0,
+    "nativeLeaseReleased": true,
+    "targetRemainedAlive": true,
+    "noMessageSent": true
+  },
+  "incomingAcceptance": {
+    "passed": false,
+    "reason": "native hook invoked but no permitted message exported; filter diagnosis continuing",
+    "noAutomaticReply": true
+  },
+  "publication": "candidate-not-published"
+}
