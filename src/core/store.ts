@@ -198,7 +198,9 @@ export class Store {
     );
   }
   async setPlugins(plugins: InstalledPlugin[]) {
+    const removed=new Set(this.plugins().filter(p=>!plugins.some(next=>next.manifest.id===p.manifest.id)).map(p=>p.manifest.id));
     this.data.plugins = z.array(installedPluginSchema).max(100).parse(plugins);
+    if(this.data.portablePlugins)this.data.portablePlugins=this.data.portablePlugins.filter(p=>!removed.has(p.manifest.id));
     this.data.tools.dockerEnabled = pluginEnabled(plugins, 'docker');
     this.data.tools.commandSuggestions = pluginEnabled(plugins, 'commands');
     await this.persist();

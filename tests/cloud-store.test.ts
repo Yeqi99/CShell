@@ -72,6 +72,9 @@ test('external snippets restore selection and commands, executable selections on
  const snippet={manifest:{protocol:1 as const,id:'example.shortcuts',version:'1.0.0',name:'Shortcuts',description:'',publisher:'Fixture',provider:'snippets' as const,permissions:['terminal.input' as const],commands:[{label:'list',text:'ls -la'}]},enabled:true,source:'custom:'+'a'.repeat(64)};
  await a.setPlugins([...a.plugins(),snippet]);await b.cloudImport(await a.cloudExport());assert.deepEqual(b.plugins().find(p=>p.manifest.id===snippet.manifest.id),snippet);
  await b.load();assert.equal(b.plugins().find(p=>p.manifest.id===snippet.manifest.id)?.enabled,true);
+ const duplicate=await a.cloudExport();duplicate.extensions.external!.push(duplicate.extensions.external![0]);assert.throws(()=>b.cloudValidate(duplicate),/Duplicate/);
+ await b.setPlugins(b.plugins().filter(p=>p.manifest.id!==snippet.manifest.id));const deleted=await b.cloudExport();assert(!deleted.extensions.external?.some(p=>p.manifest.id===snippet.manifest.id));await b.load();await b.cloudImport(deleted);assert(!b.plugins().some(p=>p.manifest.id===snippet.manifest.id));
+ await b.cloudImport(await a.cloudExport());
  const bad=await a.cloudExport();bad.extensions.external![0].manifest.name='tampered';const before=b.cloudCheckpoint();await assert.rejects(b.cloudImport(bad),/摘要/);assert.equal(b.cloudCheckpoint(),before);
  const executable={...snippet,manifest:{...snippet.manifest,id:'example.native',provider:'process' as const,permissions:['remote.execute' as const],commands:[]}};
  await a.setPlugins([...a.plugins(),executable]);await b.cloudImport(await a.cloudExport());assert(!b.plugins().some(p=>p.manifest.id==='example.native'),'missing executable is not fabricated as installed');

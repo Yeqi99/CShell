@@ -150,7 +150,7 @@ export class CloudSync {
     }
   }
   private async api(path: string, body?: unknown, schema?: number): Promise<any> {
-    const snapshot = path === '/v1/vault' && body !== undefined ? await this.adapter.export() as any : undefined;
+    const snapshot = path === '/v1/vault' && body !== undefined && this.data.key && this.data.session ? decryptVault((body as any).envelope,this.data.key,this.data.session.accountId) : undefined;
     const writeSchema = String(schema ?? vaultWriteSchema(snapshot));
     const response = await this.request(this.endpoint + path, {
       method: body === undefined ? 'GET' : 'POST',

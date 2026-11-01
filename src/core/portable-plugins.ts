@@ -4,7 +4,7 @@ import { installedPluginSchema, type InstalledPlugin } from '../shared/plugins';
 
 // Selection/configuration only. Executable payloads and local execution grants never travel here.
 export const portablePluginSchema=installedPluginSchema.extend({manifestSha256:z.string().regex(/^[a-f0-9]{64}$/)}).strict();
-export const portablePluginsSchema=z.array(portablePluginSchema).max(100);
+export const portablePluginsSchema=z.array(portablePluginSchema).max(100).refine(items=>new Set(items.map(p=>p.manifest.id)).size===items.length,'Duplicate portable plugin ID');
 export function portablePlugin(plugin:InstalledPlugin){return {...plugin,manifestSha256:createHash('sha256').update(JSON.stringify(plugin.manifest)).digest('hex')};}
 export function restorePortablePlugins(local:InstalledPlugin[],incoming:z.infer<typeof portablePluginsSchema>):InstalledPlugin[]{
  const result=structuredClone(local);
