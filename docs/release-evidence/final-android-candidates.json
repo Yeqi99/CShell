@@ -1,6 +1,42 @@
 {
-  "verification": "Replacement semantic-freshness candidates: official GitHub ZIP digest, apksigner persistent certificate, package IDs and version verified. Both API29/35 input/video/WebView fresh-tree assertions passed in listed instrumentation runs. Previous APK candidates superseded. Physical phone fresh semantic tree/text validation remains pending system update; not published.",
+  "verification": "Final focused virtual editor and stream replay candidates. Both editions signed with original certificate; both API29/35 include native editor, WebView continuous clear, no-focus rejection, protocol replay revocation and recovery assertions. Physical Pro latest installed; final interaction acceptance tracked separately, not claimed by this artifact receipt.",
   "files": [
+    {
+      "edition": "opensource",
+      "packageId": "org.canpshell.mobile",
+      "run": 41310002331,
+      "artifact": 13084049219,
+      "commit": "f8821a65f294c4d24e5908738beea1cf2e31f8a6",
+      "zipSha": "57ff975cd3465327b6919d8e6d2f193e82ae2ba85b300a9aaed8a2d8cbcdddad",
+      "name": "CShell-0.8.18-android.apk",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\android-core-focused-final\\CShell-0.8.18-android.apk",
+      "bytes": 4897942,
+      "sha256": "b958ccd6b618ced4b1bb564d4274d95ec66cd647978aa316e740ffea7d037495",
+      "instrumentationRun": 41310002331,
+      "certificateSha256": "34cc1c9a0eacafc512a0837c3d286081879822f047e5637a65cdbc5b525914c5",
+      "versionCode": 8018,
+      "versionName": "0.8.18",
+      "focusedWebViewInstrumentationVerified": true
+    },
+    {
+      "edition": "pro",
+      "packageId": "org.canpshell.mobile.pro",
+      "run": 41309477350,
+      "artifact": 13084424177,
+      "commit": "8309398bce833b857057b36e08c0f3ac619e4f23",
+      "zipSha": "51f5ccba772606e4320fd600c060efb1a95cb4087aa8224d9af50c3e8201e450",
+      "name": "CShell-Pro-0.8.18-android.apk",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\ci-artifacts\\android-focused-final\\CShell-Pro-0.8.18-android.apk",
+      "bytes": 4923366,
+      "sha256": "7f9f866c1767f991370e4171619e29c53b29cf41487a08413c39ed7205adbd78",
+      "instrumentationRun": 41309477156,
+      "certificateSha256": "34cc1c9a0eacafc512a0837c3d286081879822f047e5637a65cdbc5b525914c5",
+      "versionCode": 8018,
+      "versionName": "0.8.18",
+      "focusedWebViewInstrumentationVerified": true
+    }
+  ],
+  "previousCandidates": [
     {
       "edition": "opensource",
       "packageId": "org.canpshell.mobile",
@@ -37,5 +73,6 @@
       "versionName": "0.8.18",
       "instrumentationRun": 41293851767
     }
-  ]
+  ],
+  "status": "candidate-not-published"
 }
