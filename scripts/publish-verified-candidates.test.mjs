@@ -1,9 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { validatePlans, verifyRelease } from './publish-verified-candidates.mjs';
+import { Readable, Writable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+import { validatePlans, verifyRelease, boundedPayload } from './publish-verified-candidates.mjs';
 const fixture = () => ['opensource','pro'].map(edition => ({ edition, status:'candidate-not-published', version:'0.8.18', sha:'a'.repeat(40), assets:[...Array.from({length:edition==='pro'?13:15},(_,i)=>({name:`CAgent-0.8.18-test-${i}.exe`,size:100,sha256:'b'.repeat(64)})),{name:'SHA256SUMS.txt',size:10,sha256:'c'.repeat(64)}] }));
 test('complete distinct channels allowed without publication',()=>validatePlans(fixture()));
+test('oversize origin stream fails before writing excess bytes',async()=>{let written=0;await assert.rejects(pipeline(Readable.from([Buffer.alloc(4),Buffer.alloc(8)]),boundedPayload(5),new Writable({write(b,e,cb){written+=b.length;cb();}})),/exceeds verified size/);assert.equal(written,4);});
 test('actual 30-asset release shape includes Core macOS ZIPs',async()=>{
   const plans=await Promise.all(['opensource','pro'].map(async e=>({...JSON.parse(await readFile(new URL(`../services/update-edge/verified-${e}-0818.json`,import.meta.url),'utf8')),status:'candidate-not-published'})));
   assert.equal(plans.flatMap(p=>p.assets).length,30);assert(plans[0].assets.some(a=>a.name.endsWith('.zip')));validatePlans(plans);

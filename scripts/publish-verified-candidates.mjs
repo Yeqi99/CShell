@@ -5,7 +5,7 @@ import { readFile, mkdtemp, writeFile, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { Readable } from 'node:stream';
+import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { createWriteStream } from 'node:fs';
 
@@ -38,6 +38,10 @@ export function verifyRelease(release, plan, assets) {
   for (const a of plan.assets) { const x = assets.find(x => x.name === a.name); assert(x); assert.equal(x.size, a.size); assert.equal(x.digest, `sha256:${a.sha256}`); }
 }
 const hash = async path => { const h = createHash('sha256'); for await (const b of createReadStream(path)) h.update(b); return h.digest('hex'); };
+export function boundedPayload(size) {
+  let received = 0;
+  return new Transform({ transform(chunk, encoding, done) { received += chunk.length; done(received > size ? new Error('Origin payload exceeds verified size') : null, chunk); } });
+}
 
 export async function main() {
   // No mutation, downloads or credentials unless explicitly requested by the release job.
@@ -76,8 +80,10 @@ export async function main() {
       const url = `https://shell.canp.ai/downloads/${p.edition}/v${version}/${a.name}`;
       const response = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(600000) });
       assert.equal(response.status, 200, `${p.edition}/${a.name}: origin not ready`);
+      const length = response.headers.get('content-length');
+      if (length !== null && Number(length) !== a.size) { await response.body.cancel(); throw new Error('Origin Content-Length differs from verified size'); }
       a.path = join(work, `${p.edition}-${a.name}`);
-      await pipeline(Readable.fromWeb(response.body), createWriteStream(a.path, { flags: 'wx' }));
+      await pipeline(Readable.fromWeb(response.body), boundedPayload(a.size), createWriteStream(a.path, { flags: 'wx' }));
       assert.equal((await stat(a.path)).size, a.size); assert.equal(await hash(a.path), a.sha256);
     }
     const sums = await readFile(p.assets.find(a => a.name === 'SHA256SUMS.txt').path, 'utf8');
