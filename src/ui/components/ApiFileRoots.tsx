@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import type { McpSettings } from '../../shared/contracts';
 import { useI18n } from '../i18n';
 import { useState } from 'react';
@@ -83,7 +84,7 @@ export function ApiFileRoots({
       >
         {cn ? '选择只读目录' : 'Choose read-only directory'}
       </button>
-      {error && <p role="alert">{error}</p>}
+      {error && <ErrorNotice title="操作未完成" error={error}/>}
     </details>
   );
 }

@@ -18,6 +18,8 @@ declare global {
       cagentStart?(): void;
       cagentStop?(): void;
       cagentAccessibility?(): void;
+      cagentPhoneStatus?(): string;
+      cagentPhonePermission?(kind:'sms'|'calls'): void;
       cagentBackgroundSettings?(): void;
       cagentCopyConnection?(): void;
       fileRequest(data: string): void;
@@ -617,9 +619,8 @@ function updateMachineApps(id:string){
  if(s.profile.protocol!=='agent'||cap.files)apps.push({id:'files',name:'文件',detail:'浏览、预览与传输',run:()=>{fileSource='remote';fileSession=id;navigate('files');syncFileSessions();}});
  if(cap.market)apps.push({id:'market',name:'应用市场',detail:'安装与管理远端应用',run:()=>mobileCoding.open(id,s.profile.name,'market',()=>void mobileIde.open(id,s.profile.name))});
  if(cap.ide)apps.push({id:'ide',name:'代码编辑器',detail:'项目文件与集成终端',run:()=>void mobileIde.open(id,s.profile.name)});
- for(const engine of ['codex','claude'] as const)if(cap[engine])apps.push({id:engine,name:engine==='codex'?'Codex':'Claude Code',detail:'项目会话与模型服务',run:()=>mobileCoding.open(id,s.profile.name,engine)});
  const remote=desktopStatus.get(id);if(remote?.packageReady)apps.push({id:'remote',name:'远程控制',detail:remote.viewAllowed?'查看和操作远端桌面':'等待远端共享或授权',disabled:!remote.viewAllowed,run:()=>desktop.open(id,remote)});
- for(const app of apps)if(['ide','codex','claude'].includes(app.id)&&cap.market)app.manage=()=>mobileCoding.open(id,s.profile.name,'market',()=>void mobileIde.open(id,s.profile.name));
+ for(const app of apps)if(app.id==='ide'&&cap.market)app.manage=()=>mobileCoding.open(id,s.profile.name,'market',()=>void mobileIde.open(id,s.profile.name));
  home.setApps(apps);
 }
 function updateAgentDesktopEntry(id:string){updateMachineApps(id);}
@@ -916,6 +917,14 @@ function renderCAgent(fill = false) {
   $('cagent-screen-state').textContent = cagentState.sharing ? '正在共享此手机屏幕' : cagentState.starting ? '等待 Android 屏幕共享授权' : cagentState.screenLocked ? '手机已锁屏 · 解锁后可重新共享' : cagentState.needsProjectionConsent ? '屏幕共享已结束 · 请重新授权共享' : '未共享';
   $('cagent-start').textContent = cagentState.needsProjectionConsent ? '重新授权共享屏幕' : '共享手机屏幕';
   $('cagent-access-state').textContent = cagentState.accessibilityEnabled ? '已开启 · 可接收远程操作' : '未开启 · 仅能观看画面';
+  try{
+    const phone=JSON.parse(window.CShellNative.cagentPhoneStatus?.()??'{}');
+    $('cagent-sms-state').textContent=!phone.telephony?'此设备不支持移动通信':`读取${phone.readSms?'已允许':'未允许'} · 发送${phone.sendSms?'已允许':'未允许'}；发送可能产生运营商费用`;
+    $('cagent-calls-state').textContent=!phone.telephony?'此设备不支持移动通信':`拨打${phone.call?'已允许':'未允许'} · 接听${phone.answer?'已允许':'未允许'}；由已认证控制端使用`;
+    for(const id of ['cagent-sms','cagent-calls'])($(id) as HTMLButtonElement).disabled=!enabled||!phone.telephony||!window.CShellNative.cagentPhonePermission;
+  }catch{
+    $('cagent-sms-state').textContent='无法读取系统权限状态';$('cagent-calls-state').textContent='无法读取系统权限状态';
+  }
   $('cagent-background-state').textContent = cagentState.ignoringBatteryOptimizations ? '已允许后台运行 · 屏幕共享仍受系统授权限制' : '省电限制可能中断后台连接，可在系统设置中调整。';
   ($('cagent-background') as HTMLButtonElement).disabled = !window.CShellNative?.cagentBackgroundSettings;
   $('cagent-start').hidden = !!cagentState.sharing;
@@ -982,6 +991,8 @@ for (const [id, action] of [
   ['cagent-start', () => window.CShellNative.cagentStart?.()],
   ['cagent-stop', () => window.CShellNative.cagentStop?.()],
   ['cagent-access', () => window.CShellNative.cagentAccessibility?.()],
+  ['cagent-sms', () => window.CShellNative.cagentPhonePermission?.('sms')],
+  ['cagent-calls', () => window.CShellNative.cagentPhonePermission?.('calls')],
   ['cagent-background', () => window.CShellNative.cagentBackgroundSettings?.()],
   ['cagent-copy', () => window.CShellNative.cagentCopyConnection?.()],
 ] as const) $(id).onclick = () => {

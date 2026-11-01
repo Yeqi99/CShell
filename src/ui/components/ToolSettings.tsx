@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { useState } from 'react';
 import type { ToolsSettings } from '../../shared/docker';
 import { useI18n } from '../i18n';
@@ -54,9 +55,7 @@ export function ToolSettings({
             </label>
           )}
           {error && (
-            <p role="alert" className="form-error">
-              {error}
-            </p>
+            <ErrorNotice title="操作未完成" error={error}/>
           )}
           <footer>
             {saved && <span role="status">{zh ? '已保存' : 'Saved'}</span>}

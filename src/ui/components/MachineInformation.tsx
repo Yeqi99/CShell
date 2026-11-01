@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import {LargeFileScan} from './LargeFileScan';
 import { useEffect, useRef, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
@@ -43,11 +44,12 @@ export function MachineInformation({call,active,closed}:{call:(method:AgentCall[
   },[call,active,closed,refresh]);
   const cpu=load?.length?load.reduce((a,b)=>a+b,0)/load.length:undefined;
   const current=!closed&&!error;
-  const detail=(key:'disks'|'ports'|'processes'|'gpu')=><pre>{snapshot?.[key]||snapshot?.errors[key]||'暂无数据'}</pre>;
+  const detail=(key:'disks'|'ports'|'processes'|'gpu')=>snapshot?.errors[key]?<ErrorNotice title="采集暂不可用" error={snapshot.errors[key]}/>:<pre>{snapshot?.[key]||'暂无数据'}</pre>;
   return <section className="machine-information">
     <header><div><strong>{snapshot?.hostname??'机器信息'}</strong><small>{snapshot?`${snapshot.platform} · ${snapshot.arch} · ${snapshot.release}`:'正在读取目标机器'}</small></div><button className="icon" title="刷新机器信息" aria-label="刷新机器信息" disabled={busy||closed} onClick={()=>setRefresh(n=>n+1)}><RefreshCw size={16}/></button></header>
     <nav aria-label="机器信息分类">{sections.map(([id,label])=><button key={id} aria-pressed={section===id} onClick={()=>setSection(id)}>{label}</button>)}</nav>
-    <p className="machine-freshness" role="status">{closed?'连接已断开，以下为最后采集数据':error?`采集失败：${error}`:snapshot?`采集于 ${new Date(snapshot.at).toLocaleTimeString()} · 运行 ${(snapshot.uptime/86400).toFixed(1)} 天${snapshot.source==='ssh'?' · SSH 实时采集':''}`:busy?'正在采集…':'等待采集'}</p>
+    <p className="machine-freshness" role="status">{closed?'连接已断开，以下为最后采集数据':error?'本次采集未完成':snapshot?`采集于 ${new Date(snapshot.at).toLocaleTimeString()} · 运行 ${(snapshot.uptime/86400).toFixed(1)} 天${snapshot.source==='ssh'?' · SSH 实时采集':''}`:busy?'正在采集…':'等待采集'}</p>
+    {error&&<ErrorNotice title="机器信息采集未完成" error={error}/>}
     {snapshot&&<div className="machine-information-body">
       {['overview','cpu'].includes(section)&&<><div className="machine-stat-grid"><article><span>CPU · {snapshot.cpu.length} 逻辑核心</span><strong>{current&&cpu!==undefined?cpu.toFixed(1)+'%':'—'}</strong><small>{snapshot.cpu[0]?.model||'型号不可用'}</small></article><article><span>内存 · 已用 / 总量</span><strong>{size(snapshot.memory.total-snapshot.memory.available)}</strong><small>/ {size(snapshot.memory.total)}</small></article></div><h3>CPU 采样历史</h3><svg className="machine-cpu-history" viewBox="0 0 300 65" role="img" aria-label="CPU 最近采样历史，纵轴 0 至 100%"><path d="M0 5H300 M0 60H300" stroke="currentColor" opacity=".15"/>{history.current.length>1&&<polyline fill="none" stroke="#3986d7" strokeWidth="2" points={history.current.map((v,i)=>`${i*300/29},${60-v*.55}`).join(' ')}/>}</svg></>}
       {section==='cpu'&&<><div className="machine-stat-grid">{Object.entries({用户态:cpuParts.user,内核态:cpuParts.sys,IO等待:cpuParts.iowait}).map(([label,value])=><article key={label}><span>{label}</span><strong>{current&&value!==undefined?value.toFixed(1)+'%':'未提供'}</strong></article>)}<article><span>负载均值 · 1 / 5 / 15 分钟</span><strong>{snapshot.cpuDetails?.load.map(v=>v.toFixed(2)).join(' / ')||'未提供'}</strong></article>{snapshot.cpuDetails?.temperatures.map(t=><article key={t.name}><span>{t.name}</span><strong>{t.celsius.toFixed(1)} °C</strong></article>)}</div></>}

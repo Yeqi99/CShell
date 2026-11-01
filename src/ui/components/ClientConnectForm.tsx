@@ -1,3 +1,5 @@
+import {ErrorNotice} from './ErrorNotice';
+import {ConnectionProbe} from './ConnectionProbe';
 import { ConnectionExtractor } from './ConnectionExtractor';
 import type { Profile } from '../../shared/contracts';
 import { useState } from 'react';
@@ -263,7 +265,7 @@ export function ClientConnectForm({
             </label>
           </div>
         )}
-        <button className="client-primary" disabled={busy || (!!info && !trusted)}>
+        {!relayEnabled&&<ConnectionProbe host={host} port={Number(port)} disabled={busy}/>}<button className="client-primary" disabled={busy || (!!info && !trusted)}>
           {busy
             ? cn
               ? '连接中…'
@@ -281,7 +283,7 @@ export function ClientConnectForm({
                 : 'Check device'}
         </button>
       </fieldset>
-      {error && <p role="alert">{error}</p>}
+      {error && <ErrorNotice title="操作未完成" error={error}/>}
     </form>
   );
 }

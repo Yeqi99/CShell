@@ -86,3 +86,12 @@ test('same-version trusted bundle digest change restages files and preserves onl
  }finally{await runtime.dispose();await rm(directory,{recursive:true,force:true});}
 });
 
+
+test('event discovery exposes only installed, configured and granted adapter sources',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'cagent-event-source-'));
+ const vault=new ClientVault(directory,{encrypt:async s=>Buffer.from(s).toString('base64'),decrypt:async s=>Buffer.from(s,'base64').toString()});
+ const original=capabilityCatalog()[0],base=parseCapabilityManifest(JSON.parse(original.bundle!).manifest,original.manifestSha256);
+ const entry=createBundledCapabilityEntry({...base,id:'cagent.events',adapterId:'cagent.events',name:'Events',permissions:['events.read'],tools:[],events:[{id:'message.received',description:'Incoming message',payloadSchema:{type:'object',properties:{conversation:{type:'string'}}},permissions:['events.read']}]},{'NOTICE.txt':Buffer.from('MIT fixture')});
+ const runtime=new CapabilityRuntime({directory,vault,applications:{} as AgentApplicationService,agentVersion:'0.6.11',extraPackages:[{entry,adapter:{eventSource:'extension.fixture',inspect:async()=>({installed:true,configured:true}),invoke:async()=>({})}}]});
+ try{await runtime.load();assert.deepEqual(runtime.events(),[]);await runtime.install({id:entry.id,confirm:true});assert.deepEqual(runtime.events(),[]);await runtime.grant({id:entry.id,permissions:['events.read']});assert.deepEqual(runtime.events().map(x=>[x.source,x.type]),[['extension.fixture','message.received']]);await runtime.grant({id:entry.id,permissions:[]});assert.deepEqual(runtime.events(),[]);}finally{await runtime.dispose();await rm(directory,{recursive:true,force:true});}
+});

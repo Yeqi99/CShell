@@ -3,6 +3,7 @@ import {codingMethods} from './coding';
 import { z } from 'zod';
 export const agentMethods = [
   'network.probe','machine.snapshot',
+  'automation.list','automation.create','automation.change',
   'environment.read','environment.save','assistant.model.configure','management.script.start','management.script.status','management.script.cancel',
   ...codingMethods,
   ...ideMethods,
@@ -32,6 +33,7 @@ export const agentMethods = [
   'desktop.configure',
   'desktop.open',
   'desktop.close',
+  'desktop.clipboard',
   'applications.policy',
   'applications.configure',
   'applications.list',

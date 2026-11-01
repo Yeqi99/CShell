@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import {MachineInformation} from './MachineInformation';
 import {IdeApp} from './IdeApp';
 import {agentRead} from '../agent-read';
@@ -34,8 +35,6 @@ import './linux-desktop.css';
 const apps = [
   { id: 'machine-info', label: '机器信息', icon: Monitor, color: 'blue' },
   { id: 'ide', label: '代码编辑器', icon: Terminal, color: 'blue' },
-  { id: 'codex', label: 'Codex', icon: Terminal, color: 'green' },
-  { id: 'claude', label: 'Claude Code', icon: Terminal, color: 'amber' },
   { id: 'browser', label: '浏览器', icon: Globe, color: 'blue' },
   { id: 'native', label: '应用', icon: Folder, color: 'slate' },
   { id: 'files', label: '文件', icon: Folder, color: 'amber' },
@@ -715,7 +714,7 @@ export function LinuxDesktop({
                           {onTerminal && <button onClick={onTerminal}>进入 SSH 终端</button>}
                         </>
                       )}
-                      {error && <p role="alert">{error}{!lookReady.current&&<button onClick={()=>{setError('');setLookLoadAttempt(v=>v+1);}}>重新读取外观</button>}</p>}
+                      {error && <div><ErrorNotice title="桌面设置未完成" error={error}/>{!lookReady.current&&<button onClick={()=>{setError('');setLookLoadAttempt(v=>v+1);}}>重新读取外观</button>}</div>}
                     </div>
                   </div>
                 )}
@@ -908,7 +907,7 @@ export function LinuxDesktopTerminal({
   return (
     <div className="desktop-terminal">
       {error ? (
-        <p role="alert">{error}</p>
+        <ErrorNotice title="终端连接未完成" error={error}/>
       ) : id ? (
         <TerminalPane
           id={id}

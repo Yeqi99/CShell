@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import brandMark from '../../../assets/icon.svg';
 import { useEffect, useRef, useState } from 'react';
 import { ShieldCheck, Monitor, Power, Moon, Sun } from 'lucide-react';
@@ -423,7 +424,7 @@ export function ClientApplication({ embedded = false }: { embedded?: boolean }) 
             <small className="client-fingerprint">SHA256 · {status?.fingerprint}</small>
           </details>
         </section>
-        {error && <p role="alert">{error}</p>}
+        {error && <ErrorNotice title="操作未完成" error={error}/>}
       </main>
       <footer className="client-footer" hidden={embedded}>
         <select

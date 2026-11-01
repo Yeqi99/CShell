@@ -2,6 +2,7 @@ name: Release
 on:
   push:
     tags: ['v*']
+    branches: ['codex/candidate-core-0.8.18']
   workflow_dispatch:
     inputs:
       publish:
@@ -92,6 +93,9 @@ jobs:
           architecture: 'x64'
       - name: Build the standalone Agent without Electron
         run: node scripts/agent-build.mjs
+      - if: runner.os == 'Windows'
+        name: Verify native clipboard formats in an isolated desktop
+        run: node scripts/test-native-clipboard.mjs
       - name: Verify the packaged Agent with a real native terminal
         run: pnpm exec tsx scripts/agent-package-smoke.ts
       - run: node scripts/package-agent.mjs

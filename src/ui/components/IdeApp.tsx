@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { useEffect, useState } from 'react';
 import { Code2, RotateCw } from 'lucide-react';
 import type { AgentCall } from '../../shared/agent';
@@ -47,7 +48,7 @@ export function IdeApp({
       <h2>{error ? '代码编辑器未能打开' : '正在打开代码编辑器'}</h2>
       {error && (
         <>
-          <p>{error}</p>
+          <ErrorNotice title="代码编辑器未能打开" error={error}/>
           <button onClick={() => setAttempt((v) => v + 1)}>
             <RotateCw size={16} />
             重试

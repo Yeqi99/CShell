@@ -6,7 +6,7 @@ import type { Store } from '../core/store';
 import type { SshService } from '../core/ssh';
 import type { ClientProvider } from '../core/client/provider';
 import type { ConnectionRegistry } from '../core/connections/registry';
-import { networkProbeResultSchema } from '../shared/network-probe';
+import { networkProbeResultSchema, networkProbeSchema } from '../shared/network-probe';
 
 export function registerNetworkDiagnostics(handle: (name: string, fn: (...args: any[]) => any) => void, store: Store, ssh: SshService, client: ClientProvider, registry: ConnectionRegistry) {
   const pendingPing=new Set<string>();
@@ -19,6 +19,13 @@ export function registerNetworkDiagnostics(handle: (name: string, fn: (...args: 
     pendingPing.add(host);try{return await pingHost(host)}finally{pendingPing.delete(host)}
   });
   const active = new Map<string, AbortController>();
+  handle('network:connection-probe',async raw=>{
+    const input=networkProbeSchema.pick({host:true,port:true}).strict().parse(raw);
+    if(active.size>=2)throw new Error('已有网络检测正在进行');
+    const id='draft:'+crypto.randomUUID(),controller=new AbortController();active.set(id,controller);
+    try{return await probeNetwork({...input,samples:1,timeoutMs:3000},controller.signal);}
+    finally{active.delete(id);}
+  });
   const sources = () => [
     { id: 'local', name: '本机 CShell' },
     ...registry.activeTargets().filter(t => t.providerId === 'cshell.ssh').map(t => ({ id: 'ssh:' + t.sessionId, name: t.label + ' · SSH' })),

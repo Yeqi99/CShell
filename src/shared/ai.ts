@@ -155,7 +155,7 @@ export interface AiBridge {
   aiText(input: import('./ai-text').TextRequest): Promise<import('./ai-text').TextResult>;
   aiTextProviderSave(kind: 'translate' | 'compose', id: string | null): Promise<void>;
   onAiConnection(
-    listener: (value: { sessionId: string; profile: import('./contracts').Profile }) => void,
+    listener: (value: { sessionId: string; profile: import('./contracts').Profile; managementOnly?:boolean }) => void,
   ): () => void;
   onMinimalHover(listener: (hovered: boolean) => void): () => void;
   aiExtractConnection(
@@ -181,4 +181,5 @@ export interface AiBridge {
   aiApprove(id: string, requestId: string, allow: boolean): Promise<void>;
   aiStop(id: string): Promise<void>;
   aiMode(id: string, mode: AiMode): Promise<void>;
+  aiThreadProvider(id: string, providerId: string, extensionModel?: string): Promise<void>;
 }

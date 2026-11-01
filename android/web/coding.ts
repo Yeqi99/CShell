@@ -118,7 +118,7 @@ export class MobileCoding {
                 target: { id: target, name, local: false, available: true },
                 nativeCapabilities: false,
                 onDevelopmentChanged: () => {
-                  void this.call(target, 'coding.status')
+                  void Promise.resolve({engines:[]})
                     .then((value: any) => {
                       const ready = (engine: string) =>
                         !!value.engines?.some((e: any) => e.engine === engine && e.ready);

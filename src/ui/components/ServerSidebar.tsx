@@ -1,4 +1,6 @@
+import {ErrorNotice} from './ErrorNotice';
 import {PingButton} from './PingButton';
+import {PingAll} from './PingAll';
 import type { LocalConnectionTarget } from '../../shared/local-terminal';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -232,6 +234,7 @@ export function ServerSidebar({
       </button>
       <div className="server-groups-heading">
         <span>{t('groups')}</span>
+        <PingAll profiles={profiles} interval={preferences.sidebarPingIntervalSeconds} onInterval={onPreferences ? value=>onPreferences({...preferences,sidebarPingIntervalSeconds:value}) : undefined}/>
         <button onClick={() => beginGroup()} title={t('newGroup')}>
           <FolderPlus size={13} />
           {t('newGroup')}
@@ -293,9 +296,7 @@ export function ServerSidebar({
         </form>
       )}
       {error && (
-        <p className="sidebar-error" role="alert">
-          {error}
-        </p>
+        <ErrorNotice title="操作未完成" error={error}/>
       )}
       <div className="server-list">
         {dragging && <div className="sidebar-drag-hint" role="status">{profiles.find(p => p.id === dragging)?.name} → {drop ? `${drop.group || t('ungrouped')}${drop.before ? ' · 插入此机器之前' : ' · 移到分组末尾'}` : '拖到机器之间或分组标题'}</div>}

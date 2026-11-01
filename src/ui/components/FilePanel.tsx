@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import {formatFileBytes} from '../../shared/transfer-progress';
 import {FilePermissions} from './FilePermissions';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
@@ -322,10 +323,7 @@ export function FilePanel({
         </button>
       </div>
       {error && (
-        <div className="file-inline-error" role="alert">
-          <span>{error}</span>
-          <button onClick={() => void load(draft)}>{t('retry')}</button>
-        </div>
+        <ErrorNotice title="文件操作未完成" error={error} retry={()=>void load(draft)}/>
       )}
       <div className="file-heading">
         <span>{t('fileName')}</span>

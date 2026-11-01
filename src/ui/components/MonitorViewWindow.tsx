@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { useEffect, useRef, useState } from 'react';
 import { Save, SlidersHorizontal, RotateCcw, ArrowLeft, Grid2X2, X } from 'lucide-react';
 import { Terminal } from '@xterm/xterm';
@@ -69,7 +70,7 @@ function SshView({ tile, profile, config, borrowed }: { tile: ViewTile; profile:
       }}>{submitted ? '已提交命令' : tile.screen ? '附加 screen' : '执行配置命令'}</button>}
       {borrowed ? <span className="view-session-note muted">复用工作台会话</span> : <button className="view-session-reconnect" title="重新连接" aria-label="重新连接" onClick={() => { void window.cshell.disconnect(id).catch(() => {}); setId(''); setError(''); }}><RotateCcw size={13}/></button>}
     </div><div className="view-terminal" ref={host}/></>}
-    {error && <p role="alert" className="form-error">{error}</p>}
+    {error && <ErrorNotice title="操作未完成" error={error}/>}
     <ViewTerminalMenu host={host} terminal={terminal} sessionId={id} closed={closed} onError={setError}/>
   </div>;
 }
@@ -84,7 +85,7 @@ function DesktopTile({ tile }: { tile: ViewTile }) {
     }).catch(e => { if (alive) setError(String(e)); });
     return () => { alive = false; };
   }, [tile.profileId, retry]);
-  return <>{target && status ? <AgentDesktopView target={target} canView={status.viewAllowed} canControl={status.controlAllowed} autoConnect/> : <p>{error || '正在连接机器…'}</p>}{error && <button onClick={() => { setError(''); setRetry(n => n + 1); }}>重新连接</button>}{status && !status.viewAllowed && <p role="alert">远端桌面未就绪或尚未授权，请在机器工作区检查。</p>}</>;
+  return <>{target && status ? <AgentDesktopView target={target} canView={status.viewAllowed} canControl={status.controlAllowed} autoConnect/> : error ? <ErrorNotice title="画面连接未完成" error={error}/> : <p role="status">正在连接机器…</p>}{error && <button onClick={() => { setError(''); setRetry(n => n + 1); }}>重新连接</button>}{status && !status.viewAllowed && <ErrorNotice title="远端桌面尚未就绪" error="远端桌面未就绪或尚未授权，请在机器工作区检查。"/>}</>;
 }
 export function MonitorViewWindow() {
   const [state, setState] = useState<Awaited<ReturnType<typeof window.cshell.monitorViewInit>>>();
@@ -165,7 +166,7 @@ export function MonitorViewWindow() {
         }}
           onDragStart={e => { e.dataTransfer.setData('application/x-cshell-view-tile', tile.id); e.dataTransfer.effectAllowed = 'move'; }}>{tile.label}<small>{tile.kind === 'ai' ? '智能体' : profile?.host || '连接已删除'}</small></button>
         <button className="view-pane-close" title={'关闭区域：'+tile.label} aria-label={'关闭区域：'+tile.label} onClick={() => closePane(tile.id)}><X size={13}/></button></div>
-        <div className="view-tile-content" inert={state.view.mode === 'overview' && focused !== tile.id && !editing}>{tile.kind === 'ai' ? <AiView threadId={tile.threadId!}/> : tile.kind === 'local' && window.cshell.platform !== 'win32' ? <p role="status">此区域使用 Windows 本机终端。请在视图设置中选择当前系统可用的 SSH 或 CAgent 连接。</p> : !profile ? <p role="alert">请重新配置该区域的连接。</p> : tile.kind !== 'desktop' ? <SshView tile={tile} profile={profile} config={config} borrowed={state.borrowed?.[tile.id]}/> : <DesktopTile tile={tile}/>}</div>
+        <div className="view-tile-content" inert={state.view.mode === 'overview' && focused !== tile.id && !editing}>{tile.kind === 'ai' ? <AiView threadId={tile.threadId!}/> : tile.kind === 'local' && window.cshell.platform !== 'win32' ? <p role="status">此区域使用 Windows 本机终端。请在视图设置中选择当前系统可用的 SSH 或 CAgent 连接。</p> : !profile ? <p role="status">请重新配置该区域的连接。</p> : tile.kind !== 'desktop' ? <SshView tile={tile} profile={profile} config={config} borrowed={state.borrowed?.[tile.id]}/> : <DesktopTile tile={tile}/>}</div>
         {state.view.mode === 'overview' && !editing && !focused && <button className="view-preview-open" aria-label={'放大 '+tile.label} title={'点击放大并操作 '+tile.label} onClick={() => setFocused(tile.id)}><span>点击放大</span></button>}
       </section>;
     })}{!state.view.tiles.length && <p className="view-empty">当前窗口没有区域。可保存布局，或关闭窗口后从工作台重新配置视图。</p>}</div>

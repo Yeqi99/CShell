@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 export type NativeDesktopConfig={display?:number;width?:number;height?:number;fps:number;bitrate:number;memoryBudgetBytes?:number;forceGdi?:number};
@@ -34,7 +35,8 @@ export class NativeDesktop extends EventEmitter {
    else if(meta.type==='frame'){
     if(!Number.isSafeInteger(meta.id)||meta.id<0||typeof meta.key!=='boolean'||!Number.isSafeInteger(meta.timestampUs)||!payload.length)throw new Error('Invalid native frame');
     this.emit('frame',{...meta,data:payload} satisfies NativeDesktopFrame);
-   }else if(meta.type==='input-status')this.emit('input-status',meta);
+   }else if(meta.type==='clipboard')this.emit('clipboard',meta);
+   else if(meta.type==='input-status')this.emit('input-status',meta);
    else if(meta.type==='capture-error'){this.errorText=String(meta.message).slice(0,2048);}
    else if(meta.type==='input-error')this.emit('input-error',new Error(String(meta.message).slice(0,1024)));
    else throw new Error('Unknown native packet');
@@ -74,6 +76,14 @@ export class NativeDesktop extends EventEmitter {
    try{this.input(event);}catch(error){done(error as Error);}
   });}finally{this.confirmedPending--;}
  }
+ async clipboard(generation:number,input:Record<string,unknown>){
+  const request=randomUUID();return await new Promise<any>((resolve,reject)=>{
+   const done=(error?:Error,value?:unknown)=>{clearTimeout(timer);this.off('clipboard',reply);this.off('closed',closed);error?reject(error):resolve(value);};
+   const reply=(r:any)=>{if(r.request===request)done(r.error?Error(String(r.error)):undefined,r.value);};const closed=()=>done(Error('Clipboard session closed'));
+   const timer=setTimeout(()=>done(Error('Clipboard timeout; write outcome must be checked before retry')),5000);this.on('clipboard',reply);this.once('closed',closed);
+   try{this.send({op:'clipboard',generation,request,...input});}catch(e){done(e as Error);}
+  });
+ }
  async stop(){
   const child=this.child;if(!child||this.finished)return;this.stopping=true;
   try{this.send({op:'stop'});child.stdin.end();}catch{/* Already disconnected. */}
@@ -84,4 +94,3 @@ export class NativeDesktop extends EventEmitter {
   });
  }
 }
-

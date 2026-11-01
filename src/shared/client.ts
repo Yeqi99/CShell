@@ -108,7 +108,7 @@ export const clientPasswordSchema = z.string().min(1).max(128);
 export const clientAccessSchema = z
   .object({
     password: clientPasswordSchema,
-    shells: z.array(clientShellSchema).min(1).max(6),
+    shells: z.array(clientShellSchema).max(6),
       allowHttp: z.boolean().default(true),
       allowManage: z.boolean().default(true),
       allowHosting: z.boolean().default(true),

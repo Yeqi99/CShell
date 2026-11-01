@@ -130,6 +130,13 @@ export class ClientServer {
   async revealPassword() { return (await this.vault.read('connection-password', z.string())) ?? ''; }
   async setAccess(options: unknown) {
     const input = clientAccessSchema.parse(options);
+    // Defaults apply only to a new access record. Partial edits must retain
+    // explicit opt-outs stored by an existing installation.
+    if (this.access && options && typeof options === 'object') {
+      for (const key of ['allowHttp','allowManage','allowHosting','allowRelay'] as const) {
+        if (!Object.prototype.hasOwnProperty.call(options,key)) input[key]=this.access[key];
+      }
+    }
     if (this.server || this.changingAccess) throw new Error('请先停止服务再修改密码与权限');
     this.changingAccess = true;
     try {

@@ -146,11 +146,20 @@ export class AgentTerminalProvider implements ManagedProvider {
   private executing = 0;
   private managedEnvironment:Record<string,string>={};
   setManagedEnvironment(values:Record<string,string>){this.managedEnvironment={...values};}
-  private processEnvironment(){
+  private async processEnvironment(extra:Record<string,string>={}){
     const values={...process.env};
-    for(const [name,value] of Object.entries(this.managedEnvironment)){
-      // Windows keys are case-insensitive. Node otherwise retains the first
-      // lexical variant (PATH/Path), potentially discarding the requested value.
+    if(process.platform==='win32'){
+      // Launchers may inject their own PowerShell modules (including versions
+      // requiring publisher approval). Native Windows PowerShell must use the
+      // user's registered module paths, not the launcher's private runtime.
+      const systemModules=join(process.env.SystemRoot||'C:\\Windows','System32/WindowsPowerShell/v1.0/Modules');
+      const {stdout}=await exec(join(process.env.SystemRoot||'C:\\Windows','System32/WindowsPowerShell/v1.0/powershell.exe'),
+        ['-NoLogo','-NoProfile','-NonInteractive','-Command',"[Console]::OutputEncoding=[Text.UTF8Encoding]::new(); [Console]::Write(([Environment]::GetEnvironmentVariable('PSModulePath','User'),[Environment]::GetEnvironmentVariable('PSModulePath','Machine') -join ';'))"],
+        {windowsHide:true,timeout:15000,maxBuffer:65536,env:{...process.env,PSModulePath:systemModules}});
+      for(const key of Object.keys(values))if(key.toLowerCase()==='psmodulepath')delete values[key];
+      values.PSModulePath=[join(homedir(),'Documents/WindowsPowerShell/Modules'),...stdout.trim().split(';'),systemModules].filter(Boolean).join(';');
+    }
+    for(const [name,value] of Object.entries({...this.managedEnvironment,...extra})){
       if(process.platform==='win32')for(const key of Object.keys(values))if(key.toLowerCase()===name.toLowerCase())delete values[key];
       values[name]=value;
     }
@@ -200,7 +209,7 @@ export class AgentTerminalProvider implements ManagedProvider {
     const id = request.shell === 'wsl' ? 'wsl:' + request.distribution : request.shell;
     const shell = (await this.detect()).find((s) => s.id === id);
     if (!shell) throw new Error('所选 Shell 或 WSL 发行版未安装');
-    combined.throwIfAborted();
+    if (combined.aborted) throw new Error(signal.aborted ? '操作已取消' : '命令执行超时');
     const args =
       request.shell === 'wsl'
         ? ['--distribution', request.distribution!, '--exec', 'sh', '-lc', request.command]
@@ -209,6 +218,8 @@ export class AgentTerminalProvider implements ManagedProvider {
           : request.shell === 'powershell'
             ? ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', request.command]
             : ['-lc', request.command];
+    const environment=await this.processEnvironment(undefined);
+    if (combined.aborted) throw new Error(signal.aborted ? '操作已取消' : '命令执行超时');
     return new Promise<{
       stdout: string;
       stderr: string;
@@ -219,7 +230,7 @@ export class AgentTerminalProvider implements ManagedProvider {
     }>((resolve, reject) => {
       const child = spawnProcess(shell.executable, args, {
         cwd: homedir(),
-        env: this.processEnvironment(),
+        env: environment,
         windowsHide: true,
         windowsVerbatimArguments: request.shell === 'cmd',
         detached: process.platform !== 'win32',
@@ -303,7 +314,7 @@ export class AgentTerminalProvider implements ManagedProvider {
     if (this.sessions.size >= 16) throw new Error('终端会话达到上限');
     const spawn = this.spawnPty ?? (await import('node-pty')).spawn;
     const env = Object.fromEntries(
-      Object.entries(this.processEnvironment()).filter((v): v is [string, string] => v[1] !== undefined),
+      Object.entries(await this.processEnvironment(undefined)).filter((v): v is [string, string] => v[1] !== undefined),
     );
     delete env.ELECTRON_RUN_AS_NODE;
     delete env.CSHELL_AGENT_CONTROL_TOKEN;

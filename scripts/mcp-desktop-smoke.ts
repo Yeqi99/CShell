@@ -75,9 +75,20 @@ export async function mcpDesktopSmoke(app: ElectronApplication, page: Page) {
     assert.equal(await panel.getByLabel('powershell', { exact: true }).isChecked(), false);
   }
   await panel.getByText('MCP 正在运行', { exact: true }).waitFor();
-  await panel.getByRole('button', { name: '复制访问令牌', exact: true }).click();
-  await panel.getByRole('button', { name: '已复制', exact: true }).waitFor();
-  const token = await app.evaluate(({ clipboard }) => clipboard.readText());
+  // Verify the real UI/IPC copy path without replacing the user's OS clipboard.
+  // Native clipboard formats have their own isolated acceptance test.
+  await app.evaluate(({clipboard})=>{
+    (globalThis as any).__mcpSmokeCopy={original:clipboard.writeText,value:''};
+    clipboard.writeText=(async(text:string)=>{(globalThis as any).__mcpSmokeCopy.value=text;}) as typeof clipboard.writeText;
+  });
+  let token:string;
+  try{
+    await panel.getByRole('button', { name: '复制访问令牌', exact: true }).click();
+    await panel.getByRole('button', { name: '已复制', exact: true }).waitFor();
+    token=await app.evaluate(()=> (globalThis as any).__mcpSmokeCopy.value);
+  }finally{
+    await app.evaluate(({clipboard})=>{clipboard.writeText=(globalThis as any).__mcpSmokeCopy.original;delete (globalThis as any).__mcpSmokeCopy;});
+  }
   assert.ok(token.length > 32);
   const invoke = async (name: string, args: object = {}) => {
     const response = await fetch(`http://127.0.0.1:${port}/api/v1/invoke`, {
@@ -219,6 +230,6 @@ export async function mcpDesktopSmoke(app: ElectronApplication, page: Page) {
     .getByRole('button', { name: '取消', exact: true })
     .click();
   console.log(
-    'PASS: desktop MCP settings, port binding, token clipboard, actual protocol handshake and service shutdown',
+    'PASS: desktop MCP settings, port binding, token copy handler, actual protocol handshake and service shutdown',
   );
 }

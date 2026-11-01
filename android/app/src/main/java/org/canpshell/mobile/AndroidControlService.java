@@ -11,6 +11,39 @@ import org.json.JSONObject;
 
 /** Explicitly enabled Android accessibility controls; not a privileged input injector. */
 public final class AndroidControlService extends AccessibilityService {
+  /** Bounded semantic view of the current window. Password values never leave Android. */
+  static org.json.JSONObject snapshot() throws Exception {
+    AndroidControlService service=instance;
+    if(service==null)throw new IllegalStateException("请先在手机系统设置中启用 CAgent 辅助控制");
+    java.util.concurrent.CompletableFuture<org.json.JSONObject> result=new java.util.concurrent.CompletableFuture<>();
+    new Handler(android.os.Looper.getMainLooper()).post(()->{
+      AccessibilityNodeInfo root=service.getRootInActiveWindow();
+      try {
+        org.json.JSONArray nodes=new org.json.JSONArray();
+        if(root!=null)describe(root,nodes,0);
+        result.complete(new org.json.JSONObject().put("nodes",nodes).put("available",root!=null).put("truncated",nodes.length()>=300));
+      }catch(Exception error){result.completeExceptionally(error);}finally{if(root!=null)root.recycle();}
+    });
+    return result.get(3,java.util.concurrent.TimeUnit.SECONDS);
+  }
+  private static void describe(AccessibilityNodeInfo node,org.json.JSONArray nodes,int depth)throws Exception {
+    if(depth>24||nodes.length()>=300||!node.isVisibleToUser())return;
+    android.graphics.Rect bounds=new android.graphics.Rect();node.getBoundsInScreen(bounds);
+    org.json.JSONObject value=new org.json.JSONObject().put("class",String.valueOf(node.getClassName()))
+      .put("clickable",node.isClickable()).put("editable",node.isEditable()).put("enabled",node.isEnabled())
+      .put("password",node.isPassword()).put("bounds",new org.json.JSONArray().put(bounds.left).put(bounds.top).put(bounds.right).put(bounds.bottom));
+    if(!node.isPassword()){
+      if(node.getText()!=null)value.put("text",bounded(node.getText()));
+      if(node.getContentDescription()!=null)value.put("description",bounded(node.getContentDescription()));
+    }
+    nodes.put(value);
+    if(node.isPassword())return;
+    for(int i=0;i<node.getChildCount()&&nodes.length()<300;i++){
+      AccessibilityNodeInfo child=node.getChild(i);if(child==null)continue;
+      try{describe(child,nodes,depth+1);}finally{child.recycle();}
+    }
+  }
+  private static String bounded(CharSequence text){String value=text.toString();return value.substring(0,Math.min(2000,value.length()));}
   private static volatile AndroidControlService instance;
   private android.os.HandlerThread inputThread;
   private Handler inputHandler;

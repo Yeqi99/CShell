@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { useEffect, useRef, useState } from 'react';
 import { Plus, RefreshCw, Save, Play, Square, Trash2 } from 'lucide-react';
 import type { AgentCall } from '../../shared/agent';
@@ -107,9 +108,7 @@ function HostingEditor({ call, target }: Props) {
         {icon('新建 HTTP 服务', <Plus size={16} />, () => choose(newConfig()))}
       </header>
       {error && (
-        <p role="alert" className="hosting-error">
-          {error}
-        </p>
+        <ErrorNotice title="操作未完成" error={error}/>
       )}
       {notice && <p role="status">{notice}</p>}
       <div className="hosting-layout">
@@ -248,7 +247,7 @@ function HostingEditor({ call, target }: Props) {
                 </button>
               </div>
             )}
-            {active?.error && <p role="alert">{active.error}</p>}
+            {active?.error && <ErrorNotice title="托管服务未完成" error={active.error}/>}
             {showLogs ? (
               <div className="hosting-logs">
                 <button type="button" onClick={() => setShowLogs(false)}>
@@ -261,7 +260,7 @@ function HostingEditor({ call, target }: Props) {
                       {new Date(log.time).toLocaleTimeString()} · {log.method} {log.path} ·{' '}
                       {log.status} · {log.durationMs} ms
                     </summary>
-                    {log.error && <p>{log.error}</p>}
+                    {log.error && <ErrorNotice title="服务请求未完成" error={log.error}/>}
                     {log.body !== undefined && (
                       <pre>
                         {log.body}
