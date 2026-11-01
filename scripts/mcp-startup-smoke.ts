@@ -93,7 +93,7 @@ try {
     .locator('.settings-savebar')
     .getByRole('button', { name: '保存', exact: true })
     .click();
-  await page.locator('.settings-savebar [role=alert]').filter({ hasText: 'is occupied by another application' }).waitFor();
+  await panel.getByRole('alert').filter({ hasText: 'is occupied by another application' }).waitFor();
   assert.equal(await panel.getByLabel('在本机启用 MCP').isChecked(), true);
   await panel.getByRole('status').filter({ hasText: /^MCP 已停止$/ }).waitFor();
   await page.screenshot({ path: 'test-results/mcp-save-port-error.png' });

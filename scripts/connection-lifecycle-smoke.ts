@@ -77,7 +77,7 @@ try {
   await form.getByRole('button', { name: '连接', exact: true }).click();
   await settled(() => sockets.size === 1);
   await form.getByRole('button', { name: '取消连接', exact: true }).click();
-  await form.getByText('已取消连接。', { exact: true }).waitFor();
+  await form.getByRole('status').filter({ hasText: '连接已取消' }).waitFor();
   await settled(() => sockets.size === 0);
   assert.equal(await page.locator('.session-tab').count(), 0);
   assert.equal(await form.getByLabel('主机地址').inputValue(), '127.0.0.1');

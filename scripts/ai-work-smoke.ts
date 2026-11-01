@@ -125,7 +125,8 @@ try {
   await panel.getByRole('button', { name: '目标管理' }).click();
   await panel.getByRole('button', { name: '新建目标', exact: true }).click();
   await panel.getByLabel('目标与完成条件').fill('检查测试容器状态，不执行删除');
-  assert.equal(await panel.getByLabel('检查间隔（分钟）').inputValue(), '15');
+  assert.equal(await panel.getByLabel('检查间隔', { exact: true }).inputValue(), '15');
+  assert.equal(await panel.getByLabel('间隔单位', { exact: true }).inputValue(), '60');
   await panel.getByRole('button', { name: '保存目标' }).click();
   await panel.locator('.agent-goal-card').waitFor();
   await panel.getByRole('button', { name: '立即检查' }).click();

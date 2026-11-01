@@ -66,10 +66,15 @@ public final class AndroidControlService extends AccessibilityService {
   private static volatile String lastEditState="none";
   private volatile long processed;
   private volatile String phase="idle";
+  private final java.util.concurrent.atomic.AtomicLong editRevision=new java.util.concurrent.atomic.AtomicLong();
   static String editState(){AndroidControlService s=instance;return lastEditState+(s==null?", disconnected":", processed="+s.processed+", phase="+s.phase+", editing="+s.editBusy+", gesture="+s.gestureState);}
   static boolean isEditing(){AndroidControlService s=instance;return s!=null&&s.editBusy;}
   @Override protected void onServiceConnected(){inputThread=new android.os.HandlerThread("cagent-accessibility-input");inputThread.start();inputHandler=new Handler(inputThread.getLooper());instance=this;AndroidAgentService.changed(this);}
-  @Override public void onAccessibilityEvent(AccessibilityEvent event){}
+  @Override public void onAccessibilityEvent(AccessibilityEvent event){
+    int type=event.getEventType();
+    if(type==AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED||type==AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED
+      ||type==AccessibilityEvent.TYPE_VIEW_FOCUSED)editRevision.incrementAndGet();
+  }
   @Override public void onInterrupt(){releaseAll();}
   @Override public void onDestroy(){if(instance==this)instance=null;synchronized(this){queue.clear();}if(inputThread!=null)inputThread.quitSafely();AndroidAgentService.changed(this);super.onDestroy();}
   static boolean isAvailable(){return instance!=null;}
@@ -255,18 +260,37 @@ public final class AndroidControlService extends AccessibilityService {
   // confirmed on the same node; never move focus or overwrite a newer edit.
   private void settleEdit(AccessibilityNodeInfo original,String expected,int caret){
     editBusy=true;AccessibilityNodeInfo node=AccessibilityNodeInfo.obtain(original);
-    inputHandler.post(new Runnable(){int attempts;
+    inputHandler.post(new Runnable(){
+      final long deadline=android.os.SystemClock.uptimeMillis()+1500;
+      long revision=-1;int stableText,stableCaret;boolean textSeen,selectionSent;
       public void run(){
         boolean retry=false,confirmed=false;
         try{
           if(instance!=AndroidControlService.this||!node.refresh()||!node.isFocused()){lastEditState="edit:focus-lost";return;}
           String actual=node.getText()==null?"":node.getText().toString();
+          long currentRevision=editRevision.get();
+          if(currentRevision!=revision){stableText=0;stableCaret=0;revision=currentRevision;}
           if(actual.equals(expected)){
-            if(node.getTextSelectionStart()==caret&&node.getTextSelectionEnd()==caret){confirmed=true;lastEditState="edit:applied";return;}
-            Bundle selection=new Bundle();selection.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT,caret);selection.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT,caret);
-            node.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION,selection);
+            textSeen=true;
+            // ACTION_SET_TEXT and its posted native selection update can finish
+            // separately (notably on API 29). Observe stable text first, then
+            // request the intended caret once. Never replay the text operation.
+            if(!selectionSent&&++stableText>=3){
+              Bundle selection=new Bundle();selection.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT,caret);selection.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT,caret);
+              if(!node.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION,selection)){lastEditState="edit:selection-rejected";return;}
+              selectionSent=true;stableCaret=0;
+            }else if(selectionSent){
+              if(node.getTextSelectionStart()==caret&&node.getTextSelectionEnd()==caret){
+                if(++stableCaret>=3){confirmed=true;lastEditState="edit:applied";return;}
+              }else stableCaret=0;
+            }
+          }else{
+            stableText=0;stableCaret=0;
+            // Once our result was observed, another edit belongs to the app or
+            // user. Do not restore old text or move its caret.
+            if(textSeen){lastEditState="edit:content-changed";return;}
           }
-          retry=++attempts<8;
+          retry=android.os.SystemClock.uptimeMillis()<deadline;
           if(!retry)lastEditState="edit:caret-unconfirmed";
         }finally{if(retry)inputHandler.postDelayed(this,32);else{
           node.recycle();

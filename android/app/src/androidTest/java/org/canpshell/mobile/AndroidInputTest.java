@@ -18,6 +18,7 @@ final class AndroidInputTest implements AutoCloseable {
   private Button button;
   private EditText editor;
   private final AtomicInteger clicks=new AtomicInteger();
+  private final AtomicBoolean delayedNativeCaret=new AtomicBoolean();
   private final java.util.ArrayDeque<String> touchTrace=new java.util.ArrayDeque<>();
   private void trace(String event){synchronized(touchTrace){if(touchTrace.size()==48)touchTrace.removeFirst();touchTrace.addLast(android.os.SystemClock.uptimeMillis()+":"+event);}}
   private String inputDiagnostics(){synchronized(touchTrace){return AndroidControlService.editState()+", nativeTouches="+touchTrace;}}
@@ -44,6 +45,13 @@ final class AndroidInputTest implements AutoCloseable {
         }
       };button.setText("CAgent native input fixture");button.setOnClickListener(v->{trace("click="+clicks.incrementAndGet());});panel.addView(button,new LinearLayout.LayoutParams(-1,80));
       editor=new EditText(app);editor.setSingleLine(true);editor.setHint("Native text fixture");panel.addView(editor,new LinearLayout.LayoutParams(-1,80));
+      editor.addTextChangedListener(new android.text.TextWatcher(){
+        public void beforeTextChanged(CharSequence s,int start,int count,int after){}
+        public void onTextChanged(CharSequence s,int start,int before,int count){}
+        public void afterTextChanged(android.text.Editable text){
+          if(delayedNativeCaret.getAndSet(false))editor.postDelayed(()->editor.setSelection(editor.length()),40);
+        }
+      });
       FrameLayout.LayoutParams placement=new FrameLayout.LayoutParams(-1,180);placement.topMargin=120;
       ((FrameLayout)app.findViewById(android.R.id.content)).addView(panel,placement);
     });
@@ -80,6 +88,9 @@ final class AndroidInputTest implements AutoCloseable {
     pressBackspace(connection);awaitText("CAgent input check\ud83d\ude00");
     pressBackspace(connection);awaitText("CAgent input check");
     test.runOnMainSync(()->editor.setSelection(7,12));
+    // Reproduce the native posted end-selection after ACTION_SET_TEXT. The next
+    // edit must use the confirmed middle caret, not append at the stale end.
+    delayedNativeCaret.set(true);
     pressBackspace(connection);awaitText("CAgent  check");
     input(connection,new JSONObject().put("kind","text").put("text","input"));
     awaitText("CAgent input check");

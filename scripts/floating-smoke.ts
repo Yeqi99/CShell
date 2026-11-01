@@ -50,12 +50,21 @@ try {
     ),
     true,
   );
-  const native = await app.evaluate(({ BrowserWindow }) =>
+  const native = await app.evaluate(({ BrowserWindow, screen }) =>
     BrowserWindow.getAllWindows()
       .filter((w) => w.webContents.getURL().includes('?floating='))
-      .map((w) => ({ size: w.getSize(), min: w.getMinimumSize() })),
+      .map((w) => ({ size: w.getSize(), content: w.getContentSize(), min: w.getMinimumSize(), bounds:w.getBounds(), display:screen.getDisplayMatching(w.getBounds()) })),
   );
-  assert.ok(Math.abs(native[0].size[0] - 560) < 5 && Math.abs(native[0].size[1] - 360) < 5);
+  const {content,bounds,display}=native[0];
+  const area=display.workArea;
+  // Compare usable DIP dimensions; Windows' invisible resize frame contributes
+  // to outer bounds and rounds at the destination display's physical pixels.
+  const rounding=Math.ceil(1/display.scaleFactor);
+  assert.ok(Math.abs(content[0]-Math.min(560,area.width))<=rounding
+    &&Math.abs(content[1]-Math.min(360,area.height))<=rounding,JSON.stringify(native));
+  assert.ok(bounds.x>=area.x&&bounds.y>=area.y
+    &&bounds.x+bounds.width<=area.x+area.width
+    &&bounds.y+bounds.height<=area.y+area.height,JSON.stringify(native));
   assert.deepEqual(native[0].min, [320, 200]);
   await first.locator('.xterm-helper-textarea').focus();
   await first.keyboard.type('from-floating');
