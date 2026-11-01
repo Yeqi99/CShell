@@ -1,15 +1,15 @@
 # 本轮需求最终核对 · 2026-11-01
 
-## 当前结论（最终 SSL 修复构建）
+## 当前有效记录 · 原生重连与 Android 最终实机验收
 
-0.8.18 仍为候选，尚未发布、切换官网更新源或升级用户的正式安装。当前唯一附件依据是 `af309bb` 的 [30 件候选库存](release-evidence/final-0.8.18-inventory.json)，此前正文中的旧摘要、旧作业与失败过程仅保留为历史，不能用于取包。
+0.8.18 尚未公开发布。当前附件唯一依据为 f566ea0 的 [最终30件库存](release-evidence/final-0.8.18-inventory.json)：24个不受后续修复影响的桌面/POSIX包、两版新CAgent Windows包、两版新Android APK及两份重新生成的校验文件。历史摘要不得用于取包。
 
-- **构建与附件**：26 个桌面/CAgent 包已按最终微信 SSL 公共信任 PEM 目录重新构建，保留两个已核验的 Android 语义修复 APK，重新生成两渠道 SHA256SUMS。Windows 四包使用 `e2c1966` 的 [最终 Windows 收据](release-evidence/final-windows-candidates.json)，实际安装器内容、SSH/SFTP、CMD/TLS、权限、布局、MCP 与重启等对应验收通过。Core `41300796296` 的四个原生架构作业和 Pro `41300827199` 的八个桌面/CAgent作业全部成功；12 ZIP 摘要和22个POSIX附件逐项核验，见 [最终运行时收据](release-evidence/runtime-final-artifacts.json)。Windows 未签名，macOS 未签名/未公证；原生 CI 不等于用户实体设备实测。
+- **Windows与POSIX**：两CShell安装器及22个POSIX附件继续采用已核验的最终SSL目录构建；Core 41300796296、Pro 41300827199 全部原生作业通过。两CAgent Windows安装器已按7759a91替换并实际安装验证安全重连、写操作不重放、共享后台与身份保留；Core无Pro账号UI。见 [Windows收据](release-evidence/final-windows-candidates.json) 和 [POSIX收据](release-evidence/runtime-final-artifacts.json)。Windows未签名、macOS未签名/未公证，CI不代替实体设备实测。
 - **微信证据分段**：手机 B 的真实消息由原生监听捕获；对同一事件的诊断投递完成一个任务。修复后两个最终冻结工具包自动重投该真实事件，HTTP 204，任务总数仍为一，没有重复模型调用。另在独立夹具中各用一个合成新事件验证自动投递和单任务执行。不得把这些记录概括为“首次真实消息自动端到端成功”；4.2 冻结传输通过，但本轮没有运行中的4.2客户端原生钩子验收。准确记录见 [微信原生与传输证据](release-evidence/wechat-final-native-lifecycle.json)。
-- **Android**：最终语义修复的 Core 独立 Android 作业 `41293923168`、Pro `41293851767` 的 API29/35 仪器验收已通过，包含真实 TLS 输入和 WebView 新旧页语义树断言；APK及签名以 [Android 收据](release-evidence/final-android-candidates.json) 为准，本轮未重复重建。物理手机17:25旧候选已成功实际点击；20:21:31已用原签名正常覆盖安装最终3ba603语义修复APK并启动。覆盖后CAgent24443尚未监听，待用户开启服务/屏幕共享后再验文字与语义树，不把旧包点击结果当作新包完整验收。无SIM短信/电话收发不在已验证范围。
+- **Android**：Core 41310002331、Pro 41309477156 的API29/35全部通过，含网页输入、连续删除、未聚焦拒绝写入、重放拒绝/释放/重连。Pro最终7f9f866 APK已在Android16手机实际验收：H264画面、点击、文字、八次退格后实际空值、返回共享设置、同身份重新连接均成功，密码保持隐藏且无需再次录屏授权。八次安全退格耗时3.37秒。见 [实机收据](release-evidence/android-0.8.18-real-input-final.json)；Core APK未单独物理安装，短信/电话未做运营商收发测试。
 - **联想无 IP 实机**：当前账号月会员已幂等开通；目标联想设备仍为 signed-out，尚不能完成该设备的强制会员中继验证。已有公网隔离设备并发/撤销/恢复证据不能代替这台实际联想机器，仍待其登录后验证，不回退内网直连冒充免 IP。
 - **其它已关闭缺口**：typed本机/SSH/CAgent身份代理、外部插件选择及非敏感配置恢复、CAgent外观云回写已实现并有对应测试；双物理Windows文本/PNG/文件剪贴板及恢复已完成。系统HTTP代理不等于TUN或忽略代理的软件全流量接管；OpenCode上游拒绝和未实机平台保持真实限制。
-- **发布门禁**：官网/docs/admin、最终发布源码树、香港30件私有暂存与更新元数据仍须一致核对。`verified-*-0818.json` 在香港最终收据核对前保留阻止状态，不提前创建公开发行或更新用户安装。
+- **发布门禁**：香港30项完整摘要/大小/权限已由7630135核验，官网26项摘要及响应式检查通过。正式源码和控制清单已固定；联想已恢复真实登录表单，仍待用户登录后完成该机器强制中继验收。完成后再统一发布代码、附件、官网/admin、更新渠道及本机升级；当前尚未公开或切换。
 
 ## 以下为历史复审与实施记录
 
