@@ -190,8 +190,7 @@ export async function registerAgent(
     const id=z.string().uuid().parse(raw),device=provider.list().find(d=>d.deviceId===id);
     if(!device)throw new Error('设备身份不可用，请重新核对并连接');
     await provider.call(id,{method:'agent.shells'});
-    const existing=[...machines].find(([,m])=>m.resourceId===id&&m.fingerprint===device.fingerprint);
-    const target=existing?.[0]??'machine:'+randomUUID();
+    const target='machine:'+randomUUID();
     machines.set(target,{resourceId:id,fingerprint:device.fingerprint,label:device.name});
     return {id:target,name:device.name,local:false,available:true};
   });

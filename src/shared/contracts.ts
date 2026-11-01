@@ -383,6 +383,7 @@ export interface Bridge
   readonly platform: string;
   networkDiagnostics?(): Promise<import('./network-probe').NetworkDiagnostics>;
   networkPing(input:{profileId?:string;sessionId?:string}):Promise<import('./icmp-ping').PingResult>;
+  connectionProbe?(input:{host:string;port:number}):Promise<import('./network-probe').NetworkProbeResult>;
   networkProbe?(input: { id: string; source: string; target: string }): Promise<import('./network-probe').NetworkProbeResult>;
   networkProbeCancel?(id: string): Promise<void>;
   connectionImportText?(text: string): Promise<import('./connection-batch').ConnectionImportPreview>;
