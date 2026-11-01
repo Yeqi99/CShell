@@ -1,154 +1,154 @@
 {
   "version": "0.8.18",
-  "status": "superseded-candidate-do-not-publish",
-  "verifiedAt": "2026-11-01T09:05:23.043Z",
+  "status": "candidate-not-published",
+  "verifiedAt": "2026-11-01T09:29:24.018Z",
   "files": [
-    {
-      "edition": "opensource",
-      "name": "CAgent-0.8.18-linux-arm64.tar.gz",
-      "path": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CAgent-0.8.18-linux-arm64.tar.gz",
-      "size": 44504556,
-      "sha256": "9aa0249b69e28850635b6e49d26d4cdab997124eb828a4c2cfe8d2a4c2ebfd99"
-    },
-    {
-      "edition": "opensource",
-      "name": "CShell-0.8.18-linux-arm64.AppImage",
-      "path": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-0.8.18-linux-arm64.AppImage",
-      "size": 140723396,
-      "sha256": "78df02bbc820df4abc92301ffa5c74ba7b581d53f55df2896cd52ffdbad3fc77"
-    },
-    {
-      "edition": "opensource",
-      "name": "CShell-0.8.18-linux-arm64.deb",
-      "path": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-0.8.18-linux-arm64.deb",
-      "size": 103036108,
-      "sha256": "38f3b9410b4c75f1cdcc7f6b56772bd38d18f6ec255db11dfc5eb4b1885d7192"
-    },
-    {
-      "edition": "opensource",
-      "name": "CAgent-0.8.18-linux-x64.tar.gz",
-      "path": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CAgent-0.8.18-linux-x64.tar.gz",
-      "size": 44818057,
-      "sha256": "9bcc386a3a9d124faeefc8a42cf26c7bb5f62d1466f60f14e6ad5b463d062924"
-    },
-    {
-      "edition": "opensource",
-      "name": "CShell-0.8.18-linux-amd64.deb",
-      "path": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-0.8.18-linux-amd64.deb",
-      "size": 108875084,
-      "sha256": "368de47e39454ec5cb0892b5366e4e59dfc09ad0b43f1b6c536395a56cc27bee"
-    },
-    {
-      "edition": "opensource",
-      "name": "CShell-0.8.18-linux-x86_64.AppImage",
-      "path": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-0.8.18-linux-x86_64.AppImage",
-      "size": 139464087,
-      "sha256": "10c5b36395e0c11f153ce2c290b59619d619636f0cb507f43c9761b496e4fcf0"
-    },
-    {
-      "edition": "opensource",
-      "name": "CAgent-0.8.18-mac-arm64.tar.gz",
-      "path": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CAgent-0.8.18-mac-arm64.tar.gz",
-      "size": 39500212,
-      "sha256": "53c17fdbec07ffee242e9c94233fec78b42ce6e8335c81d432d11ff28a9947ae"
-    },
-    {
-      "edition": "opensource",
-      "name": "CShell-0.8.18-mac-arm64.dmg",
-      "path": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-0.8.18-mac-arm64.dmg",
-      "size": 142331149,
-      "sha256": "7057cc2eb6f9dd53432681b385c165f0ec552ce7155c0dc86866551f892c472c"
-    },
-    {
-      "edition": "opensource",
-      "name": "CShell-0.8.18-mac-arm64.zip",
-      "path": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-0.8.18-mac-arm64.zip",
-      "size": 142174011,
-      "sha256": "3edcbeba5311aefc5514e33eaeaf13a73083f10090dfa78b446d687687ae2f29"
-    },
-    {
-      "edition": "opensource",
-      "name": "CAgent-0.8.18-mac-x64.tar.gz",
-      "path": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CAgent-0.8.18-mac-x64.tar.gz",
-      "size": 40730624,
-      "sha256": "55d73fc47ace14b387058214ab1d0623162a2996aada94d2dc52e1358adeb2fb"
-    },
-    {
-      "edition": "opensource",
-      "name": "CShell-0.8.18-mac-x64.dmg",
-      "path": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-0.8.18-mac-x64.dmg",
-      "size": 146124842,
-      "sha256": "c352e0b0d1ac7a3e000858971a12b91d1c078f11017a1c8a150e80937a9811b1"
-    },
-    {
-      "edition": "opensource",
-      "name": "CShell-0.8.18-mac-x64.zip",
-      "path": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-0.8.18-mac-x64.zip",
-      "size": 146015462,
-      "sha256": "c44125c147b648318b2ff92c934275a3757d808d66178b33e1be9bfdaa1e471b"
-    },
     {
       "edition": "pro",
       "name": "CShell-Pro-0.8.18-linux-arm64.AppImage",
-      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-Pro-0.8.18-linux-arm64.AppImage",
-      "size": 140957092,
-      "sha256": "5c81106e1d15a995c3b93cfcd1b24609f00f212c6d8e9071205c40de556e8172"
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\final-sync-pro-linux-arm64\\CShell-Pro-0.8.18-linux-arm64.AppImage",
+      "size": 140957071,
+      "sha256": "e11ce6a1e8e3d87ceb2f69e5177fa8e9f023bf20decd6b2b7d25d25368366599"
     },
     {
       "edition": "pro",
       "name": "CShell-Pro-0.8.18-linux-arm64.deb",
-      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-Pro-0.8.18-linux-arm64.deb",
-      "size": 103283076,
-      "sha256": "e78e058ad0f1da0828fc3863243abf6eefad9f10c0d1a9d0da3837e0e733e201"
-    },
-    {
-      "edition": "pro",
-      "name": "CShell-Pro-0.8.18-linux-amd64.deb",
-      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-Pro-0.8.18-linux-amd64.deb",
-      "size": 107782568,
-      "sha256": "5fb50f58a15639b5a6cc01af9fc3b68fe6ee6215cdbe1d8175c1da8e2548a072"
-    },
-    {
-      "edition": "pro",
-      "name": "CShell-Pro-0.8.18-linux-x86_64.AppImage",
-      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-Pro-0.8.18-linux-x86_64.AppImage",
-      "size": 139701886,
-      "sha256": "14c14d334f0816e57eeba4f2f55ab5a16cf354f2f4b8d874c219a8fb8bc14d1e"
-    },
-    {
-      "edition": "pro",
-      "name": "CShell-Pro-0.8.18-mac-arm64.dmg",
-      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-Pro-0.8.18-mac-arm64.dmg",
-      "size": 142614148,
-      "sha256": "a2a4ff3179ab49e0ea4d0dc16c1812ddb47c420f95c65aed0f75f7dcc9d460e6"
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\final-sync-pro-linux-arm64\\CShell-Pro-0.8.18-linux-arm64.deb",
+      "size": 103283340,
+      "sha256": "3e1e7d984a99dddc6bdf3526ee77bc916b27d34c9f7e39a7a6f6ecb932f6f32f"
     },
     {
       "edition": "pro",
       "name": "CShell-Pro-0.8.18-mac-x64.dmg",
-      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-Pro-0.8.18-mac-x64.dmg",
-      "size": 146425713,
-      "sha256": "32b8a2fc2c8581918eced6d19a5e661cd00ec035bd141a8ae7c2ce87bcab8ace"
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\final-sync-pro-mac-x64\\CShell-Pro-0.8.18-mac-x64.dmg",
+      "size": 146425804,
+      "sha256": "e46df9ed8621bd839596aee5cef744787c02f8b49e215293d1447322f5f76760"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.18-linux-amd64.deb",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\final-sync-pro-linux-x64\\CShell-Pro-0.8.18-linux-amd64.deb",
+      "size": 107782056,
+      "sha256": "6eae81206509bdc8df05f152c1e944aa1e66f595de049ce8a29ede631b0d5cd0"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.18-linux-x86_64.AppImage",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\final-sync-pro-linux-x64\\CShell-Pro-0.8.18-linux-x86_64.AppImage",
+      "size": 139701827,
+      "sha256": "ba3e6dda49494cf896ed52e0db8d9d1f19693d079a0408cfc9c89d0b69589cfe"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.18-mac-arm64.dmg",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\final-sync-pro-mac-arm64\\CShell-Pro-0.8.18-mac-arm64.dmg",
+      "size": 142614306,
+      "sha256": "3d2fc084b486857a751c539e76fbcf0d41f5f961b984b318aed90acc7bd81b14"
+    },
+    {
+      "edition": "opensource",
+      "name": "CAgent-0.8.18-mac-x64.tar.gz",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\final-sync-desktop-mac-x64\\CAgent-0.8.18-mac-x64.tar.gz",
+      "size": 40730638,
+      "sha256": "3102f2fc436c947b0b731e15e6d7e42bfc0d32b7aadcf3a57627b69125b0994c"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-mac-x64.dmg",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\final-sync-desktop-mac-x64\\CShell-0.8.18-mac-x64.dmg",
+      "size": 146128111,
+      "sha256": "ad3af9a70d478622145d8bf069067b2e4eebdc6d584bf33fc867fdd8c9a47960"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-mac-x64.zip",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\final-sync-desktop-mac-x64\\CShell-0.8.18-mac-x64.zip",
+      "size": 146016128,
+      "sha256": "6fe0a5171c5ab53e8074aaa5ca75c725d85e5d5ce15222123b2368bce2256b7d"
+    },
+    {
+      "edition": "opensource",
+      "name": "CAgent-0.8.18-mac-arm64.tar.gz",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\final-sync-desktop-mac-arm64\\CAgent-0.8.18-mac-arm64.tar.gz",
+      "size": 39500181,
+      "sha256": "8793c0fb4c373449d339cd01cc99364d9bace78021f744d33dde1835bcb30e23"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-mac-arm64.dmg",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\final-sync-desktop-mac-arm64\\CShell-0.8.18-mac-arm64.dmg",
+      "size": 142332832,
+      "sha256": "6fa94b7a8c30ea4e0890896e0578193f91dd54351548a505ae87233235b1e724"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-mac-arm64.zip",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\final-sync-desktop-mac-arm64\\CShell-0.8.18-mac-arm64.zip",
+      "size": 142174677,
+      "sha256": "bb907f0177e8e50afb6490a47797c6b58b89f5bf31e476fe7512df7aeea50807"
+    },
+    {
+      "edition": "opensource",
+      "name": "CAgent-0.8.18-linux-arm64.tar.gz",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\final-sync-desktop-linux-arm64\\CAgent-0.8.18-linux-arm64.tar.gz",
+      "size": 44507454,
+      "sha256": "da24c2f28e73c0be8207ab5afd592bb9361469693904ac9c35456c804977e32b"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-linux-arm64.AppImage",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\final-sync-desktop-linux-arm64\\CShell-0.8.18-linux-arm64.AppImage",
+      "size": 140723409,
+      "sha256": "f4a527236a94bc2d875c72cd3b524b6b8f62398d2aa084fd99e274b365936724"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-linux-arm64.deb",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\final-sync-desktop-linux-arm64\\CShell-0.8.18-linux-arm64.deb",
+      "size": 103039620,
+      "sha256": "d2e0e15aab9b4bf18ddd7e61cf91f4e5aab151d848fa50578172be4aa8827a8a"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-linux-amd64.deb",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\final-sync-desktop-linux-x64\\CShell-0.8.18-linux-amd64.deb",
+      "size": 108878176,
+      "sha256": "7282594f0baecec89353a13cb5b682662f602fd604dd6521fca797b04cbbb2ea"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-linux-x86_64.AppImage",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\final-sync-desktop-linux-x64\\CShell-0.8.18-linux-x86_64.AppImage",
+      "size": 139464056,
+      "sha256": "4bc67fc04ae17fdb16e89dec2e665c26a3034c5b6a83fd060ec6d1bcff586aa1"
+    },
+    {
+      "edition": "opensource",
+      "name": "CAgent-0.8.18-linux-x64.tar.gz",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\final-sync-desktop-linux-x64\\CAgent-0.8.18-linux-x64.tar.gz",
+      "size": 44819007,
+      "sha256": "cbddcaebb1b0642d763a07d48102ece094c89a935000e3df87c2c0094a3e63d6"
     },
     {
       "edition": "opensource",
       "name": "CShell-0.8.18-win-x64.exe",
       "path": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\release\\0.8.18\\CShell-0.8.18-win-x64.exe",
-      "size": 123697131,
-      "sha256": "96f433234ffffbb2958100c0d013d081e5fe97f09b1df36f2cfcbea685e8597c"
+      "size": 123698689,
+      "sha256": "8be70f11f3a129991006e4490b946f781eded5d3afda0de52f79564ac70d78aa"
     },
     {
       "edition": "opensource",
       "name": "CAgent-Setup-0.8.18-win-x64.exe",
       "path": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\release\\0.8.18\\CAgent-Setup-0.8.18-win-x64.exe",
-      "size": 26178012,
-      "sha256": "b615b4f17a069005fc363ec77d906fb0eef16f796c5bdd54aaba7aa23edfcf2b"
+      "size": 26181270,
+      "sha256": "eac2f6bc577b85fda9ddb9f5e36e9598e45f524789826db343216cad8e52850b"
     },
     {
       "edition": "pro",
       "name": "CShell-Pro-0.8.18-win-x64.exe",
       "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\release\\pro-0.8.18\\CShell-Pro-0.8.18-win-x64.exe",
-      "size": 123907652,
-      "sha256": "81dafe0c9ef8f100e962ab5bafb15bf655439d9abab80f9f9a9984c1904659ec"
+      "size": 123907757,
+      "sha256": "6a8bdb323dabbf619cf9cdf65357b875194f5f3aa6c459ebc03728cb684ac993"
     },
     {
       "edition": "pro",
@@ -204,15 +204,14 @@
       "name": "SHA256SUMS.txt",
       "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\final-checksums\\opensource\\SHA256SUMS.txt",
       "size": 1437,
-      "sha256": "85f6068d83541be7544ef5ae5940150ac3fb675809deef45938e838663373570"
+      "sha256": "1820d71ec7a84699f3c2e82eb29ba7b05f6d87319d9c3c3170c03b3dc05f3a5b"
     },
     {
       "edition": "pro",
       "name": "SHA256SUMS.txt",
       "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\final-checksums\\pro\\SHA256SUMS.txt",
       "size": 1283,
-      "sha256": "1465fbb845ddac74d92d491488129b2cd9a62f1555db6e1f168e67dd48b0729a"
+      "sha256": "180e223df66460861ff7880057bb8248a8c7a91ced8ed78a8ef16eabfb4a1170"
     }
-  ],
-  "supersededReason": "Final source audit found Core terminal identity-proxy environment omission and duplicate network UI, plus Pro official OpenCode dispose/activity omission. Rebuild affected packages and regenerate inventory before publication."
+  ]
 }
