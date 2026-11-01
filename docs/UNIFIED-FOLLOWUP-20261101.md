@@ -17,6 +17,8 @@
 - 本清单其余未勾选项目均未完成，不能据此构建正式发布。
 
 - Android 16 USB调试已授权；debug构建、Android lint及移动UI模拟回归通过，手机USB安装权限仍拦截安装。新增语义UI读取、短信/电话工具与系统权限入口，见 [Android验收](ANDROID-FOLLOWUP-20261101.md)。未发送短信或拨号。
+- 当前源码隔离Electron实测通过本机CMD/PowerShell、环境继承/隔离、原生SSH与可视化复用PTY、SFTP、配置重启恢复及MCP协议握手（followup-local-terminal.log / followup-release-desktop.log）。
+- CAgent真实TLS+Windows ConPTY验收发现并修复继承启动器私有PSModulePath导致PowerShell停在发布者询问的问题；使用系统与用户注册模块路径且保留显式环境覆盖。CMD/PowerShell实际算术输出、resize、断开及重新连接通过（agent-terminal-live.json）；这不等同Android或发行安装包验收。
 - 机器租借实现短期证书绑定委派、到期/撤销检查、真实TLS无密码连接；管理员页面接入真实列表及带原因撤销，1200/760/390布局与请求回归通过。公网跨账号链路待部署验收。
 
 ## 发布门槛
