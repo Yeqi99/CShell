@@ -9,3 +9,5 @@
 验证：TypeScript及6项API/分块/文件token测试通过；Windows原生worker编译通过。另创建隔离Window Station和Desktop（与用户WinSta0剪贴板完全分开），完成真实Unicode文字、有效PNG、CF_HDROP往返，未读取或修改用户剪贴板。
 
 尚待最终构建的双机UI验收。快捷键后读取剪贴板的时机由前端控制，不能以隔离测试声称所有应用复制行为一致。Linux/macOS远端未加入此Windows原生能力，不伪装支持。
+
+安全加固：文件路径和文件句柄全部保留在 Windows worker，Node不再直接open用户剪贴板路径。SYSTEM worker先获取所属交互会话的用户令牌并模拟该用户；无法取得令牌时拒绝，不以SYSTEM权限回退。普通进程以当前用户访问。复制文件只接受普通磁盘文件，拒绝目录与reparse point；固定句柄读取前后检查大小和mtime，避免路径替换读取别的文件。上传在该用户LocalAppData下创建专用目录，禁止路径分隔符、控制字符及Windows非法文件名。管理授权是当前 files.* 的统一后端门禁，剪贴板另加view/control和owner检查，每个IPC返回前再次确认。
