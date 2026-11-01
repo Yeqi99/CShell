@@ -8,7 +8,7 @@ const fixture = () => ['opensource','pro'].map(edition => ({ edition, status:'ca
 test('complete distinct channels allowed without publication',()=>validatePlans(fixture()));
 test('market permits only exact six versioned binary assets, never source archives',async()=>{
   const plan=JSON.parse(await readFile(new URL('../services/update-edge/verified-wechat-012.json',import.meta.url),'utf8'));
-  assert.throws(()=>validateMarketPlan(plan));plan.status='candidate-not-published';validateMarketPlan(plan);
+  assert.throws(()=>validateMarketPlan({...plan,status:'blocked-pending-final-publication-source'}));plan.status='candidate-not-published';validateMarketPlan(plan);
   const bad=structuredClone(plan);bad.assets[0].name='Weixin-Toolkit-source.zip';assert.throws(()=>validateMarketPlan(bad));
 });
 test('oversize origin stream fails before writing excess bytes',async()=>{let written=0;await assert.rejects(pipeline(Readable.from([Buffer.alloc(4),Buffer.alloc(8)]),boundedPayload(5),new Writable({write(b,e,cb){written+=b.length;cb();}})),/exceeds verified size/);assert.equal(written,4);});
