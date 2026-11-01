@@ -1,7 +1,7 @@
 /** Keep a queued terminal activation subordinate to the user's newer focus intent. */
 export function scheduleTerminalActivation(
   actions: { active(): boolean; fit(): void; focus(): void },
-  frames = { request: requestAnimationFrame, cancel: cancelAnimationFrame },
+  frames = { request: (callback: FrameRequestCallback) => requestAnimationFrame(callback), cancel: (id: number) => cancelAnimationFrame(id) },
 ) {
   const intendedFocus = document.activeElement;
   let cancelled = false;

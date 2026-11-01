@@ -9,6 +9,7 @@ const callbacks=new Map();let next=0;let active=true;let fitted=0;
 const frames={request:(callback)=>{callbacks.set(++next,callback);return next},cancel:(id)=>callbacks.delete(id)};
 const old=(actions,frames)=>{frames.request(()=>{actions.fit();actions.focus()});return ()=>{}};
 window.fixture={activate(){active=true;return (${legacy ? 'old' : 'scheduleTerminalActivation'})({active:()=>active,fit:()=>fitted++,focus:()=>document.querySelector('#terminal').focus()},frames)},flush(){const pending=[...callbacks.values()];callbacks.clear();for(const callback of pending)callback()},deactivate(){active=false},fitted:()=>fitted};
+window.nativeActivate=()=>new Promise(resolve=>scheduleTerminalActivation({active:()=>true,fit:()=>{},focus:()=>{document.querySelector('#terminal').focus();resolve()}}));
 ` }, bundle: true, write: false, format: 'iife' });
 const browser = await chromium.launch({channel:'msedge'});
 try {
@@ -29,5 +30,8 @@ try {
   await page.locator('#tab').focus();
   await page.evaluate(()=>{(window as any).fixture.activate();(window as any).fixture.flush()});
   assert.equal(await page.evaluate(()=>document.activeElement?.id),'terminal','normal activation must still focus terminal');
+  await page.locator('#tab').focus();
+  await page.evaluate(()=>(window as any).nativeActivate());
+  assert.equal(await page.evaluate(()=>document.activeElement?.id),'terminal','native frame scheduler must retain Window receiver');
   console.log('PASS real browser focus: delayed activation preserves search/other-page intent; invalidated frame does not fit; normal terminal focuses');
 } finally { await browser.close(); }
