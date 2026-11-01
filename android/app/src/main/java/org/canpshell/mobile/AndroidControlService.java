@@ -31,7 +31,7 @@ public final class AndroidControlService extends AccessibilityService {
         result.complete(new org.json.JSONObject().put("nodes",nodes).put("available",root!=null).put("truncated",nodes.length()>=300)
           .put("input",new org.json.JSONObject().put("width",metrics.widthPixels).put("height",metrics.heightPixels)
             .put("processed",service.processed).put("phase",service.phase).put("gesture",service.gestureState)
-            .put("editing",service.editBusy)));
+            .put("editing",service.editBusy).put("editState",lastEditState)));
       }catch(Exception error){result.completeExceptionally(error);}finally{if(root!=null)root.recycle();}
     });
     try{return result.get(3,java.util.concurrent.TimeUnit.SECONDS);}
@@ -227,6 +227,10 @@ public final class AndroidControlService extends AccessibilityService {
     }
   }
   private AccessibilityNodeInfo focused(){
+    // WebView focus and caret snapshots can remain stale after a real gesture
+    // or ACTION_SET_TEXT. Input must not depend on a later semantic read to
+    // invalidate that cache; obtain current OS focus for every edit/settle step.
+    if(android.os.Build.VERSION.SDK_INT>=33)clearCache();
     // Android 10 can temporarily return no global input focus while the IME
     // updates. Only fall back to a focused application window's actual input
     // focus, never an arbitrary editable field or a remembered node.
@@ -249,6 +253,7 @@ public final class AndroidControlService extends AccessibilityService {
       int start=node.getTextSelectionStart(),end=node.getTextSelectionEnd();if(start<0||end<0){start=old.length();end=start;}int lo=Math.min(start,end),hi=Math.max(start,end);if(hi>old.length())return;
       Bundle args=new Bundle();args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,old.substring(0,lo)+text+old.substring(hi));
       if(node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT,args))settleEdit(node,old.substring(0,lo)+text+old.substring(hi),lo+text.length());
+      else lastEditState="text:rejected";
     }finally{node.recycle();}
   }
   private void backspace(){AccessibilityNodeInfo node=focused();if(node==null){lastEditState="backspace:no-input-focus";return;}
