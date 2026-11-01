@@ -908,7 +908,7 @@ else
       const readClipboardMime=async(type:string)=>{const item=(await clipboard.read()).find(item=>item.types.includes(type));return item?Buffer.from(await (await item.getType(type) as Blob).arrayBuffer()):Buffer.alloc(0);};
       const writeClipboardMime=(type:string,data:Buffer)=>clipboard.write([new ClipboardItem({[type]:new Blob([new Uint8Array(data)])})]);
       const dropMime='electron application/osclipboard;format="CF_HDROP"';
-      const localClipboard=new LocalClipboard({text:()=>clipboard.readText(),png:()=>readClipboardMime('image/png'),files:()=>readClipboardMime(dropMime),writeText:text=>clipboard.writeText(text),writePng:data=>writeClipboardMime('image/png',data),writeFiles:data=>writeClipboardMime(dropMime,data)},join(app.getPath('userData'),'clipboard-files'));
+      const localClipboard=new LocalClipboard({text:()=>clipboard.readText(),png:()=>readClipboardMime('image/png'),files:()=>readClipboardMime(dropMime),writeText:text=>writeClipboardMime('text/plain',Buffer.from(text,'utf8')),writePng:data=>writeClipboardMime('image/png',data),writeFiles:data=>writeClipboardMime(dropMime,data)},join(app.getPath('userData'),'clipboard-files'));
       handle('clipboard:content-read',()=>localClipboard.read());
       handle('clipboard:content-write',value=>localClipboard.write(value as any));
       handle('clipboard:file-read',(token,offset,length)=>localClipboard.fileRead(String(token),Number(offset),Number(length)));

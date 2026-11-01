@@ -239,6 +239,7 @@ export class CagentCloud {
         this.paused = false;
       }
     }
+    if (method === 'account.appearance') { const p=this.cached?.store?.preferences??defaults; return {theme:p.theme,uiFont:p.uiFont,uiFontSize:p.uiFontSize??14}; }
     if (method === 'account.models')
       return this.assistant
         .cloudExport()

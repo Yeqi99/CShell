@@ -50,3 +50,11 @@
 - 本地剪贴板服务与双向文件传输模拟集成测试、renderer粘贴/关闭控制测试通过；不等于远端native实机成功，等待native构建与双机验证。
 - Electron新版ClipboardItem原生测试确认文本和CF_HDROP格式往返；测试错误地尝试将read()对象直接write恢复，Electron拒绝且进程退出，因此未能恢复原剪贴板，已向主任务报告并由主任务告知用户。未修改用户文件。此测试不得作为完整安全恢复通过。
 - 后续真实剪贴板测试必须先将各格式payload完整保存并验证可重建成new ClipboardItem，修改后只有当前仍是测试内容才恢复；空剪贴板也应恢复，敏感备份及时清理。
+
+## 剪贴板真实 RPC 收口（2026-11-01）
+
+- 新增可复跑 scripts/clipboard-real-rpc-smoke.ts：真实 Electron ClipboardItem、本地独立身份配置、密码配对和 pinned TLS、CAgent DesktopService 与实际 Windows 原生 worker，逐项往返 Unicode/emoji 文本、PNG 像素、CF_HDROP 文件内容。非 fixture 模拟 RPC；同一 Windows 桌面回环，不冒充跨机器安装包 UI 验收。
+- 实测发现 native 剪贴板 owner 窗口没有消息循环，另一个应用改写时同步阻塞约 5 秒并导致键鼠 lease 过期。改为独立 owner HWND 消息线程，文件 IO 仍在原授权用户上下文；不延长 lease。OpenClipboard 仅在取得锁前最多重试 200 ms，不重放写入。
+- 新原生构建后文本/PNG/文件真实往返通过（约 175 ms 的 RPC 流程），原剪贴板所有格式先保存并验证可重建，每次仅仍为测试内容时恢复；恢复校验成功并清理备份。原先事故记录保留，不将后续成功掩盖事故。
+- Ctrl+C 先读远端 sequence，再发送按键并等实际 sequence 变化，超时不替换本机剪贴板；工具栏“取回远端剪贴板”只取现有内容。权限撤销与序号不变测试通过。
+- 尚需最终完整安装包、两台物理机器交互验收；native SYSTEM broker、跨用户桌面和实际拖放场景不在此回环覆盖内。
