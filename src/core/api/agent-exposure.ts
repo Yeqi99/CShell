@@ -7,6 +7,9 @@ import type { AgentCall } from '../../shared/agent';
  * the catalog coverage test rejects newly added, unclassified RPC methods.
  */
 export const agentApiExcludedMethods = {
+  'automation.list': 'Exposed through owner-scoped agent_automation_list in the connection tool registry.',
+  'automation.create': 'Exposed through reviewed agent_automation_create with execution authorization, never opaque management.',
+  'automation.change': 'Exposed through reviewed agent_automation_change with controller ownership and execution authorization.',
   'assistant.model.configure': 'Classroom model deployment requires the prepared target identity, selected model snapshot and explicit batch confirmation; generic management cannot bypass that boundary.',
   'environment.read': 'Managed environment may contain private values and is restricted to authenticated target administration, not generic MCP management.',
   'environment.save': 'Classroom environment deployment requires an authorized paired target and confirmed batch plan; generic management cannot bypass target scope or confirmation.',
