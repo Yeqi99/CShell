@@ -159,7 +159,7 @@ export class CagentCloud {
       empty:()=>({bundle:this.emptyBundle(),assistant:assistant.emptyWorkspace()}),
       validate:(value)=>{const v=z.object({bundle,assistant:z.unknown()}).strict().parse(value);return {bundle:v.bundle,assistant:assistant.validateWorkspace(v.assistant)};},
       assertIdle:()=>assistant.assertAccountIdle(),
-      restore:async(value)=>{await assistant.restoreWorkspace(value.assistant);await vault.write('cloud-bundle',value.bundle);this.cached=structuredClone(value.bundle);},
+      restore:async(value)=>{await assistant.restoreWorkspace(value.assistant);await vault.write('cloud-bundle',value.bundle);this.cached=structuredClone(value.bundle);this.capabilityRestore=[];},
     });
     this.sync = new CloudSync(directory, codec, {
       registrationSnapshot:async()=>this.emptyBundle(),
@@ -170,6 +170,7 @@ export class CagentCloud {
       },
       import: async (v) => {
         const next = bundle.parse(v);
+        this.capabilityRestore=[];
         if((next.store as any)?.capabilityPackages&&this.capabilities)this.capabilityRestore=await this.capabilities.cloudImport((next.store as any).capabilityPackages);
         await assistant.cloudImport(next.ai);
         await vault.write('cloud-bundle', next);

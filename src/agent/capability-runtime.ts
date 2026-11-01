@@ -98,11 +98,11 @@ export class CapabilityRuntime {
   list(){return this.manager.list();}
   cloudExport(){return this.manager.list().map(item=>({id:item.id,version:item.version,manifestSha256:this.installedManifestDigests.get(item.id)!})).filter(item=>!!item.manifestSha256);}
   async cloudImport(input:unknown){
-    const desired=portableCapabilitiesSchema.parse(input),pending:{id:string;version:string;manifestSha256:string;reason:string}[]=[];
+    const desired=portableCapabilitiesSchema.parse(input),pending:{id:string;version:string;manifestSha256:string;retryAvailable:boolean;reason:string}[]=[];
     for(const item of desired){
       const entry=this.entries.find(entry=>entry.id===item.id&&entry.version===item.version&&entry.manifestSha256===item.manifestSha256);
-      if(!entry){pending.push({...item,reason:'此机器尚无匹配且已核验的能力包来源'});continue;}
-      try{await this.install({id:item.id,confirm:true});}catch{pending.push({...item,reason:'能力包恢复未完成，可在应用市场重试'});}
+      if(!entry){pending.push({...item,retryAvailable:false,reason:'此机器尚无匹配且已核验的能力包来源'});continue;}
+      try{await this.install({id:item.id,confirm:true});}catch{pending.push({...item,retryAvailable:true,reason:'能力包恢复未完成，可在应用市场重试'});}
     }
     return pending;
   }
