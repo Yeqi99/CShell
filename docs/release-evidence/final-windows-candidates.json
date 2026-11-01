@@ -1,48 +1,74 @@
 {
   "version": "0.8.18",
   "status": "candidate-not-published",
-  "verifiedAt": "2026-11-01T17:19:23.9815683+08:00",
-  "note": "Rebuilt after cross-edition source audit: Core 99ff0e7 and Pro dc97880 production fixes. Both CShell packaged platform and desktop smoke passed; Core CAgent native PTY/TLS passed; unchanged Pro CAgent retains prior package evidence. Candidate only; physical Android and WeChat event acceptance still pending.",
+  "verifiedAt": "2026-11-01T10:44:48.175Z",
+  "note": "Rebuilt after final WeChat 0.1.2 catalog and lifecycle fixes: Core6350cec/Pro2075087. Four fresh installers; both CShell packaged platform/desktop smoke and both CAgent exact-installer PTY/TLS smoke passed. Pro native/account acceptance passed. No user installations changed. Physical Android semantic recheck and WeChat event delivery remain separate gates.",
   "files": [
     {
       "edition": "opensource",
       "component": "CShell",
       "platform": "win32",
       "arch": "x64",
+      "source": "6350cec",
       "candidatePath": "release/0.8.18/CShell-0.8.18-win-x64.exe",
-      "bytes": 123698689,
-      "sha256": "8be70f11f3a129991006e4490b946f781eded5d3afda0de52f79564ac70d78aa",
-      "authenticode": "NotSigned"
+      "absolutePath": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\release\\0.8.18\\CShell-0.8.18-win-x64.exe",
+      "bytes": 123698873,
+      "sha256": "ab1da6d0505901e5258afa41abe6bbab209644c2730f11608d49e4c9cc8563bf",
+      "authenticode": "NotSigned",
+      "validation": [
+        "packaged platform smoke: native encryption, sandbox, SSH PTY, SFTP",
+        "packaged release desktop: groups, layout, settings, MCP, restart"
+      ]
     },
     {
       "edition": "opensource",
       "component": "CAgent",
       "platform": "win32",
       "arch": "x64",
+      "source": "6350cec",
       "candidatePath": "release/0.8.18/CAgent-Setup-0.8.18-win-x64.exe",
-      "bytes": 26181270,
-      "sha256": "eac2f6bc577b85fda9ddb9f5e36e9598e45f524789826db343216cad8e52850b",
-      "authenticode": "NotSigned"
+      "absolutePath": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\release\\0.8.18\\CAgent-Setup-0.8.18-win-x64.exe",
+      "bytes": 26189508,
+      "sha256": "8adf4ae89370da37b3370aa32ba65e6c023189ba6d0717168fc3ce518db786fb",
+      "authenticode": "NotSigned",
+      "validation": [
+        "exact installer isolated /S /D install",
+        "installed runtime real CMD PTY, TLS, restricted authorization, stop"
+      ]
     },
     {
       "edition": "pro",
       "component": "CShell",
       "platform": "win32",
       "arch": "x64",
+      "source": "2075087",
       "candidatePath": "release/pro-0.8.18/CShell-Pro-0.8.18-win-x64.exe",
-      "bytes": 123907757,
-      "sha256": "6a8bdb323dabbf619cf9cdf65357b875194f5f3aa6c459ebc03728cb684ac993",
-      "authenticode": "NotSigned"
+      "absolutePath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\release\\pro-0.8.18\\CShell-Pro-0.8.18-win-x64.exe",
+      "bytes": 123908010,
+      "sha256": "ed8b532380708e3cbe4b902d12592606f25b4d2b77e4fb7e6e0c95162bb7cca1",
+      "authenticode": "NotSigned",
+      "validation": [
+        "packaged platform smoke: native encryption, sandbox, SSH PTY, SFTP",
+        "packaged release desktop: groups, layout, settings, MCP, restart"
+      ]
     },
     {
       "edition": "pro",
       "component": "CAgent",
       "platform": "win32",
       "arch": "x64",
-      "candidatePath": ".local/CAgent-Setup-0.8.18-win-x64-final.exe",
-      "bytes": 26231462,
-      "sha256": "e3663e4a6821aaa8f1a11edb88e91f4466dec9039dae3dff43c47f6307aff61d",
-      "authenticode": "NotSigned"
+      "source": "2075087",
+      "candidatePath": "release/0.8.18/CAgent-Setup-0.8.18-win-x64.exe",
+      "absolutePath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\release\\0.8.18\\CAgent-Setup-0.8.18-win-x64.exe",
+      "bytes": 26236814,
+      "sha256": "0b475c095449693bb962aaf93d813d3f7da6079a42fa9a72ac94416e1697a050",
+      "authenticode": "NotSigned",
+      "validation": [
+        "exact installer isolated /S /D install",
+        "installed runtime real CMD PTY, TLS, restricted authorization, stop",
+        "packaged account API and encrypted appearance restart",
+        "native packaged model/automation/theme identity isolation"
+      ]
     }
   ]
 }
