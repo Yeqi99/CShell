@@ -259,14 +259,27 @@ public final class AndroidControlService extends AccessibilityService {
   // Android releases. Do not consume the next input until this edit's caret is
   // confirmed on the same node; never move focus or overwrite a newer edit.
   private void settleEdit(AccessibilityNodeInfo original,String expected,int caret){
-    editBusy=true;AccessibilityNodeInfo node=AccessibilityNodeInfo.obtain(original);
+    editBusy=true;
     inputHandler.post(new Runnable(){
+      AccessibilityNodeInfo node=AccessibilityNodeInfo.obtain(original);
       final long deadline=android.os.SystemClock.uptimeMillis()+1500;
       long revision=-1;int stableText,stableCaret;boolean textSeen,selectionSent;
       public void run(){
         boolean retry=false,confirmed=false;
         try{
-          if(instance!=AndroidControlService.this||!node.refresh()||!node.isFocused()){lastEditState="edit:focus-lost";return;}
+          if(instance!=AndroidControlService.this){lastEditState="edit:service-changed";return;}
+          if(!node.refresh()||!node.isFocused()){
+            // Text updates invalidate cached node snapshots on older Android.
+            // Reacquire actual input focus, but only accept the exact same node;
+            // a different focused editor must never inherit queued input.
+            AccessibilityNodeInfo fresh=focused();
+            if(fresh==null){
+              retry=android.os.SystemClock.uptimeMillis()<deadline;
+              lastEditState=retry?"edit:focus-pending":"edit:focus-unconfirmed";return;
+            }
+            if(!fresh.equals(node)){fresh.recycle();lastEditState="edit:focus-changed";return;}
+            node.recycle();node=fresh;stableText=0;stableCaret=0;
+          }
           String actual=node.getText()==null?"":node.getText().toString();
           long currentRevision=editRevision.get();
           if(currentRevision!=revision){stableText=0;stableCaret=0;revision=currentRevision;}
