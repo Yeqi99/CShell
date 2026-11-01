@@ -81,3 +81,18 @@
 | 破坏性操作确认 | 删除布局、中继停用、编辑丢稿继续使用明确确认，不误判为错误 | 未改动行为 |
 
 以上为代码与UI定向验收，不代表每个外部服务故障均已人工制造；仍由最终安装包实机回归覆盖后端。
+
+## 2026-11-01 真实双机 Windows 远控与剪贴板补验
+
+目标为已保存的 WIN-3K4794IML24 / 德威云，直连配对身份和证书均核对一致。目标实装 0.8.16，Windows Server 2022 build 20348；系统桌面服务运行且匹配。原会话 disconnected、无人登录控制台，故没有可采集的已解锁桌面。正常使用已保存 RDP 凭据恢复原账号会话；未解锁绕过、切换 console、注销、替换服务或安装驱动。
+
+在唯一临时目录部署本轮源码 ClientServer + DesktopService 和最终 candidate 原生 worker，复用远端已安装 Node。新服务仅监听 127.0.0.1:39477；通过既有授权 CAgent browser stream 转发，内部再做绑定身份的真实 TLS。无防火墙、启动项、原配置变更。连续帧与 control 租约有效；不是本机回环替代双机。
+
+- 实际本机 Electron 剪贴板 ↔ 远端 native 剪贴板：Unicode/emoji 文本、2×2 PNG 像素、小文件内容往返全部通过。
+- 双方原有格式先完整备份并验证可重建。远端六种 HGLOBAL 格式备份使用 CurrentUser DPAPI 加密；本地全格式 Blob 备份限额并验证重建。恢复前检查序列/摘要仍为测试拥有；最终 `remoteRestored:true`、`localRestored:true`。
+- 首轮发现 RDP 自带剪贴板重定向干扰：远端 sequence 在 CAgent 写入前变化，护栏停止测试。本地恢复后远端逐字节核验 `sameAsBackup:true`，没有覆盖新复制。第二轮仅验收 RDP 宿主禁用 RedirectClipboard 后完成独立通道测试。
+- 仅测试的两处远端目录、进程及加密备份已清理；临时 RDP 正常关闭，用户程序保留。旧 CAgent 服务未替换。
+- 新 native `--probe` 可检测真实显示；虚拟显示 preflight 返回 CONSOLE_SESSION_REQUIRED。此结果不声称无人登录时可控制桌面、Server 虚拟显示驱动已安装或 SYSTEM 跨会话完整验收。
+- 界面修正 CAPTURE_FAILED / ACCESS_DENIED 的操作说明，已断开会话优先显示真实状态，不再暗示需要长期保持 RDP 窗口可见。
+
+证据：`test-results/unified-ui/clipboard-physical.json`、`remote-windows-physical-session.json`、`remote-windows-candidate-diagnostics.json`、`remote-windows-cleanup.json`。最后 tsc 通过，桌面恢复/视图 13 测试通过。

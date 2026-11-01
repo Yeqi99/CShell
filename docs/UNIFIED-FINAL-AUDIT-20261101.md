@@ -52,3 +52,7 @@
 - 账号范围与上游限制：[同步矩阵](CLOUD-SYNC-MATRIX.md)；Android系统阻碍：[Android验收](ANDROID-FOLLOWUP-20261101.md)。
 - 微信与原生能力：[CAgent验收](CAGENT-FOLLOWUP-20261101.md)；界面截图和入口：[UI验收](UNIFIED-UI-ACCEPTANCE-20261101.md)。
 
+
+### 双机剪贴板补验已完成（2026-11-01）
+
+上文第4验收组合中的物理双机剪贴板缺口现已补齐：真实保存的 Windows 目标，经正常 RDP 认证恢复原用户后，隔离 candidate 的本地回环服务通过既有 CAgent 安全隧道，内层真实TLS完成文本/PNG/文件往返，两端完整剪贴板恢复成功，临时进程和目录已清理。详见 UI 验收文档末节及 `clipboard-physical.json`。这不是无人登录桌面或跨SYSTEM会话的验收；没有安装驱动、转换console、注销用户或更改原CAgent服务。原装0.8.16在断开用户会话下不可采集，新UI已提供真实可操作解释。
