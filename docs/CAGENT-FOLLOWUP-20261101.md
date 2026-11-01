@@ -51,3 +51,9 @@
 - 已有账号共享模型与自动化入口继续使用真实 API；缺少凭据的模型禁用，运行/待授权任务期间阻止模型切换，避免隐式中止任务。
 - 自动化规则可在原位编辑任务、目标记忆和秒级检查间隔；新建规则仍先保存为暂停，不扩大权限。
 - `scripts/cagent-web-capabilities-smoke.ts` 在真实 Edge 页面和隔离 mock API 下验证主题/字号/字体、模型选择与任务保护、目标记忆更新、秒级参数、聊天草稿与权限隔离。通过；TypeScript 检查通过。这是网页交互证据，不冒充 Linux/macOS 实机发布包验收。
+
+### RDP 多标签隔离补验（2026-11-01）
+- 修复每个 RDP 标签虽然有独立 UI instanceId、实际 native 宿主仍按保存连接 ID 复用的问题。打开 IPC 分别携带 profileId 和 sessionId；凭据仍只从保存的 profileId 后端读取，状态、位置、隐藏、重连与关闭均按 sessionId。
+- 更新 `rdp-saved-smoke.ts`：双击同一机器产生两个独立标签，可视化入口建立第三个；切换保留对应宿主，关闭/重连不关闭兄弟标签，安装指引及菜单覆盖时仅隐藏当前宿主。真实 Electron 隔离数据验收通过，保存密码仍加密、不回填明文。
+- `rdp-embedded-smoke.ts` 实际 Windows ActiveX 宿主测试通过：同 profile 两个 sessionId 的 PID 不同；关闭/重连一个不替换另一个；并保留取消构建、连接失败及输入上限检查。此测试目标为本机拒绝连接端口，不冒充两路远端桌面登录验收。
+- TypeScript、renderer/main 构建通过。

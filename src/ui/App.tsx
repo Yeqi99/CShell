@@ -1139,7 +1139,7 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
               className="workspace-editor"
               hidden={surface !== 'quick' || quickId !== profile.instanceId}
             >
-              {profile.protocol === 'rdp' ? <RdpMachineWorkspace active={surface === 'quick' && quickId === profile.instanceId} profile={profile} profiles={config.profiles} onOpen={openSaved}/> : profile.protocol === 'http' ? (
+              {profile.protocol === 'rdp' ? <RdpMachineWorkspace sessionId={profile.instanceId} active={surface === 'quick' && quickId === profile.instanceId} profile={profile} profiles={config.profiles} onOpen={openSaved}/> : profile.protocol === 'http' ? (
                 <HttpWorkbench
                   profile={config.profiles.find((p) => p.id === profile.id) ?? profile}
                   enabled={pluginEnabled(config.plugins, 'http')}
