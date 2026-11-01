@@ -469,10 +469,10 @@ else
       });
       const embeddedRdp=new EmbeddedRdpService(join(app.getPath('userData'),'rdp-host'));
       app.once('before-quit',()=>embeddedRdp.dispose());
-      handle('connection:rdp', async (value) => {
+      handle('connection:rdp', async (value, sessionId) => {
         const profile=rdpProfileSchema.parse(store.profile(idSchema.parse(value)));
         const secret=await store.secret(profile.id);
-        return embeddedRdp.open(profile,secret?.password||'',window.getNativeWindowHandle());
+        return embeddedRdp.open(profile,secret?.password||'',window.getNativeWindowHandle(),sessionId===undefined?profile.id:idSchema.parse(sessionId));
       });
       handle('connection:rdp-status',(id)=>embeddedRdp.status(idSchema.parse(id)));
       handle('connection:rdp-close',(id)=>embeddedRdp.close(idSchema.parse(id)));

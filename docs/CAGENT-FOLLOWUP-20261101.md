@@ -27,3 +27,9 @@
 - capability runtime、automation、managed WeChat：24项通过（含事件授权撤销、工具update真实执行、owner隔离）。
 - 先前 agent runtime 真实 Windows CMD PTY、PowerShell命令执行通过；WSL缺失跳过。
 - 原生窗口编译/退出回归先前通过；最终设置布局与真实终端点击由统一UI集成验收继续验证。
+
+### RDP 多标签隔离补验（2026-11-01）
+- 修复每个 RDP 标签虽然有独立 UI instanceId、实际 native 宿主仍按保存连接 ID 复用的问题。打开 IPC 分别携带 profileId 和 sessionId；凭据仍只从保存的 profileId 后端读取，状态、位置、隐藏、重连与关闭均按 sessionId。
+- 更新 `rdp-saved-smoke.ts`：双击同一机器产生两个独立标签，可视化入口建立第三个；切换保留对应宿主，关闭/重连不关闭兄弟标签，安装指引及菜单覆盖时仅隐藏当前宿主。真实 Electron 隔离数据验收通过，保存密码仍加密、不回填明文。
+- `rdp-embedded-smoke.ts` 实际 Windows ActiveX 宿主测试通过：同 profile 两个 sessionId 的 PID 不同；关闭/重连一个不替换另一个；并保留取消构建、连接失败及输入上限检查。此测试目标为本机拒绝连接端口，不冒充两路远端桌面登录验收。
+- TypeScript、renderer/main 构建通过。
