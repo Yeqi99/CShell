@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import {useEffect,useRef,useState} from 'react';
 import type {Profile} from '../../shared/contracts';
 import type {ClientDevice} from '../../shared/client';
@@ -23,7 +24,7 @@ export function SavedAgentConnection({profile,onConnect,onDone}:{profile:Profile
  useEffect(()=>{if(!started.current){started.current=true;void connect();}},[]);
  return <section className="client-page saved-agent-connection"><h2>{profile.name}</h2><p>{profile.host}:{profile.port}</p>
   <p>{busy?'正在连接已保存的 CAgent…':'使用已保存的设备身份连接'}</p>
-  {error&&<p role="alert" className="error">{error}</p>}
+  {error&&<ErrorNotice title="操作未完成" error={error}/>}
   {reauth&&<label>连接密码<input type="password" autoComplete="off" value={password} onChange={e=>setPassword(e.target.value)} disabled={busy}/></label>}
   <div className="form-actions"><button className="primary" disabled={busy||(reauth&&!password)} onClick={()=>void connect(reauth)}>{reauth?'认证并连接':'重试连接'}</button>
   <button disabled={busy} onClick={()=>{setReauth(v=>!v);setPassword('');}}>{reauth?'取消重新认证':'重新认证'}</button></div>

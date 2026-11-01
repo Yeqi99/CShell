@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { useEffect, useRef, useState } from 'react';
 import { Plus, RefreshCw, Save, Play, Square, Trash2 } from 'lucide-react';
 import type { AgentCall } from '../../shared/agent';
@@ -107,9 +108,7 @@ function HostingEditor({ call, target }: Props) {
         {icon('新建 HTTP 服务', <Plus size={16} />, () => choose(newConfig()))}
       </header>
       {error && (
-        <p role="alert" className="hosting-error">
-          {error}
-        </p>
+        <ErrorNotice title="操作未完成" error={error}/>
       )}
       {notice && <p role="status">{notice}</p>}
       <div className="hosting-layout">

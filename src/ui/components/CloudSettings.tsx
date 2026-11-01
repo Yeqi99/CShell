@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import '../account.css';
 import {AccountMemory} from './AccountMemory';
 import {MachineLending} from './MachineLending';
@@ -66,7 +67,7 @@ export function CloudSettings() {
       {status.unlocked&&<MachineLending key={'lending-'+status.email}/>}
       <div className="account-footer"><span><ShieldCheck size={14}/> 配置已加密保护</span><button className="account-signout" onClick={()=>setLogoutConfirm(true)}><LogOut size={14}/>退出登录</button></div>
       {logoutConfirm&&<div className="account-exception"><p>退出后重新打开未登录工作区。账号数据保留，不会混入未登录数据。</p><button disabled={busy} onClick={()=>void run(async()=>{await window.cshell.cloudLogout();setLogoutConfirm(false);})}>确认退出</button><button onClick={()=>setLogoutConfirm(false)}>取消</button></div>}
-      {error&&<p className="account-feedback" role="alert">{error}</p>}
+      {error&&<ErrorNotice title="操作未完成" error={error}/>}
     </>}
   </section>;
 }

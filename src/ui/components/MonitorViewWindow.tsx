@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { useEffect, useRef, useState } from 'react';
 import { Save, SlidersHorizontal, RotateCcw, ArrowLeft, Grid2X2, X } from 'lucide-react';
 import { Terminal } from '@xterm/xterm';
@@ -69,7 +70,7 @@ function SshView({ tile, profile, config, borrowed }: { tile: ViewTile; profile:
       }}>{submitted ? '已提交命令' : tile.screen ? '附加 screen' : '执行配置命令'}</button>}
       {borrowed ? <span className="view-session-note muted">复用工作台会话</span> : <button className="view-session-reconnect" title="重新连接" aria-label="重新连接" onClick={() => { void window.cshell.disconnect(id).catch(() => {}); setId(''); setError(''); }}><RotateCcw size={13}/></button>}
     </div><div className="view-terminal" ref={host}/></>}
-    {error && <p role="alert" className="form-error">{error}</p>}
+    {error && <ErrorNotice title="操作未完成" error={error}/>}
     <ViewTerminalMenu host={host} terminal={terminal} sessionId={id} closed={closed} onError={setError}/>
   </div>;
 }

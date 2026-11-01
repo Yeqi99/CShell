@@ -365,7 +365,7 @@ public class CagentWindow : Window {
     ActionButton(validation,"检测本机微信",async()=>{var result=await Api("managedWechat.processes",Obj("id",id));var output=Field(validation,"检测结果",json.Serialize(result),true);output.IsReadOnly=true;output.MaxHeight=140;});
     Func<int> selected=()=>{int n;if(!int.TryParse(pid.Text.Trim(),out n)||n<=0)throw new Exception("请填写检测到的微信 PID");return n;};
     ActionButton(validation,"绑定此微信进程",async()=>{await Api("managedWechat.bind",Obj("id",id,"pid",selected()));panelStatus.Text="已绑定，需通过核验后启用工具";});
-    var confirm=Check(validation,"允许向文件传输助手发送核验消息",false);
+    var confirm=Check(validation,"允许短暂监听文件传输助手以核验连接",false);
     ActionButton(validation,"核验并启动",async()=>{if(confirm.IsChecked!=true)throw new Exception("请先确认核验消息");await Api("managedWechat.validate",Obj("id",id,"pid",selected()));await ManagedWechatSettings(id);});
     ActionButton(p,"返回应用市场",Apps);
   }

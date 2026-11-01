@@ -319,13 +319,13 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
     setWslSetupTarget(null);
     setSurface(wslReturnSurface.current);
   };
-  const [quickConnections, setQuickConnections] = useState<(Profile & { instanceId: string })[]>([]);
+  const [quickConnections, setQuickConnections] = useState<(Profile & { instanceId: string; visual: boolean })[]>([]);
   const [quickId, setQuickId] = useState('');
-  const [quickVisual, setQuickVisual] = useState<Record<string, boolean>>({});
+
   const openSaved = (profile: Profile, visual = connectionUsesVisual(profile,config.preferences)) => {
-    setQuickVisual(v => ({...v, [profile.id]: visual}));
+
     const instanceId = crypto.randomUUID();
-    setQuickConnections((items) => [...items, { ...profile, instanceId }]);
+    setQuickConnections((items) => [...items, { ...profile, instanceId, visual }]);
     setQuickId(instanceId);
     setSurface('quick');
   };
@@ -519,13 +519,14 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
     credentials: Credentials,
     persist: boolean,
     signal?: AbortSignal,
+    visualOverride?: boolean,
   ) {
     const result = await connectRequest(window.cshell, profile, credentials, persist, signal);
     setTabs((v) => [
       ...v,
       { id: result.sessionId, profile, closed: terminalClosed(result.sessionId) },
     ]);
-    const visual = !isFileConnection(profile) && (quickVisual[profile.id] ?? connectionUsesVisual(profile,config.preferences));
+    const visual = !isFileConnection(profile) && (visualOverride ?? connectionUsesVisual(profile,config.preferences));
     if (visual) setLinuxWorkspaces(v=>[...v,result.sessionId]);
     setLinuxModes(v=>({...v,[result.sessionId]:visual}));
     linuxRestored.current.add(result.sessionId);
@@ -1143,11 +1144,11 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
                 <SavedAgentConnection profile={profile} onConnect={openMachineDevice} onDone={()=>setQuickConnections(items=>items.filter(item=>item.instanceId!==profile.instanceId))}/>
               ) : (
                 <SavedConnection
-                  visual={!isFileConnection(profile) && (quickVisual[profile.id] ?? connectionUsesVisual(profile,config.preferences))}
+                  visual={!isFileConnection(profile) && profile.visual}
                   profile={profile}
                   saved={config.savedCredentials.includes(profile.id)}
                   persist={config.profiles.some((p) => p.id === profile.id)}
-                  onConnect={connect}
+                  onConnect={(p,c,persist,signal)=>connect(p,c,persist,signal,profile.visual)}
                   onDone={() =>
                     setQuickConnections((items) => items.filter((item) => item.instanceId !== profile.instanceId))
                   }

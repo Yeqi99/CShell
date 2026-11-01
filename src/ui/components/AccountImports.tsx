@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import {useEffect,useState} from 'react';
 import {ArrowLeft,FolderInput,ChevronRight} from 'lucide-react';
 import type {AccountSource,AccountSourcePreview} from '../../shared/account-import';
@@ -22,6 +23,6 @@ export function AccountImports(){
    <div className="import-actions"><button disabled={busy} onClick={()=>setPreview(undefined)}>暂不载入</button><button className="primary" disabled={busy||preview.conflicts.some(c=>!choices[c.id])} onClick={()=>void run(async()=>{await window.cshell.accountSourceImport!(preview.token,settings,choices);setPreview(undefined);setMessage('已载入当前账号，云同步会自动继续。');})}>{busy?'正在处理…':'载入当前账号'}</button></div>
   </div>}
   {!preview&&sources.includes('guest')&&<div className="import-clear">{!clear?<button className="auth-link" disabled={busy} onClick={()=>setClear(true)}>清除未登录数据…</button>:<><h3>清除 Pro 未登录工作区？</h3><p className="import-description">将删除未登录时保存的连接及凭据、模型、习惯记忆、扩展配置、外观和浏览器数据。当前账号、云端数据、开源版原配置及设备身份会保留。此操作无法撤销。</p><div className="import-actions"><button disabled={busy} onClick={()=>setClear(false)}>取消</button><button disabled={busy} onClick={()=>void run(async()=>{await window.cshell.guestCacheClear!('clear-guest-local-only');setClear(false);setSources(await window.cshell.accountSources!());setMessage('未登录工作区的数据已清除。');})}>确认清除未登录数据</button></div></>}</div>}
-  {error&&<p className="account-feedback" role="alert">{error}</p>}{message&&<p className="import-description" role="status">{message}</p>}
+  {error&&<ErrorNotice title="操作未完成" error={error}/>}{message&&<p className="import-description" role="status">{message}</p>}
  </section>;
 }

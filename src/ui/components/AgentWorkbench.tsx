@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import {AgentAccountNetwork} from './AgentAccountNetwork';
 import { AgentAssistantSettings } from './AgentAssistantSettings';
 import { AgentApplications } from './AgentApplications';
@@ -54,7 +55,7 @@ export function AgentWorkbench() {
           }}>{launching ? '正在打开…' : '打开本机 CAgent'}</button>
         )}
       </div>
-      {error && <p role="alert">{error}</p>}
+      {error && <ErrorNotice title="操作未完成" error={error}/>}
       {launchMessage && <p role="status">{launchMessage}</p>}
       {current?.available ? (
         <AgentConfiguration key={target} target={current} />
@@ -397,7 +398,7 @@ function AgentConnection({ target, call }: { target: AgentTarget; call: Call }) 
         ))}
       </details>
       {message && <p role="status">{message}</p>}
-      {error && <p role="alert">{error}</p>}
+      {error && <ErrorNotice title="操作未完成" error={error}/>}
     </div>
   );
 }
@@ -411,7 +412,7 @@ function AgentLogs({ call }: { call: Call }) {
   }, [call]);
   return (
     <div>
-      <p role="alert">{error}</p>
+      <ErrorNotice title="操作未完成" error={error}/>
       <pre>{logs.map((r) => `${r.time}  ${r.action}  ${r.peer}`).join('\n') || '暂无活动'}</pre>
     </div>
   );

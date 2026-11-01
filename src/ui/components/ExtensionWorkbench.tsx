@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import type {ClassroomTasksBridge} from '../../shared/classroom-tasks';
 import type {AgentLanBridge} from '../../shared/agent-lan';
 import {TavilyView} from '../../extensions/tavily/View';
@@ -234,9 +235,7 @@ export function ExtensionWorkbench({
           )}
         </header>
         {error && (
-          <div className="extension-error" role="alert">
-            {error}
-          </div>
+          <ErrorNotice title="操作未完成" error={error}/>
         )}
         <div hidden={section !== 'plugins'} className={`plugin-market${dragging?' extension-drop-active':''}`}
           onDragOver={e=>{if(e.dataTransfer.types.includes('Files')){e.preventDefault();e.dataTransfer.dropEffect='copy';setDragging(true);}}}
@@ -628,9 +627,7 @@ function ServerExtensions({
         </div>
       )}
       {error && (
-        <div className="extension-error" role="alert">
-          {error}
-        </div>
+        <ErrorNotice title="操作未完成" error={error}/>
       )}
       <div hidden={section !== 'apps'} className="application-market">
         <div className="application-toolbar">

@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import {ConnectionProbe} from './ConnectionProbe';
 import {AgentDownloadEntry} from './AgentDownloadEntry';
 import { ConnectionExtractor } from './ConnectionExtractor';
@@ -284,7 +285,7 @@ export function ClientConnectForm({
                 : 'Check device'}
         </button>
       </fieldset>
-      {error && <p role="alert">{error}</p>}
+      {error && <ErrorNotice title="操作未完成" error={error}/>}
     </form>
   );
 }

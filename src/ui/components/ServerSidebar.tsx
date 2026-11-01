@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import {PingButton} from './PingButton';
 import {PingAll} from './PingAll';
 import type { LocalConnectionTarget } from '../../shared/local-terminal';
@@ -295,9 +296,7 @@ export function ServerSidebar({
         </form>
       )}
       {error && (
-        <p className="sidebar-error" role="alert">
-          {error}
-        </p>
+        <ErrorNotice title="操作未完成" error={error}/>
       )}
       <div className="server-list">
         {dragging && <div className="sidebar-drag-hint" role="status">{profiles.find(p => p.id === dragging)?.name} → {drop ? `${drop.group || t('ungrouped')}${drop.before ? ' · 插入此机器之前' : ' · 移到分组末尾'}` : '拖到机器之间或分组标题'}</div>}

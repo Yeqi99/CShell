@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import {useState} from 'react';
 import {Download,ChevronDown,ArrowUpRight} from 'lucide-react';
 import type {AgentDownload} from '../../shared/agent-downloads';
@@ -17,7 +18,7 @@ export function AgentDownloadEntry(){
     {loaded&&!items.length&&<p>{cn?'暂无匹配的安装包。':'No packages available.'}</p>}
     {item&&<small>{cn?'香港下载源':'Hong Kong download'} · {(item.size/1048576).toFixed(1)} MB{item.platform!=='Windows'&&(cn?' · 实验版':' · Experimental')}</small>}
    </>}
-   {error&&<div className="agent-download-error" role="alert">{error}<button type="button" disabled={busy} onClick={()=>void load()}>{cn?'重试':'Retry'}</button></div>}
+   {error&&<ErrorNotice title="下载目录未完成" error={error} busy={busy} retry={()=>void load()}/>}
   </div>
  </details>
 }

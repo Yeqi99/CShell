@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {ArrowUp,Check,Copy,Download,File,Folder,FolderPlus,Pencil,RefreshCw,Trash2,Upload,X} from 'lucide-react';
 import type {FileEntry,Transfer} from '../../shared/contracts';
@@ -65,7 +66,7 @@ export function FtpFilePanel({sessionId,closed,transfers}:{sessionId:string;clos
       <button className="icon" aria-label="重命名" title="重命名" disabled={busy||chosen.length!==1} onClick={()=>begin('rename')}><Pencil size={15}/></button>
       <button className="icon" aria-label="删除" title="删除所选文件或空目录" disabled={busy||!chosen.length} onClick={()=>begin('delete')}><Trash2 size={15}/></button>
     </div>
-    {error&&<div className="file-inline-error" role="alert"><span>{error}</span><button disabled={busy} onClick={()=>void load(path)}>刷新目录</button></div>}
+    {error&&<ErrorNotice title="文件操作未完成" error={error} busy={busy} retry={()=>void load(path)}/>}
     <div className="ftp-file-head" aria-hidden="true"><span>名称</span><span>大小</span><span>修改时间</span></div>
     <div className="ftp-file-list" role="listbox" aria-label="文件列表" aria-multiselectable="true" aria-busy={loading} tabIndex={0} onKeyDown={event=>{
       if(busy)return;if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='a'){event.preventDefault();setSelected(entries.map(entry=>entry.path));}

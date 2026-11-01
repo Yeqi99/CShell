@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { useEffect, useState } from 'react';
 import { useI18n } from '../i18n';
 import type { WslNetworkState } from '../../shared/wsl-network';
@@ -137,9 +138,7 @@ export function WslNetwork() {
       )}
       {message && <p role="status">{message}</p>}
       {error && (
-        <p role="alert" className="form-error">
-          {error}
-        </p>
+        <ErrorNotice title="操作未完成" error={error}/>
       )}
     </details>
   );

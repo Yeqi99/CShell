@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { ConnectionExtractor } from './ConnectionExtractor';
 import { useEffect, useRef, useState } from 'react';
 import { Plus, Send, Square, Save, Trash2, Settings2, RefreshCw, Copy, Globe } from 'lucide-react';
@@ -65,7 +66,7 @@ export function HttpCreate({
       <button className="primary" disabled={busy||extracting}>
         {busy ? '正在创建…' : '创建 HTTP 工作区'}
       </button>
-      {error && <p role="alert">{error}</p>}
+      {error && <ErrorNotice title="操作未完成" error={error}/>}
     </form>
   );
 }
@@ -681,9 +682,7 @@ export function HttpWorkbench({
             )
           )}
           {error && (
-            <p role="alert" className="http-error">
-              {error}
-            </p>
+            <ErrorNotice title="操作未完成" error={error}/>
           )}
           {notice && (
             <p role="status" className="http-notice">
