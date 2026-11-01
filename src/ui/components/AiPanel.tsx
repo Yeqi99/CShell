@@ -284,7 +284,7 @@ export function AiPanel({
       {error && (
         <ErrorNotice title="智能体操作未完成" error={error} />
       )}
-      <div className="agent-chat-page" hidden={page !== 'chat'}>
+      <div className="agent-chat-page" hidden={page === 'settings' || page === 'history'}>
         {backgroundCount > 0 && <button className="agent-background-tasks" onClick={() => setPage('history')}>
           <History size={14} /><span>{backgroundCount} 个会话在后台进行</span><span>查看</span>
         </button>}
@@ -313,6 +313,7 @@ export function AiPanel({
         />
       </div>
       <div hidden={page !== 'goals'} className="agent-goals-page">
+        <div className="agent-menu-heading"><strong>目标</strong><button type="button" onClick={() => setPage('chat')} aria-label="关闭目标菜单">关闭</button></div>
         <AiGoals
           snapshot={snapshot}
           sessionId={sessionId}
@@ -326,6 +327,7 @@ export function AiPanel({
         />
       </div>
       <div className="agent-events-page" hidden={page !== 'events'}>
+        <div className="agent-menu-heading"><strong>事件订阅</strong><button type="button" onClick={() => setPage('chat')} aria-label="关闭事件菜单">关闭</button></div>
         <AiEventSubscriptions
           {...events}
           threads={snapshot.threads.filter(t => !t.parentId && !t.goal && snapshot.providers.some(p => p.id === t.providerId))}

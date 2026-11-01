@@ -353,8 +353,8 @@ export function McpSettings({
           <details>
             <summary>{locale === 'zh-CN' ? '独立 API 客户端' : 'Independent API clients'}</summary>
             {(draft.clients ?? []).map((client) => (
-              <details key={client.id}>
-                <summary>{client.name}</summary>
+              <details className="api-client-card" key={client.id}>
+                <summary><span>{client.name}</span><button type="button" className="quiet" aria-label={`${locale === 'zh-CN' ? '移除客户端' : 'Remove client'} ${client.name}`} title={locale === 'zh-CN' ? '移除后保存设置以撤销令牌' : 'Save settings after removal to revoke the token'} onClick={event => {event.preventDefault();event.stopPropagation();setDraft({...draft,clients:draft.clients?.filter(c=>c.id!==client.id)});}}>{locale === 'zh-CN' ? '移除' : 'Remove'}</button></summary>
                 <label>
                   {locale === 'zh-CN' ? '客户端名称' : 'Client name'}
                   <input

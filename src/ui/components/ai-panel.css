@@ -1,4 +1,14 @@
 /* Agent surfaces share the workbench palette, with compact controls at the edges. */
+.ai-panel { position: relative; }
+.ai-panel .agent-goals-page:not([hidden]), .ai-panel .agent-events-page:not([hidden]) {
+  position:absolute; z-index:20; top:52px; right:10px; left:10px;
+  max-height:min(65%,560px); overflow:auto; border:1px solid var(--border);
+  border-radius:12px; background:var(--panel); box-shadow:0 12px 36px #172a4120;
+}
+.agent-goals-page[hidden], .agent-events-page[hidden] { display:none; }
+.agent-menu-heading { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; position:sticky; top:0; background:var(--panel); border-bottom:1px solid var(--border); z-index:1; }
+.agent-menu-heading button { border:0; background:transparent; color:var(--muted); font:inherit; cursor:pointer; padding:5px 8px; }
+.agent-menu-heading button:focus-visible { outline:2px solid var(--accent); }
 .ai-panel .agent-title {
   display: flex;
   align-items: center;

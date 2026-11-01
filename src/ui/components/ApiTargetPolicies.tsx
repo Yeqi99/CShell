@@ -46,7 +46,7 @@ export function ApiTargetPolicies({
     'http.send.local': '本机 HTTP 请求',
   };
   return (
-    <details>
+    <details className="permission-targets">
       <summary>{cn ? '按目标覆盖权限' : 'Per-target permissions'}</summary>
       {profiles
         .filter((p) => settings.allowedProfiles.includes(p.id))
@@ -59,8 +59,8 @@ export function ApiTargetPolicies({
             change(next);
           };
           return (
-            <details key={profile.id}>
-              <summary>{profile.name}</summary>
+            <details className="permission-target" key={profile.id}>
+              <summary><span>{profile.name}</span><small>{policy ? (cn ? '独立授权' : 'Override') : (cn ? '继承默认' : 'Inherited')}</small></summary>
               <label>
                 <input
                   type="checkbox"
@@ -93,7 +93,7 @@ export function ApiTargetPolicies({
                   </label>
                   <CapabilitySelection options={apiCapabilitySchema.options} value={policy.capabilities} change={capabilities=>update({...policy,capabilities})} />
                   {apiCapabilitySchema.options.map((capability) => (
-                    <label key={capability}>
+                    <label className="checkbox" key={capability}>
                       <input
                         type="checkbox"
                         checked={policy.capabilities.includes(capability)}
