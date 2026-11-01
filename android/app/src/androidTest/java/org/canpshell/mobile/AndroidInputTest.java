@@ -42,7 +42,18 @@ final class AndroidInputTest implements AutoCloseable {
     // connection IDs and causes five-second refresh/action timeouts. The test
     // driver no longer needs accessibility after granting the real service.
     // All following taps/edits still travel through TLS and AndroidControlService.
-    test.getUiAutomation(UiAutomation.FLAG_DONT_USE_ACCESSIBILITY|UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES);
+    if(android.os.Build.VERSION.SDK_INT>=31){
+      test.getUiAutomation(UiAutomation.FLAG_DONT_USE_ACCESSIBILITY|UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES);
+    }else{
+      // API29 ignores the later DONT_USE flag. Its still-running UiAutomation
+      // thread was observed holding AccessibilityCache while awaiting the main
+      // thread, which itself waited for that cache lock. Stop only the test
+      // driver's event subscription; keep the product service fully enabled.
+      android.accessibilityservice.AccessibilityServiceInfo info=automation.getServiceInfo();
+      check(info!=null,"Test driver accessibility settings unavailable");
+      info.packageNames=new String[]{"org.canpshell.instrumentation.no-accessibility-target"};
+      info.eventTypes=0;automation.setServiceInfo(info);
+    }
     sampler.scheduleAtFixedRate(()->{
       if(!AndroidControlService.isEditing())return;
       StackTraceElement[] stack=android.os.Looper.getMainLooper().getThread().getStackTrace();
