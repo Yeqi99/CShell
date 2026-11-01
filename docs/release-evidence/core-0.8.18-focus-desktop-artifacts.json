@@ -1,0 +1,121 @@
+{
+  "source": "143418e4c0e0d3b6aca7d2f5ff3835e6220ff456",
+  "remoteSource": "015163f8208fe08bd0437bcf613085b3a2f5ecb2",
+  "artifacts": [
+    {
+      "archive": "core-focus-linux-arm64.zip",
+      "bytes": 287432647,
+      "sha256": "9b812c8c0f5f534ce166174367f9942d107a45fa4968d6ea18c16432113b9e71",
+      "packages": [
+        {
+          "name": "CAgent-0.8.18-linux-arm64.tar.gz",
+          "archiveEntry": "0.8.18/CAgent-0.8.18-linux-arm64.tar.gz",
+          "bytes": 44504556,
+          "sha256": "9aa0249b69e28850635b6e49d26d4cdab997124eb828a4c2cfe8d2a4c2ebfd99",
+          "localPath": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CAgent-0.8.18-linux-arm64.tar.gz"
+        },
+        {
+          "name": "CShell-0.8.18-linux-arm64.AppImage",
+          "archiveEntry": "0.8.18/CShell-0.8.18-linux-arm64.AppImage",
+          "bytes": 140723396,
+          "sha256": "78df02bbc820df4abc92301ffa5c74ba7b581d53f55df2896cd52ffdbad3fc77",
+          "localPath": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-0.8.18-linux-arm64.AppImage"
+        },
+        {
+          "name": "CShell-0.8.18-linux-arm64.deb",
+          "archiveEntry": "0.8.18/CShell-0.8.18-linux-arm64.deb",
+          "bytes": 103036108,
+          "sha256": "38f3b9410b4c75f1cdcc7f6b56772bd38d18f6ec255db11dfc5eb4b1885d7192",
+          "localPath": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-0.8.18-linux-arm64.deb"
+        }
+      ]
+    },
+    {
+      "archive": "core-focus-linux-x64.zip",
+      "bytes": 292374131,
+      "sha256": "3cc025c93f42ce8f13e2240c3340713421a2fa31bdbd4e64d6b6aac8d58b1656",
+      "packages": [
+        {
+          "name": "CAgent-0.8.18-linux-x64.tar.gz",
+          "archiveEntry": "0.8.18/CAgent-0.8.18-linux-x64.tar.gz",
+          "bytes": 44818057,
+          "sha256": "9bcc386a3a9d124faeefc8a42cf26c7bb5f62d1466f60f14e6ad5b463d062924",
+          "localPath": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CAgent-0.8.18-linux-x64.tar.gz"
+        },
+        {
+          "name": "CShell-0.8.18-linux-amd64.deb",
+          "archiveEntry": "0.8.18/CShell-0.8.18-linux-amd64.deb",
+          "bytes": 108875084,
+          "sha256": "368de47e39454ec5cb0892b5366e4e59dfc09ad0b43f1b6c536395a56cc27bee",
+          "localPath": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-0.8.18-linux-amd64.deb"
+        },
+        {
+          "name": "CShell-0.8.18-linux-x86_64.AppImage",
+          "archiveEntry": "0.8.18/CShell-0.8.18-linux-x86_64.AppImage",
+          "bytes": 139464087,
+          "sha256": "10c5b36395e0c11f153ce2c290b59619d619636f0cb507f43c9761b496e4fcf0",
+          "localPath": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-0.8.18-linux-x86_64.AppImage"
+        }
+      ]
+    },
+    {
+      "archive": "core-focus-mac-arm64.zip",
+      "bytes": 322981227,
+      "sha256": "657c370815c116fda538874ff65a7ac9ea6b49fd641289312d5cdd0c3e08ec8c",
+      "packages": [
+        {
+          "name": "CAgent-0.8.18-mac-arm64.tar.gz",
+          "archiveEntry": "0.8.18/CAgent-0.8.18-mac-arm64.tar.gz",
+          "bytes": 39500212,
+          "sha256": "53c17fdbec07ffee242e9c94233fec78b42ce6e8335c81d432d11ff28a9947ae",
+          "localPath": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CAgent-0.8.18-mac-arm64.tar.gz"
+        },
+        {
+          "name": "CShell-0.8.18-mac-arm64.dmg",
+          "archiveEntry": "0.8.18/CShell-0.8.18-mac-arm64.dmg",
+          "bytes": 142331149,
+          "sha256": "7057cc2eb6f9dd53432681b385c165f0ec552ce7155c0dc86866551f892c472c",
+          "localPath": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-0.8.18-mac-arm64.dmg"
+        },
+        {
+          "name": "CShell-0.8.18-mac-arm64.zip",
+          "archiveEntry": "0.8.18/CShell-0.8.18-mac-arm64.zip",
+          "bytes": 142174011,
+          "sha256": "3edcbeba5311aefc5514e33eaeaf13a73083f10090dfa78b446d687687ae2f29",
+          "localPath": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-0.8.18-mac-arm64.zip"
+        }
+      ]
+    },
+    {
+      "archive": "core-focus-mac-x64.zip",
+      "bytes": 331848850,
+      "sha256": "14167054a30b4f46c285b1c3122627a4f02a8316bb6c4e49af3b2aa883a7ca24",
+      "packages": [
+        {
+          "name": "CAgent-0.8.18-mac-x64.tar.gz",
+          "archiveEntry": "0.8.18/CAgent-0.8.18-mac-x64.tar.gz",
+          "bytes": 40730624,
+          "sha256": "55d73fc47ace14b387058214ab1d0623162a2996aada94d2dc52e1358adeb2fb",
+          "localPath": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CAgent-0.8.18-mac-x64.tar.gz"
+        },
+        {
+          "name": "CShell-0.8.18-mac-x64.dmg",
+          "archiveEntry": "0.8.18/CShell-0.8.18-mac-x64.dmg",
+          "bytes": 146124842,
+          "sha256": "c352e0b0d1ac7a3e000858971a12b91d1c078f11017a1c8a150e80937a9811b1",
+          "localPath": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-0.8.18-mac-x64.dmg"
+        },
+        {
+          "name": "CShell-0.8.18-mac-x64.zip",
+          "archiveEntry": "0.8.18/CShell-0.8.18-mac-x64.zip",
+          "bytes": 146015462,
+          "sha256": "c44125c147b648318b2ff92c934275a3757d808d66178b33e1be9bfdaa1e471b",
+          "localPath": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-0.8.18-mac-x64.zip"
+        }
+      ]
+    }
+  ],
+  "verifiedArtifactDigests": true,
+  "run": 41289862842,
+  "published": false
+}
