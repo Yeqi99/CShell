@@ -1,5 +1,7 @@
 # CShell / CAgent 统一收口验收清单 · 2026-11-01
 
+> 最终状态以 [本轮需求最终核对](UNIFIED-FINAL-AUDIT-20261101.md) 为准。下方早期未勾选与“待验证”是实施时点记录，不再作为当前发布阻塞；后文保留真实失败、修复与验收边界。
+
 状态：开发中，尚未发布。开发工作树为 C:/Users/35097/.codex/worktrees/pro-unified-followup/CShell，分支 codex/pro-unified-followup，基于迁入仓库的 Pro cfe0c8c；原项目及未提交修改保留。
 
 ## 本轮已执行
