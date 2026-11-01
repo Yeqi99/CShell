@@ -5,7 +5,7 @@ import { CloudSync } from '../core/cloud-sync';
 import { AccountWorkspaces } from '../core/account-workspaces';
 import { join } from 'node:path';
 import { emptySharedAi } from '../shared/shared-ai';
-import { defaults } from '../shared/contracts';
+import { defaults, preferencesSchema } from '../shared/contracts';
 import { sharedAiConfigSchema } from '../shared/shared-ai';
 import type { SecretCodec } from '../core/store';
 import type { ClientVault } from '../core/client/identity';
@@ -239,7 +239,23 @@ export class CagentCloud {
         this.paused = false;
       }
     }
-    if (method === 'account.appearance') { const p=this.cached?.store?.preferences??defaults; return {theme:p.theme,uiFont:p.uiFont,uiFontSize:p.uiFontSize??14}; }
+    if (method === 'account.appearance') {
+      const change=z.object({theme:preferencesSchema.shape.theme.optional(),uiFont:preferencesSchema.shape.uiFont.optional(),uiFontSize:preferencesSchema.shape.uiFontSize.optional()}).strict().parse(input??{});
+      if(Object.keys(change).length){
+        const wasPaused=this.paused;this.paused=true;
+        try{
+          await this.pending;
+          const next=structuredClone(this.cached);
+          next.store.preferences={...(next.store.preferences??defaults),...change};
+          await this.vault.write('cloud-bundle',next);
+          this.cached=next;
+        }finally{this.paused=wasPaused;}
+        // Guest appearance stays local. Signed-in changes use normal revision conflict handling.
+        if(this.sync.status().unlocked)await this.sync.autoSync();
+      }
+      const p=this.cached?.store?.preferences??defaults;
+      return {theme:p.theme,uiFont:p.uiFont,uiFontSize:p.uiFontSize??14};
+    }
     if (method === 'account.models')
       return this.assistant
         .cloudExport()

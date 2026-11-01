@@ -69,3 +69,14 @@ test('CAgent keeps guest habits out of registration and restores isolated accoun
     assert.equal(assistant.cloudExport().habits?.[0].text,'Account B preference');
   }finally{await cloud.close();await assistant.close();await rm(directory,{recursive:true,force:true});}
 });
+
+test('CAgent appearance changes persist and synchronize without changing unrelated settings',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'cagent-appearance-'));const codec={encrypt:async(s:string)=>s,decrypt:async(s:string)=>s};
+ const vault=new ClientVault(directory,codec);const assistant=new CagentAssistant(vault,{shells:async()=>[],applications:async()=>[],execute:async()=>'',allowed:()=>false});const cloud=new CagentCloud(directory,codec,vault,assistant);
+ try{await assistant.load();await cloud.load();let synced=0;cloud.sync.status=()=>({state:'ready',email:'fixture@example.com',unlocked:true,revision:1});cloud.sync.autoSync=async()=>{synced++;};
+ const before=structuredClone((cloud as any).cached.store.preferences);const result=await cloud.call('account.appearance',{theme:'dark'});
+ assert.equal((result as any).theme,'dark');assert.equal(synced,1);assert.deepEqual((cloud as any).cached.store.preferences,{...before,theme:'dark'});
+ await assert.rejects(cloud.call('account.appearance',{mcp:{enabled:true}}));
+ const saved=await vault.read('cloud-bundle',(await import('zod')).z.any());assert.equal(saved.store.preferences.theme,'dark');
+ }finally{await cloud.close();await assistant.close();await rm(directory,{recursive:true,force:true});}
+});
