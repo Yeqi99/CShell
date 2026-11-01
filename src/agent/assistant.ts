@@ -72,8 +72,10 @@ export class CagentAssistant {
   async cloudImport(input:unknown){
     this.assertAccountIdle();
     const next=sharedAiConfigSchema.parse(input);
-    const selected=next.providers.find(p=>p.url===this.settings.endpoint&&p.model===this.settings.model)??next.providers.find(p=>!p.extension);
-    const settings=selected?settingsSchema.parse({...this.settings,endpoint:selected.url,model:selected.model,key:selected.key}):this.settings;
+    const selected=next.providers.find(p=>!p.extension&&p.url===this.settings.endpoint&&p.model===this.settings.model)??next.providers.find(p=>!p.extension);
+    // A removed provider must not remain usable through a stale local key. Keep
+    // grants and execution preferences, but clear only the model binding.
+    const settings=settingsSchema.parse({...this.settings,...(selected?{endpoint:selected.url,model:selected.model,key:selected.key}:{model:'',key:''})});
     this.configuring=true;
     try {await this.vault.write('assistant-shared',next);await this.vault.write('assistant-settings',settings);this.shared=next;this.settings=settings;}
     finally {this.configuring=false;}
@@ -167,7 +169,7 @@ export class CagentAssistant {
         signal.throwIfAborted();this.authorize(task.owner);
         const config=this.settings;
         const capabilityTools=this.host.capabilityTools?.()??[];
-        const suppliedTools=[...(this.host.automation&&config.automation?[{type:"function",function:{name:"automation",description:"管理持久化自动化规则。创建可指定enabled；仅在已授权自动化管理时可用，副作用遵循当前审核策略，不扩大权限。action为create/list/pause/delete/cancel。create input包含name、prompt、trigger（kind=once+at毫秒时间，interval+everyMs至少60000，event+source+type，可选ttlMs默认300000、filter为JSON字段路径到标量的等值筛选，例如isSelf=false、conversation=指定会话）。其他操作input包含id，list为空对象。",parameters:{type:"object",properties:{action:{type:"string",enum:["create","list","pause","delete","cancel"]},input:{type:"object"}},required:["action","input"],additionalProperties:false}}}]:[]),...toolDefinitions.filter(t=>!['command','task_start','task_wait','task_stop','task_list'].includes(t.function.name)||config.commands),...(capabilityTools.length&&this.host.capabilityInvoke?[capabilityDefinition(capabilityTools)]:[])];
+        const suppliedTools=[...(this.host.automation&&config.automation?[{type:"function",function:{name:"automation",description:"管理持久化自动化规则。创建可指定enabled；仅在已授权自动化管理时可用，副作用遵循当前审核策略，不扩大权限。action为create/list/pause/delete/cancel/update。update input包含id，可提供memory（最多16000字）、everyMs（至少1000毫秒）和prompt；用于更新目标记忆、检查间隔和目标说明。create input包含name、prompt、trigger（kind=once+at毫秒时间，interval+everyMs至少1000，event+source+type，可选ttlMs默认300000、filter为JSON字段路径到标量的等值筛选，例如isSelf=false、conversation=指定会话）。其他操作input包含id，list为空对象。",parameters:{type:"object",properties:{action:{type:"string",enum:["create","list","pause","delete","cancel","update"]},input:{type:"object"}},required:["action","input"],additionalProperties:false}}}]:[]),...toolDefinitions.filter(t=>!['command','task_start','task_wait','task_stop','task_list'].includes(t.function.name)||config.commands),...(capabilityTools.length&&this.host.capabilityInvoke?[capabilityDefinition(capabilityTools)]:[])];
         budget.reserve({messages,tools:suppliedTools});
         const reply=await this.request(config.endpoint,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+this.modelKey()},body:JSON.stringify({model:config.model,messages,stream:true,tools:suppliedTools})},signal,text=>{task.answer=text.slice(0,64000);});
         budget.reserve(reply);

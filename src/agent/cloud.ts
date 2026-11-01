@@ -100,11 +100,13 @@ export class CagentCloud {
         }
         if (!profile.membership.active) await this.hooks.stop();
       }
-      await this.sync.autoSync();
     } catch (e) {
       this.transportError = e instanceof Error ? e.message : '云连接暂时不可用';
     } finally {
-      this.ticking = false;
+      // Relay enrollment/model catalog availability must not block account data.
+      // autoSync owns its own error/conflict state, independently of transportError.
+      try { await this.sync.autoSync(); }
+      finally { this.ticking = false; }
     }
   }
 

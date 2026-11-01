@@ -27,6 +27,17 @@ test('Pro model distribution survives reload/cloud round trip without changing g
   await assistant.close(); await reload.close();
 });
 
+test('cloud provider removal clears stale credentials while retaining execution preferences', async () => {
+  const f=fixture(), assistant=f.create(); await assistant.load();
+  await assistant.configure({...model,commands:false,review:true,delegates:[]});
+  const next=assistant.cloudExport(); next.providers=[];
+  await assistant.cloudImport(next);
+  const reload=f.create(); await reload.load();
+  assert.equal(reload.snapshot().model,''); assert.equal(reload.snapshot().keyConfigured,false);
+  assert.equal(reload.snapshot().commands,false); assert.equal(reload.snapshot().review,true);
+  await assistant.close(); await reload.close();
+});
+
 test('pending configuration, cloud import and account restore exclude each other and task start', async () => {
   const f = fixture(), assistant = f.create();
   await assistant.load(); await assistant.configure({ ...model, commands: false, review: true, delegates: [] });
