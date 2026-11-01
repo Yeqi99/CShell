@@ -1,3 +1,4 @@
+import { syncClientProfiles } from '../core/client/profiles';
 import { importCloudStages, type CloudImportStage } from '../core/cloud-import';
 import { app, net } from 'electron';
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
@@ -160,10 +161,15 @@ export async function registerCloudHandlers(
     const { createSshBrowserProxy } = await import('../core/ssh-browser-proxy');
     const { agentBrowserStream } = await import('../core/agent-browser-stream');
     const proxies = new Map<string, Awaited<ReturnType<typeof createSshBrowserProxy>>>();
+    const savedMachineNetwork=network.machine;
     network.machine = {
-      list: async () => client.cloudExport().filter(device => device.accountManaged).map(device => ({ id: device.deviceId, name: device.name })),
+      close:async()=>{await savedMachineNetwork?.close?.();},
+      list: async () => [...new Map([...(await savedMachineNetwork?.list()??[]),...client.cloudExport().filter(device => device.accountManaged).map(device => ({ id: device.deviceId, name: device.name }))].map(item=>[item.id,item])).values()],
       proxy: async id => {
-        if (!client.cloudExport().some(device => device.deviceId === id && device.accountManaged)) throw Error('账号机器不可用，未回退本机网络');
+        if (!client.cloudExport().some(device => device.deviceId === id && device.accountManaged)) {
+          if(savedMachineNetwork && (await savedMachineNetwork.list()).some(item=>item.id===id))return savedMachineNetwork.proxy(id);
+          throw Error('账号机器不可用，未回退本机网络');
+        }
         // The server checks current membership and device ownership, including reused proxy listeners.
         await cloud.accountRequest('/v1/devices/lease', { deviceId: id });
         let proxy = proxies.get(id);
@@ -187,6 +193,27 @@ export async function registerCloudHandlers(
     app.once('before-quit', () => { for (const proxy of proxies.values()) proxy.close(); proxies.clear(); });
   }
   client.cloudLease=async id=>{const result=await cloud.accountRequest('/v1/devices/lease',{deviceId:id});return (await import('../shared/agent-relay')).agentRelayConnectionSchema.parse(result.relay);};
+  client.cloudDelegation=async(deviceId,fingerprint)=>{const result=await cloud.accountRequest('/v1/devices/delegate',{deviceId,fingerprint});return z.string().regex(/^[a-f0-9]{64}$/).parse(result.credential);};
+  handle('cloud:network',async(input?:unknown)=>{
+    const rule=input===undefined?undefined:z.object({source:z.string().uuid(),target:z.string().uuid().nullable()}).strict().parse(input);
+    const result=await cloud.accountRequest('/v1/network',rule);
+    const discovery=await cloud.accountRequest('/v1/devices');
+    return {...result,devices:(discovery.devices??[]).filter((d:any)=>!d.borrowed).map((d:any)=>({id:d.deviceId,name:d.name}))};
+  });
+  handle('cloud:lending',async(input:any)=>{
+    const action=z.enum(['list','create','redeem','revoke']).parse(input?.action);
+    const result=await cloud.accountRequest(action==='list'?'/v1/lending':'/v1/lending/'+action,action==='list'?undefined:input.body);
+    if(action==='redeem'){
+      const discovery=await cloud.accountRequest('/v1/devices');const current=client.cloudExport();
+      for(const raw of discovery.devices??[]){if(!raw.borrowed)continue;const existing=current.find(d=>d.deviceId===raw.deviceId);if(existing&&!existing.accountBorrowed)continue;
+        const lease=await client.cloudLease!(raw.deviceId);const device={protocol:1,deviceId:raw.deviceId,name:raw.name,certificate:raw.certificate,host:lease.host,port:lease.port,relay:lease,accountManaged:true,accountBorrowed:true};
+        if(existing)Object.assign(existing,device);else current.push(device as any);
+      }
+      await client.cloudImport(current);
+      await syncClientProfiles(store,client.list());publish();
+    }
+    return result;
+  });
   handle('cloud:memory',()=>ai.memory());
   handle('cloud:remember',input=>ai.remember(input));
   handle('cloud:forget',id=>ai.forget(id));

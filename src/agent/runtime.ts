@@ -120,6 +120,7 @@ export async function createAgentRuntime(
       ...(s.distribution ? { distribution: s.distribution } : {}),
     }));
   server = new ClientServer(vault, terminal, {
+    delegation:async(credential,fingerprint,continuation=false)=>{try{return (await account.sync.accountRequest('/v1/devices/delegation/verify',{deviceId:(await vault.identity()).id,credential,fingerprint,continuation})).allowed===true;}catch{return false;}},
     http:(request,signal)=>accountNetwork.http(request,signal),
     manage: (method, params, signal, owner) => dispatch(method, params, signal, false, owner),
     desktopStream: async (socket,owner) => {if(updateAdmissionClosed){socket.destroy();return;}await desktop.service.acceptAuthenticated(socket,owner);},
@@ -193,7 +194,7 @@ export async function createAgentRuntime(
   const coding=new CodingService(vault,directory,owner=>owner==='local'||(server.managementAllowed(owner)&&server.status().peers.some(p=>p.fingerprint===owner&&p.shells.some(s=>server.status().allowedShells?.includes(s)))));
   await coding.load();
   const ide=new IdeService(vault,directory,owner=>owner==='local'||server.managementAllowed(owner));await ide.load();
-  const accountNetwork=new AccountNetwork(account,new ClientVault(join(directory,'account-network'),codec));accountNetwork.setUpdateGuard(()=>updateAdmissionClosed);await accountNetwork.load();terminal.networkEnvironment=()=>accountNetwork.environment();
+  const accountNetwork=new AccountNetwork(account,new ClientVault(join(directory,'account-network'),codec));accountNetwork.setUpdateGuard(()=>updateAdmissionClosed);await accountNetwork.load();terminal.networkEnvironment=()=>accountNetwork.environment();assistant.networkTransport=accountNetwork.fetch;account.setNetworkTransport(accountNetwork.fetch);
   const browserNetwork=new AgentBrowserNetwork(owner=>owner==='local'||server.browserAllowed(owner),(host,port)=>accountNetwork.open(host,port));
   const hosting = new HostingService(join(directory, 'hosting'));
   await hosting.load();

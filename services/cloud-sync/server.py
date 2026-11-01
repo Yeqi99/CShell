@@ -415,6 +415,10 @@ def handler(service):
                     value=service.devices.authorize(body)
                 elif admin and self.path == '/v1/admin/model-usage' and self.command == 'GET':
                     value=service.models.usage()
+                elif admin and self.path == '/v1/admin/lending' and self.command == 'GET':
+                    value=service.devices.lending.admin_list()
+                elif admin and self.path == '/v1/admin/lending/revoke' and self.command == 'POST':
+                    value=service.devices.lending.admin_revoke(body)
                 elif admin and self.path == '/v1/admin/accounts' and self.command == 'GET':
                     value = service.admin_accounts()
                 elif admin and self.path == '/v1/admin/membership' and self.command == 'POST':

@@ -270,3 +270,19 @@ test('native terminal exit reasons reach the controller once without leaving a l
     assert.throws(()=>client.resolve(session),/closed/);
   } finally { client.dispose();await server.stop();await rm(dir,{recursive:true,force:true,maxRetries:5}); }
 });
+
+test('borrowed device uses fingerprint-bound delegation without persistent pairing or password and disconnects on revocation', async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'cshell-borrow-'));let allowed=true;const sessions=new Set<string>();
+ const terminal:ManagedProvider={id:'test',version:'1',capabilities:['terminal.interactive'],configuration:z.any(),async connect(){const id=randomUUID();sessions.add(id);return id;},disconnect(id){sessions.delete(id);},resolve(id){return {target:{providerId:'test',resourceId:id,identity:id,label:id},tools:[],terminal:{input(){},resize(){},acknowledge(){}}};}};
+ const controllerVault=new ClientVault(join(dir,'controller'),codec);const controller=await controllerVault.identity();const expected=fingerprint(controller.certificate);
+ const server=new ClientServer(new ClientVault(join(dir,'server'),codec),terminal,{delegation:async(token,fp)=>allowed&&token==='a'.repeat(64)&&fp===expected,manage:async()=>({password:'must never expose'})});
+ const client=new ClientProvider(controllerVault,()=>{});await server.load();await client.load();
+ try{
+  await server.setAccess({password:'not-shared-with-borrower',shells:['cmd'],allowManage:true,allowHttp:true,allowHosting:true,allowRelay:true});await server.start({bind:'127.0.0.1',port:await freePort()});
+  const info=JSON.parse(server.connectionInfo('127.0.0.1'));await client.cloudImport([{...info,accountBorrowed:true}]);client.cloudDelegation=async(_id,fp)=>{assert.equal(fp,expected);return 'a'.repeat(64);};
+  await client.connect({deviceId:info.deviceId,shell:'cmd'},undefined,new AbortController().signal);assert.equal(sessions.size,1);assert.equal(server.status().peers.length,0);
+  await assert.rejects((client as any).managementCall(info.deviceId,{method:'connection.settings'},new AbortController().signal));
+  allowed=false;const until=Date.now()+5000;while(sessions.size&&Date.now()<until)await new Promise(r=>setTimeout(r,50));assert.equal(sessions.size,0);assert.equal(server.status().peers.length,0);
+  await assert.rejects(client.connect({deviceId:info.deviceId,shell:'cmd'},undefined,new AbortController().signal));
+ }finally{await client.dispose();await server.stop();await rm(dir,{recursive:true,force:true});}
+});
