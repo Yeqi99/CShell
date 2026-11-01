@@ -34,6 +34,7 @@ export const agentMethods = [
   'desktop.configure',
   'desktop.open',
   'desktop.close',
+  'desktop.clipboard',
   'applications.policy',
   'applications.configure',
   'applications.list',
@@ -112,3 +113,4 @@ export const agentCapability = (method: string) =>
     : method.startsWith('relay.')
       ? 'agent.relay'
       : 'agent.manage';
+

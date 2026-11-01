@@ -78,6 +78,7 @@ export async function registerAgent(
           host,
           identity: status.deviceId,
           local: true,
+          clipboard:(value:Record<string,unknown>)=>callAgent('desktop.clipboard',{...value,id:ticket.id},directory),
           close: () => callAgent('desktop.close', { id: ticket.id }, directory),
         };
       }
@@ -97,6 +98,7 @@ export async function registerAgent(
         host: device.host,
         identity: device.deviceId,
         local: false,
+        clipboard:(value:Record<string,unknown>)=>provider.call(deviceId,{method:'desktop.clipboard',params:{...value,id:ticket.id}}),
         connect: async () => {
           const controller = new AbortController(),
             timer = setTimeout(() => controller.abort(), 15000);
@@ -150,6 +152,7 @@ export async function registerAgent(
     }
   });
   handle('desktop:view-stop', (id) => views.stop(id));
+  handle('desktop:view-clipboard',(id,value,generation)=>views.clipboard(id,value,generation));
   handle('desktop:view-input', (id, value, generation) => views.input(id, value, generation));
   handle('desktop:view-release', (id, generation) => views.release(id, generation));
   handle('desktop:view-ack', (id, sequence, decoded, decodeMs, generation) =>
@@ -300,3 +303,4 @@ export async function registerAgent(
     },
   };
 }
+

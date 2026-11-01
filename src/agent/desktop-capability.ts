@@ -110,11 +110,13 @@ export async function createDesktopCapability(options:{identity:string;nativeExe
     return service.configure(config);
    }
    case 'desktop.open':{if(!registered)throw new Error('Desktop package is not ready');const request=z.object({control:z.boolean().default(false),mediaTransport:z.enum(['udp','tcp']).optional(),transport:z.enum(['direct','management']).optional(),quality:desktopQualitySchema}).strict().parse(params);await refreshSystemDesktop(true);return service.open(owner,request);}
+   case 'desktop.clipboard':return service.clipboard(owner,params);
    case 'desktop.close':await service.close(owner,z.object({id:z.string().regex(/^[0-9a-f]{32}$/)}).strict().parse(params).id);return {closed:true};
    default:throw new Error('Unsupported desktop method');
   }
  };
  return {service,extraPackages:extras,dispatch,shutdown:()=>service.shutdown()};
 }
+
 
 
