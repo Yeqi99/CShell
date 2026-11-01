@@ -1,19 +1,19 @@
 {
   "version": "0.8.18",
   "status": "candidate-not-published",
-  "verifiedAt": "2026-11-01T10:50:38.370Z",
-  "note": "Final four Windows candidates. Both CShell installers extracted and embedded dist/agent/agent.cjs verified against both final 0.1.2 manifest URLs/SHA and lifecycle cleanup guard. Both CAgent fresh stages rebuilt explicitly, exact installers independently installed to isolated directories and same content checks passed. Both CShell platform/desktop smoke, both CAgent actual installed CMD/TLS, Pro account/native and app-host exit tests passed. User applications untouched; no publication.",
+  "verifiedAt": "2026-11-01T11:16:18.355Z",
+  "note": "Final SSL-fixed WeChat catalog Windows candidates: Pro c53e8f1 / Core3202d56. Explicit fresh independent agent-build before package; no assumed electron-builder hook. Exact CShell NSIS app.asar dist/agent/agent.cjs and exact CAgent isolated installed runtime both verified against latest lifecycle.finalPackages manifest SHA and cleanup guard. Both CShell full platform/desktop smoke and both CAgent installed real CMD/TLS passed; Pro packaged account/native and both installed app-host exits passed. No user application installation or release channel changed.",
   "files": [
     {
       "edition": "opensource",
       "component": "CShell",
       "platform": "win32",
       "arch": "x64",
-      "source": "6350cec",
+      "source": "3202d56",
       "candidatePath": "release/0.8.18/CShell-0.8.18-win-x64.exe",
       "absolutePath": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\release\\0.8.18\\CShell-0.8.18-win-x64.exe",
-      "bytes": 123698873,
-      "sha256": "ab1da6d0505901e5258afa41abe6bbab209644c2730f11608d49e4c9cc8563bf",
+      "bytes": 123698686,
+      "sha256": "cfbd46aaf0afe839cecd4489fec218950ff6721ab65668ef35ce4dce311a639c",
       "authenticode": "NotSigned",
       "validation": [
         "packaged platform smoke: native encryption, sandbox, SSH PTY, SFTP",
@@ -27,11 +27,11 @@
       "component": "CAgent",
       "platform": "win32",
       "arch": "x64",
-      "source": "6350cec",
+      "source": "3202d56",
       "candidatePath": "release/0.8.18/CAgent-Setup-0.8.18-win-x64.exe",
       "absolutePath": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\release\\0.8.18\\CAgent-Setup-0.8.18-win-x64.exe",
-      "bytes": 26186638,
-      "sha256": "94557f758374ec25b87f8ae7731274d325730fd77f559a20d6ac8b6bfcfeb34f",
+      "bytes": 26184977,
+      "sha256": "923df9ef48db38eaf32aa6ce5d4fc0c2e61230348a8f4250ea024cdd1ab5a513",
       "authenticode": "NotSigned",
       "validation": [
         "exact installer isolated /S /D install",
@@ -45,11 +45,11 @@
       "component": "CShell",
       "platform": "win32",
       "arch": "x64",
-      "source": "2075087",
+      "source": "c53e8f1",
       "candidatePath": "release/pro-0.8.18/CShell-Pro-0.8.18-win-x64.exe",
       "absolutePath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\release\\pro-0.8.18\\CShell-Pro-0.8.18-win-x64.exe",
-      "bytes": 123908010,
-      "sha256": "ed8b532380708e3cbe4b902d12592606f25b4d2b77e4fb7e6e0c95162bb7cca1",
+      "bytes": 123908045,
+      "sha256": "cd7d209967775649be63ebd91275965ab4ccc4b12294c7e841a738b144541a18",
       "authenticode": "NotSigned",
       "validation": [
         "packaged platform smoke: native encryption, sandbox, SSH PTY, SFTP",
@@ -63,11 +63,11 @@
       "component": "CAgent",
       "platform": "win32",
       "arch": "x64",
-      "source": "2075087",
+      "source": "c53e8f1",
       "candidatePath": "release/0.8.18/CAgent-Setup-0.8.18-win-x64.exe",
       "absolutePath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\release\\0.8.18\\CAgent-Setup-0.8.18-win-x64.exe",
-      "bytes": 26230409,
-      "sha256": "82eeadb6cf4a994a394dad6911d1c43e5a1dd77ec2395359d1a6aabe712c9910",
+      "bytes": 26231769,
+      "sha256": "631530736500dfe19405022f9b9b6b3fdba0c33d39d7ec7cbb26aa29b2030d85",
       "authenticode": "NotSigned",
       "validation": [
         "exact installer isolated /S /D install",
@@ -86,5 +86,42 @@
       "8adf4ae89370da37b3370aa32ba65e6c023189ba6d0717168fc3ce518db786fb",
       "0b475c095449693bb962aaf93d813d3f7da6079a42fa9a72ac94416e1697a050"
     ]
-  }
+  },
+  "previousCatalogCandidates": {
+    "commit": "c2cb207",
+    "reason": "Superseded after frozen WeChat public SSL trust PEM fix and final catalog replacement.",
+    "files": [
+      {
+        "edition": "opensource",
+        "component": "CShell",
+        "sha256": "ab1da6d0505901e5258afa41abe6bbab209644c2730f11608d49e4c9cc8563bf"
+      },
+      {
+        "edition": "opensource",
+        "component": "CAgent",
+        "sha256": "94557f758374ec25b87f8ae7731274d325730fd77f559a20d6ac8b6bfcfeb34f"
+      },
+      {
+        "edition": "pro",
+        "component": "CShell",
+        "sha256": "ed8b532380708e3cbe4b902d12592606f25b4d2b77e4fb7e6e0c95162bb7cca1"
+      },
+      {
+        "edition": "pro",
+        "component": "CAgent",
+        "sha256": "82eeadb6cf4a994a394dad6911d1c43e5a1dd77ec2395359d1a6aabe712c9910"
+      }
+    ]
+  },
+  "wechatCatalogReceipt": "docs/release-evidence/wechat-final-native-lifecycle.json",
+  "wechatManifestSha256": [
+    {
+      "id": "cagent.wechat.v411556",
+      "sha256": "d9d2f2d8b51032c78e06d36d4ced77e7115b208029568ce1f1c1906d80ca88b4"
+    },
+    {
+      "id": "cagent.wechat.v42012",
+      "sha256": "98b558f680746112d09c6b76e78ebf219dd514585cbacfb7526edd70210ed0d5"
+    }
+  ]
 }
