@@ -17,3 +17,5 @@ TypeScript、Vite 前端、桌面/CLI/CAgent JavaScript 构建通过；Windows C
 最终全量测试 703 项：699 通过、0 失败、4 项条件跳过。新增工具目录断言与异步命令准备阶段取消文案已修复。真实 Electron release-desktop-smoke 通过（SSH、SFTP、MCP、布局、重启持久化）；隔离 WinStation 原生剪贴板 text/png/files 三项通过，文件授权 Node 回归 4 项通过。构建与测试日志保存在本工作树 .local。
 
 本记录不代表已发布，不代表 Android/macOS/Linux 全部实机验收通过。未修改用户实际安装或账户数据。
+
+普通版独立 Windows x64 dir 包构建成功（保留 0.8.17 版号，仅验收未发布）。platform-package-smoke 和针对打包 CShell.exe 的 release-desktop-smoke 均通过，隔离测试 profile 未触及实际用户配置。
