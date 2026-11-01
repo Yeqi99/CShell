@@ -665,6 +665,7 @@ else
         wechat,
         () => [...processExtensions.applicationTools(),...(identityNetwork?.tools()??[])],
         new MachineNetworkRoute(store, clientProvider),
+        true,
       );
       identityNetwork=new IdentityNetwork(app.getPath('userData'),store,clientProvider,disposeAi.network);await identityNetwork.load();await identityNetwork.activate();ssh.networkShell=profile=>identityNetwork!.shell(profile.id);handle('network:identity',input=>identityNetwork!.call(input));window.once('closed',()=>void identityNetwork?.close());
       registerPresetHandlers(handle, window, app.getPath('userData'), store, text);

@@ -57,6 +57,8 @@ export interface SecretCodec {
   decrypt(value: string): Promise<string>;
 }
 export class Store {
+  private firstInstallation = false;
+  isNewInstallation() { return this.firstInstallation; }
   monitorViews(): MonitorView[] { return structuredClone(this.data.monitorViews); }
   async saveMonitorView(value: MonitorView) {
     const view = monitorViewSchema.parse(value);
@@ -88,6 +90,7 @@ export class Store {
     private codec: SecretCodec,
   ) {}
   async load() {
+    this.firstInstallation = false;
     try {
       this.data = schema.parse(
         JSON.parse(await readFile(join(this.directory, 'config.json'), 'utf8')),
@@ -97,6 +100,7 @@ export class Store {
         throw new Error('Configuration could not be read. Original file was preserved.', {
           cause: error,
         });
+      this.firstInstallation = true;
     }
   }
   presets() {
