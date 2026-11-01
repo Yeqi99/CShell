@@ -12,7 +12,7 @@ jobs:
       - uses: actions/github-script@v7
         with:
           script: |
-            const allowed = [41280855262, 41282159438];
+            const allowed = [41282509031, 41283403036];
             for (const run_id of allowed) {
               const { data: run } = await github.rest.actions.getWorkflowRun({ ...context.repo, run_id });
               if (run.head_branch !== 'codex/candidate-core-0.8.18' || run.event !== 'push') throw new Error('Refusing unexpected run ' + run_id);
