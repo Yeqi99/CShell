@@ -1,0 +1,64 @@
+{
+  "base": "/opt/cshell-release-staging/wechat-0.1.2-pipe-protocol",
+  "status": "private-staged-not-published",
+  "verifiedAt": "2026-11-01T10:54:55.381Z",
+  "count": 6,
+  "totalBytes": 676264291,
+  "productionUntouched": true,
+  "files": [
+    {
+      "edition": "toolkit",
+      "name": "Weixin-4.1.15.56-0.1.2.cagent-package.json",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\wechat-0.1.2-pipe-protocol-candidate\\Weixin-4.1.15.56-0.1.2.cagent-package.json",
+      "bytes": 264769283,
+      "sha256": "2e581952bc0eba427c4ee7e8ad5f81f843660273fd1286638d022cbffca8e6f4",
+      "remotePath": "/opt/cshell-release-staging/wechat-0.1.2-pipe-protocol/toolkit/Weixin-4.1.15.56-0.1.2.cagent-package.json",
+      "result": "uploaded-verified"
+    },
+    {
+      "edition": "toolkit",
+      "name": "Weixin-4.1.15.56-0.1.2.manifest.json",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\wechat-0.1.2-pipe-protocol-candidate\\Weixin-4.1.15.56-0.1.2.manifest.json",
+      "bytes": 16396,
+      "sha256": "0359b9d816811eb25e69fd0fa77467a3645c32041e1edda3c57f08c3e23ed12a",
+      "remotePath": "/opt/cshell-release-staging/wechat-0.1.2-pipe-protocol/toolkit/Weixin-4.1.15.56-0.1.2.manifest.json",
+      "result": "uploaded-verified"
+    },
+    {
+      "edition": "toolkit",
+      "name": "WeixinToolkit-4.1.15.56-win-x64.zip",
+      "localPath": "C:\\Users\\35097\\Documents\\ChatGPT\\微信工具包开发\\.local\\private-binary\\pipe-final-protocol-20261101-1837\\WeixinToolkit-4.1.15.56-win-x64.zip",
+      "bytes": 73345975,
+      "sha256": "450c4d81b946c6b7eaab494a765f28520ef47a79294fa0c0cf5bfa515f5aa96b",
+      "remotePath": "/opt/cshell-release-staging/wechat-0.1.2-pipe-protocol/toolkit/WeixinToolkit-4.1.15.56-win-x64.zip",
+      "result": "uploaded-verified"
+    },
+    {
+      "edition": "toolkit",
+      "name": "Weixin-4.2.0.12-0.1.2.cagent-package.json",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\wechat-0.1.2-pipe-protocol-candidate\\Weixin-4.2.0.12-0.1.2.cagent-package.json",
+      "bytes": 264769135,
+      "sha256": "22093d070410f796cc4c81f2f3bfd1fe9a00f9115bd1004dd0691ad530905e79",
+      "remotePath": "/opt/cshell-release-staging/wechat-0.1.2-pipe-protocol/toolkit/Weixin-4.2.0.12-0.1.2.cagent-package.json",
+      "result": "uploaded-verified"
+    },
+    {
+      "edition": "toolkit",
+      "name": "Weixin-4.2.0.12-0.1.2.manifest.json",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\wechat-0.1.2-pipe-protocol-candidate\\Weixin-4.2.0.12-0.1.2.manifest.json",
+      "bytes": 16392,
+      "sha256": "6029644fb944747f9b9836148ab6b50f16a02c729fea0a56786a5b66f0692620",
+      "remotePath": "/opt/cshell-release-staging/wechat-0.1.2-pipe-protocol/toolkit/Weixin-4.2.0.12-0.1.2.manifest.json",
+      "result": "uploaded-verified"
+    },
+    {
+      "edition": "toolkit",
+      "name": "WeixinToolkit-4.2.0.12-win-x64.zip",
+      "localPath": "C:\\Users\\35097\\Documents\\ChatGPT\\微信工具包开发\\.local\\private-binary\\pipe-final-protocol-20261101-1837\\WeixinToolkit-4.2.0.12-win-x64.zip",
+      "bytes": 73347110,
+      "sha256": "48bb0f1354eb1cab2d21a2957be8cd0b6471bb0e5e318dc97bc48d34f591947f",
+      "remotePath": "/opt/cshell-release-staging/wechat-0.1.2-pipe-protocol/toolkit/WeixinToolkit-4.2.0.12-win-x64.zip",
+      "result": "uploaded-verified"
+    }
+  ]
+}
