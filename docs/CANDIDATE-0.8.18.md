@@ -20,3 +20,13 @@ GitHub 候选分支 `codex/candidate-core-0.8.18` 首轮远端提交 `706cddcd25
 工作流 `41280855262` 仅构建上传 artifact，publish 条件不满足，不能生成 Release。Android API 29/35 验收完成；Linux/macOS 第一轮测试长时间未结束，尚不能计为通过。Windows 第一轮发现 RDP 标签宿主复用与编辑器 smoke 样式打包配置问题。
 
 后续已同步独立 RDP session ID 与 editor smoke outfile 修复；实际 RDP saved smoke、editor reload race smoke、TypeScript 检查通过。测试加入每项 120 秒超时以显露跨平台挂起，不通过 force-exit 隐藏资源泄漏。后续源码变化须重新生成候选包，以上首轮摘要不作为最终发布附件摘要。
+
+## 更新后的 Windows 候选与跨平台修复
+
+第二次重建已包含独立 RDP 会话、网页端自动化记忆/秒间隔及远控恢复提示。CShell 安装器 123762456 字节，SHA-256 `94e5d846cada0ae3ad682ce943c68ebdca1f8c3b50094f5f8adaf6e472310083`；CAgent 安装器 26183846 字节，SHA-256 `33cbea18e9eb9f56269d6a57499548074d254495ab81e9ea12880860631ee578`。两个安装器仍未签名。
+
+实际 CShell 包 platform-package 与 release-desktop smoke 通过；实际 CAgent 安装器解包、摘要、CMD PTY、TLS 和受限权限通过。随后修正的 client/refinement smoke 均在独立临时配置上通过：双击连接新建独立工作区，基座输入遵循共用 36px 控件。
+
+第三轮 CI 的 Linux/macOS 挂起定位为 WindowsSystemProxy.close 在非 Windows 平台调用拒绝支持的 set(false)，事件 fixture 清理被异常打断后遗留 HTTP socket。已修正为非 Windows 无副作用关闭，仍拒绝显式启用系统代理；同时测试在初始化失败时也释放 socket。定向测试通过，真实平台须以修复后的 CI 结果为准，不把 Windows 上模拟平台分支视为 Linux 实机验证。
+
+修复候选本地 `0aa0388` 对应远端树等值提交 `93cf1938523d2d365b3b777fa5eea55132fec1c7`，Release 验证 run `41283521122`；该提交未发布。候选构建后续有源码变化时需重新核验最终附件，不能沿用上表声明最终发布成功。
