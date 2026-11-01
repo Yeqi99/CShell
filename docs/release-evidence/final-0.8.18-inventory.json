@@ -1,6 +1,6 @@
 {
   "version": "0.8.18",
-  "status": "candidate-not-published",
+  "status": "superseded-candidate-do-not-publish",
   "verifiedAt": "2026-11-01T09:05:23.043Z",
   "files": [
     {
@@ -213,5 +213,6 @@
       "size": 1283,
       "sha256": "1465fbb845ddac74d92d491488129b2cd9a62f1555db6e1f168e67dd48b0729a"
     }
-  ]
+  ],
+  "supersededReason": "Final source audit found Core terminal identity-proxy environment omission and duplicate network UI, plus Pro official OpenCode dispose/activity omission. Rebuild affected packages and regenerate inventory before publication."
 }
