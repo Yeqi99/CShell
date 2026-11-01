@@ -30,6 +30,7 @@ public class CagentWindow : Window {
   readonly Button modelChip=new Button(); readonly StackPanel welcome=new StackPanel();
   readonly SolidColorBrush ink=new SolidColorBrush(Color.FromRgb(35,49,68));
   readonly SolidColorBrush blue=new SolidColorBrush(Color.FromRgb(37,99,235));
+  Task reconnectTask; int hostLaunchCount; DateTime reconnectAfter=DateTime.MinValue;
   Process host; string origin,token,selected,lastRender="",requestId,requestPrompt; bool polling,busy,fixture,connected,exiting;
   Dictionary<string,object> current; DispatcherTimer timer; string screenshot;
   System.Windows.Forms.NotifyIcon tray; bool verification;
@@ -74,7 +75,7 @@ public class CagentWindow : Window {
     status.FontSize=10;status.Foreground=Brush("#8C98A2");status.Text="正在连接本机运行时…";status.Margin=new Thickness(6,10,6,0);status.TextAlignment=TextAlignment.Center;status.TextWrapping=TextWrapping.Wrap;composer.Children.Add(status);
     send.Click+=async(s,e)=>await Guard(Send);stop.Click+=async(s,e)=>await Guard(async()=>{if(selected!=null)await Api("assistant.cancel",Obj("id",selected));await Poll();});
     Grid.SetRow(overlay,1);overlay.Visibility=Visibility.Collapsed;root.Children.Add(overlay);
-    Loaded+=async(s,e)=>{if(fixture){if(args.Length>2&&args[2]=="narrow"){Width=340;Height=400;}if(args.Length<3||args[2]!="empty")Render(Obj("id","fixture","prompt","帮我检查一下这台电脑的运行环境","answer","已检查。\n\nPowerShell 和 CMD 都已就绪。你可以继续让我整理文件，或安装需要的应用。","state","completed","events",new object[0]));modelChip.Content="本地模型  ⌄";status.Text="本机 · 准备就绪";input.Text="";await Task.Delay(350);if(args.Length>2&&args[2]=="verify"){VerifyInteractions();await Task.Delay(250);}if(args.Length>2&&args[2]=="wechat"){RenderWechatSettings(Obj("config",Obj("enabled",false,"experimental",false),"processes",new[]{Obj("pid",1234,"version","4.1.15.50")}));await Task.Delay(250);}if(args.Length>2&&args[2]=="market"){VerifyMarket();await Task.Delay(250);}if(args.Length>2&&args[2]=="desktop"){VerifyDesktopSettings();await Task.Delay(250);}if(args.Length>2&&(args[2]=="desktop-system"||args[2]=="desktop-virtual")){VerifySystemDesktopSettings(args[2]=="desktop-virtual");await Task.Delay(250);}if(args.Length>2&&args[2]=="error"){Panel("连接与启动");await Guard(()=>{throw new Exception("password: Too small: expected string to have >=1 characters");});await Task.Delay(250);}if(screenshot!=null){SaveImage(screenshot);Close();}return;}await Guard(()=>Start());if(args.Length>1&&args[0]=="--verify-remote-recovery"){string phase="initial remote";try{await Remote();string initialError=panelStatus.Text;bool visible=panelStatus.Text.Contains("后台仍是旧版");await Task.Delay(1500);bool persistent=visible&&panelStatus.Text.Contains("后台仍是旧版");phase="restart";await RestartRemote();phase="receipt";File.WriteAllText(args[1],json.Serialize(Obj("initialError",initialError,"legacyErrorVisible",visible,"errorPersistent",persistent,"settingsOpened",overlay.Visibility==Visibility.Visible&&panelStatus.Text=="","connected",connected)),Encoding.UTF8);}catch(Exception error){File.WriteAllText(args[1],json.Serialize(Obj("failure",error.ToString(),"phase",phase)),Encoding.UTF8);}Close();return;}if(args.Length>1&&args[0]=="--verify-tray"){try{if(!connected)throw new Exception(status.Text);input.Text="tray draft";verification=false;Close();bool hidden=!IsVisible&&tray.Visible;await Api("client.status");RestoreWindow();bool restored=IsVisible&&input.Text=="tray draft";File.WriteAllText(args[1],json.Serialize(Obj("connected",connected,"hiddenWithTray",hidden,"backendAliveWhileHidden",true,"restoredWithDraft",restored)),Encoding.UTF8);await ExitApp();}catch(Exception error){File.WriteAllText(args[1],json.Serialize(Obj("failure",error.ToString())),Encoding.UTF8);exiting=true;Close();}return;}if(args.Length>1&&args[0]=="--verify-runtime"){await Task.Delay(150);File.WriteAllText(args[1],json.Serialize(Obj("connected",connected,"status",status.Text,"browser",false,"window",true)),Encoding.UTF8);Close();}};
+    Loaded+=async(s,e)=>{if(fixture){if(args.Length>2&&args[2]=="narrow"){Width=340;Height=400;}if(args.Length<3||args[2]!="empty")Render(Obj("id","fixture","prompt","帮我检查一下这台电脑的运行环境","answer","已检查。\n\nPowerShell 和 CMD 都已就绪。你可以继续让我整理文件，或安装需要的应用。","state","completed","events",new object[0]));modelChip.Content="本地模型  ⌄";status.Text="本机 · 准备就绪";input.Text="";await Task.Delay(350);if(args.Length>2&&args[2]=="verify"){VerifyInteractions();await Task.Delay(250);}if(args.Length>2&&args[2]=="wechat"){RenderWechatSettings(Obj("config",Obj("enabled",false,"experimental",false),"processes",new[]{Obj("pid",1234,"version","4.1.15.50")}));await Task.Delay(250);}if(args.Length>2&&args[2]=="market"){VerifyMarket();await Task.Delay(250);}if(args.Length>2&&args[2]=="desktop"){VerifyDesktopSettings();await Task.Delay(250);}if(args.Length>2&&(args[2]=="desktop-system"||args[2]=="desktop-virtual")){VerifySystemDesktopSettings(args[2]=="desktop-virtual");await Task.Delay(250);}if(args.Length>2&&args[2]=="error"){Panel("连接与启动");await Guard(()=>{throw new Exception("password: Too small: expected string to have >=1 characters");});await Task.Delay(250);}if(screenshot!=null){SaveImage(screenshot);Close();}return;}await Guard(()=>Start());if(args.Length>1&&args[0]=="--verify-host-reconnect"){await VerifyHostReconnect(args[1]);return;}if(args.Length>1&&args[0]=="--verify-remote-recovery"){string phase="initial remote";try{await Remote();string initialError=panelStatus.Text;bool visible=panelStatus.Text.Contains("后台仍是旧版");await Task.Delay(1500);bool persistent=visible&&panelStatus.Text.Contains("后台仍是旧版");phase="restart";await RestartRemote();phase="receipt";File.WriteAllText(args[1],json.Serialize(Obj("initialError",initialError,"legacyErrorVisible",visible,"errorPersistent",persistent,"settingsOpened",overlay.Visibility==Visibility.Visible&&panelStatus.Text=="","connected",connected)),Encoding.UTF8);}catch(Exception error){File.WriteAllText(args[1],json.Serialize(Obj("failure",error.ToString(),"phase",phase)),Encoding.UTF8);}Close();return;}if(args.Length>1&&args[0]=="--verify-tray"){try{if(!connected)throw new Exception(status.Text);input.Text="tray draft";verification=false;Close();bool hidden=!IsVisible&&tray.Visible;await Api("client.status");RestoreWindow();bool restored=IsVisible&&input.Text=="tray draft";File.WriteAllText(args[1],json.Serialize(Obj("connected",connected,"hiddenWithTray",hidden,"backendAliveWhileHidden",true,"restoredWithDraft",restored)),Encoding.UTF8);await ExitApp();}catch(Exception error){File.WriteAllText(args[1],json.Serialize(Obj("failure",error.ToString())),Encoding.UTF8);exiting=true;Close();}return;}if(args.Length>1&&args[0]=="--verify-runtime"){await Task.Delay(150);File.WriteAllText(args[1],json.Serialize(Obj("connected",connected,"status",status.Text,"browser",false,"window",true)),Encoding.UTF8);Close();}};
     if(!fixture)CreateTray();
     Closing+=(s,e)=>{if(!fixture&&!verification&&!exiting){e.Cancel=true;Hide();return;}if(timer!=null)timer.Stop();if(tray!=null){tray.Visible=false;tray.Dispose();}try{if(host!=null&&!host.HasExited)host.StandardInput.Close();}catch{}};
     PreviewKeyDown+=(s,e)=>{if(e.Key==Key.Escape&&overlay.Visibility==Visibility.Visible){e.Handled=true;ShowChat();input.Focus();}if(e.Key==Key.N&&(Keyboard.Modifiers&ModifierKeys.Control)!=0){e.Handled=true;NewTask();input.Focus();}};
@@ -153,24 +154,72 @@ public class CagentWindow : Window {
   void AddAsyncMenu(ContextMenu m,string title,Func<Task> fn){var item=new MenuItem{Header=title};item.Click+=async(s,e)=>await Guard(fn);m.Items.Add(item);}
   string FriendlyError(string detail){if(detail.Contains("password")||detail.Contains("密码"))return "连接密码未填写或不正确，请检查连接设置。";if(detail.Contains("503")||detail.Contains("502"))return "服务暂时无法响应，请稍后重试。";if(detail.Contains("权限")||detail.Contains("denied"))return "当前操作缺少授权，请检查设置与权限。";if(detail.Contains("too_small")||detail.Contains("TypeError")||detail.StartsWith("["))return "配置未通过检查，请检查必填项后重试。";return detail.Length<180?detail:"操作未完成，请展开诊断详情查看原因。";}
   async Task Guard(Func<Task> action){try{if(panelStatus!=null)panelStatus.Text="";if(panelError!=null)panelError.Visibility=Visibility.Collapsed;await action();}catch(Exception e){if(overlay.Visibility==Visibility.Visible&&panelError!=null){string detail=System.Text.RegularExpressions.Regex.Replace(e.Message,@"(Bearer\s+)[^\s]+","$1[已隐藏]",System.Text.RegularExpressions.RegexOptions.IgnoreCase);bool membership=detail.Contains("会员")||detail.Contains("membership.required");bool notice=membership||detail.Contains("权限")||detail.Contains("未启用")||detail.Contains("未就绪")||detail.Contains("未开放");panelErrorTitle.Text=membership?"会员功能":notice?"操作提示":"操作未完成";panelError.Background=Brush(notice?"#FFF9EB":"#FFF5F3");panelError.BorderBrush=Brush(notice?"#E7D9AE":"#E9C9C4");panelErrorMessage.Text=membership?"此功能需要有效的 Pro 会员，请在账号中查看当前方案。":FriendlyError(detail);panelErrorDetails.Text=detail;panelError.Visibility=Visibility.Visible;}else{status.Text=FriendlyError(e.Message);status.ToolTip=e.Message;}}}
-  async Task Start(string hostMode="app-host"){
+  async Task LaunchHost(string hostMode="app-host"){
     string dir=AppDomain.CurrentDomain.BaseDirectory;
     var start=new ProcessStartInfo(Path.Combine(dir,"node.exe"),"\""+Path.Combine(dir,"agent.cjs")+"\" "+hostMode){UseShellExecute=false,CreateNoWindow=true,RedirectStandardOutput=true,RedirectStandardInput=true,RedirectStandardError=true};
-    string startupError="";host=Process.Start(start);host.ErrorDataReceived+=(s,e)=>{if(!string.IsNullOrWhiteSpace(e.Data))startupError=e.Data;};host.BeginErrorReadLine();
+    string startupError="";var launched=Process.Start(start);host=launched;hostLaunchCount++;bool accepted=false;try{host.ErrorDataReceived+=(s,e)=>{if(!string.IsNullOrWhiteSpace(e.Data))startupError=e.Data;};host.BeginErrorReadLine();
     var line=host.StandardOutput.ReadLineAsync();if(await Task.WhenAny(line,Task.Delay(30000))!=line)throw new Exception("本机运行时启动超时");
     string firstLine=await line;if(firstLine==null)throw new Exception("本机运行时启动失败："+startupError);var result=D(json.DeserializeObject(firstLine));string url=S(result,"url");Uri u;
     if(!Uri.TryCreate(url,UriKind.Absolute,out u)||u.Host!="127.0.0.1"||u.Scheme!="http"||u.Fragment.Length!=65)throw new Exception("本机运行时未返回有效界面连接");
-    origin=u.GetLeftPart(UriPartial.Authority);token=u.Fragment.Substring(1);
+    origin=u.GetLeftPart(UriPartial.Authority);token=u.Fragment.Substring(1);accepted=true;
+    }finally{if(!accepted){try{launched.StandardInput.Close();}catch{}launched.Dispose();}}
+  }
+  async Task Start(string hostMode="app-host"){
+    await LaunchHost(hostMode);
     await Poll();var settings=D(await Api("assistant.settings"));ModelLabel(S(settings,"model"));connected=true;if(current==null)status.Text="本机 · 准备就绪";timer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(1000)};timer.Tick+=async(s,e)=>{if(polling)return;polling=true;try{await Poll();}catch(Exception ex){status.Text=ex.Message;}finally{polling=false;}};timer.Start();
   }
+  async Task VerifyHostReconnect(string report){
+    try{
+      if(!IsIsolatedAcceptanceData())throw new Exception("Isolated data required");if(timer!=null)timer.Stop();
+      var before=D(await Api("connection.settings"));var settings=D(await Api("assistant.settings"));
+      await Api("agent.shutdown",Obj("confirm",true));for(int i=0;i<100&&!OwnedHostExited();i++)await Task.Delay(100);
+      bool refused=false;try{await Api("assistant.configure",Obj("model","must-not-replay"));}catch(Exception error){refused=error.Message.Contains("结果尚未确认");}
+      if(!refused)throw new Exception("Mutation was not refused");
+      var after=D(await Api("assistant.settings"));if(S(after,"model")=="must-not-replay")throw new Exception("Mutation replayed");
+      var connectionAfter=D(await Api("connection.settings"));foreach(string key in new[]{"deviceId","password","bind","port","allowManage","allowHttp","allowHosting","allowRelay","shells"})if(json.Serialize(V(before,key))!=json.Serialize(V(connectionAfter,key)))throw new Exception("Connection setting changed: "+key);
+      var sharedHost=host;sharedHost.StandardInput.Close();await Task.Delay(500);int launches=hostLaunchCount;
+      await Task.WhenAll(Api("update.check"),Api("update.status"),Api("assistant.settings"));
+      if(hostLaunchCount!=launches+1)throw new Exception("Concurrent requests launched duplicate hosts");
+      if(sharedHost.HasExited)throw new Exception("Shared runtime was stopped");
+      string validToken=token;int beforeUnauthorized=hostLaunchCount;token=new string('0',64);bool rejected=false;try{await Api("update.status");}catch{rejected=true;}finally{token=validToken;}
+      if(!rejected||hostLaunchCount!=beforeUnauthorized)throw new Exception("Unauthorized response recovered incorrectly");
+      File.WriteAllText(report,json.Serialize(Obj("readReconnected",connected,"mutationNotReplayed",refused,"connectionSettingsPreserved",true,"concurrentReads",true,"singleReplacement",true,"sharedRuntimePreserved",true,"unauthorizedNotRetried",true)),Encoding.UTF8);
+    }catch(Exception error){File.WriteAllText(report,json.Serialize(Obj("failure",error.ToString())),Encoding.UTF8);}
+    if(IsIsolatedAcceptanceData()){try{await Api("agent.shutdown",Obj("confirm",true));}catch{}}exiting=true;Close();
+  }
+  static bool ReplayableRead(string method){return new HashSet<string>{"update.status","update.check","assistant.tasks","assistant.task","assistant.settings","account.status","account.models","account.appearance","connection.settings","client.status","agent.shells","automation.list","packages.list","packages.catalog"}.Contains(method);}
+  async Task ReconnectLocalHost(string failedOrigin){
+    if(origin!=failedOrigin)return;
+    if(reconnectTask!=null){await reconnectTask;return;}
+    if(DateTime.UtcNow<reconnectAfter)throw new Exception("本机服务正在恢复，请稍后重试。");
+    reconnectAfter=DateTime.UtcNow.AddSeconds(15);
+    reconnectTask=LaunchReplacement();try{await reconnectTask;reconnectAfter=DateTime.MinValue;}finally{reconnectTask=null;}
+  }
+  async Task LaunchReplacement(){
+    connected=false;
+    // Close only this window's app-host pipe. Never shut down the shared agent.
+    try{if(host!=null&&!host.HasExited)host.StandardInput.Close();}catch{}
+    await LaunchHost();connected=true;
+  }
   async Task<object> Api(string method,object parameters=null){
+    string failedOrigin=origin;
+    WebException failure=null;
+    try{return await ApiOnce(method,parameters);}catch(WebException error){
+      if(error.Status!=WebExceptionStatus.ConnectFailure&&error.Status!=WebExceptionStatus.ConnectionClosed&&error.Status!=WebExceptionStatus.ReceiveFailure&&error.Status!=WebExceptionStatus.SendFailure)throw;
+      if(exiting)throw;failure=error;
+    }
+    await ReconnectLocalHost(failedOrigin);
+    if(!ReplayableRead(method))throw new Exception("本机服务连接已恢复。上次操作结果尚未确认，请先查看状态，再决定是否重新操作。",failure);
+    return await ApiOnce(method,parameters);
+  }
+  async Task<object> ApiOnce(string method,object parameters=null){
     if(fixture)throw new Exception("界面夹具不调用真实服务");
-    string body=json.Serialize(Obj("method",method,"params",parameters));
+    string body=json.Serialize(Obj("method",method,"params",parameters));string requestOrigin=origin,requestToken=token;
     string response=await Task.Run(()=>{
-      var req=(HttpWebRequest)WebRequest.Create(origin+"/api");req.Method="POST";req.ContentType="application/json";req.Headers["Origin"]=origin;req.Headers["X-Cagent-Token"]=token;req.Timeout=method.StartsWith("desktop.virtual-display.")?240000:65000;req.ReadWriteTimeout=req.Timeout;req.Proxy=null;
+      var req=(HttpWebRequest)WebRequest.Create(requestOrigin+"/api");req.Method="POST";req.ContentType="application/json";req.Headers["Origin"]=requestOrigin;req.Headers["X-Cagent-Token"]=requestToken;req.Timeout=method.StartsWith("desktop.virtual-display.")?240000:65000;req.ReadWriteTimeout=req.Timeout;req.Proxy=null;
       byte[] bytes=Encoding.UTF8.GetBytes(body);req.ContentLength=bytes.Length;using(var stream=req.GetRequestStream())stream.Write(bytes,0,bytes.Length);
       try{using(var r=req.GetResponse())using(var reader=new StreamReader(r.GetResponseStream()))return reader.ReadToEnd();}
-      catch(WebException ex){if(ex.Response==null)throw;using(var r=ex.Response)using(var reader=new StreamReader(r.GetResponseStream()))return reader.ReadToEnd();}
+      catch(WebException ex){if(ex.Response==null)throw;using(var r=ex.Response){var http=r as HttpWebResponse;if(http!=null&&(http.StatusCode==HttpStatusCode.Unauthorized||http.StatusCode==HttpStatusCode.Forbidden))throw new InvalidOperationException("本机界面认证失效，请重新打开 CAgent。");using(var reader=new StreamReader(r.GetResponseStream()))return reader.ReadToEnd();}}
     });
     var value=D(json.DeserializeObject(response));if(value.ContainsKey("error"))throw new Exception(S(value,"error"));return V(value,"result");
   }
@@ -448,7 +497,10 @@ public class CagentWindow : Window {
     if(B(s,"running"))ActionButton(p,"停止连接服务",async()=>{await Api("client.stop");await Remote();});
   }
   void SaveImage(string path){var bitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);bitmap.Render(this);var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bitmap));using(var output=File.Create(path))encoder.Save(output);}
+  static bool IsIsolatedAcceptanceData(){try{string raw=Environment.GetEnvironmentVariable("CSHELL_AGENT_DATA");if(String.IsNullOrWhiteSpace(raw))return false;string data=Path.GetFullPath(raw).TrimEnd(Path.DirectorySeparatorChar,Path.AltDirectorySeparatorChar);string temp=Path.GetFullPath(Path.GetTempPath()).TrimEnd(Path.DirectorySeparatorChar,Path.AltDirectorySeparatorChar);return String.Equals(Path.GetDirectoryName(data),temp,StringComparison.OrdinalIgnoreCase)&&Path.GetFileName(data).StartsWith("native-ui-acceptance-data-",StringComparison.Ordinal)&&Directory.Exists(data)&&(File.GetAttributes(data)&FileAttributes.ReparsePoint)==0;}catch{return false;}}
   [STAThread]public static void Main(string[] args){
+    if(args.Length>0&&(args[0]=="--verify-host-reconnect")&&!IsIsolatedAcceptanceData()){if(args.Length>1)File.WriteAllText(args[1],"{\"blockedBeforeRuntime\":true}",Encoding.UTF8);return;}
+
     if(args.Length>0){new Application().Run(new CagentWindow(args));return;}
     string scope=System.Security.Principal.WindowsIdentity.GetCurrent().User.Value;
     using(var mutex=new System.Threading.Mutex(false,"Local\\CAgent.Window."+scope)){
