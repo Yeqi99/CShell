@@ -5,13 +5,22 @@ import { EventEmitter } from 'node:events';
 import { DesktopTargets } from '../src/core/desktop-targets';
 import { DesktopViews } from '../src/core/desktop-views';
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-test('whole network outage loses active terminal but desktop reauthenticates pinned paired device', async () => {
+async function until(check: () => boolean) {
+  const deadline = Date.now() + 5_000;
+  while (!check()) {
+    assert.ok(Date.now() < deadline, 'Expected desktop lifecycle event before deadline');
+    await sleep(10);
+  }
+}
+test('whole network outage loses active terminal but desktop reauthenticates pinned paired device', { timeout: 10_000 }, async () => {
   let active = true,
     online = true,
     enabled = true;
   const deviceId = randomUUID(),
     session = randomUUID(),
     id = randomUUID();
+  let offlineAttempt!: () => void;
+  const attemptedWhileOffline = new Promise<void>((resolve) => { offlineAttempt = resolve; });
   let devices = [{ deviceId, fingerprint: 'original-pin' }];
   const targets = new DesktopTargets({
     active: (target) => (active && target === session ? { resourceId: deviceId } : undefined),
@@ -32,7 +41,10 @@ test('whole network outage loses active terminal but desktop reauthenticates pin
     publish: (e) => events.push(e),
     open: async (input) => {
       opened.push(targets.resolve(input.target));
-      if (!online) throw Object.assign(new Error('offline'), { code: 'ECONNREFUSED' });
+      if (!online) {
+        offlineAttempt();
+        throw Object.assign(new Error('offline'), { code: 'ECONNREFUSED' });
+      }
       return {
         ticket: { control: false } as any,
         host: 'test',
@@ -63,15 +75,16 @@ test('whole network outage loses active terminal but desktop reauthenticates pin
     active = false;
     online = false;
     clients[0].emit('closed', 'CONTROL_CLOSED');
-    await sleep(560);
+    // Wait for the actual failed attempt, not an assumed runner timer schedule.
+    await attemptedWhileOffline;
     assert.equal(events.at(-1).state, 'reconnecting');
     assert.equal(targets.resolve(session), deviceId);
     online = true;
-    await sleep(150);
+    await until(() => clients.length === 2);
     assert.equal(clients.length, 2);
     assert.deepEqual(opened, [deviceId, deviceId, deviceId]);
     devices = [{ deviceId, fingerprint: 'different-pin' }];
-    await sleep(520);
+    await until(() => events.at(-1)?.type === 'closed');
     assert.equal(events.at(-1).type, 'closed');
     assert.throws(() => targets.resolve(session));
   } finally {

@@ -1,7 +1,7 @@
 name: Windows checks
 on:
   push:
-    branches-ignore: ['codex/runtime-core-0.8.18', 'codex/android-core-candidate-0.8.18']
+    branches-ignore: ['codex/runtime-core-mac-0.8.18', 'codex/runtime-core-0.8.18', 'codex/android-core-candidate-0.8.18']
   pull_request:
 permissions:
   contents: read
