@@ -1,0 +1,79 @@
+{
+  "edition": "pro",
+  "sha": "f1a18b459d4b216cfa93a6a49bebee5ebaa1e8d8",
+  "status": "candidate-not-published",
+  "version": "0.8.18",
+  "verification": "All local asset sizes and SHA-256 checked against the final 30-file inventory. Source targets fixed before committing this publication-control metadata. This file does not publish, deploy, or switch an update channel.",
+  "assets": [
+    {
+      "name": "CAgent-0.8.18-linux-arm64.tar.gz",
+      "size": 44560276,
+      "sha256": "0713f0f973831f05b3bb5d4ac1cd72a344cc9179ea470b1b250932105171723e"
+    },
+    {
+      "name": "CAgent-0.8.18-linux-x64.tar.gz",
+      "size": 44875055,
+      "sha256": "0049d23aa175d7f0d64826dc01d25c8691a20b5d1127025197fdbb5fd86acf3a"
+    },
+    {
+      "name": "CAgent-0.8.18-mac-arm64.tar.gz",
+      "size": 39550085,
+      "sha256": "81cb8ad2298dcf26d522c8d1c876b5c0e9bd8952cb024044f5adf5f458a33dea"
+    },
+    {
+      "name": "CAgent-0.8.18-mac-x64.tar.gz",
+      "size": 40782709,
+      "sha256": "63a1a22c3342c2c89ead74a9021eed32e4a4b9cc26b34a1318d0bb9b9460cff6"
+    },
+    {
+      "name": "CAgent-Setup-0.8.18-win-x64.exe",
+      "size": 26231462,
+      "sha256": "e3663e4a6821aaa8f1a11edb88e91f4466dec9039dae3dff43c47f6307aff61d"
+    },
+    {
+      "name": "CShell-Pro-0.8.18-android.apk",
+      "size": 4922450,
+      "sha256": "3ba6032307c67f135477eedd876dafbb9fa17237126bc4cf174fbcaf34a72032"
+    },
+    {
+      "name": "CShell-Pro-0.8.18-linux-amd64.deb",
+      "size": 107782056,
+      "sha256": "6eae81206509bdc8df05f152c1e944aa1e66f595de049ce8a29ede631b0d5cd0"
+    },
+    {
+      "name": "CShell-Pro-0.8.18-linux-arm64.AppImage",
+      "size": 140957071,
+      "sha256": "e11ce6a1e8e3d87ceb2f69e5177fa8e9f023bf20decd6b2b7d25d25368366599"
+    },
+    {
+      "name": "CShell-Pro-0.8.18-linux-arm64.deb",
+      "size": 103283340,
+      "sha256": "3e1e7d984a99dddc6bdf3526ee77bc916b27d34c9f7e39a7a6f6ecb932f6f32f"
+    },
+    {
+      "name": "CShell-Pro-0.8.18-linux-x86_64.AppImage",
+      "size": 139701827,
+      "sha256": "ba3e6dda49494cf896ed52e0db8d9d1f19693d079a0408cfc9c89d0b69589cfe"
+    },
+    {
+      "name": "CShell-Pro-0.8.18-mac-arm64.dmg",
+      "size": 142614306,
+      "sha256": "3d2fc084b486857a751c539e76fbcf0d41f5f961b984b318aed90acc7bd81b14"
+    },
+    {
+      "name": "CShell-Pro-0.8.18-mac-x64.dmg",
+      "size": 146425804,
+      "sha256": "e46df9ed8621bd839596aee5cef744787c02f8b49e215293d1447322f5f76760"
+    },
+    {
+      "name": "CShell-Pro-0.8.18-win-x64.exe",
+      "size": 123907757,
+      "sha256": "6a8bdb323dabbf619cf9cdf65357b875194f5f3aa6c459ebc03728cb684ac993"
+    },
+    {
+      "name": "SHA256SUMS.txt",
+      "size": 1283,
+      "sha256": "6d9b00fc9565dfc542a6f1b161d10004cf24b087bef60a483ceacda8c3d2e7db"
+    }
+  ]
+}
