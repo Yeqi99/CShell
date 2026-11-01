@@ -147,8 +147,8 @@ export const apiClientSchema = z
     allowedLocalShells: z.array(localShellSchema).max(100).optional(),
     localFileRoots: apiLocalFileRoots,
     applicationCapabilities: z
-      .array(z.enum(['plugins.read', 'plugins.manage']))
-      .max(2)
+      .array(z.enum(['plugins.read', 'plugins.manage', 'connections.read', 'http.use']))
+      .max(4)
       .optional(),
     targetPolicies: apiTargetPoliciesSchema,
     capabilities: z.array(apiCapabilitySchema).max(32),
@@ -172,8 +172,8 @@ export const mcpSettingsSchema = z
     allowedLocalShells: z.array(localShellSchema).max(100).optional(),
     localFileRoots: apiLocalFileRoots,
     applicationCapabilities: z
-      .array(z.enum(['plugins.read', 'plugins.manage']))
-      .max(2)
+      .array(z.enum(['plugins.read', 'plugins.manage', 'connections.read', 'http.use']))
+      .max(4)
       .optional(),
     targetPolicies: apiTargetPoliciesSchema,
     clients: z
@@ -395,6 +395,7 @@ export interface Bridge
   networkRemoteOpen?(input:{source:string;exit:string}):Promise<{port:number}>;
   networkStatus?(): Promise<import('./network-route').NetworkRouteStatus>;
   networkSystemStatus?():Promise<{supported:boolean;enabled:boolean;error:string}>;
+  identityNetwork(input:import('./identity-network').IdentityNetworkCommand):Promise<import('./identity-network').IdentityNetworkStatus>;
   networkSystemSet?(enabled:boolean):Promise<{supported:boolean;enabled:boolean;error:string}>;
   desktopLookGet?(id:string,legacy?:import('./desktop-look').DesktopLook):Promise<import('./desktop-look').DesktopLook|null>;
   desktopLookSave?(id:string,value:import('./desktop-look').DesktopLook|null):Promise<import('./desktop-look').DesktopLook|null>;

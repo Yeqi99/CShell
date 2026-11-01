@@ -29,6 +29,7 @@ const bridge: Bridge = {
   connectionImportDiscard: token => ipcRenderer.invoke('connections:import-discard', token),
   networkRemoteSources: () => ipcRenderer.invoke('network:remote-sources'),
   networkRemoteOpen: input => ipcRenderer.invoke('network:remote-open',input),
+  identityNetwork:input=>ipcRenderer.invoke('network:identity',input),
   networkStatus: () => ipcRenderer.invoke('network:status'),
   networkSystemStatus:()=>ipcRenderer.invoke('network:system-status'),
   networkSystemSet:enabled=>ipcRenderer.invoke('network:system-set',enabled),
@@ -216,6 +217,7 @@ const bridge: Bridge = {
   pythonSaveFile: (id, path, code, revision) =>
     ipcRenderer.invoke('python:save', id, path, code, revision),
   plugins: () => ipcRenderer.invoke('plugins:list'),
+  pluginsRestorePending:()=>ipcRenderer.invoke('plugins:restore-pending'),
   pluginInstall: (id) => ipcRenderer.invoke('plugins:install', id),
   pluginToggle: (id, enabled) => ipcRenderer.invoke('plugins:toggle', id, enabled),
   pluginRemove: (id) => ipcRenderer.invoke('plugins:remove', id),

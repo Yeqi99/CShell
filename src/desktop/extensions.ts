@@ -113,6 +113,7 @@ export function registerExtensionHandlers(
     return services.processExtensions.authorize(value,grant?plugin.manifest.capability.permissions:[]);
   });
   handle('plugins:list', () => store.plugins());
+  handle('plugins:restore-pending',()=>[]);
   handle('plugins:install', (id) => plugins.install(pluginId.parse(id)));
   handle('plugins:toggle', async (id, enabled) => {
     pluginId.parse(id);

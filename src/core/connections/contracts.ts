@@ -10,6 +10,8 @@ export interface ConnectionTarget {
   readonly label: string;
 }
 export interface ConnectionTool {
+  /** Trusted host tools touching saved machines must declare every affected scope. */
+  readonly applicationTargets?: (input:unknown)=>readonly {id:string;group?:string;capabilities:readonly string[]}[];
   readonly name: string;
   readonly capability: string;
   readonly description: string;

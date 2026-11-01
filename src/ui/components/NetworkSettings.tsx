@@ -1,3 +1,4 @@
+import {MachineNetworkRules} from './MachineNetworkRules';
 import {SystemMachineProxy} from './SystemMachineProxy';
 import {RemoteAppNetwork} from './RemoteAppNetwork';
 import { useEffect, useState } from 'react';
@@ -53,6 +54,6 @@ export function NetworkSettings() {
     </fieldset>}
     {window.cshell.networkSystemStatus&&<SystemMachineProxy machineReady={status?.route.mode==='machine'}/>}
     {status && window.cshell.networkRemoteOpen && <RemoteAppNetwork machines={status.machines}/>}
-    {window.cshell.networkDiagnostics && <NetworkDiagnostics/>}
+    <MachineNetworkRules/>{window.cshell.networkDiagnostics && <NetworkDiagnostics/>}
   </section>;
 }

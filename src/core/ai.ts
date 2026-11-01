@@ -651,6 +651,7 @@ export class AiService {
     const appTool = this.applicationTools(t).find((d) => d.name === tool);
     if (appTool) {
       if (!allowsApplication(caller, appTool.capability)) return false;
+      if(input!==undefined&&appTool.applicationTargets){try{if(!appTool.applicationTargets(input).every(target=>target.capabilities.every(capability=>allowsCapability(caller,target,capability))))return false;}catch{return false;}}
       if(tool.startsWith('remote_wechat_')){
         if(!t.sessionId)return false;
         try{const scope=this.connections.scope(t.sessionId);return !!scope&&allowsCapability(caller,scope,'agent.manage');}catch{return false;}

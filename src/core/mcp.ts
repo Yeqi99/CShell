@@ -1900,8 +1900,7 @@ export class McpService {
       async ({ taskId }) => run('task_cancel', () => this.tasks.cancel(owner, taskId)),
     );
     for (const tool of this.host?.applicationTools ?? []) {
-      const authorized = () =>
-        this.host?.applicationTools?.includes(tool) === true && allowsApplication(this.callerPolicy(owner), tool.capability);
+      const authorized = (args?:unknown) => {try{return this.host?.applicationTools?.includes(tool) === true && allowsApplication(this.callerPolicy(owner), tool.capability) && (args===undefined||!tool.applicationTargets||tool.applicationTargets(args).every(target=>target.capabilities.every(capability=>allowsCapability(this.callerPolicy(owner),target,capability))));}catch{return false;}};
       if (!authorized()) continue;
       register(
         tool.name,
@@ -1935,7 +1934,7 @@ export class McpService {
         async (value) =>
           run(tool.name, async () => {
             const args = tool.input.parse(value);
-            if (!authorized())
+            if (!authorized(args))
               throw new ApiError(
                 'FORBIDDEN',
                 'Application capability is not authorized.',
@@ -1956,13 +1955,13 @@ export class McpService {
                 'Do not repeat a declined request automatically.',
               );
             signal.throwIfAborted();
-            if (!authorized())
+            if (!authorized(args))
               throw new ApiError(
                 'FORBIDDEN',
                 'Application capability was revoked.',
                 'Review application-level grants.',
               );
-            return JSON.parse(await tool.invoke(args, signal));
+            return JSON.parse(await tool.invoke(args, signal,undefined,()=>{if(!authorized(args))throw Error('Application target authorization revoked');}));
           }),
       );
     }

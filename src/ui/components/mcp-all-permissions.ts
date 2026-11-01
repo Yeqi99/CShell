@@ -8,7 +8,7 @@ export function selectAllMcpPermissions(settings: McpSettings, profiles: Profile
     allowedLocalShells: [...new Set(shells)],
     allowCommands: true,
     capabilities: [...apiCapabilitySchema.options],
-    applicationCapabilities: ['plugins.read', 'plugins.manage'] as NonNullable<McpSettings['applicationCapabilities']>,
+    applicationCapabilities: ['plugins.read', 'plugins.manage', 'connections.read', 'http.use'] as NonNullable<McpSettings['applicationCapabilities']>,
     review: 'authorized' as const,
     targetPolicies: {},
   };

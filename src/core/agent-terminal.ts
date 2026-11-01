@@ -137,6 +137,7 @@ export async function detectAgentShells(): Promise<AgentShell[]> {
 
 /** Native persistent PTY, independent of SSH, Electron and renderer lifetime. */
 export class AgentTerminalProvider implements ManagedProvider {
+  networkEnvironment?:()=>Record<string,string>;
   readonly id = 'cshell.agent-terminal';
   readonly version = '1.0.0';
   readonly capabilities = ['terminal.interactive'];

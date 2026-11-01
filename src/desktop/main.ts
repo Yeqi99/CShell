@@ -1,3 +1,4 @@
+import {IdentityNetwork} from './identity-network';
 import {remoteAppProxy,proxyShellCommand} from './remote-app-proxy';
 import { MachineNetworkRoute } from './machine-network-route';
 import { EmbeddedRdpService } from './embedded-rdp';
@@ -623,6 +624,7 @@ else
         browser:(id,action,input,signal,guard)=>machineBrowser.automation(connections.tools.describe(id).providerId==='cshell.client'?'agent-session:'+id:id,action,input,signal,guard),
         desktop:(id,action,input,signal,guard)=>agent.desktopTool(id,action,input,signal,guard),
       }));
+      let identityNetwork:IdentityNetwork|undefined;
       const disposeAi = await registerAiHandlers(
         handle,
         app.getPath('userData'),
@@ -661,9 +663,10 @@ else
         },
         http,
         wechat,
-        () => processExtensions.applicationTools(),
+        () => [...processExtensions.applicationTools(),...(identityNetwork?.tools()??[])],
         new MachineNetworkRoute(store, clientProvider),
       );
+      identityNetwork=new IdentityNetwork(app.getPath('userData'),store,clientProvider,disposeAi.network);await identityNetwork.load();await identityNetwork.activate();ssh.networkShell=profile=>identityNetwork!.shell(profile.id);handle('network:identity',input=>identityNetwork!.call(input));window.once('closed',()=>void identityNetwork?.close());
       registerPresetHandlers(handle, window, app.getPath('userData'), store, text);
       registerConnectionImport(handle, window, store);
       classroomTasks=registerClassroomTasks(handle,clientProvider,classroomEnabled,disposeAi);
@@ -691,7 +694,7 @@ else
         {
           manager: connections,
           http,
-          applicationTools: extensionServices.applicationTools,
+          applicationTools: [...extensionServices.applicationTools,...(identityNetwork?.tools()??[])],
           connectEnvironment: async (parent, conda, prefix, signal, ready) => {
             let child: string | undefined;
             try {
