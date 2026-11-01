@@ -155,12 +155,13 @@ class Service:
                     account = db.execute('SELECT id FROM accounts WHERE email=?', (email,)).fetchone()[0]
                     token = secrets.token_urlsafe(32)
                     db.execute('DELETE FROM sessions WHERE expires<?', (time.time(),))
+                    db.execute('INSERT INTO vault_versions VALUES(?,?)',(account,schema))
                     db.execute('INSERT INTO sessions VALUES(?,?,?)', (self.digest(token), account, time.time() + 30 * 86400))
         if not valid:
             raise Failure(401, '验证码无效、过期或尝试次数已用尽')
         return {'accountId': account, 'email': email, 'token': token}
 
-    def register(self, body, ip):
+    def register(self, body, ip, schema=1):
         email = self.email(body.get('email'))
         self.limit('register-ip:' + self.digest(ip), 10, 600)
         password, account, box = body.get('password'), body.get('accountId'), body.get('keybox')
@@ -426,7 +427,7 @@ def handler(service):
                 elif self.command == 'POST' and self.path == '/v1/auth/code':
                     value = service.request_code(body.get('email'), ip)
                 elif self.command == 'POST' and self.path == '/v1/auth/register':
-                    value = service.register(body, ip)
+                    value = service.register(body, ip, 2 if self.headers.get('X-CShell-Vault-Schema') == '2' and self.headers.get('X-CShell-Vault-Write-Schema') == '2' else 1)
                 elif self.command == 'POST' and self.path == '/v1/auth/login':
                     value = service.login(body.get('email'), body.get('code'), ip)
                 elif self.command == 'POST' and self.path == '/v1/auth/password-login':
@@ -446,6 +447,18 @@ def handler(service):
                         value=service.devices.list(account)
                     elif self.path == '/v1/devices/register' and self.command == 'POST':
                         value=service.devices.register(account,body)
+                    elif self.path == '/v1/lending' and self.command == 'GET':
+                        value=service.devices.lending.list(account)
+                    elif self.path == '/v1/lending/create' and self.command == 'POST':
+                        value=service.devices.lending.create(account,body)
+                    elif self.path == '/v1/lending/redeem' and self.command == 'POST':
+                        value=service.devices.lending.redeem(account,body)
+                    elif self.path == '/v1/lending/revoke' and self.command == 'POST':
+                        value=service.devices.lending.revoke(account,body)
+                    elif self.path == '/v1/devices/delegate' and self.command == 'POST':
+                        value=service.devices.delegate(account,body)
+                    elif self.path == '/v1/devices/delegation/verify' and self.command == 'POST':
+                        value=service.devices.verify_delegation(account,body)
                     elif self.path == '/v1/devices/lease' and self.command == 'POST':
                         value=service.devices.lease(account,body)
                     elif self.path == '/v1/devices/remove' and self.command == 'POST':

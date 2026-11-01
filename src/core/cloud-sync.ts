@@ -148,15 +148,15 @@ export class CloudSync {
       }
     }
   }
-  private async api(path: string, body?: unknown): Promise<any> {
+  private async api(path: string, body?: unknown, schema?: number): Promise<any> {
     const snapshot = path === '/v1/vault' && body !== undefined ? await this.adapter.export() as any : undefined;
-    const writeSchema = snapshot?.store?.extensions?.enabled !== undefined ? '2' : '1';
+    const writeSchema = schema === 2 || snapshot?.store?.extensions?.enabled !== undefined ? '2' : '1';
     const response = await this.request(this.endpoint + path, {
       method: body === undefined ? 'GET' : 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-CShell-Vault-Schema': '2',
-        ...(path === '/v1/vault' && body !== undefined ? {'X-CShell-Vault-Write-Schema': writeSchema} : {}),
+        ...(body !== undefined ? {'X-CShell-Vault-Write-Schema': writeSchema} : {}),
         ...(this.data.session ? { Authorization: 'Bearer ' + this.data.session.token } : {}),
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
@@ -233,7 +233,7 @@ export class CloudSync {
     return this.exclusive(async()=>{
       const accountId=randomUUID().replaceAll('-',''),key=newRecoveryKey();
       const snapshot=await (this.adapter.registrationSnapshot?.() ?? this.adapter.export());
-      const session:CloudSession=await this.api('/v1/auth/register',{email,code,password,accountId,keybox:wrapRecoveryKey(key,password,accountId),envelope:encryptVault(snapshot,key,accountId)});
+      const session:CloudSession=await this.api('/v1/auth/register',{email,code,password,accountId,keybox:wrapRecoveryKey(key,password,accountId),envelope:encryptVault(snapshot,key,accountId)}, (snapshot as any)?.store?.extensions?.enabled !== undefined ? 2 : 1);
       if(session.accountId!==accountId || !/^[A-Za-z0-9_-]{43}$/.test(session.token))throw new Error('注册响应不正确，请使用密码登录');
       await this.activate({session,key,revision:1,digest:vaultDigest(snapshot),baseline:snapshot,lastSync:new Date().toISOString(),membership:{active:false,expiresAt:null}});
       this.error=undefined;this.profileChecked=0;return this.status();
