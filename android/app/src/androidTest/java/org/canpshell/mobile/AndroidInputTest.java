@@ -50,7 +50,9 @@ final class AndroidInputTest implements AutoCloseable {
       // retaining that connection deadlocks its shared node cache against the
       // application's main thread. No product permission/service is changed.
       UiAutomation.class.getMethod("destroy").invoke(automation);
-      check(Boolean.TRUE.equals(UiAutomation.class.getMethod("isDestroyed").invoke(automation)),"Test driver remained connected");
+      boolean disconnected=false;
+      try{automation.getServiceInfo();}catch(IllegalStateException expected){disconnected=true;}
+      check(disconnected,"Test driver remained connected");
     }
     sampler.scheduleAtFixedRate(()->{
       if(!AndroidControlService.isEditing())return;
