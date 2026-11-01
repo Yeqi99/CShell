@@ -149,7 +149,28 @@ final class AndroidInputTest implements AutoCloseable {
     awaitText("CAgent input checkZ");pressBackspace(connection);awaitText("CAgent input check");
     long actualEvents=serviceEventRevision()-initialEvents;
     check(actualEvents>0,"Product accessibility event path did not receive native edit events");
-    return "PASS encrypted remote input → real Accessibility tap, editable text, scan-code letter, repeated/Unicode/selection backspace, held Shift across tap, fail-stop gesture outcomes and fresh input recovery; productEvents="+actualEvents+"\n";
+    AtomicReference<android.webkit.WebView> semantic=new AtomicReference<>();
+    test.runOnMainSync(()->{
+      android.webkit.WebView view=new android.webkit.WebView(app);view.getSettings().setJavaScriptEnabled(true);
+      ((FrameLayout)app.findViewById(android.R.id.content)).addView(view,new FrameLayout.LayoutParams(-1,100));semantic.set(view);
+      view.loadDataWithBaseURL(null,"<html><body><button>CAgent semantic page one</button></body></html>","text/html","UTF-8",null);
+    });
+    try{
+      awaitSemanticText("CAgent semantic page one","CAgent semantic page two");
+      test.runOnMainSync(()->semantic.get().evaluateJavascript("document.body.innerHTML='<button>CAgent semantic page two</button>'",null));
+      awaitSemanticText("CAgent semantic page two","CAgent semantic page one");
+    }finally{test.runOnMainSync(()->{android.webkit.WebView view=semantic.get();((ViewGroup)view.getParent()).removeView(view);view.destroy();});}
+    return "PASS encrypted remote input → real Accessibility tap, editable text, scan-code letter, repeated/Unicode/selection backspace, held Shift across tap, fail-stop gesture outcomes, fresh input recovery and current semantic content; productEvents="+actualEvents+"\n";
+  }
+  private void awaitSemanticText(String expected,String stale)throws Exception {
+    long end=System.nanoTime()+TimeUnit.SECONDS.toNanos(3);boolean found=false,old=false;
+    do{
+      org.json.JSONArray nodes=AndroidControlService.snapshot().getJSONArray("nodes");found=false;old=false;
+      for(int i=0;i<nodes.length();i++){String text=nodes.getJSONObject(i).optString("text");found|=text.equals(expected);old|=text.equals(stale);}
+      if(found&&!old)return;
+      Thread.sleep(50);
+    }while(System.nanoTime()<end);
+    throw new AssertionError("Current semantic content missing or stale: found="+found+", stale="+old);
   }
   private long serviceEventRevision()throws Exception {
     java.lang.reflect.Field instance=AndroidControlService.class.getDeclaredField("instance");instance.setAccessible(true);
