@@ -1,4 +1,5 @@
 import {MachineNetworkRules} from './MachineNetworkRules';
+import {SystemMachineProxy} from './SystemMachineProxy';
 import {RemoteAppNetwork} from './RemoteAppNetwork';
 import { useEffect, useState } from 'react';
 import { Globe, ArrowRight } from 'lucide-react';
@@ -51,6 +52,7 @@ export function NetworkSettings() {
       <p className="network-note">默认跟随系统代理及其自动配置；系统未配置代理时直连。手动代理或机器出口不可用时会报错，不自动切回直连。应用后重新建立模型连接。</p>
       <div className="network-actions"><span role="status">{saved ? '已应用，后续请求使用新出口' : ''}</span><button className="primary" type="button" onClick={() => void apply()} disabled={mode === 'proxy' && !url || mode === 'machine' && !machine}>{busy ? '正在应用…' : '应用网络设置'}</button></div>
     </fieldset>}
+    {window.cshell.networkSystemStatus&&<SystemMachineProxy machineReady={status?.route.mode==='machine'}/>}
     {status && window.cshell.networkRemoteOpen && <RemoteAppNetwork machines={status.machines}/>}
     <MachineNetworkRules/>{window.cshell.networkDiagnostics && <NetworkDiagnostics/>}
   </section>;
