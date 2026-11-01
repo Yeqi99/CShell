@@ -6,7 +6,7 @@
 
 - **Windows**：以 `e2c1966` 的 [四包收据](release-evidence/final-windows-candidates.json) 为准。两版CShell与独立CAgent均重新构建，精确安装器内的新微信目录两摘要及异常退出保护已核验；两CShell真实成品验收、两CAgent实际安装后的CMD/TLS、Pro账号/原生设置及退出验收通过。未签名，未覆盖用户安装。
 - **POSIX**：Core `41300796296` 四作业、Pro `41300827199` 八作业全部成功。12个GitHub归档摘要、22个附件SHA-256核验完成，八个CAgent归档内的最终目录和渠道实现已检查，见 [最终运行时收据](release-evidence/runtime-final-artifacts.json)。Core生产源码 `3202d56`，Pro生产源码 `c53e8f1`；其后纯文档/收据修改不要求重复构建。macOS未签名/未公证，原生CI不替代实体设备验收。
-- **Android**：本轮运行时目录变更不影响Android，继续使用 [最新Android收据](release-evidence/final-android-candidates.json) 的两个APK。API29/35及新旧WebView语义树断言已通过。物理手机17:25旧包的实际点击成功，但最新语义修复包待覆盖安装后再验，不能写成新包全部通过。
+- **Android**：本轮运行时目录变更不影响Android，继续使用 [最新Android收据](release-evidence/final-android-candidates.json) 的两个APK。API29/35及新旧WebView语义树断言已通过。物理手机17:25旧包的实际点击成功；20:21:31已正常覆盖安装最终3ba603语义修复APK并启动。CAgent24443待开启，服务/屏幕共享恢复后继续文字与语义树实测，不能写成新包全部通过。
 - **微信**：真实手机B消息被原生监听捕获；诊断投递同事件完成一个任务；最终冻结包自动重投该事件返回204且无重复任务/模型调用；另有独立合成新事件的自动单任务验收。首次真实消息自动端到端成功尚不是本轮证据，4.2原生钩子也未实机。详见 [分段证据](release-evidence/wechat-final-native-lifecycle.json)。
 - **联想会员中继**：会员已幂等开通，实际联想设备仍signed-out，待登录后强制中继测试；不以局域网直连或其它隔离机器代替。
 
