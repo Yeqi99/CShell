@@ -34,6 +34,13 @@ final class AndroidInputTest implements AutoCloseable {
       Settings.Secure.putString(app.getContentResolver(),Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,previousServices==null||previousServices.isEmpty()?component:previousServices+":"+component);
       Settings.Secure.putInt(app.getContentResolver(),Settings.Secure.ACCESSIBILITY_ENABLED,1);
     }finally{automation.dropShellPermissionIdentity();}
+    // Android 10 shares one AccessibilityInteractionClient node cache inside
+    // this process. Retaining UiAutomation's separate accessibility connection
+    // while the actual service edits our native view cross-contaminates cached
+    // connection IDs and causes five-second refresh/action timeouts. The test
+    // driver no longer needs accessibility after granting the real service.
+    // All following taps/edits still travel through TLS and AndroidControlService.
+    test.getUiAutomation(UiAutomation.FLAG_DONT_USE_ACCESSIBILITY|UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES);
     test.runOnMainSync(()->{
       panel=new LinearLayout(app);panel.setOrientation(LinearLayout.VERTICAL);panel.setBackgroundColor(0xffffffff);
       button=new Button(app){
