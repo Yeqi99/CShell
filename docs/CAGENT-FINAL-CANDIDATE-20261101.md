@@ -25,3 +25,10 @@ Actual packaged verification passed after the Pro desktop suite released the des
 No model request, WeChat action, real user configuration change or application upgrade occurred. Paused automation CRUD is not evidence of actual event delivery or task execution. These runs do not add new claims about physical Android, WeChat callbacks or remote Windows screen capture.
 
 Logs: `test-results/cagent-final-build.log`, `cagent-final-package.log`, `cagent-final-tls-pty.log`, `cagent-final-native.log`; structured native evidence: `test-results/cagent-native-runtime-capabilities.json`.
+
+The matching standalone installer was subsequently generated from this exact deployment directory:
+
+- `.local/CAgent-Setup-0.8.18-win-x64-final.exe`
+- 26,231,462 bytes; SHA256 `e3663e4a6821aaa8f1a11edb88e91f4466dec9039dae3dff43c47f6307aff61d`.
+- The real EXE completed silent `/PREPARE` into `.local/cagent-final-exe-prepare-4403`. All 48 extracted version payload files matched the original manifest. Existing CAgent installation discovery registration was unchanged.
+- This preparation test deliberately did not activate the candidate, change the user's launcher/shortcuts, restart their application, or claim a completed user installation. Authenticode signing remains absent.
