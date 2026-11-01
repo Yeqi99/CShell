@@ -1,3 +1,4 @@
+import {cleanDisplayError} from '../error-display';
 import { AlertCircle, RotateCw } from 'lucide-react';
 import {useEffect} from 'react';
 import { CopyButton } from './AiCopyButton';
@@ -7,9 +8,7 @@ const reported = new Map<string,number>();
 export function ErrorNotice({ error, title, retry, busy = false }: {
   error: string; title: string; retry?: () => void; busy?: boolean;
 }) {
-  const cleaned = error.replace(/Error invoking remote method '[^']*':\s*/g, '').replace(/^(Error:\s*)+/, '')
-    .replace(/(Bearer\s+)[^\s"']+/gi, '$1[已隐藏]')
-    .replace(/((?:api[_-]?key|password|token)["']?\s*[:=]\s*["']?)[^\s,"'}]+/gi, '$1[已隐藏]');
+  const cleaned = cleanDisplayError(error);
   const membership = /需要.*(?:Pro|会员)|membership.required/i.test(cleaned);
   const permission = !membership && /权限|permission.denied|access.denied|\b403\b/i.test(cleaned);
   const unavailable = !membership && !permission && /未开启|未启用|未就绪|未安装|未开放|not.ready|not.enabled|not.installed/i.test(cleaned);
@@ -22,7 +21,7 @@ export function ErrorNotice({ error, title, retry, busy = false }: {
     : /password|密码/i.test(cleaned) ? '连接密码未填写或不正确。请检查连接设置后重新连接。'
     : /TypeError|ReferenceError|SyntaxError|\bstack\b|\[\s*\{|too_small/i.test(cleaned) ? '应用未能完成这项操作。请重试；若仍然失败，可复制下面的诊断详情反馈。'
     : cleaned.length < 220 ? cleaned : '操作未完成。可以展开诊断详情查看具体原因。';
-  const details = cleaned.replace(/(Bearer\s+)[^\s"']+/gi, '$1[已隐藏]').replace(/((?:api[_-]?key|password|token)["']?\s*[:=]\s*["']?)[^\s,"'}]+/gi, '$1[已隐藏]');
+  const details = cleaned;
   useEffect(()=>{
     if(!details)return;
     const key=title+': '+details,now=Date.now();

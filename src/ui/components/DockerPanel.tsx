@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { useEffect, useRef, useState } from 'react';
 import {
   Box,
@@ -226,8 +227,8 @@ export function DockerPanel({ sessionId, active }: { sessionId: string; active: 
         )}
       </div>
       {(error || loadError) && (
-        <div className="docker-error" role="alert">
-          {(error || loadError).replace(/^Error invoking remote method '[^']+': Error: /, '')}
+        <div className="docker-error">
+          <ErrorNotice title="Docker 操作未完成" error={error || loadError}/>
           {!data && (
             <small>
               {zh
@@ -563,9 +564,7 @@ export function DockerPanel({ sessionId, active }: { sessionId: string; active: 
               {container.state !== 'running' ? (
                 <p className="muted">{zh ? '容器未运行' : 'Container is not running'}</p>
               ) : statsError ? (
-                <p role="alert" className="form-error">
-                  {statsError}
-                </p>
+                <ErrorNotice title="容器监控暂不可用" error={statsError}/>
               ) : !stats ? (
                 <p className="muted">{zh ? '正在采集…' : 'Collecting…'}</p>
               ) : (

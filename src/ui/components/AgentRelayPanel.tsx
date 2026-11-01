@@ -661,9 +661,7 @@ function ReverseEditor({ call, target }: Props) {
       </header>
       <p className="agent-relay-note">此 Agent 主动连接中继，无需为此 Agent 开放公网端口。</p>
       {(error || status?.error) && (
-        <p className="agent-relay-error" role="alert">
-          {error || status?.error}
-        </p>
+        <ErrorNotice title="中继连接未完成" error={error || status?.error || ''}/>
       )}
       {message && <p role="status">{message}</p>}
       {draft && status && (

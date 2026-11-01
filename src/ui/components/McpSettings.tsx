@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { defaultMcpPort } from '../../shared/mcp-endpoint';
 import { selectAllMcpPermissions } from './mcp-all-permissions';
 import { apiCapabilitySchema } from '../../shared/contracts';
@@ -619,9 +620,7 @@ export function McpSettings({
       )}
       {status && <p role="status">{status.running ? t('mcpRunning') : t('mcpStopped')}</p>}
       {(error || status?.error) && (
-        <p className="form-error" role="alert">
-          {error || status?.error}
-        </p>
+        <ErrorNotice title="MCP 操作未完成" error={error || status?.error || ''}/>
       )}
     </section>
   );

@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import {ConnectionProbe} from './ConnectionProbe';
 import { useEffect, useId, useRef, useState } from 'react';
 import {
@@ -402,12 +403,7 @@ export function ConnectionForm({
           </div>
         </fieldset>
         {error && (
-          <p
-            className={cancelled ? 'connection-notice' : 'form-error connection-error'}
-            role={cancelled ? 'status' : 'alert'}
-          >
-            {error}
-          </p>
+          cancelled ? <p className="connection-notice" role="status">连接已取消</p> : <ErrorNotice title="连接未完成" error={error}/>
         )}
         <ConnectionProbe host={value.host} port={Number(port)} disabled={!!busy}/><footer className="connection-footer">
           <div className="connection-actions">

@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import {Monitor, LoaderCircle, AlertCircle, Unplug, ArrowRight} from 'lucide-react';
 import './machine-connection-state.css';
 
@@ -13,7 +14,7 @@ export function MachineConnectionState({name, phase, error, details, primary, se
       <h1>{name}</h1>
       <p className="machine-connection-phase" role={phase==='error'?'alert':'status'}>{pending?<LoaderCircle className="machine-connection-spinner" size={17}/>:phase==='error'?<AlertCircle size={17}/>:<Unplug size={17}/>} {labels[phase]}</p>
       <p className="machine-connection-note">{phase==='closed'?'重新连接这台机器后继续。':phase==='error'?'可以重试，或查看详细原因。':phase==='installing'?'安装进度将在这里更新。':'连接完成后自动进入桌面。'}</p>
-      {(error||details)&&<details><summary>{phase==='error'?'查看错误详情':'查看执行详情'}</summary><pre>{error||details}</pre></details>}
+      {error ? <ErrorNotice title="工作区暂不可用" error={error}/> : details && <details><summary>查看执行详情</summary><pre>{details}</pre></details>}
       {(primary||secondary)&&<div className="machine-connection-actions">{primary&&<button onClick={primary.run}>{primary.label}<ArrowRight size={15}/></button>}{secondary&&<button className="secondary" onClick={secondary.run}>{secondary.label}</button>}</div>}
     </div>
   </section>;

@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { useEffect, useRef, useState } from 'react';
 import { ArrowUp, ExternalLink, Square, Terminal, Trash2 } from 'lucide-react';
 import { commandHelp, commandLabel, parseConsoleCommand, type CapabilityContract, type CommandResult } from '../../shared/command-console';
@@ -51,7 +52,7 @@ export function CommandConsole({ active, onSettings, onNewTab }: { active: boole
     <div className="command-output" ref={log} role="log" aria-label="命令结果" aria-live="polite">
       {!entries.length && <div className="command-welcome"><Terminal size={28}/><h2>一个入口，调用已授权的能力</h2><p>输入 tools 查找命令，help 查看参数。每个命令台独立保留草稿与结果。</p><div>{['help', 'tools', 'servers'].map(text => <button key={text} onClick={() => void submit(text)}>{text}</button>)}</div><small>这是 CShell 命令，不会作为系统 Shell 执行。关闭窗口不会重放命令。</small></div>}
       {entries.map(entry => <article key={entry.id} className="command-entry"><header><span aria-hidden="true">›</span><strong>{entry.label}</strong><span>{entry.error ? '未完成' : entry.result ? '完成' : '执行中'}</span></header>
-        {entry.error ? <p role="alert" className="form-error">{entry.error}</p> : entry.result ? <CommandResultView result={entry.result} onGuide={name => { setDraft(`help ${name}`); input.current?.focus(); }}/>: <p className="command-wait">正在等待结果…</p>}</article>)}
+        {entry.error ? <ErrorNotice title="指令未完成" error={entry.error}/> : entry.result ? <CommandResultView result={entry.result} onGuide={name => { setDraft(`help ${name}`); input.current?.focus(); }}/>: <p className="command-wait">正在等待结果…</p>}</article>)}
     </div>
     <form className="command-composer" onSubmit={e => { e.preventDefault(); void submit(); }}><label aria-hidden="true">›</label><textarea ref={input} aria-label="输入 CShell 命令" value={draft} maxLength={60000} spellCheck={false} placeholder='tools / call 能力名 {"参数": "值"}' onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && e.keyCode !== 229) { e.preventDefault(); void submit(); } }}/>
       {request ? <button type="button" title="停止等待，执行中的远端操作需检查结果" aria-label="停止等待" onClick={() => void window.cshell.commandCancel(request).catch(() => {})}><Square size={17}/></button> : <button type="submit" disabled={!draft.trim()} title="执行（Enter）" aria-label="执行命令"><ArrowUp size={18}/></button>}

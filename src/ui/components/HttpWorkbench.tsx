@@ -730,7 +730,7 @@ export function HttpWorkbench({
               <small>
                 {response.request.method} {response.url}
               </small>
-              {response.error && <p role="alert">{response.error}</p>}
+              {response.error && <ErrorNotice title="HTTP 请求未完成" error={response.error}/>}
               <div className="http-editor-tabs">
                 <button
                   aria-pressed={responsePanel === 'body'}

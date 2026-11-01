@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { usePermissionFocus } from '../permission-navigation';
 import { useState } from 'react';
 import { Check, ShieldCheck, Server, Monitor } from 'lucide-react';
@@ -301,9 +302,7 @@ export function AiPermissionTree({
         </section>
       </fieldset>
       <footer className="permission-tree-footer">
-        <span role={failed ? 'alert' : 'status'} className={failed ? 'form-error' : ''}>
-          {feedback || (draft ? '有未保存的修改' : '未授权的能力不可调用')}
-        </span>
+        {failed ? <ErrorNotice title="权限保存未完成" error={feedback}/> : <span role="status">{feedback || (draft ? '有未保存的修改' : '未授权的能力不可调用')}</span>}
         <button type="button" className="primary" disabled={busy} onClick={() => void save()}>
           <Check size={14} />
           {busy ? '保存中…' : '保存权限'}

@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import {MachineInformation} from './MachineInformation';
 import {IdeApp} from './IdeApp';
 import {agentRead} from '../agent-read';
@@ -713,7 +714,7 @@ export function LinuxDesktop({
                           {onTerminal && <button onClick={onTerminal}>进入 SSH 终端</button>}
                         </>
                       )}
-                      {error && <p role="alert">{error}{!lookReady.current&&<button onClick={()=>{setError('');setLookLoadAttempt(v=>v+1);}}>重新读取外观</button>}</p>}
+                      {error && <div><ErrorNotice title="桌面设置未完成" error={error}/>{!lookReady.current&&<button onClick={()=>{setError('');setLookLoadAttempt(v=>v+1);}}>重新读取外观</button>}</div>}
                     </div>
                   </div>
                 )}
@@ -906,7 +907,7 @@ export function LinuxDesktopTerminal({
   return (
     <div className="desktop-terminal">
       {error ? (
-        <p role="alert">{error}</p>
+        <ErrorNotice title="终端连接未完成" error={error}/>
       ) : id ? (
         <TerminalPane
           id={id}
