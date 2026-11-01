@@ -262,13 +262,15 @@ public final class AndroidControlService extends AccessibilityService {
     editBusy=true;
     inputHandler.post(new Runnable(){
       AccessibilityNodeInfo node=AccessibilityNodeInfo.obtain(original);
-      final long deadline=android.os.SystemClock.uptimeMillis()+1500;
-      long revision=-1;int stableText,stableCaret;boolean textSeen,selectionSent;
+      final long started=android.os.SystemClock.uptimeMillis(),deadline=started+1500;
+      long revision=-1,refreshMillis;int stableText,stableCaret,rounds,revisionChanges;boolean textSeen,selectionSent;
       public void run(){
         boolean retry=false,confirmed=false;
         try{
           if(instance!=AndroidControlService.this){lastEditState="edit:service-changed";return;}
-          if(!node.refresh()||!node.isFocused()){
+          rounds++;long refreshStarted=android.os.SystemClock.uptimeMillis();boolean refreshed=node.refresh();
+          refreshMillis+=android.os.SystemClock.uptimeMillis()-refreshStarted;
+          if(!refreshed||!node.isFocused()){
             // Text updates invalidate cached node snapshots on older Android.
             // Reacquire actual input focus, but only accept the exact same node;
             // a different focused editor must never inherit queued input.
@@ -285,7 +287,7 @@ public final class AndroidControlService extends AccessibilityService {
           }
           String actual=node.getText()==null?"":node.getText().toString();
           long currentRevision=editRevision.get();
-          if(currentRevision!=revision){stableText=0;stableCaret=0;revision=currentRevision;}
+          if(currentRevision!=revision){stableText=0;stableCaret=0;revision=currentRevision;revisionChanges++;}
           if(actual.equals(expected)){
             textSeen=true;
             // ACTION_SET_TEXT and its posted native selection update can finish
@@ -307,7 +309,7 @@ public final class AndroidControlService extends AccessibilityService {
             if(textSeen){lastEditState="edit:content-changed";return;}
           }
           retry=android.os.SystemClock.uptimeMillis()<deadline;
-          if(!retry)lastEditState="edit:caret-unconfirmed:text="+stableText+",selectionSent="+selectionSent+",caret="+stableCaret;
+          if(!retry)lastEditState="edit:caret-unconfirmed:text="+stableText+",selectionSent="+selectionSent+",caret="+stableCaret+",rounds="+rounds+",revisions="+revisionChanges+",refreshMs="+refreshMillis+",elapsedMs="+(android.os.SystemClock.uptimeMillis()-started);
         }finally{if(retry)inputHandler.postDelayed(this,32);else{
           node.recycle();
           // Later keystrokes depend on this edit's caret. If it was not
