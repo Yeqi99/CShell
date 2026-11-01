@@ -1,9 +1,9 @@
 {
   "edition": "opensource",
-  "sha": "f23fa4194f218f5812abe46c4f8ff3d602201d8f",
-  "status": "blocked-pending-fresh-ai-defaults-and-final-audit",
+  "sha": "68bdaf5433c73b3aa951fe0bac08ee607e1023b1",
+  "status": "blocked-pending-final-HK-and-Lenovo-verification",
   "version": "0.8.18",
-  "verification": "Exact final 30-file inventory f566ea0, full Hong Kong verification 7630135, Android physical evidence e49397a. Fixed complete source tree; only Lenovo account login and physical relay acceptance remain. Not published.",
+  "verification": "Final inventory fdf3454: sixteen CShell desktop binaries rebuilt for fresh defaults; eight native POSIX jobs, two Windows exact installers and all thirty file digests verified. Ten CAgent and two Android binaries unchanged. Updated Hong Kong full-inventory and Lenovo physical account relay verification still pending; no publication.",
   "assets": [
     {
       "name": "CAgent-0.8.18-linux-arm64.tar.gz",
@@ -37,59 +37,58 @@
     },
     {
       "name": "CShell-0.8.18-linux-amd64.deb",
-      "size": 108878404,
-      "sha256": "d113287a05c499e294d6b6898e4fdcc068fc57eebebefdf8652cb7776f913b9b"
+      "size": 107543400,
+      "sha256": "f3de08f12adc004e66cfcc5fdfeecc1ecca4949dfb4ee622d61dceb330168590"
     },
     {
       "name": "CShell-0.8.18-linux-arm64.AppImage",
-      "size": 140723265,
-      "sha256": "7153ced0ecc4e8308c94a6f40af9e6185c08a751b66926c30408f1a6183a754a"
+      "size": 140723392,
+      "sha256": "8d68d280cd2d383ed45b434f66606514b73696bbff547726a27b46126388c2ea"
     },
     {
       "name": "CShell-0.8.18-linux-arm64.deb",
-      "size": 103039944,
-      "sha256": "b056997c5661a30f233526183a0ca53d441471afb8aa34e712e86267e7e0d41c"
+      "size": 103040424,
+      "sha256": "9457570bd6bdf68fb3a78584f71060ef2e6d0348ad671260cb199853e01b8cee"
     },
     {
       "name": "CShell-0.8.18-linux-x86_64.AppImage",
-      "size": 139463969,
-      "sha256": "4b89b95b20e9b9816809eb1b489146130199bbbdfcbfd2831c8a9022965843e7"
+      "size": 139468198,
+      "sha256": "5c565da9284912ff464a76123e3871e378f89a79f87fb8a03f43b671cfa2ca10"
     },
     {
       "name": "CShell-0.8.18-mac-arm64.dmg",
-      "size": 142332957,
-      "sha256": "fb172b70d8bab55d2e34819a23b633978ec28a47c30765a111bfc876975877b2"
+      "size": 142333581,
+      "sha256": "07bed2e371a3566eb544f378842b868b8a70b999ebe6dd2f8ac67c80c2f7772b"
     },
     {
       "name": "CShell-0.8.18-mac-arm64.zip",
-      "size": 142176193,
-      "sha256": "f22797676143133f06b1a8ff862f246c60f5a9fe492fe231856f60f9991c5d87"
+      "size": 142176270,
+      "sha256": "5c13b5a394d51f6cabc1161dc365bfeaf9e7640709b774d5c3860b161e4dc1bf"
     },
     {
       "name": "CShell-0.8.18-mac-x64.dmg",
-      "size": 146128145,
-      "sha256": "6da41db0647350bf9f443ccd78d396d5056604a8700a93572777ffaed3064059"
+      "size": 146128653,
+      "sha256": "fe631973313c25601e032a809a1d0fd916bceac360bb43c361bb522e0c368ad5"
     },
     {
       "name": "CShell-0.8.18-mac-x64.zip",
-      "size": 146017644,
-      "sha256": "2f9bb6477d7687bb6082ddea04443c0ddad6e64d5dd52acacb3aa88cce477707"
+      "size": 146017721,
+      "sha256": "985fb4b8aeff851a3cefa116926c78d93f9197c1e8052c6bb3f66ca215ab5c6c"
     },
     {
       "name": "CShell-0.8.18-win-x64.exe",
-      "size": 123698686,
-      "sha256": "cfbd46aaf0afe839cecd4489fec218950ff6721ab65668ef35ce4dce311a639c"
+      "size": 123699494,
+      "sha256": "c401acdbb335b0c43412ae1c5148268142f2df35e1990681b680df84fe8d8a14"
     },
     {
       "name": "SHA256SUMS.txt",
       "size": 1437,
-      "sha256": "2f92e96ec5a3ad05501a5c2342f40b4d955b567d48ddaef71b3b33b1b12d0289"
+      "sha256": "911007348921ada7b8fc0e15425143ee94be0c283cf2afddcafc9f57b66995bb"
     }
   ],
-  "blockReason": "Pending Windows native CAgent stale-host credential recovery and Android fresh editable-node/continuous-delete fixes. Replace only two Windows CAgent installers, two Android APKs, and two SHA256SUMS. Verified 22 POSIX binaries and two Windows CShell installers remain valid; no unrelated matrix rebuild.",
   "pendingGates": [
-    "new CShell profiles need explicitly requested default AI authorization factory; preserve existing grants and absent cloud fields, keep MCP listener disabled",
-    "final nineteen-requirement read-only audit and exact affected-package rebuild plan",
+    "updated Hong Kong thirty-file inventory verification",
     "Lenovo physical membership relay acceptance"
-  ]
+  ],
+  "blockedReason": "New desktop artifacts require final Hong Kong full-inventory verification; Lenovo remains signed out pending physical account relay acceptance."
 }
