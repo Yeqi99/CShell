@@ -30,6 +30,7 @@ import { ClientVault, fingerprint, type ClientIdentity } from './identity';
 import { frames, send, textChunks } from './wire';
 import { ManagementQueue } from './management-queue';
 import { remoteProcessTools } from '../remote-process-tools';
+import { remoteCapabilityTools } from '../remote-capability-tools';
 const deviceSchema = clientInvitationSchema
   .omit({ token: true, expires: true })
   .extend({ relay: agentRelayConnectionSchema.optional(),accountManaged:z.boolean().optional(),accountBorrowed:z.boolean().optional(),accountPassword:clientPasswordSchema.optional() });
@@ -517,6 +518,10 @@ export class ClientProvider implements ManagedProvider {
       };
       // Custom tools run on the native CAgent host, never a selected WSL environment.
       let processTools: import('../connections/contracts').ConnectionTool[] = [];
+      let packageTools: import('../connections/contracts').ConnectionTool[] = [];
+      if(config.shell!=='wsl'&&auth.capabilities.includes('agent.manage')){
+        try{packageTools=await remoteCapabilityTools((call,abort)=>this.call(device.deviceId,call,abort),auth.capabilities.includes('commands.execute'),AbortSignal.any([signal,AbortSignal.timeout(3000)]));}catch{/* Unsupported package protocol contributes no tools. */}
+      }
       if(config.shell!=='wsl'&&auth.capabilities.includes('agent.manage')&&auth.capabilities.includes('commands.execute')) {
         try { processTools=await remoteProcessTools((call,abort)=>this.call(device.deviceId,call,abort),AbortSignal.any([signal,AbortSignal.timeout(3000)])); }
         catch { /* Older agents or unavailable metadata contribute no executable tools. */ }
@@ -557,6 +562,7 @@ export class ClientProvider implements ManagedProvider {
         agent: (call, abort) => this.call(device.deviceId, call, abort),
         tools: [
           ...processTools,
+          ...packageTools,
           ...(auth.capabilities.includes('commands.execute')&&auth.shells.includes(config.shell)
             ? [
                 {
