@@ -272,6 +272,7 @@ export interface ExtensionBridge {
     revision: string,
   ): Promise<{ revision: string }>;
   plugins(): Promise<InstalledPlugin[]>;
+  pluginsRestorePending():Promise<(InstalledPlugin & {reason:string})[]>;
   pluginInstall(id: string): Promise<void>;
   pluginToggle(id: string, enabled: boolean): Promise<void>;
   pluginRemove(id: string): Promise<void>;

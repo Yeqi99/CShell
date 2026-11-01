@@ -191,6 +191,7 @@ export class Store {
     this.data.pluginSource = schema.shape.pluginSource.parse(value);
     await this.persist();
   }
+  pluginsRestorePending(){return (this.data.portablePlugins??[]).filter(p=>!this.plugins().some(local=>local.manifest.id===p.manifest.id&&local.source===p.source&&portablePlugin(local).manifestSha256===p.manifestSha256)).map(({manifestSha256,...p})=>({...p,reason:'此机器尚未安装相同来源的扩展包，请导入已核验的安装文件'}));}
   plugins() {
     return structuredClone(
       this.data.plugins ??
@@ -199,7 +200,9 @@ export class Store {
   }
   async setPlugins(plugins: InstalledPlugin[]) {
     const removed=new Set(this.plugins().filter(p=>!plugins.some(next=>next.manifest.id===p.manifest.id)).map(p=>p.manifest.id));
-    this.data.plugins = z.array(installedPluginSchema).max(100).parse(plugins);
+    const previouslyInstalled=new Set(this.plugins().map(p=>p.manifest.id));
+    const parsed=z.array(installedPluginSchema).max(100).parse(plugins);
+    this.data.plugins=parsed.map(p=>previouslyInstalled.has(p.manifest.id)?p:restorePortablePlugins([p],this.data.portablePlugins??[]).find(item=>item.manifest.id===p.manifest.id)!);
     if(this.data.portablePlugins)this.data.portablePlugins=this.data.portablePlugins.filter(p=>!removed.has(p.manifest.id));
     this.data.tools.dockerEnabled = pluginEnabled(plugins, 'docker');
     this.data.tools.commandSuggestions = pluginEnabled(plugins, 'commands');
