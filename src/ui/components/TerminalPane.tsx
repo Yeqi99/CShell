@@ -5,6 +5,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { SearchAddon } from '@xterm/addon-search';
+import { scheduleTerminalActivation } from '../terminal-activation';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { ArrowDown, ArrowUp, X, Search, Keyboard } from 'lucide-react';
 import { installTerminalColors } from '../terminal-colors';
@@ -582,12 +583,13 @@ export function TerminalPane({
   }, [preferences.terminalFont, preferences.fontSize, preferences.lineHeight,
     preferences.theme, preferences.backgroundAsset, zoom]);
   useEffect(() => {
-    if (active)
-      requestAnimationFrame(() => {
-        fit.current?.fit();
-        term.current?.focus();
-      });
-  }, [active]);
+    if (!active || searching) return;
+    return scheduleTerminalActivation({
+      active: () => suggestionState.current.active,
+      fit: () => { fit.current?.fit(); },
+      focus: () => { term.current?.focus(); },
+    });
+  }, [active, searching]);
   useEffect(() => {
     if (closed && term.current) term.current.options.disableStdin = true;
   }, [closed]);
