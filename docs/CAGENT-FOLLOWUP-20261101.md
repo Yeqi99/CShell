@@ -35,3 +35,10 @@
 - 验证：WPF编译通过，隔离原生fixture验证云模型菜单、运行中禁替换、关闭授权保留、事件来源入口、字号应用和会话草稿保留；12项自动化单元/集成测试通过。未触发真实微信消息或自动任务。
 
 剪贴板文件上传采用每次独立随机目录，保留原文件名；提交完成后断开会话不会删除待粘贴文件。未完成文件仍清理。缓存位于交互用户 LocalAppData 下 CAgent-Clipboard-* 专用目录，累计最多512MiB/4096项，满后明确提示清理，绝不自动清理用户原文件。原生隔离测试覆盖同名重复上传和会话释放后文件保留。
+
+## 原生实际包与本机 API 验收
+使用独立复制的实际 Windows 包（node.exe + agent.cjs + 依赖），编译当前WPF外壳，在全新临时 CSHELL_AGENT_DATA 启动真实 app-host；不是静态UI fixture。scripts/native-cagent-capabilities-smoke.ts 可对最终 Cagent.exe 重复执行。
+- 真实 API：保存隔离假基座，account.models列出，再account.model.select选中；commands=false/review=true/automation=false均保持。假域名不发模型请求。
+- 原生窗口：实际Models菜单、AutomationRules页面可达；真实API创建暂停间隔规则、更新记忆与秒级间隔、删除、重新显示列表；未启用规则执行。
+- 从隔离加密云快照恢复dark/字号偏好并经account.appearance应用；前后connection.settings等值。关闭重启后identity.enc摘要不变。
+- 临时数据在测试结束清理，不接触真实账号/设备数据；没有发送微信消息、短信、电话或模型请求。此验收证明本机包/UI/API链路，不替代用户账号云端登录、真实事件交付或自动化任务效果。报告 test-results/cagent-native-runtime-capabilities.json。
