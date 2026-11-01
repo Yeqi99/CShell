@@ -1,0 +1,32 @@
+[
+  {
+    "Name": "CShell-Pro-0.8.18-linux-arm64.AppImage",
+    "Bytes": 140928278,
+    "SHA256": "6446469d9f6a96c59339dbbb97f5d88c5d51c9bd6a51747a9454712f8ea28adc"
+  },
+  {
+    "Name": "CShell-Pro-0.8.18-linux-arm64.deb",
+    "Bytes": 103261424,
+    "SHA256": "3d64c5641944eeac78d74b281cc227d20c2f9ecdc8cb20fae14b78ba7112febb"
+  },
+  {
+    "Name": "CShell-Pro-0.8.18-linux-amd64.deb",
+    "Bytes": 107763948,
+    "SHA256": "58bdb63820bbbd240aa236e459d1bc756c02376878c58031a72e0c54dd90daa3"
+  },
+  {
+    "Name": "CShell-Pro-0.8.18-linux-x86_64.AppImage",
+    "Bytes": 139673048,
+    "SHA256": "1b6aaf0dfcbd8eb8bf775e81860c94bed756d3af4a487a5923c744f3fae24ff4"
+  },
+  {
+    "Name": "CShell-Pro-0.8.18-mac-arm64.dmg",
+    "Bytes": 142594501,
+    "SHA256": "7eb224091f8f8662982cb2cd7e3437041f2032b6e4e2342e552c47d608add0bb"
+  },
+  {
+    "Name": "CShell-Pro-0.8.18-mac-x64.dmg",
+    "Bytes": 146401913,
+    "SHA256": "4fea63df51bf75d8c06c6cdc11dbda3d0cef8ca5f9f77738d96a1640c0aba155"
+  }
+]
