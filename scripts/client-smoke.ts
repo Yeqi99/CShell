@@ -41,6 +41,8 @@ try {
     w = await control.firstWindow();
   c.setDefaultTimeout(20000);
   w.setDefaultTimeout(20000);
+  // Keep invitation clipboard checks inside the isolated test applications.
+  await client.evaluate(({ipcMain})=>{ipcMain.removeHandler('clipboard:write');ipcMain.handle('clipboard:write',(_event,text)=>{(globalThis as any).fixtureClipboard=text;});});
   await c.locator('.client-service-card').getByText('服务已停止', { exact: true }).waitFor();
   await mkdir('test-results', { recursive: true });
   await c.screenshot({ path: 'test-results/client-idle.png' });
@@ -55,8 +57,9 @@ try {
   await c.getByText('服务运行中', { exact: true }).waitFor();
   await c.getByRole('button', { name: '复制连接信息', exact: true }).click();
   await c.getByRole('button', { name: '已复制', exact: true }).waitFor();
-  const invitation = await client.evaluate(({ clipboard }) => clipboard.readText());
+  const invitation = await client.evaluate(() => (globalThis as any).fixtureClipboard as string);
   assert.equal(invitation.includes(password), false);
+  await control.evaluate(({ipcMain},text)=>{ipcMain.removeHandler('clipboard:read');ipcMain.handle('clipboard:read',()=>text);},invitation);
   await c.getByRole('button', { name: '切换深色主题' }).click();
   await c.getByLabel('Language').selectOption('en-US');
   assert.equal(await c.getByLabel('CMD', { exact: true }).isChecked(), true);
@@ -113,9 +116,11 @@ try {
   await editor.getByRole('button', { name: '保存', exact: true }).click();
   await editor.getByText('已保存', { exact: true }).waitFor();
   await w.locator('.server-open').filter({ hasText: 'Client 已重命名' }).first().dblclick();
-  await w.locator('.machine-terminal-bar').getByRole('button',{name:/powershell/i}).click();
+  // A repeated double-click opens an independent workspace; its terminal is opened explicitly.
+  await w.locator('.linux-desktop:visible .desktop-icons').getByRole('button',{name:'终端',exact:true}).dblclick();
+  await w.locator('.machine-terminal-bar:visible').getByRole('button',{name:/powershell/i}).click();
   await w.waitForFunction(() => document.querySelectorAll('.machine-terminal-tabs > div').length === 2);
-  const ps = w.locator('.terminal-pane.active .xterm-helper-textarea');
+  const ps = w.locator('.terminal-pane.active:visible .xterm-helper-textarea');
   await ps.focus();
   await ps.fill('Write-Output CSHELL_CLIENT_POWERSHELL');
   await ps.press('Enter');
@@ -148,7 +153,7 @@ try {
   assert.ok(!encrypted.includes('PRIVATE KEY'));
   await c.getByRole('button', { name: /已授权控制端/ }).click();
   await c.getByRole('button', { name: '撤销授权并断开' }).click();
-  await w.locator('.machine-terminal').getByText('此终端已断开，可在上方重新打开终端。',{exact:true}).waitFor();
+  await w.locator('.machine-terminal:visible').getByText('此终端已断开，可在上方重新打开终端。',{exact:true}).waitFor();
   await c.getByRole('button', { name: '停止服务', exact: true }).click();
   await c.locator('.client-service-card').getByText('服务已停止', { exact: true }).waitFor();
   console.log(

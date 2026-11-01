@@ -21,7 +21,12 @@ public final class AndroidControlService extends AccessibilityService {
       try {
         org.json.JSONArray nodes=new org.json.JSONArray();
         if(root!=null)describe(root,nodes,0);
-        result.complete(new org.json.JSONObject().put("nodes",nodes).put("available",root!=null).put("truncated",nodes.length()>=300));
+        android.util.DisplayMetrics metrics=new android.util.DisplayMetrics();
+        ((android.view.WindowManager)service.getSystemService(WINDOW_SERVICE)).getDefaultDisplay().getRealMetrics(metrics);
+        result.complete(new org.json.JSONObject().put("nodes",nodes).put("available",root!=null).put("truncated",nodes.length()>=300)
+          .put("input",new org.json.JSONObject().put("width",metrics.widthPixels).put("height",metrics.heightPixels)
+            .put("processed",service.processed).put("phase",service.phase).put("gesture",service.gestureState)
+            .put("editing",service.editBusy)));
       }catch(Exception error){result.completeExceptionally(error);}finally{if(root!=null)root.recycle();}
     });
     return result.get(3,java.util.concurrent.TimeUnit.SECONDS);

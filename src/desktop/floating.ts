@@ -195,7 +195,17 @@ export class FloatingWindows {
       if (view.closed && ![...this.views.values()].some((v) => v.sessionId === sessionId))
         this.streams.delete(sessionId);
     });
-    window.once('ready-to-show', () => window.show());
+    window.once('ready-to-show', () => {
+      window.show();
+      // Windows applies the destination display's non-client/DPI adjustment on
+      // first show. Reapply the intended DIP size once, before user interaction,
+      // and constrain the actual outer bounds to that display's work area.
+      const shown = window.getBounds();
+      const work = screen.getDisplayMatching(shown).workArea;
+      const w = Math.min(width, work.width), h = Math.min(height, work.height);
+      window.setBounds({x:Math.max(work.x,Math.min(shown.x,work.x+work.width-w)),
+        y:Math.max(work.y,Math.min(shown.y,work.y+work.height-h)),width:w,height:h});
+    });
     try {
       await window.loadURL(url);
     } catch (error) {

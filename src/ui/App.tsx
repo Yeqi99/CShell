@@ -1133,24 +1133,28 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
               />
             </div>
           )}
-          {quickConnections.map((profile) => (
+          {quickConnections.map((profile) => {
+            // Workspace instance state is not part of a persisted/IPC profile.
+            // In particular temporary reconnect uses the strict profile schema.
+            const {instanceId: _instanceId, visual: _visual, ...connection} = profile;
+            return (
             <div
               key={`quick-${profile.instanceId}`}
               className="workspace-editor"
               hidden={surface !== 'quick' || quickId !== profile.instanceId}
             >
-              {profile.protocol === 'rdp' ? <RdpMachineWorkspace sessionId={profile.instanceId} active={surface === 'quick' && quickId === profile.instanceId} profile={profile} profiles={config.profiles} onOpen={openSaved}/> : profile.protocol === 'http' ? (
+              {profile.protocol === 'rdp' ? <RdpMachineWorkspace sessionId={profile.instanceId} active={surface === 'quick' && quickId === profile.instanceId} profile={connection} profiles={config.profiles} onOpen={openSaved}/> : profile.protocol === 'http' ? (
                 <HttpWorkbench
-                  profile={config.profiles.find((p) => p.id === profile.id) ?? profile}
+                  profile={config.profiles.find((p) => p.id === profile.id) ?? connection}
                   enabled={pluginEnabled(config.plugins, 'http')}
                   onSaveProfile={saveProfile}
                 />
               ) : profile.protocol === 'client' ? (
-                <SavedAgentConnection profile={profile} onConnect={openMachineDevice} onDone={()=>setQuickConnections(items=>items.filter(item=>item.instanceId!==profile.instanceId))}/>
+                <SavedAgentConnection profile={connection} onConnect={openMachineDevice} onDone={()=>setQuickConnections(items=>items.filter(item=>item.instanceId!==profile.instanceId))}/>
               ) : (
                 <SavedConnection
                   visual={!isFileConnection(profile) && profile.visual}
-                  profile={profile}
+                  profile={connection}
                   saved={config.savedCredentials.includes(profile.id)}
                   persist={config.profiles.some((p) => p.id === profile.id)}
                   onConnect={(p,c,persist,signal)=>connect(p,c,persist,signal,profile.visual)}
@@ -1160,7 +1164,7 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
                 />
               )}
             </div>
-          ))}
+          );})}
           {drafts.map((draft) => (
             <div
               key={draft === 'new' ? 'new' : draft.id}
