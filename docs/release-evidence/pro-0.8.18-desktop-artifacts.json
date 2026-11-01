@@ -1,0 +1,33 @@
+{
+  "status": "candidate-not-published",
+  "artifacts": [
+    {
+      "id": 13074865279,
+      "name": "pro-linux-arm64",
+      "archiveSha256": "96b33ae36255da1a62d71ec502e577e4518965c14ba0f499ea1c78241a06db01",
+      "source": "f5687f51005e8f6d7444cd0653208760dc3a7043",
+      "runId": 41284319755
+    },
+    {
+      "id": 13074409208,
+      "name": "pro-mac-arm64",
+      "archiveSha256": "8d3f52df4f17aed139b5a78b630e564529862c8656d7ae2309e6abb1c8ac989b",
+      "source": "f5687f51005e8f6d7444cd0653208760dc3a7043",
+      "runId": 41284319755
+    },
+    {
+      "id": 13074249984,
+      "name": "pro-mac-x64",
+      "archiveSha256": "2fb153523abd90d290d057f1b56ac3c49fd8e2dbd2cd8c16f1ae7c375592c318",
+      "source": "f5687f51005e8f6d7444cd0653208760dc3a7043",
+      "runId": 41284319755
+    },
+    {
+      "id": 13073669294,
+      "name": "pro-linux-x64",
+      "archiveSha256": "fb6f11c387ad1d4b60657756b9fd0f36583b7a5258ae43faca8c348447ca70b9",
+      "source": "f5687f51005e8f6d7444cd0653208760dc3a7043",
+      "runId": 41284319755
+    }
+  ]
+}
