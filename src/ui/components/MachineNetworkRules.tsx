@@ -13,8 +13,8 @@ export function MachineNetworkRules(){
   const run=async(command:IdentityNetworkCommand={action:'list'})=>{
     setBusy(true);setError('');setNotice('');
     try{
-      setState(await window.cshell.identityNetwork(command));
-      if(command.action!=='list'){setEditing(false);setSource('');setTarget('');setNotice(command.action==='remove'?'已撤销此规则':'已保存，状态以实际连接结果为准');}
+      const result=await window.cshell.identityNetwork(command);setState(result);
+      if(command.action!=='list'){setEditing(false);setSource('');setTarget('');setNotice(command.action==='remove'?(result.pendingRemovals?.some(item=>identityKey(item.source)===identityKey(command.source))?'撤销已排队，等待来源机器恢复':'已撤销此规则'):'已保存，状态以实际连接结果为准');}
     }catch(e){setError(String(e));}finally{setBusy(false);}
   };
   const endpoints=state?.endpoints??[];
@@ -44,6 +44,7 @@ export function MachineNetworkRules(){
           <div className="identity-rule-actions"><button type="button" className="icon" title="编辑规则" aria-label={`编辑 ${label(rule.source)} 的出口`} disabled={busy} onClick={()=>{setSource(identityKey(rule.source));setTarget(identityKey(rule.target));setOriginalSource(identityKey(rule.source));setEditing(true);}}><Pencil size={14}/></button><button type="button" className="icon" title="撤销规则" aria-label={`撤销 ${label(rule.source)} 的出口`} disabled={busy} onClick={()=>void run({action:'remove',source:rule.source})}><Trash2 size={14}/></button></div>
         </div>)}
       </div>
+      {state.pendingRemovals?.map(item=><div key={identityKey(item.source)} className="identity-rule-warning" role="status"><strong>{label(item.source)}</strong> · 等待机器恢复后撤销{item.error&&<small>：{cleanDisplayError(item.error)}</small>}</div>)}
       {editing&&<fieldset className="identity-rule-editor" disabled={busy}><legend>设置出口</legend><div className="network-rule-create">
         <label>来源<select aria-label="代理规则来源" disabled={!!originalSource} value={source} onChange={e=>{setSource(e.target.value);if(e.target.value===target)setTarget('');}}><option value="">选择机器</option>{endpoints.map(item=><option key={identityKey(item.endpoint)} value={identityKey(item.endpoint)}>{item.name} · {kindName(item.endpoint)}{item.available?'':' · 未连接'}</option>)}</select></label>
         <ArrowRight size={15} aria-hidden="true"/>
