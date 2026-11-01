@@ -28,5 +28,5 @@ export class WindowsSystemProxy{
   const applied:SystemProxyState={ProxyEnable:1,ProxyServer:'http=127.0.0.1:'+listener.port+';https=127.0.0.1:'+listener.port,ProxyOverride:'',AutoConfigURL:null,AutoDetect:0};
   try{await writeFile(this.file()+'.tmp',await this.store.encryptPrivate(JSON.stringify({previous,applied})),{mode:0o600});await rename(this.file()+'.tmp',this.file());await this.write(applied);this.listener=listener;this.error='';}catch(error){listener.close();await this.recover().catch(()=>{});await this.afterDisable?.();throw error;}
   return this.status();});this.queue=task.then(()=>{},()=>{});return task;}
- async close(){await this.queue;await this.set(false);}
+ async close(){await this.queue;if(this.platform!=='win32')return;await this.set(false);}
 }
