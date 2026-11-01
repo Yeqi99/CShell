@@ -14,3 +14,10 @@
 - GET /v1/admin/lending、POST /v1/admin/lending/revoke：管理员可查看授权元数据和带原因撤销（审计记录），不能获取分享码或设备密码。
 
 验收：Python 服务测试包含限次、跨账号、邮箱、过期、撤销、管理员撤销、短期凭据及证书绑定；真实本机 TLS 测试覆盖免密码借用终端、拒绝配置读取、无永久配对与撤销断连。尚需部署云端与客户端后验证真实跨账号公网中继/UI体验。
+
+## 2026-11-01 生产同步服务部署
+
+- 香港 `/opt/cshell-sync` 已部署 server.py、devices.py、lending.py、models.py；仅重启 cshell-sync，cshell-model-link 和 cshell-relay 保持运行。
+- 部署前 SQLite 在线备份和原代码位于 `/opt/cshell-sync/backup-unified-20261101`，备份 integrity_check=ok；未覆盖账号、会员、密文、设备身份。
+- 使用临时隔离3账号，对实际 HTTP 服务验证跨账号借用、兑换幂等、次数限制、无密码 lease、设备证书/owner 绑定、撤销立即失效、schema2 写入后schema1读取返回426。全部通过，fixture账号和所属数据已清理。
+- 真实 TLS 本地中继7项通过：反向接入、注册和转发凭据隔离、端到端证书、取消和凭据轮换关闭旧隧道、动态目标授权。公网持续中继与实际用户设备稳定性尚未完成，不能等同以上回归。
