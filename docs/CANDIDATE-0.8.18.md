@@ -43,3 +43,9 @@ GitHub 候选分支 `codex/candidate-core-0.8.18` 首轮远端提交 `706cddcd25
 | CAgent-Setup-0.8.18-win-x64.exe | 26178012 | b615b4f17a069005fc363ec77d906fb0eef16f796c5bdd54aaba7aa23edfcf2b |
 
 两个附件均未签名。实际 CShell win-unpacked 程序通过 platform-package 与 release-desktop：SSH、SFTP、隔离数据目录、原生/可视化共享会话、设置、MCP 和重启恢复。CAgent 安装器实际解包后通过摘要、原生 CMD PTY、TLS、受限权限与停止验收。没有覆盖用户已安装应用，没有改变发布标签或下载源。
+
+### 终端焦点竞争修复后的替代附件
+
+Core 独立 Windows checks 暴露旧终端搜索焦点竞争：切换标签遗留的动画帧可能抢走新搜索输入框焦点。激活帧现在在搜索/切换时取消，并重新检查当前目标和焦点意图。真实 Edge 延迟帧测试旧实现稳定失败、新实现通过；实际 Electron connection-lifecycle 的历史搜索、重连和主题流程也通过。抽取调度函数初版的原生 RAF 接收者问题已在本地验收发现并修复，未发布该初版。
+
+本地源码 `143418e` 对应候选 `015163f8208fe08bd0437bcf613085b3a2f5ecb2`，实际安装目录通过 platform-package 与 release-desktop 两套验收。替代 CShell 安装器为 **123697131 字节**，SHA-256 `96f433234ffffbb2958100c0d013d081e5fe97f09b1df36f2cfcbea685e8597c`。CAgent 代码未变，沿用上表 CAgent 已核验附件。此前 CShell 安装器和四平台归档属于较早候选，不作为本次最终桌面发布附件。最终矩阵为 Release `41289862842`、Windows checks `41289862820`。
