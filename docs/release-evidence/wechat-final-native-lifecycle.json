@@ -15,9 +15,72 @@
     "noMessageSent": true
   },
   "incomingAcceptance": {
-    "passed": false,
-    "reason": "native hook invoked but no permitted message exported; filter diagnosis continuing",
-    "noAutomaticReply": true
+    "nativeCaptured": true,
+    "source": "user phone filehelper message",
+    "nativeCounters": {
+      "hits": 2,
+      "emptyBatch": 1,
+      "accepted": 1,
+      "accountRejected": 0,
+      "targetRejected": 0,
+      "errors": 0
+    },
+    "scopeMatched": true,
+    "exactConditionMatched": true,
+    "direction": "outgoing (own phone message synchronized to desktop)",
+    "initialFrozenAutomaticDelivery": false,
+    "initialFailure": "Frozen urllib initializes SSL context; required public trust PEM omitted from bundle",
+    "diagnosticSameEventDelivery": {
+      "httpStatus": 204,
+      "completedTasks": 1
+    },
+    "fixedFrozenAutomaticReplay": {
+      "versions": [
+        "4.1.15.56",
+        "4.2.0.12"
+      ],
+      "sameGenuineEventId": true,
+      "httpStatus": 204,
+      "completedBefore": 1,
+      "completedAfter": 1,
+      "additionalModelCalls": 0
+    },
+    "noAutomaticReply": true,
+    "noAdditionalMessageSent": true
   },
-  "publication": "candidate-not-published"
+  "publication": "candidate-not-published",
+  "syntheticAcceptance": {
+    "separateFromNativeEvidence": true,
+    "versions": [
+      "4.1.15.56",
+      "4.2.0.12"
+    ],
+    "httpStatus": 204,
+    "completedTasksPerIsolatedRun": 1,
+    "nativeAttach": false
+  },
+  "limitations": [
+    "4.2.0.12 frozen transport validated; no live 4.2 client/native-hook test in this lifecycle",
+    "Initial genuine event required diagnostic redelivery; fixed transport subsequently automatically replayed the same event and preserved deduplication"
+  ],
+  "finalPackages": [
+    {
+      "id": "cagent.wechat.v411556",
+      "version": "0.1.2",
+      "bundleBytes": 264771703,
+      "bundleSha256": "52eb044cf5870124dbf704292c232225a6156658bc153ce3c8659cb85a7d33c4",
+      "manifestSha256": "d9d2f2d8b51032c78e06d36d4ced77e7115b208029568ce1f1c1906d80ca88b4",
+      "verifiedFiles": 93
+    },
+    {
+      "id": "cagent.wechat.v42012",
+      "version": "0.1.2",
+      "bundleBytes": 264771599,
+      "bundleSha256": "aab70f092aed4a1b622be9a086cd89711b69d37bf401c11d18be9c6c6ffe4604",
+      "manifestSha256": "98b558f680746112d09c6b76e78ebf219dd514585cbacfb7526edd70210ed0d5",
+      "verifiedFiles": 93
+    }
+  ],
+  "privateSourceCommit": "f73e5e7",
+  "tlsVerificationRetained": true
 }
