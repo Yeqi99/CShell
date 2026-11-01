@@ -1,8 +1,8 @@
 {
   "version": "0.8.18",
   "status": "candidate-not-published",
-  "verifiedAt": "2026-11-01T11:16:18.355Z",
-  "note": "Final SSL-fixed WeChat catalog Windows candidates: Pro c53e8f1 / Core3202d56. Explicit fresh independent agent-build before package; no assumed electron-builder hook. Exact CShell NSIS app.asar dist/agent/agent.cjs and exact CAgent isolated installed runtime both verified against latest lifecycle.finalPackages manifest SHA and cleanup guard. Both CShell full platform/desktop smoke and both CAgent installed real CMD/TLS passed; Pro packaged account/native and both installed app-host exits passed. No user application installation or release channel changed.",
+  "verifiedAt": "2026-11-01T12:41:48.206Z",
+  "note": "Final SSL-fixed WeChat catalog Windows candidates: Pro c53e8f1 / Core3202d56. Explicit fresh independent agent-build before package; no assumed electron-builder hook. Exact CShell NSIS app.asar dist/agent/agent.cjs and exact CAgent isolated installed runtime both verified against latest lifecycle.finalPackages manifest SHA and cleanup guard. Both CShell full platform/desktop smoke and both CAgent installed real CMD/TLS passed; Pro packaged account/native and both installed app-host exits passed. No user application installation or release channel changed. Native host reconnect rebuilt only CAgent installers; exact isolated installed windows passed. Intermediate Core 5dc66d9 stage discarded; corrected narrow 8d23feb retains Core without Pro account UI. CShell installers unchanged. Android pending separately.",
   "files": [
     {
       "edition": "opensource",
@@ -27,18 +27,27 @@
       "component": "CAgent",
       "platform": "win32",
       "arch": "x64",
-      "source": "3202d56",
+      "source": "8d23feb",
       "candidatePath": "release/0.8.18/CAgent-Setup-0.8.18-win-x64.exe",
       "absolutePath": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\release\\0.8.18\\CAgent-Setup-0.8.18-win-x64.exe",
-      "bytes": 26184977,
-      "sha256": "923df9ef48db38eaf32aa6ce5d4fc0c2e61230348a8f4250ea024cdd1ab5a513",
+      "bytes": 26187452,
+      "sha256": "59dc9978ae2193cbfca6a705e07c90b9af0815e6cf364ec9df6b3de982249572",
       "authenticode": "NotSigned",
       "validation": [
         "exact installer isolated /S /D install",
-        "installed runtime real CMD PTY, TLS, restricted authorization, stop"
+        "installed runtime real CMD PTY, TLS, restricted authorization, stop",
+        "exact installer native host reconnect: reads recover, mutations not replayed, single replacement, 401/403 not retried, shared runtime preserved"
       ],
       "finalCatalogVerifiedInExactInstaller": true,
-      "abnormalExitGuardVerifiedInExactInstaller": true
+      "abnormalExitGuardVerifiedInExactInstaller": true,
+      "previousCandidate": {
+        "bytes": 26184977,
+        "sha256": "923df9ef48db38eaf32aa6ce5d4fc0c2e61230348a8f4250ea024cdd1ab5a513",
+        "source": "3202d56"
+      },
+      "nativeWindowSha256": "cd7ce05eb6b9f8dddc83fbd93b85e7d9590f047b5677dd2bd5ca2ba956a65da2",
+      "nativeReconnectInstalledAcceptance": true,
+      "editionUiIsolationVerified": true
     },
     {
       "edition": "pro",
@@ -63,20 +72,29 @@
       "component": "CAgent",
       "platform": "win32",
       "arch": "x64",
-      "source": "c53e8f1",
+      "source": "3d75fb01c78a3fd946f3fd5fd7e11a9632360576",
       "candidatePath": "release/0.8.18/CAgent-Setup-0.8.18-win-x64.exe",
       "absolutePath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\release\\0.8.18\\CAgent-Setup-0.8.18-win-x64.exe",
-      "bytes": 26231769,
-      "sha256": "631530736500dfe19405022f9b9b6b3fdba0c33d39d7ec7cbb26aa29b2030d85",
+      "bytes": 26230795,
+      "sha256": "7f60ff4c4d297586487bac9c604e150a0aa438a786b3fc6bf11d17dc681cffe3",
       "authenticode": "NotSigned",
       "validation": [
         "exact installer isolated /S /D install",
         "installed runtime real CMD PTY, TLS, restricted authorization, stop",
         "packaged account API and encrypted appearance restart",
-        "native packaged model/automation/theme identity isolation"
+        "native packaged model/automation/theme identity isolation",
+        "exact installer native host reconnect: reads recover, mutations not replayed, single replacement, 401/403 not retried, shared runtime preserved"
       ],
       "finalCatalogVerifiedInExactInstaller": true,
-      "abnormalExitGuardVerifiedInExactInstaller": true
+      "abnormalExitGuardVerifiedInExactInstaller": true,
+      "previousCandidate": {
+        "bytes": 26231769,
+        "sha256": "631530736500dfe19405022f9b9b6b3fdba0c33d39d7ec7cbb26aa29b2030d85",
+        "source": "c53e8f1"
+      },
+      "nativeWindowSha256": "3b3fb0c4b29c4086ec77560c2c97e7dfab64d6ecfd671f136ba1868a466c0150",
+      "nativeReconnectInstalledAcceptance": true,
+      "editionUiIsolationVerified": true
     }
   ],
   "superseded": {
