@@ -10,9 +10,10 @@ const server=createServer(async(req,res)=>{
 await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
 const browser=await chromium.launch({channel:'msedge'});
 try{
-  const page=await browser.newPage();let revoked=false,payload:unknown;
+  const page=await browser.newPage();let revoked=false,lendingFailed=false,payload:unknown;
   await page.route('**/admin-api/**',async route=>{
     const path=new URL(route.request().url()).pathname;
+    if(lendingFailed&&path.endsWith('/lending')){await route.fulfill({status:503,json:{error:'暂时不可用'}});return;}
     let response:unknown={};
     if(path.endsWith('/accounts'))response={accounts:[{id:'owner',email:'owner@example.test',revision:2,membership:{active:true}}],audit:[]};
     else if(path.endsWith('/model-usage'))response={usage:[],recent:[]};
@@ -44,5 +45,8 @@ try{
     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
     await page.screenshot({path:`test-results/admin/settings-${width}.png`,fullPage:true});
   }
-  console.log('PASS admin lending responsive list and explicit audited revocation');
+  lendingFailed=true;await page.reload();
+  await page.locator('.settings-row').filter({hasText:'机器借用授权'}).getByText('待连接',{exact:true}).waitFor();
+  assert.equal(await page.locator('.settings-row').filter({hasText:'账号与会员'}).getByText('已连接',{exact:true}).count(),1);
+  console.log('PASS admin lending responsive list, explicit audited revocation and accurate live/draft status');
 }finally{await browser.close();server.close();}
