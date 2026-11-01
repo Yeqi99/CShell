@@ -21,6 +21,8 @@ export interface UpdateBridge {
   usageRead?():Promise<{enabled:boolean}>;
   usageConsent?(enabled:boolean):Promise<{enabled:boolean}>;
 
+  agentDownloadList():Promise<Omit<import('./agent-downloads').AgentDownload,'url'>[]>;
+  agentDownloadOpen(id:string):Promise<void>;
   updateState(): Promise<UpdateState>;
   checkUpdate(): Promise<UpdateState>;
   downloadUpdate(): Promise<UpdateState>;
@@ -96,3 +98,4 @@ export function checksumFor(text: string, name: string): string {
   if (entries.length !== 1) throw new Error('Missing or ambiguous checksum');
   return entries[0]![1].toLowerCase();
 }
+

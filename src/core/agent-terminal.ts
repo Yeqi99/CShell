@@ -219,7 +219,7 @@ export class AgentTerminalProvider implements ManagedProvider {
           : request.shell === 'powershell'
             ? ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', request.command]
             : ['-lc', request.command];
-    const environment=await this.processEnvironment(undefined);
+    const environment=await this.processEnvironment(shell.environment==='host'?this.networkEnvironment?.():undefined);
     if (combined.aborted) throw new Error(signal.aborted ? '操作已取消' : '命令执行超时');
     return new Promise<{
       stdout: string;
@@ -315,7 +315,7 @@ export class AgentTerminalProvider implements ManagedProvider {
     if (this.sessions.size >= 16) throw new Error('终端会话达到上限');
     const spawn = this.spawnPty ?? (await import('node-pty')).spawn;
     const env = Object.fromEntries(
-      Object.entries(await this.processEnvironment(undefined)).filter((v): v is [string, string] => v[1] !== undefined),
+      Object.entries(await this.processEnvironment(shell.environment==='host'?this.networkEnvironment?.():undefined)).filter((v): v is [string, string] => v[1] !== undefined),
     );
     delete env.ELECTRON_RUN_AS_NODE;
     delete env.CSHELL_AGENT_CONTROL_TOKEN;
@@ -442,3 +442,4 @@ export class AgentTerminalProvider implements ManagedProvider {
     await Promise.all(this.closing);
   }
 }
+

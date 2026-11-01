@@ -1,6 +1,6 @@
 import {MachineNetworkRules} from './MachineNetworkRules';
 import {SystemMachineProxy} from './SystemMachineProxy';
-import {RemoteAppNetwork} from './RemoteAppNetwork';
+
 import { useEffect, useState } from 'react';
 import { Globe, ArrowRight } from 'lucide-react';
 import type { NetworkRoute, NetworkRouteStatus } from '../../shared/network-route';
@@ -53,7 +53,8 @@ export function NetworkSettings() {
       <div className="network-actions"><span role="status">{saved ? '已应用，后续请求使用新出口' : ''}</span><button className="primary" type="button" onClick={() => void apply()} disabled={mode === 'proxy' && !url || mode === 'machine' && !machine}>{busy ? '正在应用…' : '应用网络设置'}</button></div>
     </fieldset>}
     {window.cshell.networkSystemStatus&&<SystemMachineProxy machineReady={status?.route.mode==='machine'}/>}
-    {status && window.cshell.networkRemoteOpen && <RemoteAppNetwork machines={status.machines}/>}
+
     <MachineNetworkRules/>{window.cshell.networkDiagnostics && <NetworkDiagnostics/>}
   </section>;
 }
+
