@@ -92,6 +92,10 @@ final class AndroidInputTest implements AutoCloseable {
     // edit must use the confirmed middle caret, not append at the stale end.
     delayedNativeCaret.set(true);
     pressBackspace(connection);awaitText("CAgent  check");
+    AtomicReference<String> middleCaret=new AtomicReference<>();
+    test.runOnMainSync(()->middleCaret.set(editor.getSelectionStart()+":"+editor.getSelectionEnd()));
+    check(middleCaret.get().equals("7:7")&&AndroidControlService.editState().startsWith("edit:applied"),
+      "Middle caret was not confirmed before next input: "+middleCaret.get()+", "+AndroidControlService.editState());
     input(connection,new JSONObject().put("kind","text").put("text","input"));
     awaitText("CAgent input check");
     // A pointer release is not a keyboard release: keep Shift until key-up.
