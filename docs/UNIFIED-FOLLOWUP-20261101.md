@@ -87,6 +87,7 @@
 - `scripts/edition-isolation-smoke.ts` 使用普通版与Pro实际打包exe同时运行；各自数据目录、单实例锁、MCP端口/令牌独立，交叉令牌401，外观设置重启后互不覆盖。使用隔离数据，不覆盖实际安装身份。
 - MCP UI测试改为只在隔离测试进程拦截复制处理器，不再为读取测试令牌写用户系统剪贴板。
 - 更新后的 Windows CAgent包通过真实CMD PTY、TLS认证、权限限制与停止验收（followup-agent-final-package.log）。重新构建的原生组件 SHA-256 为 `f2fc624199dd0ccd6e51d902575412942dfef565abe7c8b9adfd32ded761fdf8`；文字/PNG/文件经真实Electron与认证TLS往返通过，约219ms，6秒后控制租约仍有效；原剪贴板恢复校验成功（followup-clipboard-final.log）。这仍是同机独立控制端回环，不替代跨物理设备验收。
+- 最后统一错误展示后，Pro重新完整构建通过；`followup-final-desktop-smoke.log` 真实Electron验收通过原生SSH默认、原位可视化复用PTY/历史、SFTP上传与创建、分组/布局/字体即时预览和取消、配置重启恢复以及MCP复制处理器/真实协议握手。错误脱敏与远端自动化增量5项回归通过。
 
 ## 身份代理链路补齐（2026-11-01）
 - Pro 保留普通 SSH/CAgent 出口列表，不再用账号中继设备覆盖原列表；账号中继仍逐次校验权益，普通连接仍核验真实身份。
