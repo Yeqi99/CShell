@@ -1,7 +1,7 @@
 name: Windows checks
 on:
   push:
-    branches-ignore: ['codex/android-diagnostic-0.8.18']
+    branches-ignore: ['codex/runtime-pro-0.8.18', 'codex/android-diagnostic-0.8.18']
   pull_request:
 permissions:
   contents: read

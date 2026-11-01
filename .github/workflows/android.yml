@@ -1,6 +1,7 @@
 name: Android validation
 on:
   push:
+    branches-ignore: ['codex/runtime-pro-0.8.18']
     paths: ['android/**', 'scripts/build-android.mjs', '.github/workflows/android.yml']
   pull_request:
     paths: ['android/**', 'scripts/build-android.mjs', '.github/workflows/android.yml']
