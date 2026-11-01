@@ -1,7 +1,7 @@
 {
   "version": "0.8.18",
-  "status": "candidate-awaiting-android-refresh-do-not-publish",
-  "verifiedAt": "2026-11-01T09:29:24.018Z",
+  "status": "candidate-not-published",
+  "verifiedAt": "2026-11-01T09:44:42.840Z",
   "files": [
     {
       "edition": "pro",
@@ -188,31 +188,30 @@
     {
       "edition": "opensource",
       "name": "CShell-0.8.18-android.apk",
-      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\android-core-final\\CShell-0.8.18-android.apk",
-      "size": 4897262,
-      "sha256": "4572e18c6d9b6d85618b0efe12411c8a85472ed3c4f5193dded53e6dfb470ec3"
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\android-core-semantic-final\\CShell-0.8.18-android.apk",
+      "size": 4897354,
+      "sha256": "ba932a8f7a64d5893fd42cbf416331501d853640ed71d92f33e93f3be875772c"
     },
     {
       "edition": "pro",
       "name": "CShell-Pro-0.8.18-android.apk",
-      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\android-pro-final\\CShell-Pro-0.8.18-android.apk",
-      "size": 4922658,
-      "sha256": "8eeda8df907a9cc131a5295e940850789b2406aa02318adafa1b6800250325cb"
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\ci-artifacts\\android-semantic\\CShell-Pro-0.8.18-android.apk",
+      "size": 4922450,
+      "sha256": "3ba6032307c67f135477eedd876dafbb9fa17237126bc4cf174fbcaf34a72032"
     },
     {
       "edition": "opensource",
       "name": "SHA256SUMS.txt",
       "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\final-checksums\\opensource\\SHA256SUMS.txt",
       "size": 1437,
-      "sha256": "1820d71ec7a84699f3c2e82eb29ba7b05f6d87319d9c3c3170c03b3dc05f3a5b"
+      "sha256": "d69a5e8a746044046e4e0c11b4e885864fa8638741f596a0772f63325442f43f"
     },
     {
       "edition": "pro",
       "name": "SHA256SUMS.txt",
       "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\final-checksums\\pro\\SHA256SUMS.txt",
       "size": 1283,
-      "sha256": "180e223df66460861ff7880057bb8248a8c7a91ced8ed78a8ef16eabfb4a1170"
+      "sha256": "6d9b00fc9565dfc542a6f1b161d10004cf24b087bef60a483ceacda8c3d2e7db"
     }
-  ],
-  "pendingRevision": "Physical Android navigation succeeded, but semantic tree remained on previous page. Android UI freshness fix is in progress; replace both APK receipts and regenerate both checksum files before publication. The 26 desktop/runtime binaries are unaffected."
+  ]
 }

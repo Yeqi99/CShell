@@ -5,8 +5,8 @@
 以下各轮构建保留为历史，不能直接从历史段落选取安装包。最终双版本源码复审修正了普通版终端代理继承、重复代理表单、CAgent 下载入口与渠道隔离，以及 Pro 官方 OpenCode 退出清理。受影响的旧包已作废，香港旧暂存目录也明确禁止发布。
 
 - Windows 当前唯一取包清单：[最终 Windows 候选](release-evidence/final-windows-candidates.json)。Pro CShell 最新安装器为 123907757 字节，SHA-256 `6a8bdb323dabbf619cf9cdf65357b875194f5f3aa6c459ebc03728cb684ac993`；两版真实成品的 SSH、SFTP、布局、字体、分组、MCP 和重启验收通过。安装器未签名。
-- 跨平台重建：Core `41292173361`、Pro `41292194243`；最终附件须在成功后重新汇总校验。旧的完整库存状态为 superseded，不能据此发布。
-- 独立 Pro CAgent 与 Android 生产代码未受本轮桌面修复影响，保留各自精确版本收据，不能混用普通版与 Pro 包。
+- 跨平台重建：Core `41292173361`、Pro `41292194243` 已成功，8 个归档、18 个文件逐项摘要核验完成，见 [源码同步后的附件](release-evidence/final-source-sync-artifacts.json)。最终 28 个二进制与 2 个校验文件以 [30 件候选库存](release-evidence/final-0.8.18-inventory.json) 为准；候选库存不代表已公开发布。
+- 独立 Pro CAgent 未受本轮桌面修复影响。Android 后续另行修复无障碍语义树缓存，已重新构建并替换候选 APK，必须使用 [最新 Android 收据](release-evidence/final-android-candidates.json)，不能使用旧 APK 或混用两版包。
 - Android API29/35 仪器验收通过；物理手机仍待覆盖安装后完成输入验收。微信真实回调触发仍待验收。本机正式应用、官网和更新渠道尚未切换。
 
 源码差异与成品影响见 [最终源码核对](FINAL-SOURCE-SYNC-AUDIT-20261101.md)。
