@@ -5,7 +5,7 @@
 0.8.18 尚未公开发布。当前附件唯一依据为 f566ea0 的 [最终30件库存](release-evidence/final-0.8.18-inventory.json)：24个不受后续修复影响的桌面/POSIX包、两版新CAgent Windows包、两版新Android APK及两份重新生成的校验文件。历史摘要不得用于取包。
 
 - **Windows与POSIX**：两CShell安装器及22个POSIX附件继续采用已核验的最终SSL目录构建；Core 41300796296、Pro 41300827199 全部原生作业通过。两CAgent Windows安装器已按7759a91替换并实际安装验证安全重连、写操作不重放、共享后台与身份保留；Core无Pro账号UI。见 [Windows收据](release-evidence/final-windows-candidates.json) 和 [POSIX收据](release-evidence/runtime-final-artifacts.json)。Windows未签名、macOS未签名/未公证，CI不代替实体设备实测。
-- **POSIX**：Core `41300796296` 四作业、Pro `41300827199` 八作业全部成功。12个GitHub归档摘要、22个附件SHA-256核验完成，八个CAgent归档内的最终目录和渠道实现已检查，见 [最终运行时收据](release-evidence/runtime-final-artifacts.json)。Core生产源码 `3202d56`，Pro生产源码 `c53e8f1`；其后纯文档/收据修改不要求重复构建。macOS未签名/未公证，原生CI不替代实体设备验收。
+- **POSIX**：Core `41300796296` 四作业、Pro `41300827199` 八作业全部成功。12个GitHub归档摘要、22个附件SHA-256核验完成，八个CAgent归档内的最终目录和渠道实现已检查，见 [最终运行时收据](release-evidence/runtime-final-artifacts.json)。Core生产源码 `3202d56`，Pro生产源码 `c53e8f1`；后续C#原生窗口与Android修改不进入POSIX构建链，已按文件差异核对无需重复构建。macOS未签名/未公证，原生CI不替代实体设备验收。
 - **Android**：Core 41310002331、Pro 41309477156 的API29/35全部通过，含网页输入、连续删除、未聚焦拒绝写入、重放拒绝/释放/重连。Pro最终7f9f866 APK已在Android16手机实际验收：H264画面、点击、文字、八次退格后实际空值、返回共享设置、同身份重新连接均成功，密码保持隐藏且无需再次录屏授权。八次安全退格耗时3.37秒。见 [实机收据](release-evidence/android-0.8.18-real-input-final.json)；Core APK未单独物理安装，短信/电话未做运营商收发测试。
 - **微信**：真实手机B消息被原生监听捕获；诊断投递同事件完成一个任务；最终冻结包自动重投该事件返回204且无重复任务/模型调用；另有独立合成新事件的自动单任务验收。首次真实消息自动端到端成功尚不是本轮证据，4.2原生钩子也未实机。详见 [分段证据](release-evidence/wechat-final-native-lifecycle.json)。
 - **联想会员中继**：会员已幂等开通，实际联想设备仍signed-out，待登录后强制中继测试；不以局域网直连或其它隔离机器代替。
