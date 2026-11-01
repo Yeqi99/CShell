@@ -197,6 +197,16 @@ public class CagentWindow : Window {
     messages.Children.Clear();var q=Text(S(t,"prompt"));q.Foreground=Brush("#3F5559");var bubble=new Border{Background=Brush("#E8EFED"),CornerRadius=new CornerRadius(16,16,5,16),Padding=new Thickness(13,6,13,6),Margin=new Thickness(36,6,0,23),HorizontalAlignment=HorizontalAlignment.Right,Child=q};messages.Children.Add(bubble);
     var answerHeader=new StackPanel{Orientation=Orientation.Horizontal,Margin=new Thickness(2,0,0,9)};answerHeader.Children.Add(Mark(20));answerHeader.Children.Add(new TextBlock{Text="CAgent",FontSize=11,Foreground=Brush("#819195"),Margin=new Thickness(8,2,0,0)});messages.Children.Add(answerHeader);
     var answer=Text(S(t,"answer"),14);answer.LineHeight=24;answer.Margin=new Thickness(2,0,8,14);messages.Children.Add(answer);Reveal(answer);
+    if(state=="running"){
+      var activity=new StackPanel{Orientation=Orientation.Horizontal,Margin=new Thickness(2,4,0,14)};
+      activity.Children.Add(Text(S(t,"answer")==""?"思考中":"正在处理",12));
+      for(int i=0;i<3;i++){
+        var dot=new Border{Width=4,Height=4,CornerRadius=new CornerRadius(2),Background=Brush("#526E70"),Margin=new Thickness(4,0,0,0),VerticalAlignment=VerticalAlignment.Center};
+        if(SystemParameters.ClientAreaAnimation){var pulse=new DoubleAnimation(.25,1,TimeSpan.FromMilliseconds(600)){AutoReverse=true,RepeatBehavior=RepeatBehavior.Forever,BeginTime=TimeSpan.FromMilliseconds(i*180)};dot.BeginAnimation(UIElement.OpacityProperty,pulse);}
+        activity.Children.Add(dot);
+      }
+      AutomationProperties.SetName(activity,"智能体正在处理任务");messages.Children.Add(activity);
+    }
     foreach(var item in A(V(t,"events"))){var ev=D(item);var content=new StackPanel();content.Children.Add(Text(json.Serialize(V(ev,"input"))));content.Children.Add(Text(S(ev,"output")));messages.Children.Add(new Expander{Header=S(ev,"tool"),Content=content,Margin=new Thickness(0,6,0,6)});}
     if(state=="approval"){
       messages.Children.Add(Text("允许执行上面的本机命令？"));var buttons=new StackPanel{Orientation=Orientation.Horizontal};

@@ -17,6 +17,19 @@ async function fixture(network: typeof fetch) {
   return { extension, saved, notifications: () => notifications, close: () => rm(directory, { recursive: true, force: true }) };
 }
 
+test('provider modality expansion does not reject the catalog', async () => {
+  const input = [...Array.from({ length: 24 }, (_, i) => `future-${i}`), 'image', 'image', null, 7];
+  const f = await fixture(async () => Response.json({ data: [
+    { id: 'beam-free', modalities: { input } },
+    { id: 'other-model', input_modalities: input },
+  ] }));
+  try {
+    const catalog = await f.extension.call('catalog', { reference: 'go/beam-free', refresh: true });
+    assert.ok(catalog.choices.some((m: any) => m.model === 'beam-free'));
+    assert.ok(catalog.choices.some((m: any) => m.model === 'other-model'));
+  } finally { await f.close(); }
+});
+
 test('retired reference is unavailable without deleting credentials or selecting another default', async () => {
   let listed = ['longcat-flash-free'];
   const f = await fixture(async () => Response.json({ data: listed.map(id => ({id})) }));

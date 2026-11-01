@@ -5,10 +5,27 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { Store } from '../src/core/store';
+import { builtinPlugins } from '../src/shared/plugins';
 const codec = {
   encrypt: async (s: string) => Buffer.from(s).toString('base64'),
   decrypt: async (s: string) => Buffer.from(s, 'base64').toString(),
 };
+
+test('account sync restores bundled plugin choices on a fresh device without copying external packages', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'cloud-plugins-'));
+  try {
+    const a = new Store(join(root, 'a'), codec), b = new Store(join(root, 'b'), codec);
+    await a.load(); await b.load();
+    const manifest = builtinPlugins.find(p => p.provider === 'opencode')!;
+    await a.setPlugins([...a.plugins(), {manifest, enabled:true, source:'bundled'}]);
+    await b.cloudImport(await a.cloudExport());
+    assert.equal(b.plugins().find(p => p.manifest.id === manifest.id)?.enabled, true);
+    await a.setPlugins(a.plugins().map(p => p.manifest.id === manifest.id ? {...p,enabled:false}:p));
+    await b.cloudImport(await a.cloudExport());
+    assert.equal(b.plugins().find(p => p.manifest.id === manifest.id)?.enabled, false);
+    assert.equal(b.mcpSettings().enabled, false);
+  } finally { await rm(root,{recursive:true,force:true}); }
+});
 test('cloud export/import carries credentials but never transfers MCP grants or tokens', async () => {
   const root = await mkdtemp(join(tmpdir(), 'cloud-store-'));
   try {

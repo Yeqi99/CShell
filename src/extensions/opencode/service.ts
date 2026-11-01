@@ -26,7 +26,19 @@ const legacySchema = z.object({
   key: z.string().max(16000).default(''),
   workspace: workspaceSchema,
 });
-const modelSchema = z.object({ id: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/), modalities:z.object({input:z.array(z.string().max(40)).max(16).optional()}).optional(),input_modalities:z.array(z.string().max(40)).max(16).optional() });
+// Capability metadata is advisory. Provider additions or duplicate entries must
+// not invalidate the entire catalog (IDs remain strictly validated).
+const modalitySchema = z.preprocess(
+  value => Array.isArray(value)
+    ? [...new Set(value.filter((item): item is string => typeof item === 'string' && item.length <= 40))]
+    : [],
+  z.array(z.string()),
+);
+const modelSchema = z.object({
+  id: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/),
+  modalities: z.object({ input: modalitySchema.optional() }).optional(),
+  input_modalities: modalitySchema.optional(),
+});
 const tierSchema = z.enum(['go', 'zen']);
 export function quotaWindows(raw: any) {
   return [

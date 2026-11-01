@@ -6,7 +6,7 @@ import {AgentJobs,jobQuery} from '../core/agent-jobs';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { ClientVault } from '../core/client/identity';
-import { requestAiReply } from '../core/ai-request';
+import { requestAgentModel } from './model-request';
 import type { RuntimeCapabilityTool } from './capability-runtime';
 
 const settingsSchema = z.object({
@@ -87,7 +87,7 @@ export class CagentAssistant {
   private configuring=false;
   private active?:{task:Task;abort:AbortController;done:Promise<void>;approval?:{resolve:(v:boolean)=>void}};
   get activity(){return this.active?1:0;}
-  constructor(private vault:ClientVault,private host:Host,private request=requestAiReply){}
+  constructor(private vault:ClientVault,private host:Host,private request=requestAgentModel){}
   async load(){
     this.settings=(await this.vault.read('assistant-settings',settingsSchema))??settingsSchema.parse({});
     this.shared=(await this.vault.read('assistant-shared',sharedAiConfigSchema))??emptySharedAi();
