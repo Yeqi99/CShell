@@ -23,6 +23,8 @@ const bundle = z
   .passthrough();
 export class CagentCloud {
   readonly sync: CloudSync;
+  private networkTransport:typeof fetch=modelTransport;
+  setNetworkTransport(transport:typeof fetch){this.networkTransport=transport;}
   private official:OfficialOpenCode;
   private openCode:OpenCodeExtension;
   private extensionSnapshot='';
@@ -123,8 +125,8 @@ export class CagentCloud {
     private assistant: CagentAssistant,
     request: typeof fetch = fetch,
   ) {
-    this.official=new OfficialOpenCode(join(directory,'opencode'),modelTransport);
-    this.openCode=new OpenCodeExtension({directory:join(directory,'opencode'),encrypt:s=>codec.encrypt(s),decrypt:s=>codec.decrypt(s),enabled:()=>this.cached?.store?.extensions?.enabled?.['cshell.opencode']!==false,saveProvider:async()=>{throw Error('请在 CShell 中配置 OpenCode 账号');},open:async()=>{throw Error('请在 CShell 中完成 OpenCode 登录');},official:this.official.request,officialStatus:this.official.status},modelTransport);
+    this.official=new OfficialOpenCode(join(directory,'opencode'),(input,init)=>this.networkTransport(input,init));
+    this.openCode=new OpenCodeExtension({directory:join(directory,'opencode'),encrypt:s=>codec.encrypt(s),decrypt:s=>codec.decrypt(s),enabled:()=>this.cached?.store?.extensions?.enabled?.['cshell.opencode']!==false,saveProvider:async()=>{throw Error('请在 CShell 中配置 OpenCode 账号');},open:async()=>{throw Error('请在 CShell 中完成 OpenCode 登录');},official:this.official.request,officialStatus:this.official.status},(input,init)=>this.networkTransport(input,init));
     assistant.resolveExtension=async(ref,session)=>{
       if(ref.id!=='cshell.opencode')throw Error('此模型扩展尚不支持 CAgent');
       const value=this.cached?.opencode??{accounts:[]},stamp=JSON.stringify(value);
@@ -189,6 +191,7 @@ export class CagentCloud {
       try {
         await this.pending;
         await this.hooks?.stop();
+    await this.official.dispose();
         const result = await this.sync.login(q.email, q.password, true);
         this.lastEnroll = 0;
         return result;

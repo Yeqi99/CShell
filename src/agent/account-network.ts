@@ -1,3 +1,5 @@
+import {tunnelFetch} from '../core/tunnel-fetch';
+import {modelTransport} from './model-request';
 import { z } from 'zod';
 import { connect } from 'node:net';
 import type { Duplex } from 'node:stream';
@@ -90,6 +92,10 @@ export class AccountNetwork {
     });
     return this.pending;
   }
+  readonly fetch:typeof fetch=async(input,init)=>{
+    if(!this.target)return modelTransport(input,init);
+    return tunnelFetch((host,port)=>this.forward(host,port))(input,init);
+  };
   async status() {
     let devices: unknown[] = [];
     try {

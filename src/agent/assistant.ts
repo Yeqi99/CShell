@@ -53,9 +53,10 @@ function capabilityDefinition(tools:RuntimeCapabilityTool[]){return {type:'funct
 export class CagentAssistant {
   officialCredential?:()=>string;
   resolveExtension?: (ref:AiExtensionRef,session:string)=>Promise<AiRuntimeProvider>;
+  networkTransport?:typeof fetch;
   private async modelRequest(url:string, init:RequestInit, signal:AbortSignal,onContent:(text:string)=>void){
     const provider=this.shared.providers.find(p=>p.id===this.settings.providerId);
-    if(!provider?.extension)return this.request(url,init,signal,onContent);
+    if(!provider?.extension)return this.request(url,init,signal,onContent,undefined,this.networkTransport);
     if(!this.resolveExtension)throw Error("模型扩展尚未就绪");
     const resolved=await this.resolveExtension(provider.extension,this.active?.task.id??"compact");
     const body=JSON.parse(String(init.body));body.model=resolved.model;
