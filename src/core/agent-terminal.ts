@@ -210,7 +210,7 @@ export class AgentTerminalProvider implements ManagedProvider {
     const id = request.shell === 'wsl' ? 'wsl:' + request.distribution : request.shell;
     const shell = (await this.detect()).find((s) => s.id === id);
     if (!shell) throw new Error('所选 Shell 或 WSL 发行版未安装');
-    combined.throwIfAborted();
+    if(combined.aborted)throw new Error(signal.aborted?'操作已取消':'命令执行超时');
     const args =
       request.shell === 'wsl'
         ? ['--distribution', request.distribution!, '--exec', 'sh', '-lc', request.command]
@@ -220,7 +220,7 @@ export class AgentTerminalProvider implements ManagedProvider {
             ? ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', request.command]
             : ['-lc', request.command];
     const environment=await this.processEnvironment(shell.environment==='host'?this.networkEnvironment?.():undefined);
-    combined.throwIfAborted();
+    if(combined.aborted)throw new Error(signal.aborted?'操作已取消':'命令执行超时');
     return new Promise<{
       stdout: string;
       stderr: string;
