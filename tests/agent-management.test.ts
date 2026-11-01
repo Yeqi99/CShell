@@ -523,7 +523,7 @@ test('Agent revocation during audit persistence prevents a queued management mut
 test('remote automation uses real authenticated TLS owner and exposes reviewed connection tools', async()=>{
  const f=await fixture();try{
   await f.runtime.dispatch('assistant.configure',{endpoint:'https://example.invalid/v1/chat/completions',model:'fixture',key:'unused',commands:false,review:true,automation:true,delegates:[]});
-  const {device,session}=await f.pair({allowManage:true});
+  const {device}=await f.pair({allowManage:true});
   const owner=f.runtime.server.status().peers[0].fingerprint;
   await f.runtime.dispatch('assistant.configure',{endpoint:'https://example.invalid/v1/chat/completions',model:'fixture',key:'unused',commands:false,review:true,automation:true,delegates:[owner]});
   // Reconnect discovery after the remote assistant grants this controller automation.
