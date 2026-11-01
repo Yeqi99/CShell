@@ -58,3 +58,11 @@ Pro 构建基于 `885e7d7`，CAgent 构建时 HEAD 为 `0b05da1`（其后者仅�
 
 全量 Pro 回归初次为 792 项、787 通过、4 跳过、1 失败；唯一失败为新代理 RPC 未声明 API 暴露分类，`885e7d7` 已将其明确归入专用控制通道，目标 2 项回归通过。没有将初次全量结果改写为零失败；最终 CI 仍须使用整合后的源码执行。Android 输入与微信真实事件验收仍独立追踪，不能由这些 Windows 包测试替代。
 
+
+## 原子授权提交后的最终 Windows Pro 候选
+
+源码 `4403eb6`（含 `d262af3`）构建的 Pro 安装器为 123907587 字节，SHA-256 `8d02383b21255406766355d180be6d23974d495c290532a8bfe1f0b3ce2c7b54`。此摘要取代上文旧候选作为当前核验对象，尚未发布或安装到用户正式目录，Authenticode 仍未签名。
+
+全量回归 794 项：790 通过、4 跳过、0 失败。实际包内程序再次通过 platform-package-smoke 与 release-desktop-smoke，覆盖 SSH/SFTP、同一 PTY 的可视化切换与历史、设置草稿和即时预览、分组持久化、重启及真实 MCP 握手。日志为 `test-results/final-atomic-regression.log` 与 `test-results/pro-final-atomic-{build,nsis,package-smoke,desktop-smoke}.log`。
+
+身份代理授权在加密与临时文件准备完成后再次核验，与原子重命名同步提交；撤权发生在准备期间时，磁盘和内存均不出现新规则。该结果不替代尚未完成的 Android 触控和微信真实事件验收。
