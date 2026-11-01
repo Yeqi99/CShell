@@ -13,10 +13,10 @@ import {
 import { OpenCodeExtension } from '../src/extensions/opencode/service';
 import {OfficialOpenCode} from '../src/extensions/opencode/official-runtime';
 
-test('official runtime reports active downloads and disposal cancels and joins them',async()=>{
+test('official runtime reports active downloads and disposal cancels and joins them',{timeout:15000},async()=>{
  const directory=await mkdtemp(join(tmpdir(),'official-lifecycle-'));let started!:()=>void;const ready=new Promise<void>(r=>{started=r;});
  const runtime=new OfficialOpenCode(directory,async(_url,init)=>{started();return new Promise((_resolve,reject)=>{init!.signal!.addEventListener('abort',()=>reject(init!.signal!.reason),{once:true});});});
- try{const request=runtime.request({tier:'zen',model:'fixture',key:'fixture',body:{model:'fixture',messages:[{role:'user',content:'fixture'}]},guard:()=>{}});const rejected=assert.rejects(request);await ready;assert.equal(runtime.status().active,1);await runtime.dispose();await rejected;assert.equal(runtime.status().active,0);await assert.rejects(runtime.request({tier:'zen',model:'fixture',key:'fixture',body:{},guard:()=>{}}),/关闭/);}finally{await runtime.dispose();await rm(directory,{recursive:true,force:true});}
+ try{const request=runtime.request({tier:'zen',model:'fixture',key:'fixture',body:{model:'fixture',messages:[{role:'user',content:'fixture'}]},guard:()=>{}});const rejected=assert.rejects(request);await Promise.race([ready,new Promise((_,reject)=>{const timer=setTimeout(()=>reject(Error('download did not start')),5000);timer.unref();})]);assert.equal(runtime.status().active,1);await runtime.dispose();await rejected;assert.equal(runtime.status().active,0);await assert.rejects(runtime.request({tier:'zen',model:'fixture',key:'fixture',body:{},guard:()=>{}}),/关闭/);}finally{await runtime.dispose();await rm(directory,{recursive:true,force:true});}
 });
 
 test('official runtime rejects corrupt or linked executables, and extracts only the verified binary', () => {
@@ -173,3 +173,4 @@ test('cancelling a shared runtime download waiter does not wait for or cancel th
     await rm(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
 });
+
