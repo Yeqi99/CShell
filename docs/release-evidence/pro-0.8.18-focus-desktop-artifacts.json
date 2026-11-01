@@ -1,0 +1,79 @@
+{
+  "run": 41289864167,
+  "source": "ca92ec47eb72b61aa8d1c6092dc95ef23ac7a6dd",
+  "verifiedArtifactDigests": true,
+  "remoteSource": "d7125cc6905293fb63764ee14595297b71057255",
+  "artifacts": [
+    {
+      "archive": "pro-linux-arm64-focus.zip",
+      "bytes": 243708254,
+      "sha256": "0215e823a7bb630b23490f497788feb0ca56e3dc1a4df52f6f708d942f18324b",
+      "packages": [
+        {
+          "name": "CShell-Pro-0.8.18-linux-arm64.AppImage",
+          "archiveEntry": "pro-0.8.18/CShell-Pro-0.8.18-linux-arm64.AppImage",
+          "bytes": 140957092,
+          "sha256": "5c81106e1d15a995c3b93cfcd1b24609f00f212c6d8e9071205c40de556e8172",
+          "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-Pro-0.8.18-linux-arm64.AppImage"
+        },
+        {
+          "name": "CShell-Pro-0.8.18-linux-arm64.deb",
+          "archiveEntry": "pro-0.8.18/CShell-Pro-0.8.18-linux-arm64.deb",
+          "bytes": 103283076,
+          "sha256": "e78e058ad0f1da0828fc3863243abf6eefad9f10c0d1a9d0da3837e0e733e201",
+          "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-Pro-0.8.18-linux-arm64.deb"
+        }
+      ]
+    },
+    {
+      "archive": "pro-linux-x64-focus.zip",
+      "bytes": 246983298,
+      "sha256": "7113833b543fdf7cf512b1e8548168fba849002ad215e368c941ca2358c21b48",
+      "packages": [
+        {
+          "name": "CShell-Pro-0.8.18-linux-amd64.deb",
+          "archiveEntry": "pro-0.8.18/CShell-Pro-0.8.18-linux-amd64.deb",
+          "bytes": 107782568,
+          "sha256": "5fb50f58a15639b5a6cc01af9fc3b68fe6ee6215cdbe1d8175c1da8e2548a072",
+          "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-Pro-0.8.18-linux-amd64.deb"
+        },
+        {
+          "name": "CShell-Pro-0.8.18-linux-x86_64.AppImage",
+          "archiveEntry": "pro-0.8.18/CShell-Pro-0.8.18-linux-x86_64.AppImage",
+          "bytes": 139701886,
+          "sha256": "14c14d334f0816e57eeba4f2f55ab5a16cf354f2f4b8d874c219a8fb8bc14d1e",
+          "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-Pro-0.8.18-linux-x86_64.AppImage"
+        }
+      ]
+    },
+    {
+      "archive": "pro-mac-arm64-focus.zip",
+      "bytes": 142374317,
+      "sha256": "bd5ce0dc20fe991481ec2349d978a8071c6ca5697cb6b4986ba702668755949b",
+      "packages": [
+        {
+          "name": "CShell-Pro-0.8.18-mac-arm64.dmg",
+          "archiveEntry": "pro-0.8.18/CShell-Pro-0.8.18-mac-arm64.dmg",
+          "bytes": 142614148,
+          "sha256": "a2a4ff3179ab49e0ea4d0dc16c1812ddb47c420f95c65aed0f75f7dcc9d460e6",
+          "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-Pro-0.8.18-mac-arm64.dmg"
+        }
+      ]
+    },
+    {
+      "archive": "pro-mac-x64-focus.zip",
+      "bytes": 146196293,
+      "sha256": "8c1737fea29a45548197839c5ad0fe56d19475e7ffbb9f0841a24f305b2c9112",
+      "packages": [
+        {
+          "name": "CShell-Pro-0.8.18-mac-x64.dmg",
+          "archiveEntry": "pro-0.8.18/CShell-Pro-0.8.18-mac-x64.dmg",
+          "bytes": 146425713,
+          "sha256": "32b8a2fc2c8581918eced6d19a5e661cd00ec035bd141a8ae7c2ce87bcab8ace",
+          "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\final-packages\\CShell-Pro-0.8.18-mac-x64.dmg"
+        }
+      ]
+    }
+  ],
+  "published": false
+}
