@@ -45,3 +45,9 @@
 - 单次API35 `CONTROL_CLOSED` 位于宿主互操作而非输入阶段；后续两API宿主互操作通过。已保留宿主fixture输出与隔离模拟器crash buffer以便再次发生时查真实原因。
 
 签名/复制验收凭据：`test-results/unified-ui/android-input-candidate-receipt.json`。物理手机无SIM，不声明运营商短信或电话收发通过。
+
+### API29 测试驱动缓存锁诊断更新
+
+run 41289177673 与 41289572866 实际栈确认锁持有者为同进程 UiAutomation 线程：在 AccessibilityCache 内刷新节点并等待应用主线程，主线程又等待该缓存锁，约5秒后超时。后一次已读回测试驱动 eventTypes=0 和无匹配 packageNames，仍收到系统缓存维护关键事件；因此不能把事件过滤当作断开。API35 在 41289572866 再次完整通过。
+
+519943b 仅修改仪器测试：API29 在建立真实 CAgent 无障碍服务后销毁测试驱动的 UiAutomation 连接并确认 isDestroyed。真实产品服务保持启用，输入仍由 TLS 进入原生服务，保留产品事件增长和全部原生控件结果断言；旋转和清理在输入验证结束后才重新建立测试驱动。Java 编译通过，新的双API仪器结果待验收，不据此先宣称API29修复。
