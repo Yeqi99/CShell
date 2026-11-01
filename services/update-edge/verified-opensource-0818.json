@@ -1,6 +1,6 @@
 {
   "edition": "opensource",
-  "sha": "f76ef2d7fe7d8b70abe4f752527771d610234ce5",
+  "sha": "04b6424f64cca4a4eaa5459b8cb8ea81fee3545f",
   "status": "candidate-not-published",
   "version": "0.8.18",
   "verification": "All local asset sizes and SHA-256 checked against the final 30-file inventory. Source targets fixed before committing this publication-control metadata. This file does not publish, deploy, or switch an update channel.",
