@@ -7,7 +7,7 @@ import {
   type DesktopQuality,
 } from '../../shared/agent-desktop';
 import { desktopScanCode, h264Codec } from '../desktop-keys';
-import {pushDesktopClipboard,pullDesktopClipboard} from '../desktop-clipboard-transfer';
+import {pushDesktopClipboard,pullDesktopClipboard,waitDesktopClipboardChange} from '../desktop-clipboard-transfer';
 import type { DesktopViewInput } from '../../shared/desktop-view';
 import './agent-desktop-view.css';
 import { ErrorNotice } from './ErrorNotice';
@@ -379,16 +379,16 @@ export function AgentDesktopView({
     // remote chord when Command is released, so no remote modifier stays down.
     if(!down && (event.code==='MetaLeft'||event.code==='MetaRight'))release();
   };
-  const exchangeClipboard=async(action:'copy'|'paste')=>{
+  const exchangeClipboard=async(action:'copy'|'paste'|'fetch')=>{
     if(pasteBusy.current)return;
     const session=id.current,wire=wireGeneration.current;
     const valid=()=>!!session&&id.current===session&&wireGeneration.current===wire&&controlling.current&&permissions.current.canControl&&visibleRef.current;
-    if(!valid())return;pasteBusy.current=true;setClipboardStatus(action==='copy'?'正在复制远端内容…':'正在发送剪贴板…');
+    if(!valid())return;pasteBusy.current=true;setClipboardStatus(action==='paste'?'正在发送剪贴板…':'正在复制远端内容…');
     const chord=async(code:number)=>{for(const event of [{kind:'key' as const,code:29,down:true},{kind:'key' as const,code,down:true},{kind:'key' as const,code,down:false},{kind:'key' as const,code:29,down:false}]){if(!valid())throw Error('连接或权限已变化');await window.cshell.desktopViewInput(session,event,wire);}};
     try{
       await window.cshell.desktopViewRelease(session,wire);
       if(action==='paste'){if(await pushDesktopClipboard(window.cshell,session,wire,valid))await chord(47);}
-      else{await chord(46);await new Promise(resolve=>setTimeout(resolve,150));await pullDesktopClipboard(window.cshell,session,wire,valid);}
+      else{if(action==='copy'){const before=await window.cshell.desktopViewClipboard(session,{action:'sequence'},wire);await chord(46);await waitDesktopClipboardChange(window.cshell,session,wire,before.sequence,valid);}await pullDesktopClipboard(window.cshell,session,wire,valid);}
     }catch(error){if(id.current===session)setError(String(error));}
     finally{pasteBusy.current=false;setClipboardStatus('');if(id.current===session)void window.cshell.desktopViewRelease(session,wire).catch(()=>{});}
   };
@@ -457,7 +457,7 @@ export function AgentDesktopView({
           </>
         )}
         {busy && <button onClick={() => void stop()}>取消连接</button>}
-        {active && <><button title="复制远端选中内容到本机（Ctrl+C）" aria-label="复制远端内容" disabled={!control||!canControl} onClick={()=>void exchangeClipboard('copy')}><Copy size={15}/></button><button title="粘贴本机剪贴板到远端（Ctrl+V）" aria-label="粘贴到远端" disabled={!control||!canControl} onClick={()=>void exchangeClipboard('paste')}><ClipboardPaste size={15}/></button></>}
+        {active && <><button title="取回远端剪贴板已有内容，不发送按键" aria-label="取回远端剪贴板" disabled={!control||!canControl} onClick={()=>void exchangeClipboard('fetch')}><Copy size={15}/></button><button title="粘贴本机剪贴板到远端（Ctrl+V）" aria-label="粘贴到远端" disabled={!control||!canControl} onClick={()=>void exchangeClipboard('paste')}><ClipboardPaste size={15}/></button></>}
         {active && info?.secureAttention && <button disabled={!control} onClick={() => input({kind:'secure-attention'})} title="向远端发送 Ctrl+Alt+Delete；是否显示登录界面由 Windows 决定">Ctrl+Alt+Delete</button>}
         <DesktopRecovery key={target} target={target} allowed={canControl&&!busy} beforeExecute={stop} onRecovered={start}/>
         {onFiles && <button onClick={onFiles} title="在当前机器选择目录，粘贴或拖入文件">传输文件</button>}

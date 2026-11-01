@@ -1,6 +1,12 @@
 import type {Bridge} from '../shared/contracts';
 const encode=(bytes:Uint8Array)=>{let text='';for(const byte of bytes)text+=String.fromCharCode(byte);return btoa(text);};
 const decode=(text:string)=>Uint8Array.from(atob(text),c=>c.charCodeAt(0));
+export async function waitDesktopClipboardChange(bridge:Bridge,id:string,generation:number|undefined,baseline:number,valid:()=>boolean,timeoutMs=3000){
+ if(!Number.isInteger(baseline)||baseline<0)throw Error('远端未提供有效剪贴板序号，请更新 CAgent');
+ const deadline=Date.now()+timeoutMs;
+ while(Date.now()<deadline){if(!valid())throw Error('连接或权限已变化，复制已停止');const value=await bridge.desktopViewClipboard(id,{action:'sequence'},generation);if(Number.isInteger(value.sequence)&&value.sequence>=0&&value.sequence!==baseline)return;await new Promise(resolve=>setTimeout(resolve,100));}
+ throw Error('远端应用没有产生新的复制内容，本机剪贴板保持不变。可选择“取回远端剪贴板”获取已有内容。');
+}
 export async function pushDesktopClipboard(bridge:Bridge,id:string,generation:number|undefined,valid:()=>boolean){
  const check=()=>{if(!valid())throw Error('连接或权限已变化，剪贴板传输已停止');};check();
  const value=await bridge.localClipboardRead();check();
