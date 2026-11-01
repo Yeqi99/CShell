@@ -17,8 +17,13 @@ public final class AndroidControlService extends AccessibilityService {
     if(service==null)throw new IllegalStateException("请先在手机系统设置中启用 CAgent 辅助控制");
     java.util.concurrent.CompletableFuture<org.json.JSONObject> result=new java.util.concurrent.CompletableFuture<>();
     new Handler(android.os.Looper.getMainLooper()).post(()->{
-      AccessibilityNodeInfo root=service.getRootInActiveWindow();
+      if(result.isDone())return;
+      AccessibilityNodeInfo root=null;
       try {
+        // A semantic read must describe the current UI, not cached virtual
+        // WebView nodes from a previous in-app page. No grants are changed.
+        if(android.os.Build.VERSION.SDK_INT>=33)service.clearCache();
+        root=service.getRootInActiveWindow();
         org.json.JSONArray nodes=new org.json.JSONArray();
         if(root!=null)describe(root,nodes,0);
         android.util.DisplayMetrics metrics=new android.util.DisplayMetrics();
@@ -29,7 +34,8 @@ public final class AndroidControlService extends AccessibilityService {
             .put("editing",service.editBusy)));
       }catch(Exception error){result.completeExceptionally(error);}finally{if(root!=null)root.recycle();}
     });
-    return result.get(3,java.util.concurrent.TimeUnit.SECONDS);
+    try{return result.get(3,java.util.concurrent.TimeUnit.SECONDS);}
+    catch(java.util.concurrent.TimeoutException error){result.cancel(false);throw error;}
   }
   private static void describe(AccessibilityNodeInfo node,org.json.JSONArray nodes,int depth)throws Exception {
     if(depth>24||nodes.length()>=300||!node.isVisibleToUser())return;
