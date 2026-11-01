@@ -1,0 +1,48 @@
+{
+  "version": "0.8.18",
+  "status": "candidate-not-published",
+  "verifiedAt": "2026-11-01T16:44:34.6330117+08:00",
+  "note": "Exact inspected Windows candidates. Do not glob release directories or substitute older same-version candidates. Other platforms and physical Android/WeChat acceptance remain separate release gates.",
+  "files": [
+    {
+      "edition": "opensource",
+      "component": "CShell",
+      "platform": "win32",
+      "arch": "x64",
+      "candidatePath": "release/0.8.18/CShell-0.8.18-win-x64.exe",
+      "bytes": 123697131,
+      "sha256": "96f433234ffffbb2958100c0d013d081e5fe97f09b1df36f2cfcbea685e8597c",
+      "authenticode": "NotSigned"
+    },
+    {
+      "edition": "opensource",
+      "component": "CAgent",
+      "platform": "win32",
+      "arch": "x64",
+      "candidatePath": "release/0.8.18/CAgent-Setup-0.8.18-win-x64.exe",
+      "bytes": 26178012,
+      "sha256": "b615b4f17a069005fc363ec77d906fb0eef16f796c5bdd54aaba7aa23edfcf2b",
+      "authenticode": "NotSigned"
+    },
+    {
+      "edition": "pro",
+      "component": "CShell",
+      "platform": "win32",
+      "arch": "x64",
+      "candidatePath": "release/pro-0.8.18/CShell-Pro-0.8.18-win-x64.exe",
+      "bytes": 123907652,
+      "sha256": "81dafe0c9ef8f100e962ab5bafb15bf655439d9abab80f9f9a9984c1904659ec",
+      "authenticode": "NotSigned"
+    },
+    {
+      "edition": "pro",
+      "component": "CAgent",
+      "platform": "win32",
+      "arch": "x64",
+      "candidatePath": ".local/CAgent-Setup-0.8.18-win-x64-final.exe",
+      "bytes": 26231462,
+      "sha256": "e3663e4a6821aaa8f1a11edb88e91f4466dec9039dae3dff43c47f6307aff61d",
+      "authenticode": "NotSigned"
+    }
+  ]
+}

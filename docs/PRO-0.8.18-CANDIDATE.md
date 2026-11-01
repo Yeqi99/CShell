@@ -66,3 +66,9 @@ Pro 构建基于 `885e7d7`，CAgent 构建时 HEAD 为 `0b05da1`（其后者仅�
 全量回归 794 项：790 通过、4 跳过、0 失败。实际包内程序再次通过 platform-package-smoke 与 release-desktop-smoke，覆盖 SSH/SFTP、同一 PTY 的可视化切换与历史、设置草稿和即时预览、分组持久化、重启及真实 MCP 握手。日志为 `test-results/final-atomic-regression.log` 与 `test-results/pro-final-atomic-{build,nsis,package-smoke,desktop-smoke}.log`。
 
 身份代理授权在加密与临时文件准备完成后再次核验，与原子重命名同步提交；撤权发生在准备期间时，磁盘和内存均不出现新规则。该结果不替代尚未完成的 Android 触控和微信真实事件验收。
+
+## 终端焦点修复后的候选
+
+`ca92ec4` 修复切换终端后延迟 RAF 抢走搜索框焦点，并取消失效页面的激活任务。真实 Edge 时序复现中旧逻辑稳定失败，新逻辑通过；新增真实浏览器 RAF 验证，避免仅手动调度器覆盖不足。首次抽取 helper 的 `88004b3` 因浏览器方法接收者丢失导致实际生命周期测试失败，已由 `ca92ec4` 修正，失败产物没有进入打包或发布。
+
+最新 Pro 安装器：123907652 字节，SHA-256 `81dafe0c9ef8f100e962ab5bafb15bf655439d9abab80f9f9a9984c1904659ec`。真实 connection-lifecycle 验证临时重连、原历史搜索、主题和无重放通过；包内 platform-package-smoke 与 release-desktop-smoke 再次通过。日志 `test-results/pro-focus-native-*.log`。此包取代上文 Windows Pro 候选，CAgent 源码未受影响，不重复重建。完整跨平台最终矩阵仍在运行，手机输入和微信事件仍待实机关闭缺口。
