@@ -1,5 +1,7 @@
 #pragma once
 #include <shellapi.h>
+#include <future>
+#include <thread>
 #include <shlobj.h>
 #include <gdiplus.h>
 #include "clipboard-files.hpp"
@@ -7,13 +9,21 @@
 // Every command is <= 8 KiB; payloads use ordered bounded chunks, never a giant control line.
 struct DesktopClipboard {
  std::vector<unsigned char> bytes;std::string kind;size_t offset=0;uint64_t until=0;bool writing=false;
- ULONG_PTR gdip=0;DesktopClipboard(){Gdiplus::GdiplusStartupInput input;if(Gdiplus::GdiplusStartup(&gdip,&input,nullptr)!=Gdiplus::Ok)throw std::runtime_error("CLIPBOARD_IMAGE_INIT");}
+ ULONG_PTR gdip=0;std::thread ownerThread;DWORD ownerThreadId=0;
+ DesktopClipboard(){
+  Gdiplus::GdiplusStartupInput input;if(Gdiplus::GdiplusStartup(&gdip,&input,nullptr)!=Gdiplus::Ok)throw std::runtime_error("CLIPBOARD_IMAGE_INIT");
+  // Windows synchronously notifies the previous owner when another process writes.
+  // The capture/control thread blocks on stdin, so it must never own this HWND.
+  const HDESK desktop=GetThreadDesktop(GetCurrentThreadId());std::promise<HWND> ready;auto result=ready.get_future();
+  ownerThread=std::thread([this,desktop,&ready]{ownerThreadId=GetCurrentThreadId();if(!SetThreadDesktop(desktop)){ready.set_value(nullptr);return;}HWND h=CreateWindowExW(0,L"STATIC",L"",0,0,0,0,0,HWND_MESSAGE,nullptr,GetModuleHandleW(nullptr),nullptr);ready.set_value(h);if(!h)return;MSG message{};while(GetMessageW(&message,nullptr,0,0)>0){TranslateMessage(&message);DispatchMessageW(&message);}DestroyWindow(h);});
+  window=result.get();if(!window){ownerThread.join();Gdiplus::GdiplusShutdown(gdip);gdip=0;throw std::runtime_error("CLIPBOARD_OWNER_INIT");}
+ }
  ClipboardFiles files;HWND window=nullptr;
- ~DesktopClipboard(){if(window)DestroyWindow(window);if(gdip)Gdiplus::GdiplusShutdown(gdip);}
+ ~DesktopClipboard(){if(ownerThread.joinable()){PostThreadMessageW(ownerThreadId,WM_QUIT,0,0);ownerThread.join();}if(gdip)Gdiplus::GdiplusShutdown(gdip);}
  static std::wstring wide(const std::string&s){int n=MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,s.data(),(int)s.size(),nullptr,0);if(n<0||(!s.empty()&&!n))throw std::runtime_error("CLIPBOARD_INVALID_UTF8");std::wstring r(n,L'\0');if(n)MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,s.data(),(int)s.size(),r.data(),n);return r;}
  static std::string hex(const unsigned char*p,size_t n){const char*d="0123456789abcdef";std::string s;s.reserve(n*2);for(size_t i=0;i<n;i++){s.push_back(d[p[i]>>4]);s.push_back(d[p[i]&15]);}return s;}
  void clear(){bytes.clear();kind.clear();offset=0;writing=false;until=0;}
- void open(){if(!window)window=CreateWindowExW(0,L"STATIC",L"",0,0,0,0,0,HWND_MESSAGE,nullptr,GetModuleHandleW(nullptr),nullptr);if(!window||!OpenClipboard(window))throw std::runtime_error("CLIPBOARD_BUSY");}
+ void open(){if(!window)throw std::runtime_error("CLIPBOARD_OWNER_UNAVAILABLE");for(unsigned attempt=0;attempt<20;attempt++){if(OpenClipboard(window))return;Sleep(10);}throw std::runtime_error("CLIPBOARD_BUSY");}
  json command(const json&c){
   const auto action=c.at("action").get<std::string>();if(until&&GetTickCount64()>until)clear();
   if(action=="sequence")return {{"sequence",GetClipboardSequenceNumber()}};
