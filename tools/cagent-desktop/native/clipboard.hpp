@@ -2,12 +2,13 @@
 #include <shellapi.h>
 #include <shlobj.h>
 #include <gdiplus.h>
+#include "clipboard-files.hpp"
 // Clipboard transactions stay in the authenticated interactive desktop worker.
 // Every command is <= 8 KiB; payloads use ordered bounded chunks, never a giant control line.
 struct DesktopClipboard {
  std::vector<unsigned char> bytes;std::string kind;size_t offset=0;uint64_t until=0;bool writing=false;
  ULONG_PTR gdip=0;DesktopClipboard(){Gdiplus::GdiplusStartupInput input;if(Gdiplus::GdiplusStartup(&gdip,&input,nullptr)!=Gdiplus::Ok)throw std::runtime_error("CLIPBOARD_IMAGE_INIT");}
- HWND window=nullptr;
+ ClipboardFiles files;HWND window=nullptr;
  ~DesktopClipboard(){if(window)DestroyWindow(window);if(gdip)Gdiplus::GdiplusShutdown(gdip);}
  static std::wstring wide(const std::string&s){int n=MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,s.data(),(int)s.size(),nullptr,0);if(n<0||(!s.empty()&&!n))throw std::runtime_error("CLIPBOARD_INVALID_UTF8");std::wstring r(n,L'\0');if(n)MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,s.data(),(int)s.size(),r.data(),n);return r;}
  static std::string hex(const unsigned char*p,size_t n){const char*d="0123456789abcdef";std::string s;s.reserve(n*2);for(size_t i=0;i<n;i++){s.push_back(d[p[i]>>4]);s.push_back(d[p[i]&15]);}return s;}
@@ -15,11 +16,14 @@ struct DesktopClipboard {
  void open(){if(!window)window=CreateWindowExW(0,L"STATIC",L"",0,0,0,0,0,HWND_MESSAGE,nullptr,GetModuleHandleW(nullptr),nullptr);if(!window||!OpenClipboard(window))throw std::runtime_error("CLIPBOARD_BUSY");}
  json command(const json&c){
   const auto action=c.at("action").get<std::string>();if(until&&GetTickCount64()>until)clear();
+  if(action=="fileBegin")return files.begin(c.at("name").get<std::string>(),c.at("size").get<uint64_t>());
+  if(action=="fileChunk"||action=="fileRead")return files.chunk(c);
+  if(action=="filesCommit"){auto data=files.paths(c.at("fileTokens")).dump();command({{"action","begin"},{"kind","files"},{"size",data.size()}});for(size_t at=0;at<data.size();at+=2048)command({{"action","chunk"},{"offset",at},{"hex",hex((const unsigned char*)data.data()+at,std::min<size_t>(2048,data.size()-at))}});return command({{"action","commit"}});}
   if(action=="read"){
    clear();open();try{
     const UINT png=RegisterClipboardFormatW(L"PNG");
     if(IsClipboardFormatAvailable(CF_HDROP)){
-     kind="files";HDROP h=(HDROP)GetClipboardData(CF_HDROP);UINT n=DragQueryFileW(h,0xffffffff,nullptr,0);if(n>128)throw std::runtime_error("CLIPBOARD_TOO_MANY_FILES");json paths=json::array();for(UINT i=0;i<n;i++){UINT len=DragQueryFileW(h,i,nullptr,0);if(len>32767)throw std::runtime_error("CLIPBOARD_PATH_TOO_LONG");std::wstring p(len+1,L'\0');DragQueryFileW(h,i,p.data(),len+1);paths.push_back(utf8(p.c_str()));}auto s=paths.dump();bytes.assign(s.begin(),s.end());
+     kind="files";HDROP h=(HDROP)GetClipboardData(CF_HDROP);UINT n=DragQueryFileW(h,0xffffffff,nullptr,0);if(n>128)throw std::runtime_error("CLIPBOARD_TOO_MANY_FILES");json paths=json::array();for(UINT i=0;i<n;i++){UINT len=DragQueryFileW(h,i,nullptr,0);if(len>32767)throw std::runtime_error("CLIPBOARD_PATH_TOO_LONG");std::wstring p(len+1,L'\0');DragQueryFileW(h,i,p.data(),len+1);paths.push_back(files.add(p.c_str()));}CloseClipboard();return {{"kind","files"},{"files",paths}};
     }else if(IsClipboardFormatAvailable(png)){
      kind="png";HANDLE h=GetClipboardData(png);SIZE_T n=GlobalSize(h);if(n>16*1024*1024)throw std::runtime_error("CLIPBOARD_TOO_LARGE");auto p=(unsigned char*)GlobalLock(h);if(!p)throw std::runtime_error("CLIPBOARD_READ_FAILED");bytes.assign(p,p+n);GlobalUnlock(h);
     }else if(IsClipboardFormatAvailable(CF_BITMAP)){
@@ -47,3 +51,7 @@ struct DesktopClipboard {
   try{open();}catch(...){GlobalFree(memory);if(bitmap)DeleteObject(bitmap);throw;}bool ok=EmptyClipboard()&&SetClipboardData(format,memory);if(bitmap&&!SetClipboardData(CF_BITMAP,bitmap))DeleteObject(bitmap);CloseClipboard();if(!ok){GlobalFree(memory);throw std::runtime_error("CLIPBOARD_WRITE_FAILED");}clear();return {{"written",true}};
  }
 };
+
+
+
+
