@@ -53,6 +53,8 @@ final class AndroidInputTest implements AutoCloseable {
       check(info!=null,"Test driver accessibility settings unavailable");
       info.packageNames=new String[]{"org.canpshell.instrumentation.no-accessibility-target"};
       info.eventTypes=0;automation.setServiceInfo(info);
+      android.accessibilityservice.AccessibilityServiceInfo applied=automation.getServiceInfo();
+      check(applied!=null&&applied.eventTypes==0&&java.util.Arrays.equals(applied.packageNames,info.packageNames),"Test driver event filter not applied");
     }
     sampler.scheduleAtFixedRate(()->{
       if(!AndroidControlService.isEditing())return;
@@ -90,6 +92,7 @@ final class AndroidInputTest implements AutoCloseable {
   }
   void awaitReady()throws Exception{long end=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);while(!AndroidControlService.isAvailable()&&System.nanoTime()<end)Thread.sleep(50);check(AndroidControlService.isAvailable(),"Accessibility service did not bind");}
   String verify(AgentConnection connection)throws Exception {
+    long initialEvents=serviceEventRevision();
     verifyGestureSettling();
     tap(connection,button);long end=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);while(clicks.get()==0&&System.nanoTime()<end)Thread.sleep(50);check(clicks.get()==1,"Remote native tap did not click fixture button; "+inputDiagnostics());
     // Queue clicks without waiting for gesture callbacks. Each accepted click
@@ -146,7 +149,15 @@ final class AndroidInputTest implements AutoCloseable {
     awaitText("CAgent input check");
     input(connection,new JSONObject().put("kind","text").put("text","Z"));
     awaitText("CAgent input checkZ");pressBackspace(connection);awaitText("CAgent input check");
-    return "PASS encrypted remote input → real Accessibility tap, editable text, scan-code letter, repeated/Unicode/selection backspace, held Shift across tap, fail-stop gesture outcomes and fresh input recovery\n";
+    long actualEvents=serviceEventRevision()-initialEvents;
+    check(actualEvents>0,"Product accessibility event path did not receive native edit events");
+    return "PASS encrypted remote input → real Accessibility tap, editable text, scan-code letter, repeated/Unicode/selection backspace, held Shift across tap, fail-stop gesture outcomes and fresh input recovery; productEvents="+actualEvents+"\n";
+  }
+  private long serviceEventRevision()throws Exception {
+    java.lang.reflect.Field instance=AndroidControlService.class.getDeclaredField("instance");instance.setAccessible(true);
+    Object service=instance.get(null);check(service!=null,"Product accessibility service disconnected");
+    java.lang.reflect.Field revision=AndroidControlService.class.getDeclaredField("editRevision");revision.setAccessible(true);
+    return ((java.util.concurrent.atomic.AtomicLong)revision.get(service)).get();
   }
   private void verifyGestureSettling()throws Exception {
     Class<AndroidControlService> type=AndroidControlService.class;
