@@ -101,6 +101,8 @@ final class AndroidAgentHost implements AutoCloseable {
         JSONArray tools=phone.tools();
         if(backend.controlAvailable())tools.put(new JSONObject().put("packageId","cagent.android").put("id","android_ui_read").put("toolId","android_ui_read")
           .put("description","Read the current Android accessibility UI; password text is omitted.").put("sideEffect",false)
+          .put("inputSchema",new JSONObject().put("type","object").put("properties",new JSONObject()).put("additionalProperties",false))
+          .put("outputSchema",new JSONObject().put("type","object"))
           .put("permissions",new JSONArray().put("desktop.view")));
         return tools;
       }

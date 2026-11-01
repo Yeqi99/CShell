@@ -9,6 +9,7 @@ export class DesktopClipboardTransfer{
   if(this.busy)throw Error('剪贴板传输正在进行');this.busy=true;
   const native=async(input:Record<string,unknown>)=>{authorize();const value=await capture.clipboard(generation,input);authorize();return value;};
   try{
+   if(p.action==='sequence')return native({action:'sequence'});
    if(p.action==='fileBegin'){if(!p.name||p.size===undefined)throw Error('文件信息不完整');return native({action:'fileBegin',name:p.name,size:p.size});}
    if(p.action==='filesCommit'){if(!p.fileTokens?.length)throw Error('请选择文件');return native({action:'filesCommit',fileTokens:p.fileTokens});}
    if(p.action==='fileRead'){if(!p.fileToken||p.offset===undefined)throw Error('文件信息不完整');const chunks:Buffer[]=[];let offset=p.offset,done=false;for(let i=0;i<32&&!done;i++){const r=await native({action:'fileRead',fileToken:p.fileToken,offset});const b=Buffer.from(r.hex,'hex');if(r.offset!==offset+b.length||(!b.length&&!r.done))throw Error('文件返回无效');chunks.push(b);offset=r.offset;done=r.done;}return {data:Buffer.concat(chunks).toString('base64'),offset,done};}
