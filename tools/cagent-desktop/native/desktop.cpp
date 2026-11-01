@@ -129,9 +129,10 @@ struct GpuConverter{
 };
 // SendInput is deliberately confined to this optional, default-denied private
 // pipe owner. Secure desktop access additionally requires the installed system broker.
+#include "clipboard.hpp"
 struct NativeInput {
  Capture& capture;HANDLE pipe;std::mutex mutex;std::atomic<bool> quitting{false};
- InputState state;std::thread watchdog;
+ InputState state;std::thread watchdog;DesktopClipboard clipboard;
  static std::wstring desktopName(HDESK desktop){
   DWORD bytes=0;GetUserObjectInformationW(desktop,UOI_NAME,nullptr,0,&bytes);
   if(!bytes)throw std::runtime_error("INPUT_DESKTOP_UNAVAILABLE");
@@ -193,11 +194,12 @@ struct NativeInput {
    Sleep(50);
   }});
  }
+ json clipboardCommand(const json&c){std::lock_guard<std::mutex> lock(mutex);state.tick(micros()/1000);if(!state.allowed||state.generation!=c.at("generation").get<uint64_t>())throw std::runtime_error("CLIPBOARD_CONTROL_DENIED");checkDesktop();return clipboard.command(c);}
  json command(const json&c,bool initialized){
   std::lock_guard<std::mutex> lock(mutex);const auto op=c.at("op").get<std::string>();
   if(op=="input-grant"){
    if(!initialized)throw std::runtime_error("INPUT_CAPTURE_NOT_READY");checkDesktop();state.grant(InputState::integer(c.at("generation")),micros()/1000);
-  }else if(op=="input-revoke")state.revoke();else state.apply(c.at("event"),micros()/1000);
+  }else if(op=="input-revoke"){state.revoke();clipboard.clear();}else state.apply(c.at("event"),micros()/1000);
   return {{"type","input-status"},{"allowed",state.allowed},{"generation",state.generation},{"sequence",state.lastSequence},{"ownedKeys",state.keys.size()},{"ownedButtons",state.buttons.size()}};
  }
  ~NativeInput(){quitting=true;if(watchdog.joinable())watchdog.join();try{state.revoke();}catch(const std::exception&e){std::cerr<<"INPUT_RELEASE_FAILED ownedKeys="<<state.keys.size()<<" ownedButtons="<<state.buttons.size()<<" "<<e.what()<<std::endl;}}
@@ -277,7 +279,7 @@ void stream(){workerTrace(L"Worker stream entered");
     if(op=="configure"){workerTrace(L"Worker configuration received");settings=command;force=true;}else if(op=="ack")credit=true;else if(op=="keyframe")force=true;else if(op=="stop")stop=true;
     else if(op=="input-grant"||op=="input-revoke"||op=="input-event"){
      try{packet(inputOwner.command(command,initialized));}catch(const std::exception&e){packet({{"type","input-error"},{"message",e.what()}});}
-    }else throw std::runtime_error("unsupported control command");
+    }else if(op=="clipboard"){try{packet({{"type","clipboard"},{"request",command.at("request")},{"value",inputOwner.clipboardCommand(command)}});}catch(const std::exception&e){packet({{"type","clipboard"},{"request",command.value("request",std::string())},{"error",e.what()}});}}else throw std::runtime_error("unsupported control command");
    }if(pending.size()>8192)throw std::runtime_error("control command too large");if(!PeekNamedPipe(input,nullptr,0,nullptr,&available,nullptr)){stop=true;return;}
   }
  };
@@ -341,4 +343,3 @@ int wmain(int argc,wchar_t**argv){
  }catch(const std::exception&e){if(systemWorker){try{packet({{"type","capture-error"},{"message",std::string(e.what()).substr(0,2048)}});}catch(...){} std::wstring detail;for(const char* p=e.what();*p&&detail.size()<2048;++p)detail.push_back((unsigned char)*p);workerTrace(detail.c_str());}std::cerr<<e.what()<<std::endl;MFShutdown();CoUninitialize();return 1;}
  MFShutdown();CoUninitialize();return 0;
 }
-

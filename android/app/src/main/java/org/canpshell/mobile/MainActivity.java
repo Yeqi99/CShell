@@ -123,6 +123,14 @@ public class MainActivity extends Activity {
     @JavascriptInterface public void cagentAccessibility(){
       runOnUiThread(()->{try{startActivity(new Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS));}catch(Exception e){AndroidAgentService.starting(MainActivity.this,false,"无法打开无障碍设置");}});
     }
+    @JavascriptInterface public String cagentPhoneStatus(){try{return new AndroidPhoneCapabilities(MainActivity.this).status().toString();}catch(Exception error){return "{}";}}
+    @JavascriptInterface public void cagentPhonePermission(String kind){runOnUiThread(()->{
+      String[] permissions;
+      if("sms".equals(kind))permissions=new String[]{android.Manifest.permission.READ_SMS,android.Manifest.permission.SEND_SMS};
+      else if("calls".equals(kind))permissions=new String[]{android.Manifest.permission.CALL_PHONE,android.Manifest.permission.ANSWER_PHONE_CALLS};
+      else return;
+      requestPermissions(permissions,7110);
+    });}
     @JavascriptInterface public void cagentBackgroundSettings(){
       runOnUiThread(()->{
         try{startActivity(new Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));}
@@ -332,6 +340,10 @@ public class MainActivity extends Activity {
       else {String path=request.getString("path");intent.putExtra(Intent.EXTRA_TITLE,path.substring(path.lastIndexOf('/')+1));}
       startActivityForResult(intent,4401);
     }catch(Exception e){if(pendingTransfer==request)pendingTransfer=null;try{fileResult(request,new JSONObject().put("error",e.getMessage()));}catch(Exception ignored){}}
+  }
+  @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] results){
+    super.onRequestPermissionsResult(request,permissions,results);
+    if(request==7110)AndroidAgentService.changed(this);
   }
   @Override protected void onActivityResult(int code,int result,Intent data) {
     super.onActivityResult(code,result,data);

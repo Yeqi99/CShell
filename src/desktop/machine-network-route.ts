@@ -1,3 +1,4 @@
+import {connect} from 'node:net';
 import ssh2 from 'ssh2';
 import { createHash } from 'node:crypto';
 import type { Store } from '../core/store';
@@ -17,6 +18,14 @@ export class MachineNetworkRoute {
  private async prepare(id:string){
   if(this.ancestors.includes(id)||this.ancestors.length>=8)throw Error('网络跳板存在循环或超过八层');
   if(this.closed)throw Error('网络出口已关闭');
+  if(id==='local'){
+   if(this.current?.id===id){this.current.validate();return 'socks5://127.0.0.1:'+this.current.proxy.port;}
+   this.release();const sockets=new Set<import('node:net').Socket>();
+   const validate=()=>{if(this.closed)throw Error('本机网络出口已关闭');};
+   const forward:Forward=(host,port,done)=>{try{validate();const socket=connect({host,port});sockets.add(socket);socket.once('close',()=>sockets.delete(socket));let settled=false;const finish=(error:Error|null)=>{if(settled)return;settled=true;socket.setTimeout(0);done(error,error?undefined:socket);};socket.setTimeout(15000,()=>socket.destroy(Error('本机出口连接超时')));socket.once('error',finish);socket.once('connect',()=>finish(null));}catch(error){done(error as Error);}};
+   const proxy=await createSshBrowserProxy(forward);this.current={id,key:'local',proxy,validate,forward,close:()=>{for(const socket of sockets)socket.destroy();sockets.clear();}};
+   return 'socks5://127.0.0.1:'+proxy.port;
+  }
   const profile=this.store.profile(id),key=this.key(id);
   if(this.current?.id===id&&this.current.key===key){try{this.current.validate();return `socks5://127.0.0.1:${this.current.proxy.port}`;}catch{this.release();}}
   this.release();

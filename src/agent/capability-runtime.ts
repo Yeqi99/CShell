@@ -9,6 +9,7 @@ import { capabilityInstallInput, stageCapabilityBundle } from './capability-inst
 import type { AgentCapabilityManifest, CapabilityPackageRecord } from '../shared/agent-capability-packages';
 
 export interface TrustedCapabilityAdapter {
+  eventSource?:string;
   inspect(root:string):Promise<{installed:boolean;configured:boolean;systemVersion?:string}>;
   invoke(toolId:string,args:unknown,owner:string,signal:AbortSignal):Promise<unknown>;
   register?(root:string,grants:readonly string[]):Promise<void>;
@@ -115,6 +116,7 @@ export class CapabilityRuntime {
   // managed root, and never turn optional retirement into a startup failure.
   private async cleanupRetiredRoot(root:string){try{await this.removeRoot(root);}catch{process.stderr.write('CAgent: retired capability files retained; active package is unchanged.\n');}}
   private async removeRoot(root:string){const parent=join(this.options.directory,'capability-packages'),within=relative(parent,root);if(!within||within.startsWith('..')||isAbsolute(within)||!/^package-[^/\\]+$/.test(within))throw new Error('Refusing to remove an unmanaged package path');await rm(root,{recursive:true,force:true});}
+  events(){return [...this.registered.values()].flatMap(({manifest,grants})=>{const source=this.adapters.get(manifest.adapterId)?.eventSource;return source?manifest.events.filter(event=>event.permissions.every(permission=>grants.includes(permission))).map(event=>({source,type:event.id,packageId:manifest.id,description:event.description,payloadSchema:structuredClone(event.payloadSchema)})):[];});}
   tools():RuntimeCapabilityTool[]{return [...this.registered.values()].flatMap(({manifest,grants})=>manifest.tools.filter(tool=>tool.permissions.every(permission=>grants.includes(permission))).map(tool=>({...structuredClone(tool),packageId:manifest.id,toolId:tool.id,...(manifest.process?{process:true as const,packageDigest:capabilityDigest(JSON.stringify(manifest)),sideEffect:true}:{})})));}
   async invoke(input:unknown,owner:string,signal:AbortSignal){
     if(this.closing)throw new Error('Capability runtime closing');signal.throwIfAborted();

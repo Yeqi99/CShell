@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { useEffect, useRef, useState } from 'react';
 import { Copy, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import type { AgentCall } from '../../shared/agent';
@@ -174,9 +175,7 @@ function RelayEditor({ call, target }: Props) {
         </button>
       </header>
       {error && (
-        <p className="agent-relay-error" role="alert">
-          {error}
-        </p>
+        <ErrorNotice title="操作未完成" error={error}/>
       )}
       {message && <p role="status">{message}</p>}
       {draft && status && (

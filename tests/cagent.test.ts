@@ -96,3 +96,12 @@ test('installed capability tools require side-effect approval and are rechecked 
  }finally{await service.close();}
 });
 
+
+test('cloud base URLs become model endpoints without duplicating explicit paths',async()=>{
+ for(const [endpoint,expected] of [['https://example.invalid/v1','https://example.invalid/v1/chat/completions'],['https://example.invalid/v1/chat/completions','https://example.invalid/v1/chat/completions'],['https://api.openai.com/v1/responses','https://api.openai.com/v1/responses']]){
+  const data=new Map<string,unknown>();let called='';
+  const vault={read:async(k:string)=>data.get(k),write:async(k:string,v:unknown)=>{data.set(k,v)}} as unknown as ClientVault;
+  const service=new CagentAssistant(vault,{shells:async()=>[],applications:async()=>[],execute:async()=>{},allowed:()=>true},(async(url)=>{called=url;return {content:'OK'}}) as typeof requestAiReply);
+  try{await service.load();await service.configure({...config,endpoint,review:false});const task=await service.start({prompt:'OK only',requestId:randomUUID()},'local');await until(()=>service.get(task,'local').state==='completed');assert.equal(called,expected);}finally{await service.close();}
+ }
+});

@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { useEffect, useRef, useState } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
@@ -207,9 +208,7 @@ export function FloatingTerminal() {
         </button>
       </header>
       {error && (
-        <div className="floating-error" role="alert">
-          {error}
-        </div>
+        <ErrorNotice title="操作未完成" error={error}/>
       )}
       <div className="floating-screen" ref={host} />
     </main>

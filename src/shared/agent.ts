@@ -32,6 +32,7 @@ export const agentMethods = [
   'desktop.configure',
   'desktop.open',
   'desktop.close',
+  'desktop.clipboard',
   'applications.policy',
   'applications.configure',
   'applications.list',

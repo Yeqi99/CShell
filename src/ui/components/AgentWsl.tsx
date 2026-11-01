@@ -47,6 +47,7 @@ export function AgentWsl({ target, call }: { target: string; call: Call }) {
   }, [call, plan?.state]);
   return (
     <div className="agent-settings">
+      <a href="https://shell.canp.ai/docs/wsl-offline.html" target="_blank" rel="noreferrer">离线安装与国内下载源 ↗</a>
       {check?.supported === false ? (
         <p>此 Agent 不是 Windows，无 WSL 功能。</p>
       ) : (

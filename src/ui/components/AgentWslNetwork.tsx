@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { useEffect, useState } from 'react';
 import type { AgentCall } from '../../shared/agent';
 import type { WslNetworkState } from '../../shared/wsl-network';
@@ -99,7 +100,7 @@ export function AgentWslNetwork({
           </button>
         </fieldset>
       )}
-      {error && <p role="alert">{error}</p>}
+      {error && <ErrorNotice title="操作未完成" error={error}/>}
       {message && <p role="status">{message}</p>}
     </details>
   );

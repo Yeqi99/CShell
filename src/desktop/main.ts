@@ -50,6 +50,7 @@ import { MonitorWindows } from './monitor-windows';
 import { registerExtensionHandlers } from './extensions';
 import { createExtensionServices } from '../core/api/extensions';
 import { registerUpdateHandlers } from './updates';
+import {LocalClipboard} from './local-clipboard';
 import { initialWindowBounds } from './window-bounds';
 import { registerAiHandlers } from './ai';
 import { toolsSettingsSchema, dockerActionSchema, dockerId } from '../shared/docker';
@@ -57,6 +58,7 @@ import {
   app,
   BrowserWindow,
   clipboard,
+  ClipboardItem,
   dialog,
   ipcMain,
   Menu,
@@ -595,7 +597,7 @@ else
       ssh.jumpTransport=async(profile,signal)=>{const route=new MachineNetworkRoute(store,clientProvider,[profile.id]);const abort=()=>{void route.close();};signal.addEventListener('abort',abort,{once:true});try{signal.throwIfAborted();const socket=await route.tunnel(profile.jumpProfileId!,profile.host,profile.port);signal.throwIfAborted();return {socket,close:()=>{signal.removeEventListener('abort',abort);void route.close();}};}catch(e){signal.removeEventListener('abort',abort);await route.close();throw e;}};
       const appProxies=new Set<()=>void>();
       handle('network:remote-sources',()=>connections!.tools.activeTargets().filter(t=>t.providerId==='cshell.ssh').map(t=>({id:t.sessionId,name:t.label})));
-      handle('network:remote-open',async(raw)=>{const input=z.object({source:z.string().uuid(),exit:z.string().uuid()}).strict().parse(raw);const source=ssh!.get(input.source);if(source.profile.id===input.exit)throw Error('请选择另一台出口机器');if(appProxies.size>=8)throw Error('代理终端数量已达上限');const route=new MachineNetworkRoute(store,clientProvider,[source.profile.id]);const pending=()=>{void route.close();};appProxies.add(pending);let proxy:Awaited<ReturnType<typeof remoteAppProxy>>;try{proxy=await remoteAppProxy(source.client,route,input.exit);}catch(e){appProxies.delete(pending);await route.close();throw e;}appProxies.delete(pending);const close=()=>{proxy.close();appProxies.delete(close);};appProxies.add(close);try{const opened=await ssh!.openEnvironment(input.source,proxyShellCommand(proxy.port),undefined,id=>connections!.adopt('cshell.ssh',id));ssh!.get(opened.sessionId).shell?.once('close',close);window.webContents.send('ai:connected',{sessionId:opened.sessionId,profile:{...source.profile,name:source.profile.name+' · 应用代理'}});return {port:proxy.port};}catch(e){close();throw e;}});
+      handle('network:remote-open',async(raw)=>{const input=z.object({source:z.string().uuid(),exit:z.union([z.string().uuid(),z.literal('local')])}).strict().parse(raw);const source=ssh!.get(input.source);if(source.profile.id===input.exit)throw Error('请选择另一台出口机器');if(appProxies.size>=8)throw Error('代理终端数量已达上限');const route=new MachineNetworkRoute(store,clientProvider,[source.profile.id]);const pending=()=>{void route.close();};appProxies.add(pending);let proxy:Awaited<ReturnType<typeof remoteAppProxy>>;try{proxy=await remoteAppProxy(source.client,route,input.exit);}catch(e){appProxies.delete(pending);await route.close();throw e;}appProxies.delete(pending);const close=()=>{proxy.close();appProxies.delete(close);};appProxies.add(close);try{const opened=await ssh!.openEnvironment(input.source,proxyShellCommand(proxy.port),undefined,id=>connections!.adopt('cshell.ssh',id));ssh!.get(opened.sessionId).shell?.once('close',close);window.webContents.send('ai:connected',{sessionId:opened.sessionId,profile:{...source.profile,name:source.profile.name+' · 应用代理'}});return {port:proxy.port};}catch(e){close();throw e;}});
       window.once('closed',()=>{for(const close of appProxies)close();});
       const machineBrowser=new MachineBrowser(window,ssh);
       const nativeDesktop=new NativeDesktopService(ssh);
@@ -629,9 +631,11 @@ else
         async (profile, signal, authorize) => {
           if (profile.protocol === 'client') {
             if (!authorize()) throw new Error('Agent scope denied');
-            const sessionId = await connections!.connect('cshell.client', { deviceId: profile.id, shell: profile.clientShell ?? 'powershell', distribution:profile.clientDistribution }, undefined, signal);
+            const config=await clientProvider.toolConfiguration(profile.id,profile.clientShell,profile.clientDistribution);
+            if(signal.aborted||!authorize())throw new Error('Agent connection cancelled');
+            const sessionId = await connections!.connect('cshell.client',config,undefined,signal);
             if (signal.aborted || !authorize() || window.isDestroyed()) { await connections!.disconnect(sessionId); throw new Error('Agent connection cancelled'); }
-            window.webContents.send('ai:connected', { sessionId, profile }); return sessionId;
+            window.webContents.send('ai:connected', { sessionId, profile, managementOnly:config.managementOnly===true }); return sessionId;
           }
           const secret = await store.secret(profile.id);
           if (
@@ -708,11 +712,7 @@ else
             if (profile.protocol === 'client')
               return connections!.connect(
                 'cshell.client',
-                {
-                  deviceId: profile.id,
-                  shell: profile.clientShell ?? 'powershell',
-                  distribution: profile.clientDistribution,
-                },
+                await clientProvider.toolConfiguration(profile.id,profile.clientShell,profile.clientDistribution),
                 undefined,
                 signal,
                 ready,
@@ -883,6 +883,16 @@ else
         clipboard.writeText(z.string().max(2_000_000).parse(value)),
       );
       handle('clipboard:read', async () => (await clipboard.readText()).slice(0, 2_000_000));
+      const readClipboardMime=async(type:string)=>{const item=(await clipboard.read()).find(item=>item.types.includes(type));return item?Buffer.from(await (await item.getType(type) as Blob).arrayBuffer()):Buffer.alloc(0);};
+      const writeClipboardMime=(type:string,data:Buffer)=>clipboard.write([new ClipboardItem({[type]:new Blob([new Uint8Array(data)])})]);
+      const dropMime='electron application/osclipboard;format="CF_HDROP"';
+      const localClipboard=new LocalClipboard({text:()=>clipboard.readText(),png:()=>readClipboardMime('image/png'),files:()=>readClipboardMime(dropMime),writeText:text=>clipboard.writeText(text),writePng:data=>writeClipboardMime('image/png',data),writeFiles:data=>writeClipboardMime(dropMime,data)},join(app.getPath('userData'),'clipboard-files'));
+      handle('clipboard:content-read',()=>localClipboard.read());
+      handle('clipboard:content-write',value=>localClipboard.write(value as any));
+      handle('clipboard:file-read',(token,offset,length)=>localClipboard.fileRead(String(token),Number(offset),Number(length)));
+      handle('clipboard:files-begin',files=>localClipboard.begin(files as any));
+      handle('clipboard:files-chunk',(id,index,offset,data)=>localClipboard.chunk(String(id),Number(index),Number(offset),String(data)));
+      handle('clipboard:files-commit',id=>localClipboard.commit(String(id)));
       handle('profile:save', (value) => {
         const profile = profileSchema.parse(value);
         const old = store.snapshot().profiles.find((p) => p.id === profile.id);

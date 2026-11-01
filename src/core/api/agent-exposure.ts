@@ -90,5 +90,6 @@ export const agentApiExcludedMethods = {
   'desktop.configure': 'Desktop grants and listener configuration are local-owner-only.',
   'desktop.open': 'Connection tickets and session keys are main-process-only; use the dedicated authenticated desktop transport.',
   'desktop.status': 'Desktop status belongs to the dedicated viewing/control permission boundary, not generic API management.',
+  'desktop.clipboard': 'Clipboard transfers require a live desktop view, control grant, owner and generation; never generic API management.',
   'desktop.close': 'Desktop sessions are owned and closed by the dedicated desktop transport.',
 } as const satisfies Partial<Record<AgentCall['method'], string>>;

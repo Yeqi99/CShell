@@ -1,3 +1,4 @@
+import {ConnectionProbe} from './ConnectionProbe';
 import { useEffect, useId, useRef, useState } from 'react';
 import {
   ArrowRight,
@@ -408,7 +409,7 @@ export function ConnectionForm({
             {error}
           </p>
         )}
-        <footer className="connection-footer">
+        <ConnectionProbe host={value.host} port={Number(port)} disabled={!!busy}/><footer className="connection-footer">
           <div className="connection-actions">
             {busy === 'connect' && (
               <button type="button" className="secondary" onClick={attempt.cancel}>

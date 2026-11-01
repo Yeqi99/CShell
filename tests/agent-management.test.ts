@@ -246,8 +246,20 @@ test('Agent native management, hosting and relay grants are independent on provi
           .tools(session)
           .filter((t) => t.capability.startsWith('agent.'))
           .map((t) => t.name),
-        [toolName],
+        grant==='allowManage'?['agent_capabilities_list',toolName]:[toolName],
       );
+      const packageList=registry.tools(session).find(t=>t.name==='agent_capabilities_list');
+      const packageInvoke=registry.tools(session).find(t=>t.name==='agent_capability_invoke');
+      if(grant==='allowManage'){
+        assert.ok(packageList);
+        const result=await registry.prepare(session,'agent_capabilities_list',{}).execute(()=>true,new AbortController().signal);
+        assert.deepEqual(JSON.parse(result),{tools:[],nextCursor:null});
+        assert.equal(packageInvoke?.capability,'commands.execute');
+        assert.equal(packageInvoke?.needsReview({}),true);
+      }else{
+        assert.equal(packageList,undefined);assert.equal(packageInvoke,undefined);
+        await assert.rejects(f.provider.call(device.deviceId,{method:'packages.tools'}),/未授予/);
+      }
       const tool = registry.prepare(session, toolName, { method: allowed });
       assert.equal(tool.needsReview, false);
       await tool.execute(() => true, new AbortController().signal);

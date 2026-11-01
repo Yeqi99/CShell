@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowLeft, Check, ChevronRight, RefreshCw, Search } from 'lucide-react';
@@ -308,9 +309,7 @@ export function AiModelMenu({
               </>
             )}
             {error && (
-              <p className="agent-model-menu-error" role="alert">
-                {error}
-              </p>
+              <ErrorNotice title="操作未完成" error={error}/>
             )}
             <footer>
               <button

@@ -154,6 +154,20 @@ export function ActivityPage({ active, servers }: { active: boolean; servers: nu
             <Settings2 size={16} />
           </button>
         </header>
+        <nav className="activity-tabs" aria-label={cn ? '统计视图' : 'Activity views'}>
+          {[
+            ['overview', cn ? '概览' : 'Overview'],
+            ['records', cn ? '操作记录' : 'History'],
+          ].map(([id, label]) => (
+            <button
+              key={id}
+              aria-current={tab === id ? 'page' : undefined}
+              onClick={() => setTab(id)}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
         <div className="activity-filters">
           <label>
             {cn ? '开始日期' : 'From'}
@@ -191,20 +205,7 @@ export function ActivityPage({ active, servers }: { active: boolean; servers: nu
             ))}
           </select>
         </div>
-        <nav className="activity-tabs" aria-label={cn ? '统计视图' : 'Activity views'}>
-          {[
-            ['overview', cn ? '概览' : 'Overview'],
-            ['records', cn ? '操作记录' : 'History'],
-          ].map(([id, label]) => (
-            <button
-              key={id}
-              aria-current={tab === id ? 'page' : undefined}
-              onClick={() => setTab(id)}
-            >
-              {label}
-            </button>
-          ))}
-        </nav>
+
         {(error || snapshot.error) && (
           <p role="alert" className="form-error">
             {error || snapshot.error}

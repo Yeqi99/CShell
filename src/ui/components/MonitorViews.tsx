@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { useEffect, useRef, useState } from 'react';
 import { Plus, Monitor, Play, Trash2, Save, X } from 'lucide-react';
 import type { Config } from '../../shared/contracts';
@@ -95,6 +96,6 @@ export function MonitorViews({ config }: { config: Config }) {
       </article>)}
     </div>}
     {!draft && !views.length && <p>新建一个视图，然后添加已保存的 SSH 或 CAgent 连接。</p>}
-    {error && <p role="alert" className="form-error">{error}</p>}{notice && <p role="status">{notice}</p>}
+    {error && <ErrorNotice title="操作未完成" error={error}/>}{notice && <p role="status">{notice}</p>}
   </section>;
 }

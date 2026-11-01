@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { useEffect, useState } from 'react';
 import { ArrowUpRight, Grid2X2, LayoutDashboard, Monitor, Plus, Terminal, View, Blocks, Settings2, Bot, Code2 } from 'lucide-react';
 import type { Config, Profile } from '../../shared/contracts';
@@ -21,7 +22,7 @@ export function WorkbenchHome(props: WorkbenchProps) {
   ] as const).map(([value, label, Icon], index, all) => <button key={value} role="tab" aria-selected={mode === value} tabIndex={mode === value ? 0 : -1} onClick={() => void props.onView(value).catch(e => setError(String(e)))} onKeyDown={e => {
     if (e.key === 'ArrowRight' || e.key === 'ArrowLeft' || e.key === 'Home' || e.key === 'End') { e.preventDefault(); const next = e.key === 'Home' ? 0 : e.key === 'End' ? 2 : (index + (e.key === 'ArrowRight' ? 1 : 2)) % 3; (e.currentTarget.parentElement?.children[next] as HTMLButtonElement)?.focus(); void props.onView(all[next][0]).catch(err => setError(String(err))); }
   }}><Icon size={15}/>{label}</button>)}</div></header>
-    {error && <p role="alert" className="form-error">{error}</p>}
+    {error && <ErrorNotice title="操作未完成" error={error}/>}
     <div className="workbench-mode" role="tabpanel" aria-label="概览" hidden={mode !== 'overview'}><WorkbenchOverview {...props} active={props.active && mode === 'overview'}/></div>
     {seen.has('command') && <div className="workbench-mode" role="tabpanel" aria-label="命令行" hidden={mode !== 'command'}><CommandConsole active={props.active && mode === 'command'} onSettings={props.onSettings} onNewTab={props.onCommandTab}/></div>}
     {seen.has('visual') && <div className="workbench-mode" role="tabpanel" aria-label="可视化" hidden={mode !== 'visual'}><WorkbenchStudio {...props} active={props.active && mode === 'visual'}/></div>}
@@ -65,6 +66,6 @@ function WorkbenchOverview({ config, active, currentCount, onNew, onViews, onCon
       {connections.length ? <div className="home-connection-list">{connections.map(p => <button key={p.id} onClick={() => onConnect(p)}><span className="home-connection-icon">{p.protocol === 'client' || p.protocol === 'rdp' ? <Monitor size={18}/> : <Terminal size={18}/>}</span><span><strong title={p.name}>{p.name}</strong><small>{p.host || 'HTTP 工作区'}</small></span><ArrowUpRight size={15}/></button>)}</div>
         : <p className="home-empty-connections">还没有保存的连接，点击加号添加。</p>}
     </section>
-    {error && <p role="alert" className="form-error">{error}</p>}
+    {error && <ErrorNotice title="操作未完成" error={error}/>}
   </section>;
 }
