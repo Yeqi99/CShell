@@ -31,6 +31,7 @@ import {
   aiPermissionSchema,
   aiPolicySchema,
   emptyAiPolicy,
+  newInstallationAiPolicy,
   type AiPolicy,
   aiProviderSchema,
   aiLocations,
@@ -60,6 +61,9 @@ const eventToolDenied = (name:string) => eventDeniedTools.has(name) || (name.sta
 const idSchema = z.string().uuid();
 export const modeSchema = z.enum(['review', 'restricted', 'allow']);
 export class AiService {
+  private untouchedInstallationPolicy = false;
+  /** A generated first-run default is not guest data. Never export edited/loaded guest grants here. */
+  registrationPolicy() { return this.untouchedInstallationPolicy ? newInstallationAiPolicy() : emptyAiPolicy(); }
   private habits:AccountHabit[]=[];
   memory(){return structuredClone(this.habits);}
   async remember(input:unknown){const value=habitWriteSchema.parse(input),id=value.id??randomUUID();const next=habitsSchema.parse([...this.habits.filter(x=>x.id!==id),{id,text:value.text,updatedAt:new Date().toISOString()}]);const old=this.habits;this.habits=next;try{await this.persist();}catch(e){this.habits=old;throw e;}return this.memory();}
@@ -77,6 +81,8 @@ export class AiService {
   }
   async cloudImport(value: unknown) {
     const next = this.cloudValidate(value);
+    const previousOrigin = this.untouchedInstallationPolicy;
+    this.untouchedInstallationPolicy = false;
     const previous = this.cloudExport();
     // Active threads retain their permission ceilings; device-side grants remain local.
     this.providers = next.providers;
@@ -89,6 +95,7 @@ export class AiService {
       this.providers = previous.providers;
       this.habits = previous.habits;
       this.policy = previous.policy;
+      this.untouchedInstallationPolicy = previousOrigin;
       this.extractionProviderId = previous.extractionProviderId;
       this.textProviderIds = previous.textProviderIds;
       throw error;
@@ -249,7 +256,8 @@ export class AiService {
       throw error;
     }
   }
-  async load() {
+  async load(initializeNewInstallation = false) {
+    this.untouchedInstallationPolicy = false;
     try {
       const data = JSON.parse(
         await this.store.decryptPrivate(await readFile(join(this.directory, 'ai.enc'), 'utf8')),
@@ -258,6 +266,8 @@ export class AiService {
       this.habits=habitsSchema.parse(data.habits??[]);
       this.permissions = z.array(aiPermissionSchema).parse(data.permissions);
       this.policy = data.policy ? aiPolicySchema.parse(data.policy) : emptyAiPolicy();
+      this.untouchedInstallationPolicy = data.untouchedInstallationPolicy === true &&
+        JSON.stringify(this.policy) === JSON.stringify(newInstallationAiPolicy());
       if (data.textProviderIds)
         this.textProviderIds = z
           .object({ translate: idSchema.nullable(), compose: idSchema.nullable() })
@@ -291,6 +301,14 @@ export class AiService {
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== 'ENOENT')
         throw new Error('AI configuration could not be decrypted; original file preserved');
+      // Account workspaces and cloud restoration never opt into first-install defaults.
+      // Existing config without ai.enc is legacy data, not a fresh installation.
+      if (initializeNewInstallation && this.store.isNewInstallation()) {
+        this.policy = newInstallationAiPolicy();
+        this.untouchedInstallationPolicy = true;
+        try { await this.persist(); }
+        catch (error) { this.policy = emptyAiPolicy(); this.untouchedInstallationPolicy = false; throw error; }
+      }
     }
   }
   snapshot(): AiSnapshot {
@@ -311,6 +329,7 @@ export class AiService {
   private persist() {
     this.threads.forEach((t) => this.onThreadUpdate?.(t));
     const data = JSON.stringify({
+      untouchedInstallationPolicy: this.untouchedInstallationPolicy,
       habits:this.habits,
       providers: this.providers,
       permissions: this.permissions,
@@ -409,11 +428,14 @@ export class AiService {
     if (new Set(next.overrides.map((o) => o.profileId)).size !== next.overrides.length)
       throw new Error('Duplicate machine override');
     const previous = this.policy;
+    const previousOrigin = this.untouchedInstallationPolicy;
     this.policy = next;
+    this.untouchedInstallationPolicy = false;
     try {
       await this.persist();
     } catch (e) {
       this.policy = previous;
+      this.untouchedInstallationPolicy = previousOrigin;
       throw e;
     }
   }

@@ -64,6 +64,8 @@ export interface SecretCodec {
   decrypt(value: string): Promise<string>;
 }
 export class Store {
+  private firstInstallation = false;
+  isNewInstallation() { return this.firstInstallation; }
   /** Explicit portable allowlist. Never include MCP grants, local identity or plugin grants. */
   async cloudExport() {
     const secrets: Record<string, unknown> = {};
@@ -89,6 +91,7 @@ export class Store {
   }
   cloudCheckpoint() { return JSON.stringify(this.data); }
   async cloudImport(value: unknown, restoreHosts = false, expected = this.cloudCheckpoint()) {
+    this.firstInstallation = false;
     const unchanged = () => { if (this.cloudCheckpoint() !== expected) throw new CloudImportConflict(); };
     unchanged();
     const next = this.cloudValidate(value), secrets: Record<string,string> = {};
@@ -159,6 +162,7 @@ export class Store {
     private codec: SecretCodec,
   ) {}
   async load() {
+    this.firstInstallation = false;
     try {
       this.data = schema.parse(
         JSON.parse(await readFile(join(this.directory, 'config.json'), 'utf8')),
@@ -168,6 +172,7 @@ export class Store {
         throw new Error('Configuration could not be read. Original file was preserved.', {
           cause: error,
         });
+      this.firstInstallation = true;
     }
   }
   presets() {

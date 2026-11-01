@@ -136,7 +136,7 @@ export async function registerCloudHandlers(
   };
   const cloud = new CloudSync(directory, clientCodec, {
     ...(profileOptions?{
-      registrationSnapshot:async()=>({format:1,store:{profiles:[],groups:[],preferences:defaults,presets:[],monitorViews:[],hosts:{},secrets:{}},ai:emptySharedAi(),devices:[],http:[],browser:{},opencode:{accounts:[]},assets:{}}),
+      registrationSnapshot:async()=>({format:1,store:{profiles:[],groups:[],preferences:defaults,presets:[],monitorViews:[],hosts:{},secrets:{}},ai:{...emptySharedAi(),policy:ai.registrationPolicy()},devices:[],http:[],browser:{},opencode:{accounts:[]},assets:{}}),
       activationTarget:async(accountId:string|undefined)=>{
         assertAccountIdle();const target=await profileOptions.profiles.prepare(accountId);
         return {directory:target.directory,commit:async()=>{

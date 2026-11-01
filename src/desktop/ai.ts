@@ -31,6 +31,7 @@ export async function registerAiHandlers(
   setupCloud?: (ai: AiService, openCode: OpenCodeExtension, network: ApplicationNetworkRoute, tavily:TavilyExtension) => Promise<void>,
   customTools?: () => readonly import('../core/connections/contracts').ConnectionTool[],
   machineNetwork?: NonNullable<ApplicationNetworkRoute['machine']>,
+  initializeNewAi = false,
 ) {
   const ai = new AiService(directory, store, connections, connectHost, { http, wechat });
   const drafts = new AiDrafts(directory, store);
@@ -71,7 +72,7 @@ export async function registerAiHandlers(
       pending.clear();
     }, 40);
   };
-  await ai.load();
+  await ai.load(initializeNewAi);
   const officialOpenCode=new OfficialOpenCode(join(directory,'extensions','opencode'),ai.requestTransport);
   const openCode=new OpenCodeExtension({official:officialOpenCode.request,officialStatus:officialOpenCode.status,directory:join(directory,'extensions','opencode'),enabled:()=>pluginEnabled(store.plugins(),'opencode'),encrypt:s=>store.encryptPrivate(s),decrypt:s=>store.decryptPrivate(s),getProvider:id=>ai.snapshot().providers.find(p=>p.id===id),changed:()=>publish?.('ai:providers-changed'),saveProvider:async p=>{await ai.saveProvider(p);publish?.('ai:providers-changed');},open:async url=>(await import('electron')).shell.openExternal(url)},ai.requestTransport);
   await openCode.load();
