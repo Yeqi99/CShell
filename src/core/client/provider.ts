@@ -30,6 +30,7 @@ import { ClientVault, fingerprint, type ClientIdentity } from './identity';
 import { frames, send, textChunks } from './wire';
 import { ManagementQueue } from './management-queue';
 import { remoteProcessTools } from '../remote-process-tools';
+import {remoteAutomationTools} from '../remote-automation-tools';
 import { remoteCapabilityTools } from '../remote-capability-tools';
 const deviceSchema = clientInvitationSchema
   .omit({ token: true, expires: true })
@@ -493,8 +494,10 @@ export class ClientProvider implements ManagedProvider {
       };
       // Custom tools run on the native CAgent host, never a selected WSL environment.
       let processTools: import('../connections/contracts').ConnectionTool[] = [];
+      let automationTools: import('../connections/contracts').ConnectionTool[] = [];
       let packageTools: import('../connections/contracts').ConnectionTool[] = [];
       if(config.shell!=='wsl'&&auth.capabilities.includes('agent.manage')){
+        try{automationTools=await remoteAutomationTools((call,abort)=>this.call(device.deviceId,call,abort),auth.capabilities.includes('commands.execute'),AbortSignal.any([signal,AbortSignal.timeout(3000)]));}catch{/* Unsupported automation or revoked grants contributes no tools. */}
         try{packageTools=await remoteCapabilityTools((call,abort)=>this.call(device.deviceId,call,abort),auth.capabilities.includes('commands.execute'),AbortSignal.any([signal,AbortSignal.timeout(3000)]));}catch{/* Unsupported package protocol contributes no tools. */}
       }
       if(config.shell!=='wsl'&&auth.capabilities.includes('agent.manage')&&auth.capabilities.includes('commands.execute')) {
@@ -538,6 +541,7 @@ export class ClientProvider implements ManagedProvider {
         tools: [
           ...processTools,
           ...packageTools,
+          ...automationTools,
           ...(auth.capabilities.includes('commands.execute')&&auth.shells.includes(config.shell)
             ? [
                 {
