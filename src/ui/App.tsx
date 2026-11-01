@@ -154,13 +154,17 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
   useEffect(() => window.cshell.onMinimalHover(setMinimalHover), []);
   useEffect(
     () =>
-      window.cshell.onAiConnection(({ sessionId, profile }) => {
+      window.cshell.onAiConnection(({ sessionId, profile, managementOnly }) => {
         if (profile.protocol === 'client') {
           void window.cshell
             .clientDevices()
             .then((devices) => {
               const device = devices.find((d) => d.deviceId === profile.id);
               if (device) {
+                if (managementOnly) {
+                  void openMachineDevice(device).catch(onError);
+                  return;
+                }
                 setTabs((items) =>
                   items.some((t) => t.id === sessionId)
                     ? items
@@ -294,6 +298,7 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
   const [nativeDesktopRequests,setNativeDesktopRequests]=useState<Record<string,number>>({});
   const linuxRestored=useRef(new Set<string>());
   useEffect(()=>{for(const tab of tabs){if(tab.local||tab.client||linuxRestored.current.has(tab.id))continue;linuxRestored.current.add(tab.id);if(connectionUsesVisual(tab.profile,config.preferences)){setLinuxWorkspaces(v=>v.includes(tab.id)?v:[...v,tab.id]);setLinuxModes(v=>({...v,[tab.id]:true}));}}},[tabs]);
+  const [machineConnectionState,setMachineConnectionState]=useState<Record<string,boolean>>({});
   const [machineSessionIds,setMachineSessionIds]=useState<Record<string,string[]>>({});
   const [machineSessionCounts,setMachineSessionCounts]=useState<Record<string,number>>({});
   const [machines,setMachines]=useState<{device:ClientDevice;target:AgentTarget}[]>([]),[machineId,setMachineId]=useState('');
@@ -307,8 +312,8 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
     await window.cshell.openCurrentView(sources, mode);
   };
   async function openMachineDevice(device:ClientDevice){
-    const existing=machines.find(m=>m.device.deviceId===device.deviceId);
-    const latest=await configLoader.load();const opened=existing?.target??await window.cshell.agentMachineOpen(device.deviceId);
+
+    const latest=await configLoader.load();const opened=await window.cshell.agentMachineOpen(device.deviceId);
     const target={...opened,name:latest.profiles.find(p=>p.id===device.deviceId)?.name??device.name};
     setMachines(v=>v.some(m=>m.target.id===target.id)?v:[...v,{device,target}]);setMachineId(target.id);setSurface('machine');
     await configLoader.load();
@@ -319,15 +324,14 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
     setWslSetupTarget(null);
     setSurface(wslReturnSurface.current);
   };
-  const [quickConnections, setQuickConnections] = useState<Profile[]>([]);
+  const [quickConnections, setQuickConnections] = useState<(Profile & { instanceId: string; visual: boolean })[]>([]);
   const [quickId, setQuickId] = useState('');
-  const [quickVisual, setQuickVisual] = useState<Record<string, boolean>>({});
+
   const openSaved = (profile: Profile, visual = connectionUsesVisual(profile,config.preferences)) => {
-    setQuickVisual(v => ({...v, [profile.id]: visual}));
-    setQuickConnections((items) =>
-      items.some((item) => item.id === profile.id) ? items : [...items, profile],
-    );
-    setQuickId(profile.id);
+
+    const instanceId = crypto.randomUUID();
+    setQuickConnections((items) => [...items, { ...profile, instanceId, visual }]);
+    setQuickId(instanceId);
     setSurface('quick');
   };
   const openConnection = (profile: Profile | 'new') => {
@@ -447,9 +451,9 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
             },
           })),
           ...quickConnections.map((profile) => ({
-            key: `quick-${profile.id}`,
+            key: `quick-${profile.instanceId}`,
             select: () => {
-              setQuickId(profile.id);
+              setQuickId(profile.instanceId);
               setSurface('quick');
             },
           })),
@@ -520,13 +524,14 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
     credentials: Credentials,
     persist: boolean,
     signal?: AbortSignal,
+    visualOverride?: boolean,
   ) {
     const result = await connectRequest(window.cshell, profile, credentials, persist, signal);
     setTabs((v) => [
       ...v,
       { id: result.sessionId, profile, closed: terminalClosed(result.sessionId) },
     ]);
-    const visual = !isFileConnection(profile) && (quickVisual[profile.id] ?? connectionUsesVisual(profile,config.preferences));
+    const visual = !isFileConnection(profile) && (visualOverride ?? connectionUsesVisual(profile,config.preferences));
     if (visual) setLinuxWorkspaces(v=>[...v,result.sessionId]);
     setLinuxModes(v=>({...v,[result.sessionId]:visual}));
     linuxRestored.current.add(result.sessionId);
@@ -776,7 +781,7 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
               groups={config.groups}
               profiles={config.profiles}
               activeProfile={surface==='machine'?machines.find(m=>m.target.id===machineId)?.device.deviceId:current?.profile.id}
-              online={[...tabs.filter((tab) => !tab.closed && !tab.local).map((tab) => tab.profile.id),...machines.map(m=>m.device.deviceId)]}
+              online={[...tabs.filter((tab) => !tab.closed && !tab.local).map((tab) => tab.profile.id),...machines.filter(m=>machineConnectionState[m.target.id]!==false).map(m=>m.device.deviceId)]}
               onOpen={(p) => openConnection(p || 'new')}
               onConnect={openSaved}
               onVisual={profile => openSaved(profile, true)}
@@ -911,16 +916,16 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
               )}
               {quickConnections.map((profile) => (
                 <div
-                  key={`quick-${profile.id}`}
-                  className={`tab ${surface === 'quick' && quickId === profile.id ? 'active' : ''}`}
+                  key={`quick-${profile.instanceId}`}
+                  className={`tab ${surface === 'quick' && quickId === profile.instanceId ? 'active' : ''}`}
                   onClick={() => {
-                    setQuickId(profile.id);
+                    setQuickId(profile.instanceId);
                     setSurface('quick');
                   }}
                 >
                   <button
                     onClick={() => {
-                      setQuickId(profile.id);
+                      setQuickId(profile.instanceId);
                       setSurface('quick');
                     }}
                   >
@@ -933,9 +938,9 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
                     onClick={(e) => {
                       e.stopPropagation();
                       setQuickConnections((items) =>
-                        items.filter((item) => item.id !== profile.id),
+                        items.filter((item) => item.instanceId !== profile.instanceId),
                       );
-                      if (quickId === profile.id) setSurface('terminal');
+                      if (quickId === profile.instanceId) setSurface('terminal');
                     }}
                   >
                     <X size={13} />
@@ -1130,27 +1135,27 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
           )}
           {quickConnections.map((profile) => (
             <div
-              key={`quick-${profile.id}`}
+              key={`quick-${profile.instanceId}`}
               className="workspace-editor"
-              hidden={surface !== 'quick' || quickId !== profile.id}
+              hidden={surface !== 'quick' || quickId !== profile.instanceId}
             >
-              {profile.protocol === 'rdp' ? <RdpMachineWorkspace active={surface === 'quick' && quickId === profile.id} profile={profile} profiles={config.profiles} onOpen={openSaved}/> : profile.protocol === 'http' ? (
+              {profile.protocol === 'rdp' ? <RdpMachineWorkspace active={surface === 'quick' && quickId === profile.instanceId} profile={profile} profiles={config.profiles} onOpen={openSaved}/> : profile.protocol === 'http' ? (
                 <HttpWorkbench
                   profile={config.profiles.find((p) => p.id === profile.id) ?? profile}
                   enabled={pluginEnabled(config.plugins, 'http')}
                   onSaveProfile={saveProfile}
                 />
               ) : profile.protocol === 'client' ? (
-                <SavedAgentConnection profile={profile} onConnect={openMachineDevice} onDone={()=>setQuickConnections(items=>items.filter(item=>item.id!==profile.id))}/>
+                <SavedAgentConnection profile={profile} onConnect={openMachineDevice} onDone={()=>setQuickConnections(items=>items.filter(item=>item.instanceId!==profile.instanceId))}/>
               ) : (
                 <SavedConnection
-                  visual={!isFileConnection(profile) && (quickVisual[profile.id] ?? connectionUsesVisual(profile,config.preferences))}
+                  visual={!isFileConnection(profile) && profile.visual}
                   profile={profile}
                   saved={config.savedCredentials.includes(profile.id)}
                   persist={config.profiles.some((p) => p.id === profile.id)}
-                  onConnect={connect}
+                  onConnect={(p,c,persist,signal)=>connect(p,c,persist,signal,profile.visual)}
                   onDone={() =>
-                    setQuickConnections((items) => items.filter((item) => item.id !== profile.id))
+                    setQuickConnections((items) => items.filter((item) => item.instanceId !== profile.instanceId))
                   }
                 />
               )}
@@ -1282,7 +1287,7 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
             </div>
           )}
           {accountOpen && <div className="workspace-editor account-workspace" hidden={surface!=="account"}><CloudSettings/></div>}
-          {viewsOpen && <div className="workspace-editor" hidden={surface !== 'views'}><MonitorViews config={config}/></div>}{machines.map(m=><div key={m.target.id} className="workspace-editor" hidden={surface!=='machine'||machineId!==m.target.id}><AgentMachineWorkspace onDisconnect={()=>closeMachine(m.target.id)} device={m.device} target={m.target} preferences={preferences} onSessionCount={(count,ids)=>{setMachineSessionCounts(v=>v[m.target.id]===count?v:{...v,[m.target.id]:count});setMachineSessionIds(v=>JSON.stringify(v[m.target.id])===JSON.stringify(ids)?v:{...v,[m.target.id]:ids});}} active={surface==='machine'&&machineId===m.target.id}/></div>)}
+          {viewsOpen && <div className="workspace-editor" hidden={surface !== 'views'}><MonitorViews config={config}/></div>}{machines.map(m=><div key={m.target.id} className="workspace-editor" hidden={surface!=='machine'||machineId!==m.target.id}><AgentMachineWorkspace onConnectionState={connected=>setMachineConnectionState(v=>v[m.target.id]===connected?v:{...v,[m.target.id]:connected})} onDisconnect={()=>closeMachine(m.target.id)} device={m.device} target={m.target} preferences={preferences} onSessionCount={(count,ids)=>{setMachineSessionCounts(v=>v[m.target.id]===count?v:{...v,[m.target.id]:count});setMachineSessionIds(v=>JSON.stringify(v[m.target.id])===JSON.stringify(ids)?v:{...v,[m.target.id]:ids});}} active={surface==='machine'&&machineId===m.target.id}/></div>)}
           <div className="workspace-editor" hidden={surface !== 'home' && !(surface === 'terminal' && !tabs.length)}>
             <WorkbenchHome config={config} active={surface === 'home' || (surface === 'terminal' && !tabs.length)} currentCount={currentSsh.length + currentDevices.length}
               onView={view=>savePreferences({...config.preferences,workbenchView:view})} onSettings={openSettings} onExtensions={openExtensions} onAgent={()=>setAiVisible(true)} onCommandTab={newCommandTab}

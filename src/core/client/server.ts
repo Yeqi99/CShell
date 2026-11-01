@@ -48,11 +48,13 @@ const requestSchema = z
   })
   .strict();
 type Peer = z.infer<typeof peerSchema>;
-type Channel = { socket: TLSSocket; peer?: Peer; terminal?: string; alive: boolean };
+type Channel = { socket: TLSSocket; peer?: Peer; terminal?: string; alive: boolean; delegation?: {token:string;fingerprint:string}; };
 export class ClientServer {
   private server?: Server;
   private identity!: ClientIdentity;
   private peers: Peer[] = [];
+  private delegatedPeers = new Set<Peer>();
+  private hasPeer(peer:Peer){return this.peers.includes(peer)||this.delegatedPeers.has(peer); }
   private channels = new Set<Channel>();
   private invitation?: { token: string; expires: number; shells: ClientShell[] };
   private audit: ClientStatus['audit'] = [];
@@ -67,6 +69,7 @@ export class ClientServer {
     private vault: ClientVault,
     private terminal: ManagedProvider,
     private options: {
+      delegation?: (credential:string,fingerprint:string,continuation?:boolean)=>Promise<boolean>;
       http?: (request:import('../../shared/http').HttpWireRequest,signal:AbortSignal)=>Promise<unknown>;
       desktopStream?: (socket: TLSSocket, owner: string) => Promise<void>;
       manage?: (method: string, params: unknown, signal: AbortSignal, owner: string) => Promise<unknown>;
@@ -124,13 +127,20 @@ export class ClientServer {
       audit: [...this.audit].reverse(),
     };
   }
-  browserAllowed(owner:string){return !!this.access?.allowHttp&&this.peers.some(p=>p.fingerprint===owner&&p.allowHttp);}
+  browserAllowed(owner:string){return !!this.access?.allowHttp&&[...this.peers,...this.delegatedPeers].some(p=>p.fingerprint===owner&&p.allowHttp);}
   managementAllowed(owner: string) {
-    return !!this.access?.allowManage && this.peers.some((p) => p.fingerprint === owner && p.allowManage);
+    return !!this.access?.allowManage && [...this.peers,...this.delegatedPeers].some((p) => p.fingerprint === owner && p.allowManage);
   }
   async revealPassword() { return (await this.vault.read('connection-password', z.string())) ?? ''; }
   async setAccess(options: unknown) {
     const input = clientAccessSchema.parse(options);
+    // Defaults apply only to a new access record. Partial edits must retain
+    // explicit opt-outs stored by an existing installation.
+    if (this.access && options && typeof options === 'object') {
+      for (const key of ['allowHttp','allowManage','allowHosting','allowRelay'] as const) {
+        if (!Object.prototype.hasOwnProperty.call(options,key)) input[key]=this.access[key];
+      }
+    }
     if (this.server || this.changingAccess) throw new Error('请先停止服务再修改密码与权限');
     this.changingAccess = true;
     try {
@@ -307,6 +317,7 @@ export class ClientServer {
       clearTimeout(timeout);
       c.alive = false;
       this.channels.delete(c);
+      if(c.delegation&&c.peer)this.delegatedPeers.delete(c.peer);
       if (c.terminal) void this.terminal.disconnect(c.terminal);
     });
     let queue = Promise.resolve(),
@@ -315,7 +326,7 @@ export class ClientServer {
       const req = requestSchema.parse(raw);
       if(req.op==='desktop-stream'){
         // Dedicated authenticated stream: no pipelined requests/terminal may cross the protocol boundary.
-        if(pending||c.terminal||!c.peer||!this.peers.includes(c.peer)||!this.managementAllowed(cert.fingerprint256)||!this.options.desktopStream){socket.destroy();return false;}
+        if(pending||c.terminal||!c.peer||!this.hasPeer(c.peer)||!this.managementAllowed(cert.fingerprint256)||!this.options.desktopStream){socket.destroy();return false;}
         socket.setTimeout(0);
         send(socket,{id:req.id,result:{desktopStream:true}});
         setImmediate(()=>{if(c.alive&&c.peer&&this.managementAllowed(cert.fingerprint256))void this.options.desktopStream!(socket,cert.fingerprint256).catch(()=>socket.destroy());else socket.destroy();});
@@ -365,10 +376,17 @@ export class ClientServer {
           name: z.string().min(1).max(80),
           token: z.string().max(128).optional(),
           password: z.string().min(1).max(128).optional(),
+          delegation: z.string().regex(/^[a-f0-9]{64}$/).optional(),
         })
         .strict()
         .parse(payload);
       let peer = this.peers.find((p) => p.fingerprint === fp);
+      if(value.delegation){
+        if(!this.options.delegation||!await this.options.delegation(value.delegation,fp)||!c.alive||!this.access)throw Error('Borrowed device authorization expired');
+        peer={fingerprint:fp,name:value.name,shells:this.access.shells,allowHttp:!!this.access.allowHttp,allowManage:!!this.access.allowManage,allowHosting:false,allowRelay:false};
+        this.delegatedPeers.add(peer);c.delegation={token:value.delegation,fingerprint:fp};
+        let checking=false;const timer=setInterval(()=>{if(checking)return;checking=true;void this.options.delegation!(value.delegation!,fp,true).then(ok=>{if(!ok)c.socket.destroy();}).catch(()=>c.socket.destroy()).finally(()=>{checking=false;});},2000);timer.unref();c.socket.once('close',()=>clearInterval(timer));
+      }
       if (!peer) {
         const invite = this.invitation;
         let shells: ClientShell[];
@@ -418,7 +436,7 @@ export class ClientServer {
         await this.record('peer.paired', fp);
       }
       // Revocation may happen while encrypted persistence awaits IO.
-      if (!c.alive || !this.peers.includes(peer)) throw new Error('Revoked');
+      if (!c.alive || !this.hasPeer(peer)) throw new Error('Revoked');
       c.peer = peer;
       return {
         protocol: 1,
@@ -434,7 +452,8 @@ export class ClientServer {
         ],
       };
     }
-    if (!c.peer || !this.peers.includes(c.peer)) throw new Error('Not paired');
+    if (!c.peer || !this.hasPeer(c.peer)) throw new Error('Not paired');
+    if(c.delegation&&(!this.options.delegation||!await this.options.delegation(c.delegation.token,c.delegation.fingerprint,true))){c.socket.destroy();throw Error('Borrowed device authorization expired');}
     if (op === 'ping') return {};
     if (op === 'exec') {
       const input = clientExecSchema.parse(payload);
@@ -445,7 +464,7 @@ export class ClientServer {
         closed = () => abort.abort();
       c.socket.once('close', closed);
       try {
-        if (!c.alive || !this.peers.includes(c.peer)) throw new Error('Revoked');
+        if (!c.alive || !this.hasPeer(c.peer)) throw new Error('Revoked');
         return await this.options.execute(input, abort.signal);
       } finally {
         c.socket.off('close', closed);
@@ -453,6 +472,7 @@ export class ClientServer {
     }
     if (op === 'manage') {
       const call = agentCallSchema.parse(payload);
+      if(c.delegation&&/^(connection\.|account\.|relay\.|hosting\.|packages\.(grant|install|uninstall)|assistant\.configure)/.test(call.method))throw Error('借用连接不能读取或修改设备身份与授权');
       if (call.method === 'agent.shells')
         return this.options.shells
           ? (await this.options.shells()).filter((s) =>
@@ -473,7 +493,7 @@ export class ClientServer {
       try {
         if (
           !c.alive ||
-          !this.peers.includes(c.peer) ||
+          !this.hasPeer(c.peer) ||
           !c.peer[permission] ||
           !this.access?.[permission]
         )
@@ -491,7 +511,7 @@ export class ClientServer {
         closed = () => abort.abort();
       c.socket.once('close', closed);
       try {
-        if (!c.alive || !this.peers.includes(c.peer)) throw new Error('Revoked');
+        if (!c.alive || !this.hasPeer(c.peer)) throw new Error('Revoked');
         return this.options.http?await this.options.http(request,abort.signal):await executeHttp(request, abort.signal, undefined, 65536);
       } finally {
         c.socket.off('close', closed);
@@ -507,7 +527,7 @@ export class ClientServer {
       c.socket.once('close', closed);
       try {
         const id = await this.terminal.connect(config, undefined, abort.signal);
-        if (!c.alive || !this.peers.includes(c.peer)) {
+        if (!c.alive || !this.hasPeer(c.peer)) {
           await this.terminal.disconnect(id);
           throw new Error('Revoked');
         }

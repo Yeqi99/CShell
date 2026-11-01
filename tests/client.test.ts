@@ -22,6 +22,42 @@ const codec = {
   encrypt: async (value: string) => Buffer.from(value).toString('base64'),
   decrypt: async (value: string) => Buffer.from(value, 'base64').toString(),
 };
+test('new access defaults remain usable while explicit opt-outs and empty shells survive partial edits and restart',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'cshell-access-preserve-'));
+ const vault=new ClientVault(dir,codec);
+ const terminal={id:'test',version:'1',capabilities:[],configuration:z.any(),connect:async()=>{throw Error('unused');},disconnect(){},resolve(){throw Error('unused');}} as ManagedProvider;
+ let server=new ClientServer(vault,terminal);
+ try{
+  await server.load();await server.setAccess({password:'isolated-access-fixture',shells:[]});
+  for(const key of ['allowHttp','allowManage','allowHosting','allowRelay'] as const) assert.equal(server.status()[key],true);
+  await server.setAccess({password:'isolated-access-fixture',shells:[],allowHttp:false,allowManage:false,allowHosting:false,allowRelay:false});
+  await server.setAccess({password:'isolated-access-fixture',shells:[]});
+  server=new ClientServer(vault,terminal);await server.load();
+  assert.equal(server.status().passwordConfigured,true);assert.deepEqual(server.status().allowedShells,[]);
+  for(const key of ['allowHttp','allowManage','allowHosting','allowRelay'] as const) assert.equal(server.status()[key],false);
+  await server.start({bind:'127.0.0.1',port:await freePort()});await server.stop();
+  for(const key of ['allowHttp','allowManage','allowHosting','allowRelay'] as const) assert.equal(server.status()[key],false);
+ }finally{await server.stop();await rm(dir,{recursive:true,force:true});}
+});
+test('management-only Agent connections expose real tools without opening a phantom terminal',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'cshell-management-'));let opens=0;
+  const terminal:ManagedProvider={id:'test',version:'1',capabilities:[],configuration:z.any(),async connect(){opens++;throw Error('No interactive terminal on this device');},disconnect(){},resolve(){throw Error('No terminal');}};
+  const server=new ClientServer(new ClientVault(join(dir,'host'),codec),terminal,{manage:async()=>[]});
+  const controller=new ClientProvider(new ClientVault(join(dir,'controller'),codec),()=>{});
+  try{
+    await server.load();await controller.load();await server.setAccess({password:'isolated-management-fixture',shells:[],allowManage:true});
+    const port=await freePort();await server.start({bind:'127.0.0.1',port});
+    const info=await controller.probe({host:'127.0.0.1',port});await controller.pairPassword(info,'isolated-management-fixture');
+    const config=await controller.toolConfiguration(info.deviceId);
+    assert.equal(config.managementOnly,true);
+    const signal=new AbortController().signal;
+    const id=await controller.connect(config,undefined,signal),connection=controller.resolve(id);
+    assert.equal(opens,0);assert.equal(connection.terminal,undefined);
+    assert.equal(connection.tools.some(tool=>tool.name==='execute_command'),false);
+    assert.deepEqual(await connection.agent!({method:'agent.shells'},signal),[]);
+    await assert.rejects(controller.connect({...config,distribution:'Ubuntu'},undefined,signal));
+  }finally{controller.dispose();await server.stop();await rm(dir,{recursive:true,force:true});}
+});
 test('Client authenticates mutual TLS, consumes invitations, scopes shells, revokes live terminals and persists trust', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'cshell-client-protocol-'));
   const sessions = new Set<string>();
@@ -269,4 +305,20 @@ test('native terminal exit reasons reach the controller once without leaving a l
     assert.deepEqual(events.filter(e=>e.type==='closed'),[{type:'closed',sessionId:session,error:'进程退出 (4294967295)'}]);
     assert.throws(()=>client.resolve(session),/closed/);
   } finally { client.dispose();await server.stop();await rm(dir,{recursive:true,force:true,maxRetries:5}); }
+});
+
+test('borrowed device uses fingerprint-bound delegation without persistent pairing or password and disconnects on revocation', async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'cshell-borrow-'));let allowed=true;const sessions=new Set<string>();
+ const terminal:ManagedProvider={id:'test',version:'1',capabilities:['terminal.interactive'],configuration:z.any(),async connect(){const id=randomUUID();sessions.add(id);return id;},disconnect(id){sessions.delete(id);},resolve(id){return {target:{providerId:'test',resourceId:id,identity:id,label:id},tools:[],terminal:{input(){},resize(){},acknowledge(){}}};}};
+ const controllerVault=new ClientVault(join(dir,'controller'),codec);const controller=await controllerVault.identity();const expected=fingerprint(controller.certificate);
+ const server=new ClientServer(new ClientVault(join(dir,'server'),codec),terminal,{delegation:async(token,fp)=>allowed&&token==='a'.repeat(64)&&fp===expected,manage:async()=>({password:'must never expose'})});
+ const client=new ClientProvider(controllerVault,()=>{});await server.load();await client.load();
+ try{
+  await server.setAccess({password:'not-shared-with-borrower',shells:['cmd'],allowManage:true,allowHttp:true,allowHosting:true,allowRelay:true});await server.start({bind:'127.0.0.1',port:await freePort()});
+  const info=JSON.parse(server.connectionInfo('127.0.0.1'));await client.cloudImport([{...info,accountBorrowed:true}]);client.cloudDelegation=async(_id,fp)=>{assert.equal(fp,expected);return 'a'.repeat(64);};
+  await client.connect({deviceId:info.deviceId,shell:'cmd'},undefined,new AbortController().signal);assert.equal(sessions.size,1);assert.equal(server.status().peers.length,0);
+  await assert.rejects((client as any).managementCall(info.deviceId,{method:'connection.settings'},new AbortController().signal));
+  allowed=false;const until=Date.now()+5000;while(sessions.size&&Date.now()<until)await new Promise(r=>setTimeout(r,50));assert.equal(sessions.size,0);assert.equal(server.status().peers.length,0);
+  await assert.rejects(client.connect({deviceId:info.deviceId,shell:'cmd'},undefined,new AbortController().signal));
+ }finally{await client.dispose();await server.stop();await rm(dir,{recursive:true,force:true});}
 });

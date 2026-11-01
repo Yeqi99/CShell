@@ -2,6 +2,7 @@ import {ideMethods} from './ide';
 import {codingMethods} from './coding';
 import { z } from 'zod';
 export const agentMethods = [
+  'automation.list','automation.create','automation.change',
   'environment.read','environment.save','assistant.model.configure','management.script.start','management.script.status','management.script.cancel',
   'network.status','network.configure',
   'network.probe',
@@ -34,6 +35,7 @@ export const agentMethods = [
   'desktop.configure',
   'desktop.open',
   'desktop.close',
+  'desktop.clipboard',
   'applications.policy',
   'applications.configure',
   'applications.list',
@@ -112,3 +114,4 @@ export const agentCapability = (method: string) =>
     : method.startsWith('relay.')
       ? 'agent.relay'
       : 'agent.manage';
+

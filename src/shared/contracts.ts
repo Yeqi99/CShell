@@ -1,3 +1,4 @@
+import type {LocalClipboardBridge} from './local-clipboard';
 import type {CommandBridge} from './command-console';
 import type {LinuxWorkspaceBridge} from './linux-workspace';
 import type { CloudBridge } from './cloud-sync';
@@ -227,6 +228,7 @@ export const preferencesSchema = z
     sidebarGroupSize: z.number().min(8).max(22).default(14),
     sidebarDetailSize: z.number().min(8).max(20).default(12),
     sidebarDensity: z.enum(['compact', 'comfortable', 'spacious']).default('comfortable'),
+    sidebarPingIntervalSeconds: z.number().int().min(0).max(3600).default(0),
     terminalFont: z.string().max(200),
     fontSize: z.number().min(8).max(28),
     lineHeight: z.number().min(1).max(1.8).default(1.2),
@@ -265,6 +267,7 @@ export const defaults: Preferences = {
   sidebarGroupSize: 14,
   sidebarDetailSize: 12,
   sidebarDensity: 'comfortable',
+  sidebarPingIntervalSeconds: 0,
   terminalFont: 'Cascadia Code, Consolas, Microsoft YaHei UI, monospace',
   fontSize: 14,
   lineHeight: 1.2,
@@ -362,7 +365,7 @@ export type SessionEvent =
   | { type: 'closed'; sessionId: string; error?: string }
   | { type: 'transfer'; transfer: Transfer };
 export interface Bridge
-  extends CommandBridge, CloudBridge, LinuxWorkspaceBridge, MachineBrowserBridge,
+  extends LocalClipboardBridge, CommandBridge, CloudBridge, LinuxWorkspaceBridge, MachineBrowserBridge,
     AgentBridge,
     DesktopViewBridge,
     HttpBridge,
@@ -381,6 +384,7 @@ export interface Bridge
   readonly platform: string;
   networkDiagnostics?(): Promise<import('./network-probe').NetworkDiagnostics>;
   networkPing(input:{profileId?:string;sessionId?:string}):Promise<import('./icmp-ping').PingResult>;
+  connectionProbe?(input:{host:string;port:number}):Promise<import('./network-probe').NetworkProbeResult>;
   networkProbe?(input: { id: string; source: string; target: string }): Promise<import('./network-probe').NetworkProbeResult>;
   networkProbeCancel?(id: string): Promise<void>;
   connectionImportText?(text: string): Promise<import('./connection-batch').ConnectionImportPreview>;
@@ -391,6 +395,8 @@ export interface Bridge
   networkRemoteSources?():Promise<{id:string;name:string}[]>;
   networkRemoteOpen?(input:{source:string;exit:string}):Promise<{port:number}>;
   networkStatus?(): Promise<import('./network-route').NetworkRouteStatus>;
+  networkSystemStatus?():Promise<{supported:boolean;enabled:boolean;error:string}>;
+  networkSystemSet?(enabled:boolean):Promise<{supported:boolean;enabled:boolean;error:string}>;
   desktopLookGet?(id:string,legacy?:import('./desktop-look').DesktopLook):Promise<import('./desktop-look').DesktopLook|null>;
   desktopLookSave?(id:string,value:import('./desktop-look').DesktopLook|null):Promise<import('./desktop-look').DesktopLook|null>;
   onDesktopLookChanged?(listener:()=>void):()=>void;

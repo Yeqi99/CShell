@@ -16,6 +16,10 @@ final class CloudAccountTest {
    JSONObject profile=new JSONObject().put("id",id).put("name","fixture").put("host","test.invalid").put("port",22).put("username","user").put("auth","password");
    JSONObject bundle=new JSONObject().put("format",1).put("store",new JSONObject().put("profiles",new JSONArray().put(profile)).put("secrets",new JSONObject().put(id,new JSONObject().put("password","fixture-secret")))).put("ai",new JSONObject().put("providers",new JSONArray()).put("policy",new JSONObject().put("future",true))).put("devices",new JSONArray()).put("opencode",new JSONObject().put("accounts",new JSONArray())).put("future-field","keep");
    bundle.put("tavily",new JSONObject().put("accounts",new JSONArray().put(new JSONObject().put("id","search").put("key","fixture-search-key").put("enabled",false))));
+   check(!CloudSync.supportsSchema2(bundle),"legacy bundle must not raise write schema");
+   bundle.getJSONObject("store").put("extensions",new JSONObject().put("enabled",new JSONObject().put("opencode",true)).put("future",new JSONObject().put("keep",true)));
+   check(CloudSync.supportsSchema2(bundle),"complete extension selection advertises schema 2");
+   check(!CloudSync.supportsSchema2(new JSONObject().put("store",new JSONObject().put("extensions",new JSONObject().put("enabled",new JSONArray())))),"invalid extension representation cannot advertise schema 2");
    CloudSync a=new CloudSync(context);JSONObject state=new JSONObject().put("session",new JSONObject().put("accountId","a").put("email","a@example.com")).put("key","fixture-key").put("bundle",bundle).put("pending",new JSONObject().put("mutationId","pending-id")).put("pendingBundle",bundle);
    set(a,"state",state);call(a,"archive",new Class<?>[]{});set(a,"state",new JSONObject());call(a,"save",new Class<?>[]{});
    CloudSync guest=new CloudSync(context);check(guest.owner().equals("guest"),"guest context");JSONObject request=new JSONObject(profile.toString()).put("cloudProfileId",id);guest.fillCredentials(request);check(!request.has("password"),"guest credential isolation");

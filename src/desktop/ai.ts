@@ -1,3 +1,4 @@
+import {WindowsSystemProxy} from './system-proxy';
 import {OfficialOpenCode} from '../extensions/opencode/official-runtime';
 import {TavilyExtension} from '../extensions/tavily/service';
 import {ApplicationNetworkRoute} from './network-route';
@@ -51,6 +52,12 @@ export async function registerAiHandlers(
   const network = new ApplicationNetworkRoute(directory, store);
   network.machine = machineNetwork;
   await network.load();
+  const systemProxy=new WindowsSystemProxy(directory,store,(host,port)=>network.systemTunnel(host,port),()=>network.prepareSystemProxy());
+  systemProxy.beforeEnable=state=>network.captureControlProxy(state);
+  systemProxy.afterDisable=()=>network.releaseControlProxy();
+  await systemProxy.recover().catch(()=>{});
+  handle('network:system-status',()=>systemProxy.status());
+  handle('network:system-set',enabled=>systemProxy.set(z.boolean().parse(enabled)));
   ai.requestTransport = process.versions.electron ? network.fetch : undefined;
   handle('network:status', () => network.status());
   handle('network:save', input => network.save(input));
@@ -153,6 +160,7 @@ export async function registerAiHandlers(
   handle('ai:approve', (id, request, allow) => ai.approve(id, request, allow));
   handle('ai:stop', (id) => ai.stopAndSave(id));
   handle('ai:mode', (id, mode) => ai.mode(id, mode));
+  handle('ai:thread-provider', (id, provider, model) => ai.changeThreadProvider(id, provider, model));
   let disposal: Promise<void> | undefined;
   const dispose = () => {
     if (disposal) return disposal;
@@ -162,7 +170,7 @@ export async function registerAiHandlers(
     ai.dispose();
     clearTimeout(timer);
     pending.clear();
-    disposal = Promise.all([events.close(),ai.flush(),remoteClose,network.close(),drafts.snapshot()]).then(()=>{});
+    disposal = Promise.all([events.close(),ai.flush(),remoteClose,systemProxy.close().finally(()=>network.close()),drafts.snapshot()]).then(()=>{});
     return disposal;
   };
   return Object.assign(dispose, { classroomModels:()=>ai.classroomModels(),classroomModel:(id:string)=>ai.classroomModel(id), hasActiveWork: () => ai.hasActiveWork });

@@ -29,7 +29,7 @@ import {
   type Preferences,
 } from '../shared/contracts';
 
-const portableExtensionsSchema=z.object({commandSuggestions:z.boolean(),dockerSocket:toolsSettingsSchema.shape.dockerSocket,commands:z.record(z.string().max(100),pluginManifestSchema.shape.commands)}).strict();
+const portableExtensionsSchema=z.object({commandSuggestions:z.boolean(),dockerSocket:toolsSettingsSchema.shape.dockerSocket,commands:z.record(z.string().max(100),pluginManifestSchema.shape.commands),enabled:z.record(z.string().max(100),z.boolean()).optional()}).strict();
 const schema = z.object({
   version: z.literal(1),
   monitorViews: z.array(monitorViewSchema).max(100).default([]),
@@ -68,7 +68,7 @@ export class Store {
       if (snapshot.secrets[profile.id]) secrets[profile.id] = JSON.parse(await this.codec.decrypt(snapshot.secrets[profile.id]));
     }
     return { profiles: snapshot.profiles, groups: snapshot.groups, preferences: snapshot.preferences,
-      presets: snapshot.presets, monitorViews: snapshot.monitorViews, hosts: snapshot.hosts, secrets, extensions:{commandSuggestions:snapshot.tools.commandSuggestions,dockerSocket:snapshot.tools.dockerSocket,commands:Object.fromEntries(this.plugins().map(p=>[p.manifest.id,p.manifest.commands]))} };
+      presets: snapshot.presets, monitorViews: snapshot.monitorViews, hosts: snapshot.hosts, secrets, extensions:{commandSuggestions:snapshot.tools.commandSuggestions,dockerSocket:snapshot.tools.dockerSocket,commands:Object.fromEntries(this.plugins().map(p=>[p.manifest.id,p.manifest.commands])),enabled:Object.fromEntries(this.plugins().filter(p=>p.source==='bundled').map(p=>[p.manifest.id,p.enabled]))} };
   }
   cloudValidate(value: unknown) {
     const result = schema.pick({profiles:true, groups:true, preferences:true, presets:true, monitorViews:true, hosts:true}).extend({
@@ -94,7 +94,11 @@ export class Store {
       const {extensions,...portable}=next;
       this.data = {...this.data, ...portable, secrets, hosts:restoreHosts?next.hosts:{...this.data.hosts,...next.hosts},
         ...(extensions ? {tools:{...this.data.tools,commandSuggestions:extensions.commandSuggestions,dockerSocket:extensions.dockerSocket},
-          plugins:this.plugins().map(p=>({...p,manifest:{...p.manifest,commands:extensions.commands[p.manifest.id]??p.manifest.commands}}))} : {})};
+          plugins:[...this.plugins(),...builtinPlugins.filter(p=>extensions.enabled?.[p.id]!==undefined&&!this.plugins().some(existing=>existing.manifest.id===p.id)).map(manifest=>({manifest,source:'bundled',enabled:false}))].map(p=>({...p,enabled:p.source==='bundled'?(extensions.enabled?.[p.manifest.id]??p.enabled):p.enabled,manifest:{...p.manifest,commands:extensions.commands[p.manifest.id]??p.manifest.commands}}))} : {})};
+      if (extensions?.enabled) {
+        this.data.tools.dockerEnabled = pluginEnabled(this.plugins(), 'docker');
+        this.data.tools.commandSuggestions = pluginEnabled(this.plugins(), 'commands');
+      }
       const applied = structuredClone(this.data);
       try {
         await mkdir(this.directory, {recursive:true});

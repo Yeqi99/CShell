@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Play, RotateCw, Search, Square } from 'lucide-react';
 import type { CapabilityContract, CommandResult } from '../../shared/command-console';
@@ -65,7 +66,7 @@ export function CapabilityExplorer({ active, onSettings, profiles = [] }: { acti
     <header><strong>能力浏览器</strong><button aria-label="刷新可用能力" title="刷新可用能力" disabled={!!busy} onClick={() => void refresh()}><RotateCw size={16}/></button></header>
     <div className="capability-context"><label>选择范围<select aria-label="能力浏览器操作范围" value={profileId} disabled={!!busy} onChange={e=>setProfileId(e.target.value)}><option value="">CShell 应用</option>{profiles.filter(p=>!p.protocol||['ssh','sftp','ftp','ftps','client'].includes(p.protocol)).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label><button disabled={!!busy} onClick={() => void selectTarget()}>载入</button></div>
     <div className="capability-session"><span>实际目标：{loadedTarget.name}{session?` · ${session.slice(0,8)}`:''}{targetChanged?' · 请载入新选择后操作':''}</span>{session&&<button disabled={!!busy} title="关闭此能力浏览器创建的 API 连接" onClick={()=>void execute(`disconnect ${session}`).then(value=>{if(value){for(const key of Object.keys(sessions.current))if(sessions.current[key].id===session)delete sessions.current[key];setSession('');setProfileId('');setLoadedTarget({id:'',signature:'',name:'CShell 应用'});setSelected(undefined);setTools([]);setResult(undefined);}})}>断开</button>}</div>
-    {error && <div role="alert" className="command-api-state"><span>{error}</span><button onClick={onSettings}>设置</button></div>}
+    {error && <div className="command-api-state"><ErrorNotice title="能力目录暂不可用" error={error}/><button onClick={onSettings}>设置</button></div>}
     <div className="capability-body">{!selected ? <>
       <label className="capability-search"><Search size={15}/><input aria-label="搜索能力" placeholder="搜索名称或用途" value={query} onChange={e => setQuery(e.target.value)}/></label>
       {!tools.length && <p className="capability-empty">{busy ? '正在读取能力目录…' : '没有可用能力。启用 API 并授权后刷新；选择机器并点击「载入」查看它的能力。'}</p>}

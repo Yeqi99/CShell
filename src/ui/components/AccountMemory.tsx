@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { useEffect, useState } from 'react';
 import { Plus, Trash2, Pencil, Check, X } from 'lucide-react';
 import type { AccountHabit } from '../../shared/account-memory';
@@ -106,7 +107,7 @@ export function AccountMemory() {
           )}
         </div>
       </form>
-      {error && <p role="alert">{error}</p>}
+      {error && <ErrorNotice title="操作未完成" error={error}/>}
     </section>
   );
 }

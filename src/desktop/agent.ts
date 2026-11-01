@@ -78,6 +78,7 @@ export async function registerAgent(
           host,
           identity: status.deviceId,
           local: true,
+          clipboard:(value:Record<string,unknown>)=>callAgent('desktop.clipboard',{...value,id:ticket.id},directory),
           close: () => callAgent('desktop.close', { id: ticket.id }, directory),
         };
       }
@@ -97,6 +98,7 @@ export async function registerAgent(
         host: device.host,
         identity: device.deviceId,
         local: false,
+        clipboard:(value:Record<string,unknown>)=>provider.call(deviceId,{method:'desktop.clipboard',params:{...value,id:ticket.id}}),
         connect: async () => {
           const controller = new AbortController(),
             timer = setTimeout(() => controller.abort(), 15000);
@@ -150,6 +152,7 @@ export async function registerAgent(
     }
   });
   handle('desktop:view-stop', (id) => views.stop(id));
+  handle('desktop:view-clipboard',(id,value,generation)=>views.clipboard(id,value,generation));
   handle('desktop:view-input', (id, value, generation) => views.input(id, value, generation));
   handle('desktop:view-release', (id, generation) => views.release(id, generation));
   handle('desktop:view-ack', (id, sequence, decoded, decodeMs, generation) =>
@@ -190,8 +193,7 @@ export async function registerAgent(
     const id=z.string().uuid().parse(raw),device=provider.list().find(d=>d.deviceId===id);
     if(!device)throw new Error('设备身份不可用，请重新核对并连接');
     await provider.call(id,{method:'agent.shells'});
-    const existing=[...machines].find(([,m])=>m.resourceId===id&&m.fingerprint===device.fingerprint);
-    const target=existing?.[0]??'machine:'+randomUUID();
+    const target='machine:'+randomUUID();
     machines.set(target,{resourceId:id,fingerprint:device.fingerprint,label:device.name});
     return {id:target,name:device.name,local:false,available:true};
   });
@@ -301,3 +303,4 @@ export async function registerAgent(
     },
   };
 }
+

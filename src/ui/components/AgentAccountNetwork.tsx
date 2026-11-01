@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { useEffect, useState } from 'react';
 import { ArrowRight, Check, Globe, Network, ShieldCheck } from 'lucide-react';
 import type { AgentCall } from '../../shared/agent';
@@ -132,9 +133,7 @@ export function AgentAccountNetwork({
         </div>
       </div>
       {error && (
-        <p role="alert" className="network-error">
-          {error}
-        </p>
+        <ErrorNotice title="操作未完成" error={error}/>
       )}
       {status?.target && status.error && (
         <p role="status" className="network-error">

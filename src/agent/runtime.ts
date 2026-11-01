@@ -120,6 +120,7 @@ export async function createAgentRuntime(
       ...(s.distribution ? { distribution: s.distribution } : {}),
     }));
   server = new ClientServer(vault, terminal, {
+    delegation:async(credential,fingerprint,continuation=false)=>{try{return (await account.sync.accountRequest('/v1/devices/delegation/verify',{deviceId:(await vault.identity()).id,credential,fingerprint,continuation})).allowed===true;}catch{return false;}},
     http:(request,signal)=>accountNetwork.http(request,signal),
     manage: (method, params, signal, owner) => dispatch(method, params, signal, false, owner),
     desktopStream: async (socket,owner) => {if(updateAdmissionClosed){socket.destroy();return;}await desktop.service.acceptAuthenticated(socket,owner);},
@@ -185,7 +186,7 @@ export async function createAgentRuntime(
       if(!peer?.shells.includes(shell)||!status.allowedShells?.includes(shell))throw new Error('控制端未获此 Shell 授权');
     }
     return terminal.execute(input,signal,output);
-  },automation:async(action,input,owner)=>{if(action==='list')return automation.list(owner);if(action==='create')return automation.create(input,owner);return automation.change({...z.record(z.string(),z.unknown()).parse(input),action},owner);},allowed:owner=>server.managementAllowed(owner),capabilityTools:()=>packages.tools(),capabilityInvoke:(input,signal,owner)=>packages.invoke(input,owner,signal)});
+  },automation:async(action,input,owner)=>{if(action==='list')return {...automation.list(owner),sources:packages.events()};if(action==='create')return automation.create(input,owner);return automation.change({...z.record(z.string(),z.unknown()).parse(input),action},owner);},allowed:owner=>server.managementAllowed(owner),capabilityTools:()=>packages.tools(),capabilityInvoke:(input,signal,owner)=>packages.invoke(input,owner,signal)});
   await assistant.load();
   const account=new CagentCloud(directory,codec,vault,assistant);
   automation=new CagentAutomation(vault,assistant);await automation.load();
@@ -193,7 +194,7 @@ export async function createAgentRuntime(
   const coding=new CodingService(vault,directory,owner=>owner==='local'||(server.managementAllowed(owner)&&server.status().peers.some(p=>p.fingerprint===owner&&p.shells.some(s=>server.status().allowedShells?.includes(s)))));
   await coding.load();
   const ide=new IdeService(vault,directory,owner=>owner==='local'||server.managementAllowed(owner));await ide.load();
-  const accountNetwork=new AccountNetwork(account,new ClientVault(join(directory,'account-network'),codec));accountNetwork.setUpdateGuard(()=>updateAdmissionClosed);await accountNetwork.load();terminal.networkEnvironment=()=>accountNetwork.environment();
+  const accountNetwork=new AccountNetwork(account,new ClientVault(join(directory,'account-network'),codec));accountNetwork.setUpdateGuard(()=>updateAdmissionClosed);await accountNetwork.load();terminal.networkEnvironment=()=>accountNetwork.environment();assistant.networkTransport=accountNetwork.fetch;account.setNetworkTransport(accountNetwork.fetch);
   const browserNetwork=new AgentBrowserNetwork(owner=>owner==='local'||server.browserAllowed(owner),(host,port)=>accountNetwork.open(host,port));
   const hosting = new HostingService(join(directory, 'hosting'));
   await hosting.load();
@@ -384,11 +385,11 @@ export async function createAgentRuntime(
     if(method==='environment.read'||method==='environment.save'){if(!admin)throw Error('未授权环境配置');return method==='environment.read'?managedEnvironment.snapshot():serialized(()=>managedEnvironment.save(params));}
     if(method.startsWith('management.script.')){if(!admin)throw Error('未授权批量命令');if(method==='management.script.start')return managedScripts.start(owner,params);return managedScripts.query(owner,params,method==='management.script.cancel');}
     if(method.startsWith('automation.')){
-      if(!local)throw Error('自动化管理需在受控端操作');
-      if(method==='automation.list')return automation.list(owner);
+      if(!local&&(owner==='local'||!server.managementAllowed(owner)))throw Error('未授权控制端管理自动化');
+      if(method==='automation.list')return {...automation.list(owner),sources:packages.events()};
       if(method==='automation.create')return automation.create(params,owner);
       if(method==='automation.change')return automation.change(params,owner);
-      if(method==='automation.event'){const e=z.object({source:z.string(),type:z.string(),id:z.string(),payload:z.unknown()}).strict().parse(params);return automation.emit(e.source,e.type,e.id,e.payload);}
+      if(method==='automation.event'){if(!local)throw Error('事件注入仅允许受控端本机来源');const e=z.object({source:z.string(),type:z.string(),id:z.string(),payload:z.unknown()}).strict().parse(params);return automation.emit(e.source,e.type,e.id,e.payload);}
       throw Error('未知自动化操作');
     }
     if(method.startsWith('assistant.')){

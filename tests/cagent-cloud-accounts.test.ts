@@ -8,6 +8,21 @@ import {CagentAssistant} from '../src/agent/assistant';
 import {ClientVault} from '../src/core/client/identity';
 import {decryptVault,encryptVault,unwrapRecoveryKey} from '../src/core/cloud-crypto';
 
+test('relay account outage does not suppress encrypted account synchronization',async()=>{
+  const directory=await mkdtemp(join(tmpdir(),'cagent-sync-outage-'));
+  const codec={encrypt:async(s:string)=>s,decrypt:async(s:string)=>s};
+  const vault=new ClientVault(directory,codec);
+  const assistant=new CagentAssistant(vault,{shells:async()=>[],applications:async()=>[],execute:async()=>'',allowed:()=>false});
+  const cloud=new CagentCloud(directory,codec,vault,assistant);
+  let synced=0;
+  cloud.sync.status=()=>({state:'ready',email:'fixture@example.com',unlocked:true,revision:1});
+  cloud.sync.accountRequest=async()=>{throw Error('relay offline');};
+  cloud.sync.autoSync=async()=>{synced++;};
+  cloud.setTransport({deviceId:()=> 'fixture',enroll:async()=>({}),start:async()=>{},stop:async()=>{}});
+  try{await (cloud as any).tick();assert.equal(synced,1);assert.equal(cloud.activity,0);}
+  finally{await cloud.close();await rm(directory,{recursive:true,force:true});}
+});
+
 test('CAgent keeps guest habits out of registration and restores isolated accounts on logout',async()=>{
   const directory=await mkdtemp(join(tmpdir(),'cagent-accounts-'));
   const codec={encrypt:async(s:string)=>Buffer.from(s).toString('base64'),decrypt:async(s:string)=>Buffer.from(s,'base64').toString()};
@@ -43,6 +58,7 @@ test('CAgent keeps guest habits out of registration and restores isolated accoun
     remote.futureExtension={enabled:true,opaque:'preserve-me'};
     a.envelope=encryptVault(remote,key,a.accountId);a.revision++;
     await cloud.call('account.login',{email:'a@example.com',password:'fixture-password'});
+    assert.equal((cloud as any).official.closed,false,'login must keep the OpenCode runtime available');
     assert.equal(assistant.cloudExport().habits?.[0].text,'Account A preference');
     const updated=decryptVault(a.envelope,key,a.accountId) as any;
     assert.deepEqual(updated.opencode,remote.opencode);

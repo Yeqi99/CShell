@@ -1,0 +1,259 @@
+{
+  "checkedAt": "2026-10-31T15:07:02.148Z",
+  "verified": 28,
+  "scope": "1024-byte ranges and pinned metadata, not full-file SHA verification",
+  "results": [
+    {
+      "path": "/downloads/opensource/v0.8.17/CAgent-0.8.17-linux-arm64.tar.gz",
+      "status": 206,
+      "bytes": 1024,
+      "totalSize": 44497231,
+      "pinnedSha256": "20cc7eb5c49afa3c8d8a43673dcc7caeb546144ad78236b5a3459f0192d9187f",
+      "noClientRedirect": true,
+      "fullBodyDigestVerified": false
+    },
+    {
+      "path": "/downloads/opensource/v0.8.17/CAgent-0.8.17-mac-arm64.tar.gz",
+      "status": 206,
+      "bytes": 1024,
+      "totalSize": 39490088,
+      "pinnedSha256": "b2ed57964cc17a3ccf75c0cfb0824b793a65284ff37239b8d3a58ca6cf345cca",
+      "noClientRedirect": true,
+      "fullBodyDigestVerified": false
+    },
+    {
+      "path": "/downloads/opensource/v0.8.17/CAgent-0.8.17-linux-x64.tar.gz",
+      "status": 206,
+      "bytes": 1024,
+      "totalSize": 44813308,
+      "pinnedSha256": "c18c7ee6ecf2b50351fa831a9aa58f55403ae568ed8297040583aea5841eb00c",
+      "noClientRedirect": true,
+      "fullBodyDigestVerified": false
+    },
+    {
+      "path": "/downloads/opensource/v0.8.17/CAgent-Setup-0.8.17-win-x64.exe",
+      "status": 206,
+      "bytes": 1024,
+      "totalSize": 25562756,
+      "pinnedSha256": "29abe2015772052dc9b7f4788916d1b1f595e54db2bdbf1afd07bcd4ccd83edb",
+      "noClientRedirect": true,
+      "fullBodyDigestVerified": false
+    },
+    {
+      "path": "/downloads/opensource/v0.8.17/CShell-0.8.17-android.apk",
+      "status": 206,
+      "bytes": 1024,
+      "totalSize": 4889358,
+      "pinnedSha256": "bc23811f42cb1f0288844e4371d61feede00a80458ef571673f584503f96bc4d",
+      "noClientRedirect": true,
+      "fullBodyDigestVerified": false
+    },
+    {
+      "path": "/downloads/opensource/v0.8.17/CAgent-0.8.17-mac-x64.tar.gz",
+      "status": 206,
+      "bytes": 1024,
+      "totalSize": 40722624,
+      "pinnedSha256": "3f4da3196568c9c02d01ef959d6dd4b2f63be4adc15d0bd197572f7902a3fd12",
+      "noClientRedirect": true,
+      "fullBodyDigestVerified": false
+    },
+    {
+      "path": "/downloads/opensource/v0.8.17/CShell-0.8.17-linux-amd64.deb",
+      "status": 206,
+      "bytes": 1024,
+      "totalSize": 108803192,
+      "pinnedSha256": "c4988577209ae25942baedbc69eb976d0796159ad612a367fba279c21e3283c7",
+      "noClientRedirect": true,
+      "fullBodyDigestVerified": false
+    },
+    {
+      "path": "/downloads/opensource/v0.8.17/CShell-0.8.17-linux-arm64.AppImage",
+      "status": 206,
+      "bytes": 1024,
+      "totalSize": 140649662,
+      "pinnedSha256": "d19753e672590ee8483908b1d4fcb8d50dbe987e1002abf83498067dcde6b261",
+      "noClientRedirect": true,
+      "fullBodyDigestVerified": false
+    },
+    {
+      "path": "/downloads/opensource/v0.8.17/CShell-0.8.17-linux-arm64.deb",
+      "status": 206,
+      "bytes": 1024,
+      "totalSize": 102979684,
+      "pinnedSha256": "81b69ae78db92ba4f43c2cb2827b591aac6a7eb20c1a27cf1e3148a66f377d87",
+      "noClientRedirect": true,
+      "fullBodyDigestVerified": false
+    },
+    {
+      "path": "/downloads/opensource/v0.8.17/CShell-0.8.17-linux-x86_64.AppImage",
+      "status": 206,
+      "bytes": 1024,
+      "totalSize": 139394437,
+      "pinnedSha256": "1128691ce66676f70345b35641a609132f380d6a75847e5bb4941c4d841510a8",
+      "noClientRedirect": true,
+      "fullBodyDigestVerified": false
+    },
+    {
+      "path": "/downloads/opensource/v0.8.17/CShell-0.8.17-mac-arm64.zip",
+      "status": 206,
+      "bytes": 1024,
+      "totalSize": 142106651,
+      "pinnedSha256": "d307351f82742e45917b98909e5f441fa680ba8616390c82ff85a8d1457c87be",
+      "noClientRedirect": true,
+      "fullBodyDigestVerified": false
+    },
+    {
+      "path": "/downloads/opensource/v0.8.17/CShell-0.8.17-mac-arm64.dmg",
+      "status": 206,
+      "bytes": 1024,
+      "totalSize": 142244926,
+      "pinnedSha256": "701d1ee1ac229b4227246d912a6ecd8c9a7be66804f789a0a8d2b161009b91f1",
+      "noClientRedirect": true,
+      "fullBodyDigestVerified": false
+    },
+    {
+      "path": "/downloads/opensource/v0.8.17/CShell-0.8.17-mac-x64.dmg",
+      "status": 206,
+      "bytes": 1024,
+      "totalSize": 146066401,
+      "pinnedSha256": "d4ab7bda569d2fe5a4363274412528a5fd6a6f6efa76c17a7bb332361f6a9dfa",
+      "noClientRedirect": true,
+      "fullBodyDigestVerified": false
+    },
+    {
+      "path": "/downloads/opensource/v0.8.17/CShell-0.8.17-mac-x64.zip",
+      "status": 206,
+      "bytes": 1024,
+      "totalSize": 145948102,
+      "pinnedSha256": "a6dd438077b689dc4cb3833c8a30458f79d7f2d5a7aaede61f290876e9e8537d",
+      "noClientRedirect": true,
+      "fullBodyDigestVerified": false
+    },
+    {
+      "path": "/downloads/opensource/v0.8.17/CShell-0.8.17-win-x64.exe",
+      "status": 206,
+      "bytes": 1024,
+      "totalSize": 123730069,
+      "pinnedSha256": "e975a175a5d7c0ddb0193bf3957c7f79ff16c0286d8437f52a33474cb8686150",
+      "noClientRedirect": true,
+      "fullBodyDigestVerified": false
+    },
+    {
+      "path": "/downloads/pro/v0.8.17/CAgent-0.8.17-linux-arm64.tar.gz",
+      "status": 206,
+      "bytes": 1024,
+      "totalSize": 44528979,
+      "pinnedSha256": "e2e8ea8d571e5e04848ac64b2aefb41e900f1db1b06846b2e68c9983d81c9179",
+      "noClientRedirect": true,
+      "fullBodyDigestVerified": false
+    },
+    {
+      "path": "/downloads/pro/v0.8.17/CAgent-0.8.17-linux-x64.tar.gz",
+      "status": 206,
+      "bytes": 1024,
+      "totalSize": 44836591,
+      "pinnedSha256": "062f88c957be817fa5e6972289986dd255ba70e23356cbc88cabcec830ac32ba",
+      "noClientRedirect": true,
+      "fullBodyDigestVerified": false
+    },
+    {
+      "path": "/downloads/pro/v0.8.17/CAgent-0.8.17-mac-arm64.tar.gz",
+      "status": 206,
+      "bytes": 1024,
+      "totalSize": 39517459,
+      "pinnedSha256": "02ed59280c654209f633adfe2c94c8612b93372471abd516d87ef2c7d30770bc",
+      "noClientRedirect": true,
+      "fullBodyDigestVerified": false
+    },
+    {
+      "path": "/downloads/pro/v0.8.17/CAgent-Setup-0.8.17-win-x64.exe",
+      "status": 206,
+      "bytes": 1024,
+      "totalSize": 25587138,
+      "pinnedSha256": "6f41a6d5cc1fecd01ea5a053485fcc3e9021f1a35e2d3aa041d6f7a0574ed9bd",
+      "noClientRedirect": true,
+      "fullBodyDigestVerified": false
+    },
+    {
+      "path": "/downloads/pro/v0.8.17/CAgent-0.8.17-mac-x64.tar.gz",
+      "status": 206,
+      "bytes": 1024,
+      "totalSize": 40751556,
+      "pinnedSha256": "9537f98a7dfce1893dffb71c0805ecabff8f5d9ad5c391441767018082d4d7f4",
+      "noClientRedirect": true,
+      "fullBodyDigestVerified": false
+    },
+    {
+      "path": "/downloads/pro/v0.8.17/CShell-Pro-0.8.17-android.apk",
+      "status": 206,
+      "bytes": 1024,
+      "totalSize": 4913938,
+      "pinnedSha256": "ed6565abc26fa3576fff5ae71060b8b8e807439edbb3e3a80aa5b805b65e74cb",
+      "noClientRedirect": true,
+      "fullBodyDigestVerified": false
+    },
+    {
+      "path": "/downloads/pro/v0.8.17/CShell-Pro-0.8.17-linux-amd64.deb",
+      "status": 206,
+      "bytes": 1024,
+      "totalSize": 107706612,
+      "pinnedSha256": "cc900adbbc134450b8580f89dc894bc0ad91c6a3c801eb4984b6c4dd40e49453",
+      "noClientRedirect": true,
+      "fullBodyDigestVerified": false
+    },
+    {
+      "path": "/downloads/pro/v0.8.17/CShell-Pro-0.8.17-linux-arm64.deb",
+      "status": 206,
+      "bytes": 1024,
+      "totalSize": 103206476,
+      "pinnedSha256": "a6b2db471593bc65c79945dfb31140bf37772a21cdaf27ed59716eb34a732703",
+      "noClientRedirect": true,
+      "fullBodyDigestVerified": false
+    },
+    {
+      "path": "/downloads/pro/v0.8.17/CShell-Pro-0.8.17-linux-arm64.AppImage",
+      "status": 206,
+      "bytes": 1024,
+      "totalSize": 140850561,
+      "pinnedSha256": "26485593efd2e5acb9658e269f7c3a550227d1fa81dfd1a05dcd7540e16e1771",
+      "noClientRedirect": true,
+      "fullBodyDigestVerified": false
+    },
+    {
+      "path": "/downloads/pro/v0.8.17/CShell-Pro-0.8.17-linux-x86_64.AppImage",
+      "status": 206,
+      "bytes": 1024,
+      "totalSize": 139595359,
+      "pinnedSha256": "c276ebddbca6a13dc9a0b140de3890851c8b357389dbcf8250ac6a926fb26339",
+      "noClientRedirect": true,
+      "fullBodyDigestVerified": false
+    },
+    {
+      "path": "/downloads/pro/v0.8.17/CShell-Pro-0.8.17-mac-arm64.dmg",
+      "status": 206,
+      "bytes": 1024,
+      "totalSize": 142508531,
+      "pinnedSha256": "a451c3ad0e22560e1871b5ed2b9f265902efdd94b704ced01d4cf55113c3321b",
+      "noClientRedirect": true,
+      "fullBodyDigestVerified": false
+    },
+    {
+      "path": "/downloads/pro/v0.8.17/CShell-Pro-0.8.17-mac-x64.dmg",
+      "status": 206,
+      "bytes": 1024,
+      "totalSize": 146322136,
+      "pinnedSha256": "24bd0e89ead1c4a63f27e41dd45f075a4ebfe22079661f4603ad8812050df975",
+      "noClientRedirect": true,
+      "fullBodyDigestVerified": false
+    },
+    {
+      "path": "/downloads/pro/v0.8.17/CShell-Pro-0.8.17-win-x64.exe",
+      "status": 206,
+      "bytes": 1024,
+      "totalSize": 123910124,
+      "pinnedSha256": "ad5fd8839c12ac3333e36aa55b1828559ef8cd89bdef328ee9af951f72abce04",
+      "noClientRedirect": true,
+      "fullBodyDigestVerified": false
+    }
+  ]
+}

@@ -15,6 +15,7 @@ type Host = {
   identity: string;
   local: boolean;
   close: () => Promise<unknown>;
+  clipboard?: (input:Record<string,unknown>)=>Promise<unknown>;
   connect?: () => Promise<DesktopClient>;
 };
 type Request = z.infer<typeof desktopViewStartSchema>;
@@ -284,6 +285,7 @@ export class DesktopViews {
     if(!view.request.control)throw new Error('此视图为仅观看');
     return view.client!.input(desktopViewInputSchema.parse(raw));
   }
+  async clipboard(id:unknown,input:Record<string,unknown>,generation?:unknown){const view=this.get(id,generation);if(!view.request.control||!view.host?.clipboard)throw Error("剪贴板需要桌面控制");const result=await view.host.clipboard(input);if(this.get(id,generation)!==view)throw Error("桌面会话已改变");return result;}
   inputConfirmed(id:unknown,raw:unknown,generation?:unknown){const view=this.get(id,generation);if(!view.request.control)throw Error('此视图为仅观看');return view.client!.inputConfirmed(desktopViewInputSchema.parse(raw));}
   release(id: unknown, generation?: unknown) {
     return this.get(id, generation).client!.releaseInput();
@@ -331,3 +333,4 @@ export class DesktopViews {
     await Promise.allSettled([...this.views.keys()].map((id) => this.stop(id)));
   }
 }
+

@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { useEffect, useRef, useState } from 'react';
 import { ArrowUp, Check, Languages, Sparkles, X } from 'lucide-react';
 import { type TextAssistTarget, translationChunks, analyzeSelection } from '../text-assist';
@@ -378,7 +379,7 @@ export function TextAssist() {
           )}
           {(busy || error) && (
             <footer role="status">
-              {error || (target.mode === 'translate' ? '正在翻译……' : '正在生成候选……')}
+              {error ? <ErrorNotice title="文字辅助未完成" error={error}/> : (target.mode === 'translate' ? '正在翻译……' : '正在生成候选……')}
             </footer>
           )}
         </section>

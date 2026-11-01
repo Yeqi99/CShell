@@ -26,7 +26,19 @@ const legacySchema = z.object({
   key: z.string().max(16000).default(''),
   workspace: workspaceSchema,
 });
-const modelSchema = z.object({ id: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/), modalities:z.object({input:z.array(z.string().max(40)).max(16).optional()}).optional(),input_modalities:z.array(z.string().max(40)).max(16).optional() });
+// Capability metadata is advisory. Provider additions or duplicate entries must
+// not invalidate the entire catalog (IDs remain strictly validated).
+const modalitySchema = z.preprocess(
+  value => Array.isArray(value)
+    ? [...new Set(value.filter((item): item is string => typeof item === 'string' && item.length <= 40))]
+    : [],
+  z.array(z.string()),
+);
+const modelSchema = z.object({
+  id: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/),
+  modalities: z.object({ input: modalitySchema.optional() }).optional(),
+  input_modalities: modalitySchema.optional(),
+});
 const tierSchema = z.enum(['go', 'zen']);
 export function quotaWindows(raw: any) {
   return [
@@ -708,7 +720,7 @@ export class OpenCodeExtension implements AiProviderExtension {
         throw Error('OpenCode 账号凭据已变化');
       }
       const ref = `${accountId}/${tier}/${model}`;
-      if (response.status === 403 || response.status === 404) {
+      if ([400,401,403,404,429].includes(response.status)) {
         // Only classify bounded error text. Never expose upstream echoes of secrets.
         const reader = response.body?.getReader();
         let detail = '', bytes = 0;
@@ -720,7 +732,10 @@ export class OpenCodeExtension implements AiProviderExtension {
             detail += new TextDecoder().decode(chunk.value.subarray(0, Math.max(0, 65536 - detail.length)));
           }
         } finally { await reader?.cancel(); }
-        const reason = response.status === 404 ? '服务端已找不到此模型，请刷新目录并重新选择'
+        const reason = response.status === 429 ? '此模型暂时受额度或频率限制，请稍后重试；不会自动切换付费模型'
+          : response.status === 401 ? '账号认证已失效，请检查或重新登录此账号'
+          : response.status === 400 ? '服务端未接受此模型请求，当前暂不可用；请重新检测或选择其他模型'
+          : response.status === 404 ? '服务端已找不到此模型，请刷新目录并重新选择'
           : /country|region/i.test(detail) ? '服务端限制了此模型在当前地区的调用，账号密钥已保留'
           : /FreeTier|only.*opencode|opencode.*only/i.test(detail) ? '服务端限制了此免费模型的客户端使用范围，账号密钥已保留'
           : '服务端拒绝此模型调用，请检查套餐、额度或模型权限；账号密钥已保留';

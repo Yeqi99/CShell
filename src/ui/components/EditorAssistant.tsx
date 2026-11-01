@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { Modal } from './Modal';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
@@ -181,8 +182,8 @@ export function EditorAssistant({
             }}
           >
             {error && (
-              <div className="editor-action-error" role="alert">
-                {error}
+              <div className="editor-action-error">
+                <ErrorNotice title="编辑操作未完成" error={error}/>
                 <button
                   className="icon"
                   aria-label={zh ? '关闭错误' : 'Dismiss error'}

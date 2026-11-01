@@ -1,6 +1,13 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { Bridge, SessionEvent } from '../shared/contracts';
 const bridge: Bridge = {
+  desktopViewClipboard:(id,input,generation)=>ipcRenderer.invoke('desktop:view-clipboard',id,input,generation),
+  localClipboardRead:()=>ipcRenderer.invoke('clipboard:content-read'),
+  localClipboardWrite:value=>ipcRenderer.invoke('clipboard:content-write',value),
+  localClipboardFileRead:(token,offset,length)=>ipcRenderer.invoke('clipboard:file-read',token,offset,length),
+  localClipboardFilesBegin:files=>ipcRenderer.invoke('clipboard:files-begin',files),
+  localClipboardFilesChunk:(id,index,offset,data)=>ipcRenderer.invoke('clipboard:files-chunk',id,index,offset,data),
+  localClipboardFilesCommit:id=>ipcRenderer.invoke('clipboard:files-commit',id),
   nativeDesktopSetup:(id,action)=>ipcRenderer.invoke('native-desktop:setup',id,action),
   nativeDesktopOpen:(id,endpoint)=>ipcRenderer.invoke('native-desktop:open',id,endpoint),
   nativeDesktopRead:id=>ipcRenderer.invoke('native-desktop:read',id),
@@ -15,6 +22,8 @@ const bridge: Bridge = {
   accountSourcePreview:source=>ipcRenderer.invoke('account:source-preview',source),
   accountSourceImport:(token,settings,choices)=>ipcRenderer.invoke('account:source-import',token,settings,choices),
   cloudStatus:()=>ipcRenderer.invoke('cloud:status'),
+  cloudNetwork:input=>ipcRenderer.invoke('cloud:network',input),
+  cloudLending:input=>ipcRenderer.invoke('cloud:lending',input),
   onCloudChanged:listener=>{const fn=()=>listener();ipcRenderer.on('cloud:changed',fn);return()=>ipcRenderer.removeListener('cloud:changed',fn);},
   cloudRequestCode:email=>ipcRenderer.invoke('cloud:code',email),
   cloudMemory:()=>ipcRenderer.invoke('cloud:memory'),
@@ -28,6 +37,7 @@ const bridge: Bridge = {
   cloudLogout:()=>ipcRenderer.invoke('cloud:logout'),
   networkDiagnostics: () => ipcRenderer.invoke('network:diagnostics'),
   networkPing: input => ipcRenderer.invoke('network:ping', input),
+  connectionProbe: input => ipcRenderer.invoke('network:connection-probe', input),
   networkProbe: input => ipcRenderer.invoke('network:probe', input),
   networkProbeCancel: id => ipcRenderer.invoke('network:probe-cancel', id),
   connectionImportText: text => ipcRenderer.invoke('connections:import-text', text),
@@ -38,6 +48,8 @@ const bridge: Bridge = {
   networkRemoteSources: () => ipcRenderer.invoke('network:remote-sources'),
   networkRemoteOpen: input => ipcRenderer.invoke('network:remote-open',input),
   networkStatus: () => ipcRenderer.invoke('network:status'),
+  networkSystemStatus:()=>ipcRenderer.invoke('network:system-status'),
+  networkSystemSet:enabled=>ipcRenderer.invoke('network:system-set',enabled),
   networkSave: route => ipcRenderer.invoke('network:save', route),
   machineBrowser:(id,action,value)=>ipcRenderer.invoke('machine-browser:action',id,action,value),
   onMachineBrowserFocus:listener=>{const fn=(_e:unknown,id:string)=>listener(id);ipcRenderer.on('machine-browser:focus',fn);return()=>{ipcRenderer.removeListener('machine-browser:focus',fn);};},
@@ -194,7 +206,7 @@ const bridge: Bridge = {
   onAiConnection: (listener) => {
     const handler = (
       _event: Electron.IpcRendererEvent,
-      value: { sessionId: string; profile: import('../shared/contracts').Profile },
+      value: { sessionId: string; profile: import('../shared/contracts').Profile; managementOnly?:boolean },
     ) => listener(value);
     ipcRenderer.on('ai:connected', handler);
     return () => ipcRenderer.removeListener('ai:connected', handler);
@@ -216,6 +228,7 @@ const bridge: Bridge = {
   aiApprove: (id, request, allow) => ipcRenderer.invoke('ai:approve', id, request, allow),
   aiStop: (id) => ipcRenderer.invoke('ai:stop', id),
   aiMode: (id, mode) => ipcRenderer.invoke('ai:mode', id, mode),
+  aiThreadProvider: (id, provider, model) => ipcRenderer.invoke('ai:thread-provider', id, provider, model),
   pythonReadFile: (id, path) => ipcRenderer.invoke('python:read', id, path),
   textReadFile: (id, path) => ipcRenderer.invoke('text:read', id, path),
   textEnvironments: (id, path) => ipcRenderer.invoke('text:environments', id, path),

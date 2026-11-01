@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { PingResult } from '../../shared/icmp-ping';
 
 export function PingButton({ profileId, sessionId }: { profileId?: string; sessionId?: string }) {
   const [result, setResult] = useState<PingResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  useEffect(()=>{const receive=(event:Event)=>{const value=(event as CustomEvent).detail;if(value?.profileId!==profileId)return;setResult(value.result??null);setError(value.error??'');};window.addEventListener('cshell:ping-result',receive);return()=>window.removeEventListener('cshell:ping-result',receive);},[profileId]);
   const detail = result?.status === 'proxy-path' ? `经 ${result.routeInterface || '代理'} 路径，ICMP 可能由本机代理应答，无法确认服务器延迟`
     : result?.status === 'route-unknown' ? '无法确认本机出口路由，未将可能的代理应答显示为服务器延迟'
     : result?.status === 'unreachable' ? '未收到 ICMP 回应，不代表 SSH 离线'

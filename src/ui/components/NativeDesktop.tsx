@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import {useEffect,useRef,useState} from 'react';
 import RFB from '@novnc/novnc';
 import './native-desktop.css';
@@ -54,7 +55,7 @@ export function NativeDesktop({session,closed,active,initialInfo}:{session:strin
   const enable=async()=>{setChecking(true);setError('');try{const result=await window.cshell.nativeDesktopSetup(session,detected?.installed?'start':'install-start');setDetected({...detected,...result,installed:true});await connect({socket:result.socket});}catch(e){setError(String(e));}finally{setChecking(false);}};
   return <section className="native-desktop-app" aria-label="原生 Linux 桌面">
     <header><strong>原生桌面</strong><span>{status==='connected'?'已连接 · SSH 加密通道':status==='connecting'?'正在连接…':'VNC · 通过当前 SSH 连接'}</span>{status!=='idle'&&<button onClick={()=>{stop();setStatus('idle');setNeedsPassword(false);}}>断开</button>}</header>
-    {error&&<p role="alert">{error}</p>}
+    {error&&<ErrorNotice title="操作未完成" error={error}/>}
     {status==='idle'&&<div className="native-desktop-setup"><h3>打开服务器上的桌面</h3><p role="status">{checking?'正在检查或配置桌面…':detected?.message || '等待检测桌面环境'}</p>
       {detected?.sessions?.length===1&&<><p>共享当前用户的 {detected.sessions[0].display} 屏幕，鼠标与键盘操作会作用于真实桌面。{!detected.installed?'将从系统软件源下载 x11vnc 组件至用户专用目录，不修改系统安装。':''}</p><button disabled={closed||checking||(!detected.installed&&!detected.canInstall)} onClick={()=>void enable()}>{detected.running?'连接原生桌面':detected.installed?'开启并连接':'安装组件并开启'}</button></>}
       {detected?.running&&<button disabled={checking} onClick={()=>{stop();setChecking(true);void window.cshell.nativeDesktopSetup(session,'stop').then(()=>inspect()).catch(()=>setError('停止共享失败，请检查连接')).finally(()=>setChecking(false));}}>停止共享</button>}

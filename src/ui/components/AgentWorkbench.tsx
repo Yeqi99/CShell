@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import {AgentAccountNetwork} from './AgentAccountNetwork';
 import { AgentAssistantSettings } from './AgentAssistantSettings';
 import { AgentApplications } from './AgentApplications';
@@ -8,6 +9,7 @@ import { AgentHostingPanel } from './AgentHostingPanel';
 import { AgentRelayPanel } from './AgentRelayPanel';
 import { AgentWsl } from './AgentWsl';
 import './agent-workbench.css';
+import './settings-surfaces.css';
 type Status = ClientStatus & { autostart?: {supported:boolean;enabled:boolean}; platform?: string; canImportLegacy?: boolean };
 export function AgentWorkbench() {
   const [targets, setTargets] = useState<AgentTarget[]>([]),
@@ -53,7 +55,7 @@ export function AgentWorkbench() {
           }}>{launching ? '正在打开…' : '打开本机 CAgent'}</button>
         )}
       </div>
-      {error && <p role="alert">{error}</p>}
+      {error && <ErrorNotice title="操作未完成" error={error}/>}
       {launchMessage && <p role="status">{launchMessage}</p>}
       {current?.available ? (
         <AgentConfiguration key={target} target={current} />
@@ -137,6 +139,7 @@ function AgentConnection({ target, call }: { target: AgentTarget; call: Call }) 
     [publicPort, setPublicPort] = useState(''),
     [host, setHost] = useState('127.0.0.1'),
     [password, setPassword] = useState(''),
+    [showPassword, setShowPassword] = useState(false),
     [grants, setGrants] = useState<ClientShell[]>([]);
   const [access, setAccess] = useState({
       allowHttp: false,
@@ -214,6 +217,7 @@ function AgentConnection({ target, call }: { target: AgentTarget; call: Call }) 
         {status?.running ? '远程访问已启动' : '远程访问未启动'} · {target.name}
       </p>
       <fieldset disabled={busy||!loaded}>
+        <h3>连接地址</h3>
         <div className="agent-fields">
           <label>
             监听地址
@@ -240,10 +244,11 @@ function AgentConnection({ target, call }: { target: AgentTarget; call: Call }) 
         </div>
         <label>对外端口（留空使用监听端口）<input type="number" min={1} max={65535} value={publicPort} placeholder={String(port)} onChange={e=>setPublicPort(e.target.value)}/></label>
         {status?.autostart?.supported&&<label><input type="checkbox" checked={status.autostart.enabled} onChange={e=>{const enabled=e.target.checked;void call('connection.autostart',{enabled}).then(autostart=>setStatus({...status,autostart})).catch(e=>setError(String(e)))}}/>开机自动启动</label>}
+        <h3>认证与访问</h3>
         <label>
           连接密码
           <input
-            type="text"
+            type={showPassword ? "text" : "password"}
             value={password}
             minLength={1}
             maxLength={128}
@@ -252,6 +257,7 @@ function AgentConnection({ target, call }: { target: AgentTarget; call: Call }) 
           />
         </label>
         <div className="agent-actions">
+          <button type="button" aria-pressed={showPassword} onClick={()=>setShowPassword(!showPassword)}>{showPassword ? "隐藏密码" : "显示密码"}</button>
           <button
             onClick={() =>
               setPassword(
@@ -324,7 +330,7 @@ function AgentConnection({ target, call }: { target: AgentTarget; call: Call }) 
           </label>
         )}
         <div className="agent-actions">
-          <button
+          <button className="primary"
             disabled={status?.running ? !confirm : !status?.passwordConfigured && !password}
             onClick={() => void save()}
           >
@@ -392,7 +398,7 @@ function AgentConnection({ target, call }: { target: AgentTarget; call: Call }) 
         ))}
       </details>
       {message && <p role="status">{message}</p>}
-      {error && <p role="alert">{error}</p>}
+      {error && <ErrorNotice title="操作未完成" error={error}/>}
     </div>
   );
 }
@@ -406,7 +412,7 @@ function AgentLogs({ call }: { call: Call }) {
   }, [call]);
   return (
     <div>
-      <p role="alert">{error}</p>
+      <ErrorNotice title="操作未完成" error={error}/>
       <pre>{logs.map((r) => `${r.time}  ${r.action}  ${r.peer}`).join('\n') || '暂无活动'}</pre>
     </div>
   );

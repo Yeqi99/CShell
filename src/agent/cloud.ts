@@ -1,3 +1,6 @@
+import { OpenCodeExtension } from '../extensions/opencode/service';
+import { OfficialOpenCode } from '../extensions/opencode/official-runtime';
+import { modelTransport } from './model-request';
 import { CloudSync } from '../core/cloud-sync';
 import { AccountWorkspaces } from '../core/account-workspaces';
 import { join } from 'node:path';
@@ -20,6 +23,11 @@ const bundle = z
   .passthrough();
 export class CagentCloud {
   readonly sync: CloudSync;
+  private networkTransport:typeof fetch=modelTransport;
+  setNetworkTransport(transport:typeof fetch){this.networkTransport=transport;}
+  private official:OfficialOpenCode;
+  private openCode:OpenCodeExtension;
+  private extensionSnapshot='';
   devices() {
     return structuredClone(this.cached.devices);
   }
@@ -100,11 +108,13 @@ export class CagentCloud {
         }
         if (!profile.membership.active) await this.hooks.stop();
       }
-      await this.sync.autoSync();
     } catch (e) {
       this.transportError = e instanceof Error ? e.message : '云连接暂时不可用';
     } finally {
-      this.ticking = false;
+      // Relay enrollment/model catalog availability must not block account data.
+      // autoSync owns its own error/conflict state, independently of transportError.
+      try { await this.sync.autoSync(); }
+      finally { this.ticking = false; }
     }
   }
 
@@ -115,6 +125,14 @@ export class CagentCloud {
     private assistant: CagentAssistant,
     request: typeof fetch = fetch,
   ) {
+    this.official=new OfficialOpenCode(join(directory,'opencode'),(input,init)=>this.networkTransport(input,init));
+    this.openCode=new OpenCodeExtension({directory:join(directory,'opencode'),encrypt:s=>codec.encrypt(s),decrypt:s=>codec.decrypt(s),enabled:()=>this.cached?.store?.extensions?.enabled?.['cshell.opencode']!==false,saveProvider:async()=>{throw Error('请在 CShell 中配置 OpenCode 账号');},open:async()=>{throw Error('请在 CShell 中完成 OpenCode 登录');},official:this.official.request,officialStatus:this.official.status},(input,init)=>this.networkTransport(input,init));
+    assistant.resolveExtension=async(ref,session)=>{
+      if(ref.id!=='cshell.opencode')throw Error('此模型扩展尚不支持 CAgent');
+      const value=this.cached?.opencode??{accounts:[]},stamp=JSON.stringify(value);
+      if(stamp!==this.extensionSnapshot){await this.openCode.cloudImport(value);this.extensionSnapshot=stamp;}
+      return this.openCode.resolve(ref.model,session);
+    };
     this.workspaces=new AccountWorkspaces(join(directory,'account-workspaces'),codec,{
       capture:async()=>({bundle:structuredClone(this.cached),assistant:assistant.localWorkspace()}),
       empty:()=>({bundle:this.emptyBundle(),assistant:assistant.emptyWorkspace()}),
@@ -221,18 +239,19 @@ export class CagentCloud {
         this.paused = false;
       }
     }
+    if (method === 'account.appearance') { const p=this.cached?.store?.preferences??defaults; return {theme:p.theme,uiFont:p.uiFont,uiFontSize:p.uiFontSize??14}; }
     if (method === 'account.models')
       return this.assistant
         .cloudExport()
-        .providers.map(({ key, ...p }) => ({ ...p, hasKey: !!key }));
+        .providers.map(({ key, ...p }) => ({ ...p, hasKey: !!key || !!p.extension }));
     if (method === 'account.model.select') {
       const { id } = z.object({ id: z.string().uuid() }).strict().parse(input);
       const data = this.assistant.cloudExport(),
-        p = data.providers.find((p) => p.id === id && !p.extension);
+        p = data.providers.find((p) => p.id === id);
       if (!p) throw Error('基座不可用');
       const s = this.assistant.snapshot();
       const { keyConfigured, ...settings } = s;
-      return this.assistant.configure({ ...settings, endpoint: p.url, model: p.model, key: p.key });
+      return this.assistant.configure({ ...settings, providerId:p.id, endpoint: p.url, model: p.model, key: p.key });
     }
     throw Error('未知账号操作');
   }
@@ -241,5 +260,6 @@ export class CagentCloud {
     if (this.timer) clearInterval(this.timer);
     await this.pending;
     await this.hooks?.stop();
+    await this.official.dispose();
   }
 }

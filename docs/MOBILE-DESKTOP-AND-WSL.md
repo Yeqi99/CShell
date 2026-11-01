@@ -39,3 +39,6 @@ WSL 是 Windows 上的 Linux 环境，不是通用虚拟机管理器。云服务
 回归入口：`scripts/mobile-desktop-smoke.ts`、`scripts/android-desktop-fixture.ts`、Android instrumentation 的 `desktopMode=true`、`tests/desktop-touch.test.ts`、`tests/wsl-diagnostics.test.ts`。`tests/fixtures/desktop-colors.h264` 是本项目原生色彩测试生成的图案，无用户画面。
 
 本轮桌面/运行时组合回归 38 项中 37 项通过，实际 Ubuntu PTY 未及时出现提示符；单独重跑又出现 Client disconnected。关闭隔离 Android 模拟器、完成并行构建后，同一测试通过：Ubuntu PTY 出现真实提示符，独立命令确认 environment=wsl、kernel=Linux，证据 wsl-isolated-final.log。这支持负载相关超时的判断，但尚不能证明根因；保留前两次失败日志。没有修改用户代理、WSL 配置或重启发行版。全新 WSL 安装仍未实测。
+
+## WSL 离线下载入口（2026-11-01）
+CShell WSL 插件、远端 WSL 配置和 CAgent 原生安装页提供[离线安装指南](https://shell.canp.ai/docs/wsl-offline.html)。指南区分官方 MSI、当前 .wsl 与国内 Ubuntu 22.04 rootfs 存档，包含清华/科大/南大目录、SHA256与数字签名核验、架构选择及不覆盖发行版的导入步骤。国内目录本机HTTP200并列出两种架构与校验文件；未下载完整镜像或实际安装。

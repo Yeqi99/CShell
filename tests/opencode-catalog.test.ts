@@ -17,6 +17,19 @@ async function fixture(network: typeof fetch) {
   return { extension, saved, notifications: () => notifications, close: () => rm(directory, { recursive: true, force: true }) };
 }
 
+test('provider modality expansion does not reject the catalog', async () => {
+  const input = [...Array.from({ length: 24 }, (_, i) => `future-${i}`), 'image', 'image', null, 7];
+  const f = await fixture(async () => Response.json({ data: [
+    { id: 'beam-free', modalities: { input } },
+    { id: 'other-model', input_modalities: input },
+  ] }));
+  try {
+    const catalog = await f.extension.call('catalog', { reference: 'go/beam-free', refresh: true });
+    assert.ok(catalog.choices.some((m: any) => m.model === 'beam-free'));
+    assert.ok(catalog.choices.some((m: any) => m.model === 'other-model'));
+  } finally { await f.close(); }
+});
+
 test('retired reference is unavailable without deleting credentials or selecting another default', async () => {
   let listed = ['longcat-flash-free'];
   const f = await fixture(async () => Response.json({ data: listed.map(id => ({id})) }));
@@ -187,4 +200,20 @@ test('cloud import invalidates transient catalog failures but preserves account 
     assert.deepEqual(await f.extension.cloudExport(), exported);
     assert.equal(f.saved.length, 1);
   } finally { await f.close(); }
+});
+
+test('quota and request incompatibility immediately disable model choices until a successful retest', async () => {
+ for (const code of [400,401,429]) {
+  let status=code;
+  const f=await fixture(async(_url,init)=>!init?.method?Response.json({data:[{id:'beam-free'}]}):Response.json({error:'private-fixture-secret'},{status}));
+  try {
+   const provider=await f.extension.resolve('go/beam-free','test');
+   const input={body:JSON.stringify({model:'beam-free',messages:[],stream:false})};
+   await assert.rejects(provider.transport('',input),e=>{assert.match(String(e),new RegExp('HTTP '+code));assert.doesNotMatch(String(e),/private-fixture/);return true;});
+   const catalog=await f.extension.call('catalog',{reference:'go/beam-free',refresh:true});
+   assert.equal(catalog.current.available,false);
+   status=200;await provider.transport('',input);
+   assert.equal((await f.extension.call('catalog',{reference:'go/beam-free'})).current.available,true);
+  } finally {await f.close();}
+ }
 });

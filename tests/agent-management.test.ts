@@ -246,8 +246,20 @@ test('Agent native management, hosting and relay grants are independent on provi
           .tools(session)
           .filter((t) => t.capability.startsWith('agent.'))
           .map((t) => t.name),
-        [toolName],
+        grant==='allowManage'?['agent_capabilities_list',toolName]:[toolName],
       );
+      const packageList=registry.tools(session).find(t=>t.name==='agent_capabilities_list');
+      const packageInvoke=registry.tools(session).find(t=>t.name==='agent_capability_invoke');
+      if(grant==='allowManage'){
+        assert.ok(packageList);
+        const result=await registry.prepare(session,'agent_capabilities_list',{}).execute(()=>true,new AbortController().signal);
+        assert.deepEqual(JSON.parse(result),{tools:[],nextCursor:null});
+        assert.equal(packageInvoke?.capability,'commands.execute');
+        assert.equal(packageInvoke?.needsReview({}),true);
+      }else{
+        assert.equal(packageList,undefined);assert.equal(packageInvoke,undefined);
+        await assert.rejects(f.provider.call(device.deviceId,{method:'packages.tools'}),/未授予/);
+      }
       const tool = registry.prepare(session, toolName, { method: allowed });
       assert.equal(tool.needsReview, false);
       await tool.execute(() => true, new AbortController().signal);
@@ -507,3 +519,22 @@ test('Agent revocation during audit persistence prevents a queued management mut
   }
 });
 
+
+test('remote automation uses real authenticated TLS owner and exposes reviewed connection tools', async()=>{
+ const f=await fixture();try{
+  await f.runtime.dispatch('assistant.configure',{endpoint:'https://example.invalid/v1/chat/completions',model:'fixture',key:'unused',commands:false,review:true,automation:true,delegates:[]});
+  const {device}=await f.pair({allowManage:true});
+  const owner=f.runtime.server.status().peers[0].fingerprint;
+  await f.runtime.dispatch('assistant.configure',{endpoint:'https://example.invalid/v1/chat/completions',model:'fixture',key:'unused',commands:false,review:true,automation:true,delegates:[owner]});
+  // Reconnect discovery after the remote assistant grants this controller automation.
+  const signal=new AbortController().signal;
+  const {remoteAutomationTools}=await import('../src/core/remote-automation-tools');
+  const tools=await remoteAutomationTools((call,abort)=>f.provider.call(device.deviceId,call,abort),true,signal);
+  const r=JSON.parse(await tools[1].invoke({name:'TLS subscription',prompt:'Only inspect matching event',trigger:{kind:'event',source:'extension.wechat',type:'message.received'},enabled:false},signal));
+  assert.equal(r.owner,owner);assert.equal(r.enabled,false);
+  const result=JSON.parse(await tools[0].invoke({},signal));assert.equal(result.rules[0].id,r.id);assert(Array.isArray(result.sources));
+  await tools[2].invoke({id:r.id,action:'delete'},signal);assert.equal(JSON.parse(await tools[0].invoke({},signal)).rules.length,0);
+  await f.runtime.dispatch('assistant.configure',{endpoint:'https://example.invalid/v1/chat/completions',model:'fixture',key:'unused',commands:false,review:true,automation:false,delegates:[]});
+  await assert.rejects(tools[0].invoke({},signal));
+ }finally{await f.close();}
+});

@@ -5,7 +5,7 @@ import { Readable } from 'node:stream';
 import {systemUpdateProxy,parseUpdateProxy} from './update-proxy';
 
 /** Per-request tunnel; proxy failure never falls through to a direct connection. */
-export async function updateRequest(url: string, options: { signal: AbortSignal; headers?: Record<string,string>; proxy?:string|null }): Promise<Response> {
+export async function updateRequest(url: string, options: { signal: AbortSignal; headers?: Record<string,string>; proxy?:string|null; method?:string; body?:string }): Promise<Response> {
  options.signal.throwIfAborted();
  const proxy=options.proxy===null?undefined:options.proxy!==undefined?parseUpdateProxy(options.proxy):await systemUpdateProxy(url);
  options.signal.throwIfAborted();
@@ -26,11 +26,12 @@ export async function updateRequest(url: string, options: { signal: AbortSignal;
   });connectRequest.end();return undefined;
  }) as typeof agent.createConnection;}
  return new Promise((resolve,reject)=>{
-  const req=request(url,{method:'GET',agent:agent??false,signal:options.signal,headers:options.headers},response=>{
+  const req=request(url,{method:options.method??'GET',agent:agent??false,signal:options.signal,headers:options.headers},response=>{
    const status=response.statusCode??500;
    if(status!==200){response.resume();req.destroy();agent?.destroy();resolve(new Response(null,{status,headers:response.headers.location?{location:response.headers.location}:undefined}));return;}
    response.once('close',()=>agent?.destroy());
-   resolve(new Response(Readable.toWeb(response) as ReadableStream<Uint8Array>,{status}));
-  });req.once('error',error=>{agent?.destroy();reject(options.signal.aborted ? options.signal.reason : error);});req.end();
+   const headers=new Headers();for(const [key,value] of Object.entries(response.headers)){if(value!==undefined)headers.set(key,Array.isArray(value)?value.join(', '):value);}
+   resolve(new Response(Readable.toWeb(response) as ReadableStream<Uint8Array>,{status,headers}));
+  });req.once('error',error=>{agent?.destroy();reject(options.signal.aborted ? options.signal.reason : error);});req.end(options.body);
  });
 }

@@ -10,6 +10,19 @@ class ServiceTest(unittest.TestCase):
         self.mail = {}
         self.service = Service(self.directory.name + '/test.sqlite', secrets.token_bytes(32), lambda email, code: self.mail.update({email: code}))
 
+    def test_new_vault_schema_blocks_old_writers_without_losing_data(self):
+        import base64, uuid
+        account=self.login('schema@example.com','schema-ip')['accountId']
+        body={'baseRevision':0,'mutationId':str(uuid.uuid4()),'envelope':{'format':1,'nonce':base64.b64encode(bytes(12)).decode(),'ciphertext':base64.b64encode(bytes(20)).decode()}}
+        self.service.write(account,body)
+        self.assertEqual(self.service.read(account)['revision'],1)
+        body['baseRevision']=1;body['mutationId']=str(uuid.uuid4())
+        self.service.write(account,body,2)
+        with self.assertRaises(Failure): self.service.read(account)
+        body['baseRevision']=2;body['mutationId']=str(uuid.uuid4())
+        with self.assertRaises(Failure): self.service.write(account,body)
+        self.assertEqual(self.service.read(account,2)['revision'],2)
+
     def test_public_usage_is_deduplicated_and_consent_reversible(self):
         import time
         first=self.login('usage@example.com','usage-ip')
@@ -62,6 +75,26 @@ class ServiceTest(unittest.TestCase):
         with self.assertRaises(Failure):
             self.service.register(body, 'register-ip')
         self.assertEqual(self.service.read(body['accountId'])['revision'], 1)
+
+    def test_registration_guards_new_schema_atomically(self):
+        import base64
+        email = 'new@example.com'
+        self.service.request_code(email, 'register-ip')
+        encrypted = {'format': 1, 'nonce': base64.b64encode(bytes(12)).decode(), 'ciphertext': base64.b64encode(bytes(32)).decode()}
+        body = {'email': email, 'code': self.mail[email], 'password': 'test-password-only', 'accountId': 'b'*32, 'keybox': {'salt': base64.b64encode(bytes(32)).decode(), 'envelope': encrypted}, 'envelope': encrypted}
+        wrong = dict(body, code='wrong')
+        with self.assertRaises(Failure):
+            self.service.register(wrong, 'register-ip')
+        self.assertEqual(len(self.service.admin_accounts()['accounts']), 0)
+        session = self.service.register(body, 'register-ip', 2)
+        self.assertEqual(self.service.authenticate(session['token']), body['accountId'])
+        self.assertEqual(self.service.read(body['accountId'],2)['revision'], 1)
+        with self.assertRaises(Failure): self.service.read(body['accountId'])
+        login = self.service.password_login(email, body['password'], 'password-ip')
+        self.assertEqual(login['keybox'], body['keybox'])
+        with self.assertRaises(Failure):
+            self.service.register(body, 'register-ip', 2)
+        self.assertEqual(self.service.read(body['accountId'],2)['revision'], 1)
 
     def test_quotas_upgrade_and_downgrade_preserve_existing_cloud(self):
         import base64,time,uuid

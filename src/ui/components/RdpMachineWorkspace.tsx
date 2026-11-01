@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { useEffect, useRef, useState } from 'react';
 import { Check, Copy, Download, Monitor, Package } from 'lucide-react';
 import type { Profile } from '../../shared/contracts';
@@ -29,7 +30,7 @@ export function RdpCagentInstallGuide({ name, address, busy, onOpenDesktop }: {
       <li><div><h3>回到 CShell，添加 CAgent 连接</h3><p>选择新建连接中的 CAgent，粘贴连接信息；核对设备身份后输入密码。原 RDP 连接仍保留。</p></div></li>
     </ol>
     {copied && <p className="rdp-install-status" role="status">下载地址已复制，可在远程桌面的浏览器中粘贴。</p>}
-    {error && <p role="alert" className="form-error">{error}</p>}
+    {error && <ErrorNotice title="操作未完成" error={error}/>}
     <p className="rdp-install-note">RDP 登录不会自动授予远程安装权限，也不会代替目标机器确认系统提权。</p>
   </section>;
 }

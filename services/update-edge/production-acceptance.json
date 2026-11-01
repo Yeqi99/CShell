@@ -1,67 +1,71 @@
 {
-  "checkedAt": "2026-10-31T08:47:34.849Z",
-  "origin": "https://shell.canp.ai",
-  "workerEtag": "9edc6cb5bc04f3db3ed584f563badebf96783e8bb3dc0ef2f79caae209022546",
-  "selectorSourceRevision": "cc9e9b7",
-  "selectorSources": [
+  "checkedAt": "2026-10-31T15:05:34.508Z",
+  "results": [
     {
-      "path": "src/shared/updates.ts",
-      "sha256": "b9ace8b2c28f80fe71dc38207f21191a3d7df75659403557252b305cb9e05fec"
-    },
-    {
-      "path": "src/agent/update.ts",
-      "sha256": "e86457e68a42e2e493f7017e79ea1405ed12a3e076066a1a43041dabf65aea12"
-    },
-    {
-      "path": "src/shared/download-source.ts",
-      "sha256": "a0577ed4c615bef77756ee9ebd8a49b6a4982dfce1dd4328a0e450bb716a813a"
-    }
-  ],
-  "choices": [
-    {
-      "edition": "opensource",
-      "cshell": "CShell-0.8.16-win-x64.exe",
-      "agent": "CAgent-Setup-0.8.16-win-x64.exe",
-      "agentUrl": "https://shell.canp.ai/downloads/opensource/v0.8.16/CAgent-Setup-0.8.16-win-x64.exe"
-    },
-    {
-      "edition": "pro",
-      "cshell": "CShell-Pro-0.8.16-win-x64.exe",
-      "agent": "CAgent-Setup-0.8.16-win-x64.exe",
-      "agentUrl": "https://shell.canp.ai/downloads/pro/v0.8.16/CAgent-Setup-0.8.16-win-x64.exe"
-    }
-  ],
-  "downloads": [
-    {
-      "edition": "opensource",
-      "name": "CShell-0.8.16-win-x64.exe",
+      "path": "/downloads/opensource/releases.json",
       "status": 200,
-      "redirectFollowed": false,
-      "bytes": 123619494,
-      "sha256": "9a678431213c642f571ce9cf627d53621e6f40b2c8ff950e2d4651a72b673c93",
-      "sizeVerified": true,
-      "digestVerified": true
+      "catalogVerified": true
     },
     {
-      "edition": "pro",
-      "name": "CShell-Pro-0.8.16-win-x64.exe",
+      "path": "/downloads/opensource/v0.8.16/SHA256SUMS.txt",
       "status": 200,
-      "redirectFollowed": false,
-      "bytes": 123874979,
-      "sha256": "8519ad2eed69e8d179e3cdded0330d782876caf1fcf2c45b1deb7dabb7693d39",
-      "sizeVerified": true,
-      "digestVerified": true
+      "bytes": 1442,
+      "fullDigestVerified": true,
+      "noClientRedirect": true
+    },
+    {
+      "path": "/downloads/opensource/v0.8.16/CAgent-Setup-0.8.16-win-x64.exe",
+      "status": 206,
+      "bytes": 1024,
+      "fullDigestVerified": false,
+      "noClientRedirect": true
+    },
+    {
+      "path": "/downloads/opensource/v0.8.17/SHA256SUMS.txt",
+      "status": 200,
+      "bytes": 1437,
+      "fullDigestVerified": true,
+      "noClientRedirect": true
+    },
+    {
+      "path": "/downloads/opensource/v0.8.17/CAgent-Setup-0.8.17-win-x64.exe",
+      "status": 206,
+      "bytes": 1024,
+      "fullDigestVerified": false,
+      "noClientRedirect": true
+    },
+    {
+      "path": "/downloads/pro/releases.json",
+      "status": 200,
+      "catalogVerified": true
+    },
+    {
+      "path": "/downloads/pro/v0.8.16/SHA256SUMS.txt",
+      "status": 200,
+      "bytes": 1283,
+      "fullDigestVerified": true,
+      "noClientRedirect": true
+    },
+    {
+      "path": "/downloads/pro/v0.8.16/CAgent-Setup-0.8.16-win-x64.exe",
+      "status": 206,
+      "bytes": 1024,
+      "fullDigestVerified": false,
+      "noClientRedirect": true
+    },
+    {
+      "path": "/downloads/pro/v0.8.17/SHA256SUMS.txt",
+      "status": 200,
+      "bytes": 1283,
+      "fullDigestVerified": true,
+      "noClientRedirect": true
+    },
+    {
+      "path": "/downloads/pro/v0.8.17/CAgent-Setup-0.8.17-win-x64.exe",
+      "status": 206,
+      "bytes": 1024,
+      "fullDigestVerified": false,
+      "noClientRedirect": true
     }
-  ],
-  "limitations": [
-    "CAgent 0.8.16 trusts the configured catalog channel; it does not independently reject an opposite-channel catalog injected by a caller. Separate pinned catalogs prevent cross-channel selection in this tested normal path."
-  ],
-  "additionalVerifiedArtifact": {
-    "name": "CAgent-Setup-0.8.16-win-x64.exe",
-    "edition": "pro",
-    "bytes": 25568112,
-    "sha256": "84cca14038fb7f3108ea41e0149c83917822525cddb389ee34bce8ede7e66a43",
-    "downloadedBy": "deployment task through public domain, direct 200",
-    "independentLocalRehashVerified": true
-  }
+  ]
 }

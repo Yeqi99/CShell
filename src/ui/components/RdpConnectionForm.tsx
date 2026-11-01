@@ -1,3 +1,4 @@
+import {ConnectionProbe} from './ConnectionProbe';
 import { useState } from 'react';
 import type { Profile } from '../../shared/contracts';
 import { ConnectionExtractor } from './ConnectionExtractor';
@@ -178,7 +179,7 @@ export function RdpConnectionForm({
             ? '密码加密保存。双击列表中的连接即可启动；系统策略或首次服务器身份核验仍可能要求确认。'
             : 'Passwords are encrypted. Double-click a saved connection to launch; Windows policy or server identity checks may still prompt.'}
         </p>
-        <div className="connection-actions">
+        <ConnectionProbe host={draft.host} port={Number(port)} disabled={busy}/><div className="connection-actions">
           <button type="submit" className="primary" disabled={busy || extracting}>
             {cn ? '保存' : 'Save'}
           </button>

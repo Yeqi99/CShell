@@ -27,6 +27,17 @@ test('Pro model distribution survives reload/cloud round trip without changing g
   await assistant.close(); await reload.close();
 });
 
+test('cloud provider removal clears stale credentials while retaining execution preferences', async () => {
+  const f=fixture(), assistant=f.create(); await assistant.load();
+  await assistant.configure({...model,commands:false,review:true,delegates:[]});
+  const next=assistant.cloudExport(); next.providers=[];
+  await assistant.cloudImport(next);
+  const reload=f.create(); await reload.load();
+  assert.equal(reload.snapshot().model,''); assert.equal(reload.snapshot().keyConfigured,false);
+  assert.equal(reload.snapshot().commands,false); assert.equal(reload.snapshot().review,true);
+  await assistant.close(); await reload.close();
+});
+
 test('pending configuration, cloud import and account restore exclude each other and task start', async () => {
   const f = fixture(), assistant = f.create();
   await assistant.load(); await assistant.configure({ ...model, commands: false, review: true, delegates: [] });
@@ -47,4 +58,16 @@ test('pending configuration, cloud import and account restore exclude each other
     assistant.assertAccountIdle();
   }
   await assistant.close();
+});
+
+test('CAgent resolves a cloud extension provider through its registered transport', async()=>{
+ const f=fixture(),assistant=f.create();await assistant.load();
+ const cloud=assistant.cloudExport(),id=randomUUID();
+ cloud.providers=[{id,name:'OpenCode',url:'https://model-extension.invalid',model:'old',key:'',extension:{id:'cshell.opencode',model:'account/model'}}];
+ await assistant.cloudImport(cloud);
+ assert.equal(assistant.snapshot().providerId,id);assert.equal(assistant.snapshot().keyConfigured,true);
+ let called=false;
+ assistant.resolveExtension=async(ref)=>{assert.equal(ref.id,'cshell.opencode');return {url:'https://bridge.invalid',model:'resolved',key:'',transport:async(_url,init)=>{called=true;assert.equal(JSON.parse(String(init?.body)).model,'resolved');return new Response(JSON.stringify({choices:[{message:{role:'assistant',content:'ok'}}]}),{headers:{'content-type':'application/json'}});}};};
+ await (assistant as any).modelRequest('https://unused.invalid',{method:'POST',body:JSON.stringify({model:'old',messages:[]})},new AbortController().signal,()=>{});
+ assert.equal(called,true);await assistant.close();
 });

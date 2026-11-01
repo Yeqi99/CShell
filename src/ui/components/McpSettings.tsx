@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { defaultMcpPort } from '../../shared/mcp-endpoint';
 import { selectAllMcpPermissions } from './mcp-all-permissions';
 import { apiCapabilitySchema } from '../../shared/contracts';
@@ -88,16 +89,16 @@ export function McpSettings({
       <p className="muted">{t('mcpHint')}</p>
       {draft && (
         <fieldset disabled={busy || saving}>
-          <div className="capability-selection">
+          <div className="capability-selection mcp-global-actions">
             <strong>{locale === 'zh-CN' ? '全局权限' : 'Global permissions'}</strong>
             <button type="button" onClick={() => void run(async () => {
               const shells = await window.cshell.apiLocalShells();
               setDraft(current => current ? selectAllMcpPermissions(current, profiles, shells) : current);
             })}>{locale === 'zh-CN' ? '一键全选所有权限' : 'Select all permissions'}</button>
           </div>
-          <p className="muted">{locale === 'zh-CN'
+          <details className="mcp-global-help"><summary>{locale === 'zh-CN' ? '全选会开放哪些范围' : 'What selecting all includes'}</summary><p className="muted">{locale === 'zh-CN'
             ? '包含当前所有可用连接、本机终端、全部能力、已添加目录的读写，以及独立客户端；取消机器级限制并设为授权范围内直接执行。保存后生效，服务与客户端启用状态保持不变。'
-            : 'Includes all current supported connections, local terminals, capabilities, configured folder mutations and API clients. Removes target overrides and enables execution within grants. Save to apply; service and client enabled states stay unchanged.'}</p>
+            : 'Includes all current supported connections, local terminals, capabilities, configured folder mutations and API clients. Removes target overrides and enables execution within grants. Save to apply; service and client enabled states stay unchanged.'}</p></details>
           <label className="checkbox">
             <input
               type="checkbox"
@@ -138,7 +139,7 @@ export function McpSettings({
                       })
                     }
                   />
-                  {profile.name} · {profile.host}
+                  <span className="mcp-profile-copy"><strong>{profile.name}</strong><small>{profile.host}</small></span>
                 </label>
               ))}
           </div>
@@ -353,8 +354,8 @@ export function McpSettings({
           <details>
             <summary>{locale === 'zh-CN' ? '独立 API 客户端' : 'Independent API clients'}</summary>
             {(draft.clients ?? []).map((client) => (
-              <details key={client.id}>
-                <summary>{client.name}</summary>
+              <details className="api-client-card" key={client.id}>
+                <summary><span>{client.name}</span><button type="button" className="quiet" aria-label={`${locale === 'zh-CN' ? '移除客户端' : 'Remove client'} ${client.name}`} title={locale === 'zh-CN' ? '移除后保存设置以撤销令牌' : 'Save settings after removal to revoke the token'} onClick={event => {event.preventDefault();event.stopPropagation();setDraft({...draft,clients:draft.clients?.filter(c=>c.id!==client.id)});}}>{locale === 'zh-CN' ? '移除' : 'Remove'}</button></summary>
                 <label>
                   {locale === 'zh-CN' ? '客户端名称' : 'Client name'}
                   <input
@@ -619,9 +620,7 @@ export function McpSettings({
       )}
       {status && <p role="status">{status.running ? t('mcpRunning') : t('mcpStopped')}</p>}
       {(error || status?.error) && (
-        <p className="form-error" role="alert">
-          {error || status?.error}
-        </p>
+        <ErrorNotice title="MCP 操作未完成" error={error || status?.error || ''}/>
       )}
     </section>
   );

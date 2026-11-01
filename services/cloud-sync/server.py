@@ -50,6 +50,7 @@ class Service:
             CREATE TABLE IF NOT EXISTS codes(email TEXT PRIMARY KEY,digest TEXT,expires REAL,attempts INTEGER);
             CREATE TABLE IF NOT EXISTS sessions(digest TEXT PRIMARY KEY,account TEXT,expires REAL);
             CREATE TABLE IF NOT EXISTS vaults(account TEXT PRIMARY KEY,revision INTEGER,envelope TEXT,mutation TEXT);
+            CREATE TABLE IF NOT EXISTS vault_versions(account TEXT PRIMARY KEY,schema INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS limits(bucket TEXT PRIMARY KEY,start REAL,count INTEGER);
             ''')
 
@@ -159,7 +160,7 @@ class Service:
             raise Failure(401, '验证码无效、过期或尝试次数已用尽')
         return {'accountId': account, 'email': email, 'token': token}
 
-    def register(self, body, ip):
+    def register(self, body, ip, schema=1):
         email = self.email(body.get('email'))
         self.limit('register-ip:' + self.digest(ip), 10, 600)
         password, account, box = body.get('password'), body.get('accountId'), body.get('keybox')
@@ -201,6 +202,7 @@ class Service:
                     db.execute('INSERT INTO passwords VALUES(?,?,?)', (account, salt, digest))
                     db.execute('INSERT INTO keyboxes VALUES(?,?)', (account, json.dumps(box)))
                     db.execute('INSERT INTO vaults(account,revision,envelope,mutation,byte_size) VALUES(?,?,?,?,?)', (account, 1, vault, secrets.token_hex(16),len(base64.b64decode(body['envelope']['ciphertext']))-16))
+                    db.execute('INSERT INTO vault_versions VALUES(?,?)',(account,schema))
                     db.execute('INSERT INTO sessions VALUES(?,?,?)', (self.digest(token), account, time.time()+30*86400))
                     db.execute('DELETE FROM codes WHERE email=?', (email,))
         if not valid:
@@ -267,12 +269,20 @@ class Service:
             else:db.execute('DELETE FROM usage_devices WHERE digest=?',(digest,))
         return {'ok':True}
 
-    def read(self, account):
+    def check_vault_schema(self, db, account, schema):
+        if schema not in (1, 2):
+            raise Failure(426, "请更新 CShell / CAgent 后再同步账号数据")
+        row=db.execute("SELECT schema FROM vault_versions WHERE account=?",(account,)).fetchone()
+        if row and schema < row[0]:
+            raise Failure(426, "此账号已使用新版同步格式，请更新 CShell / CAgent；本机及云端数据均已保留")
+
+    def read(self, account, schema=1):
         with self.db() as db:
+            self.check_vault_schema(db,account,schema)
             row = db.execute('SELECT revision,envelope FROM vaults WHERE account=?', (account,)).fetchone()
         return {'revision': row[0], 'envelope': json.loads(row[1])} if row else {'revision': 0, 'envelope': None}
 
-    def write(self, account, body):
+    def write(self, account, body, schema=1):
         revision, mutation, envelope = body.get('baseRevision'), body.get('mutationId'), body.get('envelope')
         if type(revision) is not int or revision < 0 or not isinstance(mutation, str) or not re.fullmatch(r'[a-f0-9-]{36}', mutation):
             raise Failure(400, '同步版本不正确')
@@ -287,6 +297,7 @@ class Service:
         encoded = json.dumps(envelope, separators=(',', ':'))
         with self.db() as db:
             db.execute('BEGIN IMMEDIATE')
+            self.check_vault_schema(db,account,schema)
             row = db.execute('SELECT revision,mutation,envelope FROM vaults WHERE account=?', (account,)).fetchone()
             if row and row[1] == mutation:
                 if row[2] != encoded:
@@ -300,6 +311,7 @@ class Service:
             if revision != (row[0] if row else 0):
                 raise Failure(409, '另一台设备已更新云端，请检查同步冲突')
             db.execute('INSERT OR REPLACE INTO vaults(account,revision,envelope,mutation,byte_size) VALUES(?,?,?,?,?)', (account, revision + 1, encoded, mutation,len(ciphertext)-16))
+            db.execute('INSERT INTO vault_versions VALUES(?,?) ON CONFLICT(account) DO UPDATE SET schema=max(schema,excluded.schema)',(account,schema))
         return {'revision': revision + 1}
 
     def logout(self, token):
@@ -403,6 +415,10 @@ def handler(service):
                     value=service.devices.authorize(body)
                 elif admin and self.path == '/v1/admin/model-usage' and self.command == 'GET':
                     value=service.models.usage()
+                elif admin and self.path == '/v1/admin/lending' and self.command == 'GET':
+                    value=service.devices.lending.admin_list()
+                elif admin and self.path == '/v1/admin/lending/revoke' and self.command == 'POST':
+                    value=service.devices.lending.admin_revoke(body)
                 elif admin and self.path == '/v1/admin/accounts' and self.command == 'GET':
                     value = service.admin_accounts()
                 elif admin and self.path == '/v1/admin/membership' and self.command == 'POST':
@@ -416,7 +432,7 @@ def handler(service):
                 elif self.command == 'POST' and self.path == '/v1/auth/code':
                     value = service.request_code(body.get('email'), ip)
                 elif self.command == 'POST' and self.path == '/v1/auth/register':
-                    value = service.register(body, ip)
+                    value = service.register(body, ip, 2 if self.headers.get('X-CShell-Vault-Schema') == '2' and self.headers.get('X-CShell-Vault-Write-Schema') == '2' else 1)
                 elif self.command == 'POST' and self.path == '/v1/auth/login':
                     value = service.login(body.get('email'), body.get('code'), ip)
                 elif self.command == 'POST' and self.path == '/v1/auth/password-login':
@@ -436,6 +452,18 @@ def handler(service):
                         value=service.devices.list(account)
                     elif self.path == '/v1/devices/register' and self.command == 'POST':
                         value=service.devices.register(account,body)
+                    elif self.path == '/v1/lending' and self.command == 'GET':
+                        value=service.devices.lending.list(account)
+                    elif self.path == '/v1/lending/create' and self.command == 'POST':
+                        value=service.devices.lending.create(account,body)
+                    elif self.path == '/v1/lending/redeem' and self.command == 'POST':
+                        value=service.devices.lending.redeem(account,body)
+                    elif self.path == '/v1/lending/revoke' and self.command == 'POST':
+                        value=service.devices.lending.revoke(account,body)
+                    elif self.path == '/v1/devices/delegate' and self.command == 'POST':
+                        value=service.devices.delegate(account,body)
+                    elif self.path == '/v1/devices/delegation/verify' and self.command == 'POST':
+                        value=service.devices.verify_delegation(account,body)
                     elif self.path == '/v1/devices/lease' and self.command == 'POST':
                         value=service.devices.lease(account,body)
                     elif self.path == '/v1/devices/remove' and self.command == 'POST':
@@ -454,9 +482,9 @@ def handler(service):
                     elif self.path == '/v1/auth/password' and self.command == 'POST':
                         value = service.set_password(account, body.get('password'))
                     elif self.path == '/v1/vault' and self.command == 'GET':
-                        value = service.read(account)
+                        value = service.read(account, 2 if self.headers.get('X-CShell-Vault-Schema') == '2' else 1)
                     elif self.path == '/v1/vault' and self.command == 'POST':
-                        value = service.write(account, body)
+                        value = service.write(account, body, 2 if self.headers.get('X-CShell-Vault-Schema') == '2' and self.headers.get('X-CShell-Vault-Write-Schema') == '2' else 1)
                     elif self.path == '/v1/auth/logout' and self.command == 'POST':
                         value = service.logout(token)
                     else:

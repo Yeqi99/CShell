@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { useEffect, useState } from 'react';
 import { PythonEditor } from './PythonEditor';
 import { pluginEnabled } from '../../shared/plugins';
@@ -42,7 +43,7 @@ export function TextFileEditor({ sessionId, path, realtime = false, closed = fal
         <option value="">选择环境</option>{interpreters.map(p => <option key={p} value={p}>{p}</option>)}
       </select></label>}
     </div>
-    {error && <p role="alert">{error}</p>}
+    {error && <ErrorNotice title="操作未完成" error={error}/>}
     <PythonEditor sessionId={sessionId} path={path} python={!disableEnvironment && mode === 'python' ? python : ''} connected={connected && !closed}
       textFile initialRealtime={realtime} languageMode={mode} onDependency={() => window.dispatchEvent(new Event('cshell:open-extensions'))}/>
   </section>;

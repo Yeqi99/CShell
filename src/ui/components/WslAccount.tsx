@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { useState } from 'react';
 import { Terminal, ArrowRight } from 'lucide-react';
 export function WslAccount({
@@ -79,9 +80,7 @@ export function WslAccount({
       </label>
       <small>密码用于 Linux 内的 sudo 等授权，不用于每次打开终端。CShell 不保存此密码。</small>
       {error && (
-        <p role="alert" className="form-error">
-          {error}
-        </p>
+        <ErrorNotice title="操作未完成" error={error}/>
       )}
       <footer>
         <button type="button" className="secondary" disabled={busy} onClick={onCancel}>
