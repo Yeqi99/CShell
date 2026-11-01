@@ -26,7 +26,7 @@ export function MachineNetworkRules(){
   const save=()=>{if(selectedSource&&selectedTarget&&!validation)void run({action:'save',rule:{source:selectedSource.endpoint,target:selectedTarget.endpoint}});};
   return <details className="network-rule-section identity-network" onToggle={e=>{if(e.currentTarget.open&&!state&&!busy)void run();}}>
     <summary>机器网络出口</summary>
-    <p>按来源设置出口。适用于使用应用代理的网络请求，不接管忽略代理的软件。</p>
+    <p>按来源设置出口。SSH 规则用于之后打开的终端；只代理遵守代理设置的应用，不改变已运行软件的网络。</p>
     {error&&<ErrorNotice title="网络出口未完成" error={error}/>}
     <div className="network-rule-heading"><span>{state?`${state.rules.length} 条规则`:'来源 → 出口'}</span><div className="identity-rule-actions">
       <button type="button" className="icon" title="刷新规则状态" aria-label="刷新规则状态" disabled={busy} onClick={()=>void run()}><RefreshCw size={15}/></button>
