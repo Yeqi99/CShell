@@ -53,6 +53,8 @@ export async function registerAiHandlers(
   network.machine = machineNetwork;
   await network.load();
   const systemProxy=new WindowsSystemProxy(directory,store,(host,port)=>network.systemTunnel(host,port),()=>network.prepareSystemProxy());
+  systemProxy.beforeEnable=state=>network.captureControlProxy(state);
+  systemProxy.afterDisable=()=>network.releaseControlProxy();
   await systemProxy.recover().catch(()=>{});
   handle('network:system-status',()=>systemProxy.status());
   handle('network:system-set',enabled=>systemProxy.set(z.boolean().parse(enabled)));

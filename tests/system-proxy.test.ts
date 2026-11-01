@@ -10,10 +10,13 @@ test('explicit system proxy saves/restores old settings without touching user ch
  const run=async(script:string)=>{if(script.includes('Get-ItemProperty'))return JSON.stringify(current);const encoded=script.match(/FromBase64String\('([^']+)'\)/)?.[1];assert.ok(encoded);current=JSON.parse(Buffer.from(encoded,'base64').toString());writes++;return '';};
  const codec={encryptPrivate:async(s:string)=>s,decryptPrivate:async(s:string)=>s};
  const proxy=new WindowsSystemProxy(dir,codec,async()=>{throw Error('egress offline')},async()=>{},'win32',run);
+ let captured=false,released=0;
+ proxy.beforeEnable=async state=>{assert.deepEqual(state,previous);assert.deepEqual(current,previous);captured=true;};
+ proxy.afterDisable=async()=>{released++;};
  try{
   await proxy.recover();assert.equal(writes,0);
-  await proxy.set(true);assert.equal(proxy.status().enabled,true);assert.match(current.ProxyServer,/http=127\.0\.0\.1:/);
-  await proxy.set(false);assert.deepEqual(current,previous);
+  await proxy.set(true);assert.equal(captured,true);assert.equal(proxy.status().enabled,true);assert.match(current.ProxyServer,/http=127\.0\.0\.1:/);
+  await proxy.set(false);assert.deepEqual(current,previous);assert.equal(released,1);
   await proxy.set(true);current={...previous,ProxyServer:'user-new-proxy:8080'};
   await proxy.set(false);assert.equal(current.ProxyServer,'user-new-proxy:8080');
  }finally{await proxy.close();await rm(dir,{recursive:true,force:true});}

@@ -148,7 +148,7 @@ export class AiService {
       checkTarget: (t) => this.checkWorkTarget(t),
       pin: (t) => {
         t.permissionCeiling ??= structuredClone(this.policy);
-        t.boundIdentity ??= JSON.stringify(this.connections.describe(t.sessionId!));
+        if (t.sessionId) t.boundIdentity ??= JSON.stringify(this.connections.describe(t.sessionId));
       },
       child: (t, task) => this.spawn(t, task),
       send: (id, text) => this.send(id, text),
@@ -157,7 +157,7 @@ export class AiService {
     });
   }
   private checkWorkTarget(t: AiThread) {
-    if (!t.sessionId) throw new Error('请先绑定真实机器连接');
+    if (!t.sessionId) { if(t.boundIdentity) throw new Error('目标连接已断开'); return; }
     const target = this.connections.describe(t.sessionId);
     if (t.boundIdentity && JSON.stringify(target) !== t.boundIdentity)
       throw new Error('目标身份已变化');
@@ -674,7 +674,7 @@ export class AiService {
       const parent = this.threads.find((p) => p.id === t.parentId);
       if (!parent || !this.runs.has(parent.id) || !this.allowed(parent, tool, input)) return false;
     }
-    if ((t.parentId || t.goal || t.boundIdentity) && tool === 'connect_machine') return false;
+    if ((t.parentId || t.boundIdentity) && tool === 'connect_machine') return false;
     if (t.boundIdentity) {
       try {
         this.checkWorkTarget(t);

@@ -145,7 +145,7 @@ export async function registerCloudHandlers(
       try { await apply(value); }
       finally { publish(); }
     },
-  }, undefined, (url, options) => net.fetch(String(url), options));
+  }, undefined, (url, options) => network?network.controlFetch(url,options):net.fetch(String(url), options));
   await cloud.load();
   if(profileOptions){
     try{await profileOptions.profiles.initialize(cloud.accountId());}
@@ -167,7 +167,6 @@ export async function registerCloudHandlers(
     const proxies = new Map<string, Awaited<ReturnType<typeof createSshBrowserProxy>>>();
     const savedMachineNetwork=network.machine;
     network.machine = {
-      systemProxySupported:id=>!client.cloudExport().some(device=>device.deviceId===id&&device.accountManaged),
       tunnel:async(id,host,port)=>{
         if(!client.cloudExport().some(device=>device.deviceId===id&&device.accountManaged)){
           if(savedMachineNetwork?.tunnel&&(await savedMachineNetwork.list()).some(device=>device.id===id))return savedMachineNetwork.tunnel(id,host,port);

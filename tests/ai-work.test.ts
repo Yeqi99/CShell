@@ -371,3 +371,19 @@ test('goals require explicit capability, block without a report, pause persists,
     await f.cleanup();
   }
 });
+
+test('global goal preserves a permission ceiling and accepts seconds and factual memory', async () => {
+ const f=await setup(()=>({content:'ok'}));
+ try {
+  const provider=f.ai.snapshot().providers[0];
+  const t=await f.ai.create('workspace',provider.id,'allow');
+  await f.ai.saveGoal(t.id,{objective:'Monitor authorized machines',intervalSeconds:2,memory:'Last verified baseline'});
+  const saved=f.ai.snapshot().threads.find(x=>x.id===t.id)!;
+  assert.equal(saved.goal?.intervalSeconds,2);
+  assert.equal(saved.goal?.memory,'Last verified baseline');
+  assert.equal(saved.boundIdentity,undefined);
+  assert.ok(saved.permissionCeiling);
+  assert.ok(saved.goal!.nextRun! - Date.now()<=2000);
+ } finally {await f.cleanup();}
+});
+

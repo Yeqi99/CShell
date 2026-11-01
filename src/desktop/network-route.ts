@@ -9,6 +9,14 @@ import type { Store } from '../core/store';
 export class ApplicationNetworkRoute {
   private route: NetworkRoute = { mode: 'system' };
   private current?: Session;
+  private control?:Session;
+  async captureControlProxy(previous:import('./system-proxy').SystemProxyState){
+    const {session}=await import('electron');const isolated=session.fromPartition('cshell-control-'+randomUUID(),{cache:false});
+    await isolated.setProxy(previous.AutoConfigURL?{mode:'pac_script',pacScript:previous.AutoConfigURL}:previous.ProxyEnable&&previous.ProxyServer?{mode:'fixed_servers',proxyRules:previous.ProxyServer,proxyBypassRules:previous.ProxyOverride??''}:previous.AutoDetect?{mode:'auto_detect'}:{mode:'direct'});
+    const old=this.control;this.control=isolated;await old?.closeAllConnections();
+  }
+  async releaseControlProxy(){const old=this.control;this.control=undefined;await old?.closeAllConnections();}
+  readonly controlFetch:typeof fetch=async(input,init)=>{const {net}=await import('electron');return this.control?this.control.fetch(input as any,init):net.fetch(String(input),init);};
   private currentProxy?: string;
   private queue: Promise<unknown> = Promise.resolve();
   private closed = false;
@@ -21,8 +29,8 @@ export class ApplicationNetworkRoute {
     close?(): Promise<void>;
   };
   constructor(private directory: string, private store: Store) {}
-  async prepareSystemProxy(){if(this.route.mode!=='machine'||!this.machine?.tunnel)throw Error('请先选择可用的机器出口，再开启系统代理');if(this.machine.systemProxySupported?.(this.route.id)===false)throw Error('此账号中继出口暂不支持系统代理，请选择直连 SSH 或 CAgent');await this.machine.proxy(this.route.id);}
-  async systemTunnel(host:string,port:number){if(this.route.mode!=='machine'||!this.machine?.tunnel)throw Error('所选机器出口不可用，未回退直连');if(this.machine.systemProxySupported?.(this.route.id)===false)throw Error('当前出口不支持系统代理，已阻止回退直连');return this.machine.tunnel(this.route.id,host,port);}
+  async prepareSystemProxy(){if(this.route.mode!=='machine'||!this.machine?.tunnel)throw Error('请先选择可用的机器出口，再开启系统代理');await this.machine.proxy(this.route.id);}
+  async systemTunnel(host:string,port:number){if(this.route.mode!=='machine'||!this.machine?.tunnel)throw Error('所选机器出口不可用，未回退直连');return this.machine.tunnel(this.route.id,host,port);}
   async load() {
     try {
       this.route = networkRouteSchema.parse(JSON.parse(await this.store.decryptPrivate(
@@ -101,6 +109,7 @@ export class ApplicationNetworkRoute {
     this.closed = true;
     await this.queue.catch(() => {});
     await this.current?.closeAllConnections();
+    await this.releaseControlProxy();
     await this.machine?.close?.();
   }
 }
