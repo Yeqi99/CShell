@@ -16,6 +16,7 @@ struct DesktopClipboard {
  void open(){if(!window)window=CreateWindowExW(0,L"STATIC",L"",0,0,0,0,0,HWND_MESSAGE,nullptr,GetModuleHandleW(nullptr),nullptr);if(!window||!OpenClipboard(window))throw std::runtime_error("CLIPBOARD_BUSY");}
  json command(const json&c){
   const auto action=c.at("action").get<std::string>();if(until&&GetTickCount64()>until)clear();
+  if(action=="sequence")return {{"sequence",GetClipboardSequenceNumber()}};
   if(action=="fileBegin")return files.begin(c.at("name").get<std::string>(),c.at("size").get<uint64_t>());
   if(action=="fileChunk"||action=="fileRead")return files.chunk(c);
   if(action=="filesCommit"){auto data=files.paths(c.at("fileTokens")).dump();command({{"action","begin"},{"kind","files"},{"size",data.size()}});for(size_t at=0;at<data.size();at+=2048)command({{"action","chunk"},{"offset",at},{"hex",hex((const unsigned char*)data.data()+at,std::min<size_t>(2048,data.size()-at))}});return command({{"action","commit"}});}

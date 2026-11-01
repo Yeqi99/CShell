@@ -37,7 +37,23 @@ final class AndroidPhoneCapabilities {
     return tools;
   }
   private JSONObject tool(String id,String permission,boolean sideEffect)throws Exception {
-    return new JSONObject().put("packageId","cagent.android").put("id",id).put("toolId",id).put("permissions",new JSONArray().put(permission)).put("sideEffect",sideEffect);
+    JSONObject properties=new JSONObject();
+    JSONArray fields=new JSONArray();String description;
+    if(id.equals("android_sms_read")){
+      description="Read recent inbox SMS from this Android device only after its READ_SMS permission is granted.";
+      properties.put("limit",new JSONObject().put("type","integer").put("minimum",1).put("maximum",50).put("default",20));
+      properties.put("after",new JSONObject().put("type","integer").put("minimum",0).put("description","Inclusive Unix timestamp in milliseconds"));
+    }else{
+      properties.put("requestId",new JSONObject().put("type","string").put("format","uuid").put("description","Unique operation ID; retries with this ID never send or dial twice"));fields.put("requestId");
+      if(!id.equals("android_call_answer")){properties.put("number",new JSONObject().put("type","string").put("pattern","^\\+?[0-9]{3,20}$"));fields.put("number");}
+      if(id.equals("android_sms_send")){properties.put("text",new JSONObject().put("type","string").put("minLength",1).put("maxLength",1600));fields.put("text");description="Send an SMS from this Android device using its configured default SMS SIM. Requires SEND_SMS. Submitted is not a delivery confirmation.";}
+      else if(id.equals("android_call"))description="Place a non-emergency outgoing phone call from this Android device. Requires CALL_PHONE. Never retry an unknown outcome with a new operation ID.";
+      else description="Answer the currently ringing phone call on this Android device. Requires ANSWER_PHONE_CALLS; submitted does not confirm connection.";
+    }
+    return new JSONObject().put("packageId","cagent.android").put("id",id).put("toolId",id).put("description",description)
+      .put("inputSchema",new JSONObject().put("type","object").put("properties",properties).put("required",fields).put("additionalProperties",false))
+      .put("outputSchema",new JSONObject().put("type","object"))
+      .put("permissions",new JSONArray().put(permission)).put("sideEffect",sideEffect);
   }
   private void require(String permission){if(!phone()||!allowed(permission))throw new SecurityException("请在手机上授予此项电话或短信权限");}
   synchronized Object invoke(String owner,String id,JSONObject args)throws Exception {
@@ -83,3 +99,4 @@ final class AndroidPhoneCapabilities {
     return state;
   }
 }
+
