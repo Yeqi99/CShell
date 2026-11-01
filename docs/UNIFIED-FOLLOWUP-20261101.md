@@ -126,3 +126,8 @@ Cloud schema 3 carries external plugin selection plus its manifest digest, and C
 Host-owned capability adapters may implement `portableConfiguration` with `export`, `validate`, and `import`. `validate` must use an exact allowlist of non-sensitive settings; the cloud envelope limits values to bounded primitives/string arrays. An adapter without this contract cannot import arbitrary configuration. Tokens, passwords, local paths/ports, process identity, granted permissions, and WeChat send/receive scopes stay on the target machine. Command snippet content and bundled plugin configuration continue to use the existing explicit portable fields.
 
 A changed CAgent theme/font is written into shared account preferences. Account mutations are serialized; concurrent appearance edits preserve unrelated fields and switching accounts restores the correct workspace. New-format fields advance the server minimum only when actually written. Existing schema 1/2 vaults remain readable by their old clients until then; incompatible readers/writers receive an update-required response before touching the ciphertext.
+
+
+### CAgent 能力包同步范围
+
+CAgent 能力包当前恢复安装选择、精确版本与清单摘要。portableConfiguration 是适配器可选的非敏感配置白名单契约，目前生产适配器尚未声明，不能称全部扩展配置已同步。既有 CShell 命令配置按原有字段恢复；微信本机监听、进程与账号绑定、联系人收发范围和操作授权不迁移。
