@@ -48,7 +48,7 @@ jobs:
             android/app/build/reports/lint-results-debug.html
 
   android-native:
-    if: github.event_name == 'workflow_dispatch' && inputs.native
+    if: (github.event_name == 'workflow_dispatch' && inputs.native) || (github.event_name == 'push' && github.ref == 'refs/heads/codex/android-diagnostic-0.8.18')
     timeout-minutes: 35
     runs-on: ubuntu-latest
     strategy:
