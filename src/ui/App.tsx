@@ -154,13 +154,17 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
   useEffect(() => window.cshell.onMinimalHover(setMinimalHover), []);
   useEffect(
     () =>
-      window.cshell.onAiConnection(({ sessionId, profile }) => {
+      window.cshell.onAiConnection(({ sessionId, profile, managementOnly }) => {
         if (profile.protocol === 'client') {
           void window.cshell
             .clientDevices()
             .then((devices) => {
               const device = devices.find((d) => d.deviceId === profile.id);
               if (device) {
+                if (managementOnly) {
+                  void openMachineDevice(device).catch(onError);
+                  return;
+                }
                 setTabs((items) =>
                   items.some((t) => t.id === sessionId)
                     ? items
@@ -294,6 +298,7 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
   const [nativeDesktopRequests,setNativeDesktopRequests]=useState<Record<string,number>>({});
   const linuxRestored=useRef(new Set<string>());
   useEffect(()=>{for(const tab of tabs){if(tab.local||tab.client||linuxRestored.current.has(tab.id))continue;linuxRestored.current.add(tab.id);if(connectionUsesVisual(tab.profile,config.preferences)){setLinuxWorkspaces(v=>v.includes(tab.id)?v:[...v,tab.id]);setLinuxModes(v=>({...v,[tab.id]:true}));}}},[tabs]);
+  const [machineConnectionState,setMachineConnectionState]=useState<Record<string,boolean>>({});
   const [machineSessionIds,setMachineSessionIds]=useState<Record<string,string[]>>({});
   const [machineSessionCounts,setMachineSessionCounts]=useState<Record<string,number>>({});
   const [machines,setMachines]=useState<{device:ClientDevice;target:AgentTarget}[]>([]),[machineId,setMachineId]=useState('');
@@ -776,7 +781,7 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
               groups={config.groups}
               profiles={config.profiles}
               activeProfile={surface==='machine'?machines.find(m=>m.target.id===machineId)?.device.deviceId:current?.profile.id}
-              online={[...tabs.filter((tab) => !tab.closed && !tab.local).map((tab) => tab.profile.id),...machines.map(m=>m.device.deviceId)]}
+              online={[...tabs.filter((tab) => !tab.closed && !tab.local).map((tab) => tab.profile.id),...machines.filter(m=>machineConnectionState[m.target.id]!==false).map(m=>m.device.deviceId)]}
               onOpen={(p) => openConnection(p || 'new')}
               onConnect={openSaved}
               onVisual={profile => openSaved(profile, true)}
@@ -1282,7 +1287,7 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
             </div>
           )}
           {accountOpen && <div className="workspace-editor account-workspace" hidden={surface!=="account"}><CloudSettings/></div>}
-          {viewsOpen && <div className="workspace-editor" hidden={surface !== 'views'}><MonitorViews config={config}/></div>}{machines.map(m=><div key={m.target.id} className="workspace-editor" hidden={surface!=='machine'||machineId!==m.target.id}><AgentMachineWorkspace onDisconnect={()=>closeMachine(m.target.id)} device={m.device} target={m.target} preferences={preferences} onSessionCount={(count,ids)=>{setMachineSessionCounts(v=>v[m.target.id]===count?v:{...v,[m.target.id]:count});setMachineSessionIds(v=>JSON.stringify(v[m.target.id])===JSON.stringify(ids)?v:{...v,[m.target.id]:ids});}} active={surface==='machine'&&machineId===m.target.id}/></div>)}
+          {viewsOpen && <div className="workspace-editor" hidden={surface !== 'views'}><MonitorViews config={config}/></div>}{machines.map(m=><div key={m.target.id} className="workspace-editor" hidden={surface!=='machine'||machineId!==m.target.id}><AgentMachineWorkspace onConnectionState={connected=>setMachineConnectionState(v=>v[m.target.id]===connected?v:{...v,[m.target.id]:connected})} onDisconnect={()=>closeMachine(m.target.id)} device={m.device} target={m.target} preferences={preferences} onSessionCount={(count,ids)=>{setMachineSessionCounts(v=>v[m.target.id]===count?v:{...v,[m.target.id]:count});setMachineSessionIds(v=>JSON.stringify(v[m.target.id])===JSON.stringify(ids)?v:{...v,[m.target.id]:ids});}} active={surface==='machine'&&machineId===m.target.id}/></div>)}
           <div className="workspace-editor" hidden={surface !== 'home' && !(surface === 'terminal' && !tabs.length)}>
             <WorkbenchHome config={config} active={surface === 'home' || (surface === 'terminal' && !tabs.length)} currentCount={currentSsh.length + currentDevices.length}
               onView={view=>savePreferences({...config.preferences,workbenchView:view})} onSettings={openSettings} onExtensions={openExtensions} onAgent={()=>setAiVisible(true)} onCommandTab={newCommandTab}

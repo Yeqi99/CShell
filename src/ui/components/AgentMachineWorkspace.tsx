@@ -16,7 +16,7 @@ import {AgentApplications} from './AgentApplications';
 import {AgentConfiguration} from './AgentWorkbench';
 import {terminalClosed} from '../terminalBus';
 import './agent-machine.css';
-export function AgentMachineWorkspace({device,target,preferences,active,onSessionCount,onDisconnect}:{onDisconnect:()=>Promise<void>;onSessionCount:(count:number,ids:string[])=>void;device:ClientDevice;target:AgentTarget;preferences:Preferences;active:boolean}){
+export function AgentMachineWorkspace({device,target,preferences,active,onSessionCount,onDisconnect,onConnectionState}:{onConnectionState?:(connected:boolean)=>void;onDisconnect:()=>Promise<void>;onSessionCount:(count:number,ids:string[])=>void;device:ClientDevice;target:AgentTarget;preferences:Preferences;active:boolean}){
  const [attempt,setAttempt]=useState(0);
  const [machine,setMachine]=useState<any>(),[section,setSection]=useState('loading'),[visited,setVisited]=useState<string[]>([]),[shells,setShells]=useState<AgentShellOption[]>([]),[sessions,setSessions]=useState<{id:string;name:string}[]>([]),[selected,setSelected]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[desktop,setDesktop]=useState<any>();
  useEffect(()=>{const ids=sessions.filter(s=>!terminalClosed(s.id)).map(s=>s.id);onSessionCount(ids.length,ids);},[sessions,preferences,active]);
@@ -25,9 +25,9 @@ export function AgentMachineWorkspace({device,target,preferences,active,onSessio
  const linux=machine?.platform==='linux';
  const [pendingFiles,setPendingFiles]=useState<globalThis.File[]>([]);
  const running=useRef<string[]>([]),mounted=useRef(true);
- const [connectionError,setConnectionError]=useState('');
- const call=useCallback(async(method:AgentCall['method'],params?:unknown)=>{try{const result=await window.cshell.agentCall(target.id,{method,params});setConnectionError('');return result;}catch(error){const text=String(error);if(/断开|无法连接|连接失败|超时|closed|connect|socket|timeout/i.test(text))setConnectionError(text);throw error;}},[target.id]);
- useEffect(()=>{if(!active||!machine)return;let stopped=false,timer:ReturnType<typeof setTimeout>;const check=async()=>{try{await call('client.status');}catch{}if(!stopped)timer=setTimeout(()=>void check(),15000);};timer=setTimeout(()=>void check(),15000);return()=>{stopped=true;clearTimeout(timer);};},[active,call,!!machine]);
+ const [connectionError,setConnectionError]=useState('');const connectionObserver=useRef(onConnectionState);connectionObserver.current=onConnectionState;
+ const call=useCallback(async(method:AgentCall['method'],params?:unknown)=>{try{const result=await window.cshell.agentCall(target.id,{method,params});setConnectionError('');connectionObserver.current?.(true);return result;}catch(error){const text=String(error);if(/断开|无法连接|连接失败|认证失败|超时|closed|connect|socket|timeout|\b401\b/i.test(text)){setConnectionError(text);connectionObserver.current?.(false);}throw error;}},[target.id]);
+ useEffect(()=>{if(!machine)return;let stopped=false,timer:ReturnType<typeof setTimeout>;const check=async()=>{try{await call('client.status');}catch{}if(!stopped)timer=setTimeout(()=>void check(),15000);};timer=setTimeout(()=>void check(),15000);return()=>{stopped=true;clearTimeout(timer);};},[call,!!machine]);
  useEffect(()=>{mounted.current=true;let alive=true;setSection('loading');setVisited([]);setError('');
   void (async()=>{try{
     let status:any;
