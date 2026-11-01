@@ -50,7 +50,6 @@ public final class AndroidControlService extends AccessibilityService {
   }
   private static String bounded(CharSequence text){String value=text.toString();return value.substring(0,Math.min(2000,value.length()));}
   private static volatile AndroidControlService instance;
-  private android.os.HandlerThread inputThread;
   private Handler inputHandler;
   private float x=.5f,y=.5f;
   private Path drag;
@@ -69,14 +68,20 @@ public final class AndroidControlService extends AccessibilityService {
   private final java.util.concurrent.atomic.AtomicLong editRevision=new java.util.concurrent.atomic.AtomicLong();
   static String editState(){AndroidControlService s=instance;return lastEditState+(s==null?", disconnected":", processed="+s.processed+", phase="+s.phase+", editing="+s.editBusy+", gesture="+s.gestureState);}
   static boolean isEditing(){AndroidControlService s=instance;return s!=null&&s.editBusy;}
-  @Override protected void onServiceConnected(){inputThread=new android.os.HandlerThread("cagent-accessibility-input");inputThread.start();inputHandler=new Handler(inputThread.getLooper());instance=this;AndroidAgentService.changed(this);}
+  @Override protected void onServiceConnected(){
+    // Android's accessibility cache refreshes nodes while processing events on
+    // this looper. Concurrent same-process edits from a worker can wait on that
+    // cache while the UI awaits the interaction reply (five-second timeout).
+    // Keep OS actions, events and their bounded continuation queue on one looper.
+    inputHandler=new Handler(getMainLooper());instance=this;AndroidAgentService.changed(this);
+  }
   @Override public void onAccessibilityEvent(AccessibilityEvent event){
     int type=event.getEventType();
     if(type==AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED||type==AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED
       ||type==AccessibilityEvent.TYPE_VIEW_FOCUSED)editRevision.incrementAndGet();
   }
   @Override public void onInterrupt(){releaseAll();}
-  @Override public void onDestroy(){if(instance==this)instance=null;synchronized(this){queue.clear();}if(inputThread!=null)inputThread.quitSafely();AndroidAgentService.changed(this);super.onDestroy();}
+  @Override public void onDestroy(){if(instance==this)instance=null;synchronized(this){queue.clear();}if(inputHandler!=null)inputHandler.removeCallbacksAndMessages(null);AndroidAgentService.changed(this);super.onDestroy();}
   static boolean isAvailable(){return instance!=null;}
   /** Returns queued, not proof that a target application accepted the action. */
   static boolean dispatch(JSONObject event){
@@ -219,7 +224,7 @@ public final class AndroidControlService extends AccessibilityService {
     // Android 10 can temporarily return no global input focus while the IME
     // updates. Only fall back to a focused application window's actual input
     // focus, never an arbitrary editable field or a remembered node.
-    for(int attempt=0;attempt<4;attempt++){
+    {
       AccessibilityNodeInfo node=findFocus(AccessibilityNodeInfo.FOCUS_INPUT);
       if(node!=null){if(node.isFocused())return node;node.recycle();}
       for(android.view.accessibility.AccessibilityWindowInfo window:getWindows()){
@@ -229,7 +234,6 @@ public final class AndroidControlService extends AccessibilityService {
           try{node=root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);if(node!=null){if(node.isFocused())return node;node.recycle();}}finally{root.recycle();}
         }finally{window.recycle();}
       }
-      android.os.SystemClock.sleep(24);
     }
     return null;
   }
