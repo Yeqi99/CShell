@@ -202,6 +202,7 @@ export class ClientProvider implements ManagedProvider {
       deviceId: z.string().uuid(),
       shell: clientShellSchema,
       distribution: z.string().min(1).max(100).optional(),
+      managementOnly: z.boolean().optional(),
     })
     .strict();
   private identity?: Promise<ClientIdentity>;
@@ -423,6 +424,16 @@ export class ClientProvider implements ManagedProvider {
       }
     }
   }
+  async toolConfiguration(deviceId:string,shell?:import('../../shared/client').ClientShell,distribution?:string){
+    const options=await this.shells(deviceId);
+    if(!options.length){
+      if(distribution)throw new Error('此机器没有所选 WSL 环境');
+      return {deviceId,shell:'powershell' as const,managementOnly:true};
+    }
+    const selected=shell?options.find(option=>option.shell===shell&&option.distribution===distribution):options.find(option=>option.shell!=='wsl')??options[0];
+    if(!selected)throw new Error('此机器没有所选终端环境');
+    return {deviceId,shell:selected.shell,distribution:selected.distribution};
+  }
   async connect(
     value: unknown,
     _credentials: unknown,
@@ -461,13 +472,18 @@ export class ClientProvider implements ManagedProvider {
         await channel.request('auth', { name: hostname(),...await this.authFields(device) }),
         device.deviceId,
       );
-      if (!auth.shells.includes(config.shell)) throw new Error('Client 未授权此 Shell');
-      await channel.request(
+      if(config.managementOnly){
+        if(config.distribution)throw new Error('机器管理连接不能冒充 WSL 环境');
+        if(!auth.capabilities.includes('agent.manage'))throw new Error('机器未开放管理能力');
+      }else {
+        if (!auth.shells.includes(config.shell)) throw new Error('Client 未授权此 Shell');
+        await channel.request(
         'open',
         config.distribution
           ? { shell: config.shell, distribution: config.distribution }
           : config.shell,
-      );
+        );
+      }
       signal.throwIfAborted();
       if (channel.socket.destroyed) throw new Error('Client disconnected');
       const fire = (op: string, payload: unknown) => {
@@ -512,7 +528,7 @@ export class ClientProvider implements ManagedProvider {
           providerId: this.id,
           resourceId: device.deviceId,
           identity: fingerprint(device.certificate),
-          label: `${device.name} · ${config.distribution ?? config.shell}`,
+          label: config.managementOnly?device.name:`${device.name} · ${config.distribution ?? config.shell}`,
         },
         http:
           auth.capabilities.includes('http.send') && config.shell !== 'wsl'
@@ -541,7 +557,7 @@ export class ClientProvider implements ManagedProvider {
         agent: (call, abort) => this.call(device.deviceId, call, abort),
         tools: [
           ...processTools,
-          ...(auth.capabilities.includes('commands.execute')
+          ...(auth.capabilities.includes('commands.execute')&&auth.shells.includes(config.shell)
             ? [
                 {
                   name: 'execute_command',
@@ -682,7 +698,7 @@ export class ClientProvider implements ManagedProvider {
               },
             })),
         ],
-        terminal: {
+        terminal: config.managementOnly?undefined:{
           input: (data) => {
             for (const chunk of textChunks(data)) fire('input', chunk);
           },

@@ -641,7 +641,9 @@ else
         async (profile, signal, authorize) => {
           if (profile.protocol === 'client') {
             if (!authorize()) throw new Error('Agent scope denied');
-            const sessionId = await connections!.connect('cshell.client', { deviceId: profile.id, shell: profile.clientShell ?? 'powershell', distribution:profile.clientDistribution }, undefined, signal);
+            const config=await clientProvider.toolConfiguration(profile.id,profile.clientShell,profile.clientDistribution);
+            if(signal.aborted||!authorize())throw new Error('Agent connection cancelled');
+            const sessionId = await connections!.connect('cshell.client',config,undefined,signal);
             if (signal.aborted || !authorize() || window.isDestroyed()) { await connections!.disconnect(sessionId); throw new Error('Agent connection cancelled'); }
             window.webContents.send('ai:connected', { sessionId, profile }); return sessionId;
           }
@@ -730,11 +732,7 @@ else
             if (profile.protocol === 'client')
               return connections!.connect(
                 'cshell.client',
-                {
-                  deviceId: profile.id,
-                  shell: profile.clientShell ?? 'powershell',
-                  distribution: profile.clientDistribution,
-                },
+                await clientProvider.toolConfiguration(profile.id,profile.clientShell,profile.clientDistribution),
                 undefined,
                 signal,
                 ready,

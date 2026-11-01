@@ -22,6 +22,25 @@ const codec = {
   encrypt: async (value: string) => Buffer.from(value).toString('base64'),
   decrypt: async (value: string) => Buffer.from(value, 'base64').toString(),
 };
+test('management-only Agent connections expose real tools without opening a phantom terminal',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'cshell-management-'));let opens=0;
+  const terminal:ManagedProvider={id:'test',version:'1',capabilities:[],configuration:z.any(),async connect(){opens++;throw Error('No interactive terminal on this device');},disconnect(){},resolve(){throw Error('No terminal');}};
+  const server=new ClientServer(new ClientVault(join(dir,'host'),codec),terminal,{manage:async()=>[]});
+  const controller=new ClientProvider(new ClientVault(join(dir,'controller'),codec),()=>{});
+  try{
+    await server.load();await controller.load();await server.setAccess({password:'isolated-management-fixture',shells:[],allowManage:true});
+    const port=await freePort();await server.start({bind:'127.0.0.1',port});
+    const info=await controller.probe({host:'127.0.0.1',port});await controller.pairPassword(info,'isolated-management-fixture');
+    const config=await controller.toolConfiguration(info.deviceId);
+    assert.equal(config.managementOnly,true);
+    const signal=new AbortController().signal;
+    const id=await controller.connect(config,undefined,signal),connection=controller.resolve(id);
+    assert.equal(opens,0);assert.equal(connection.terminal,undefined);
+    assert.equal(connection.tools.some(tool=>tool.name==='execute_command'),false);
+    assert.deepEqual(await connection.agent!({method:'agent.shells'},signal),[]);
+    await assert.rejects(controller.connect({...config,distribution:'Ubuntu'},undefined,signal));
+  }finally{controller.dispose();await server.stop();await rm(dir,{recursive:true,force:true});}
+});
 test('Client authenticates mutual TLS, consumes invitations, scopes shells, revokes live terminals and persists trust', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'cshell-client-protocol-'));
   const sessions = new Set<string>();

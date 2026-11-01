@@ -4,17 +4,20 @@
 
 ## 本轮已执行
 
-- 完整单元/集成回归：728 项，724 通过，4 跳过，0 失败（test-results/unified-regression.log）。跳过项不是实机通过。
+- 完整单元/集成回归：742 项，738 通过，4 跳过，0 失败（test-results/unified-followup-regression.log）；之后无Shell管理连接新增真TLS回归7项通过。后续变更仍需对应回归。跳过项不是实机通过。
 - CAgent 模型 HTTPS 请求接入系统代理 CONNECT 通道，保留请求方法、正文及流响应 Content-Type；代理失败不回退直连。相关代理/AI/自动化 20 项测试通过。PAC/WPAD、SOCKS 及机器身份出口尚待补齐，不宣称全代理支持。
 - CAgent 原生思考/处理动效已增加，尊重系统关闭动画；WPF 编译通过，原生草稿/返回对话/运行控制 fixture 验证通过。真实模型联网待验收。
-- 内置插件启用状态加入云端保存与新设备恢复，15 项账号与导入并发测试通过；外部插件不自动下载安装或授权。新增 enabled 可选字段对旧版 strict schema 的兼容仍待处理，禁止提前发布。
+- 内置插件启用状态加入云端保存与新设备恢复，15 项账号与导入并发测试通过；外部插件不自动下载安装或授权。新增字段通过服务端vault schema门禁保护旧客户端，首次注册和后续写入都原子记录版本；必须先部署服务端再发布。
 - 细滚动条悬停反馈已调整，待桌面 UI 统一实测。
 
 - OpenCode 可选 modalities 元数据移除 16 项硬限制，过滤非字符串、去重；模型 ID 校验仍保留。新增超长列表回归覆盖。
 - OpenCode catalog / core / cloud 三组共 26 测试通过；TypeScript 全项目检查通过。
 - ErrorNotice 将会员门槛和权限说明区分为黄色 status 提示；真实故障保留 alert。尚未进行界面实测，也尚未覆盖各处裸错误文本。
-- 排查发现 CagentAssistant.cloudImport 只选择非扩展 provider，CAgent 云端 OpenCode 接入链路尚待补齐，不能宣称无缝共享完成。
+- CAgent 云端 OpenCode凭据与官方运行时transport已接入；真实上游账号调用尚待验证，不以模拟transport通过替代实机。
 - 本清单其余未勾选项目均未完成，不能据此构建正式发布。
+
+- Android 16 USB调试已授权；debug构建、Android lint及移动UI模拟回归通过，手机USB安装权限仍拦截安装。新增语义UI读取、短信/电话工具与系统权限入口，见 [Android验收](ANDROID-FOLLOWUP-20261101.md)。未发送短信或拨号。
+- 机器租借实现短期证书绑定委派、到期/撤销检查、真实TLS无密码连接；管理员页面接入真实列表及带原因撤销，1200/760/390布局与请求回归通过。公网跨账号链路待部署验收。
 
 ## 发布门槛
 
