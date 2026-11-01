@@ -24,7 +24,6 @@ export class ApplicationNetworkRoute {
     list(): Promise<NetworkRouteStatus['machines']>;
     // Resolver must enforce entitlement, identity and forwarding permission.
     proxy(id: string): Promise<string>;
-    systemProxySupported?(id:string):boolean;
     tunnel?(id:string,host:string,port:number):Promise<import('node:stream').Duplex>;
     close?(): Promise<void>;
   };

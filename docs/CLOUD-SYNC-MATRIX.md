@@ -30,4 +30,8 @@ CAgent 对不消费的顶层字段保留原值。桌面解析当前已知格式�
 ## 秒级目标与系统代理控制面（2026-11-01）
 - CShell 目标支持 1 秒至 7 天检查间隔，旧分钟配置保持兼容。智能体可通过 update_goal 保存目标记忆并调整间隔，不重放工具操作；每轮记忆作为不可信历史笔记注入。未绑定目标可在授权范围内选机器，已绑定目标继续锁定真实身份。保存编辑保留检查历史。
 - Windows 系统代理启用前固定原有系统代理到独立控制请求会话，账号租约/中继请求不会递归经过自身出口。系统代理仅覆盖遵守系统 HTTP/HTTPS 代理的应用，不是 TUN；忽略代理的软件和 UDP 不在接管范围内。
-- 验证：ai-work 9 个测试；system-proxy 2 个模拟注册表测试；local-http-proxy 实际 HTTP 转发测试；TypeScript 编译。未修改用户当前系统代理，尚未实机验收系统范围切换。
+- 验证：ai-work 10 个测试；system-proxy 2 个模拟注册表测试；local-http-proxy 实际 HTTP 转发测试；TypeScript 编译。未修改用户当前系统代理，尚未实机验收系统范围切换。
+
+
+## OpenCode 真实账号验证（2026-11-01）
+使用已安装 Pro 的一个现有账号，只读解密至进程内存，在隔离目录用官方 OpenCode 1.19.4 发起最小回复请求；未修改用户配置或使用收费模型。目录读取成功，但 beam-free 的 Go / Zen 调用返回地区限制 403；iceman-contributor-free 返回 400；deepseek-v4.1-flash-free、flint-40b-free、glm-5.3-flash-free、mimo-v2.6-flash-free、nemotron-3.5-lightning-free 返回 429。因此尚未获得该账号当前网络下的成功回复，不能以目录可见代替模型调用通过。后续需要上游恢复额度或账号可用模型后再验收，不自动切到付费目录。

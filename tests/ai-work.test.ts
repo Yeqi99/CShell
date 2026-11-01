@@ -387,3 +387,17 @@ test('global goal preserves a permission ceiling and accepts seconds and factual
  } finally {await f.cleanup();}
 });
 
+
+test('goal memory update persists without replay and failed persistence rolls back', async () => {
+ const {AiWork}=await import('../src/core/ai-work');
+ const t:any={id:randomUUID(),messages:[],title:'monitor',state:'idle'};let sends=0,fail=false;
+ const work=new AiWork({threads:()=>[t],busy:()=>false,allowed:()=>true,checkTarget:()=>{},pin:()=>{},child:async()=>t,send:async()=>{sends++},stop:()=>{},save:async()=>{if(fail)throw Error('disk unavailable')}});
+ await work.saveGoal(t,{objective:'monitor',intervalSeconds:2,memory:'before'});
+ const update=work.tools(t).find(x=>x.name==='update_goal')!;
+ await update.invoke({memory:'verified observation',intervalSeconds:3},new AbortController().signal);
+ assert.equal(t.goal.memory,'verified observation');assert.equal(t.goal.intervalSeconds,3);assert.equal(sends,0);
+ fail=true;
+ await assert.rejects(update.invoke({memory:'must roll back'},new AbortController().signal),/disk unavailable/);
+ assert.equal(t.goal.memory,'verified observation');
+ work.dispose();
+});
