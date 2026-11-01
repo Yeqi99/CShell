@@ -7,6 +7,7 @@ import {
   type DesktopQuality,
 } from '../../shared/agent-desktop';
 import { desktopScanCode, h264Codec } from '../desktop-keys';
+import {desktopTextChunks} from '../desktop-paste';
 import type { DesktopViewInput } from '../../shared/desktop-view';
 import './agent-desktop-view.css';
 import { ErrorNotice } from './ErrorNotice';
@@ -39,6 +40,7 @@ export function AgentDesktopView({
   const visibleRef = useRef(visible);
   visibleRef.current = visible;
   const requestedControl=useRef(true);
+  const pasteBusy=useRef(false);
   const [qualityOpen,setQualityOpen]=useState(false);
   const [toolsOpen,setToolsOpen]=useState(false);
   const [picture, setPicture] = useState('等待远端画面…');
@@ -364,6 +366,8 @@ export function AgentDesktopView({
   const key = (event: React.KeyboardEvent<HTMLCanvasElement>, down: boolean) => {
     if(event.key==='Escape' && (fullscreen||expanded)){event.preventDefault();release();if(down){if(fullscreen)void document.exitFullscreen();else setExpanded(false);}return;}
     if (!controlling.current || event.nativeEvent.isComposing) return;
+    // Allow Chromium's trusted paste event to supply only the user's chosen data.
+    if(event.code==='KeyV'&&(event.ctrlKey||event.metaKey))return;
     const code = desktopScanCode(event.code);
     if (!code) return;
     event.preventDefault();
@@ -371,6 +375,22 @@ export function AgentDesktopView({
     // macOS may suppress key-up for a key pressed with Command. Release the
     // remote chord when Command is released, so no remote modifier stays down.
     if(!down && (event.code==='MetaLeft'||event.code==='MetaRight'))release();
+  };
+  const pasteText=async(event:React.ClipboardEvent<HTMLCanvasElement>)=>{
+    if(!controlling.current||!permissions.current.canControl||!visibleRef.current)return;
+    event.preventDefault();
+    if(pasteBusy.current){setError('上一段内容仍在粘贴，请稍候');return;}
+    if(event.clipboardData.files.length){setError('当前远控尚未支持图片或文件剪贴板，请使用文件窗口上传');return;}
+    const text=event.clipboardData.getData('text/plain');if(!text)return;
+    const session=id.current,wire=wireGeneration.current;if(!session)return;
+    pasteBusy.current=true;
+    try{
+      await window.cshell.desktopViewRelease(session,wire);
+      for(const chunk of desktopTextChunks(text)){
+        if(id.current!==session||wireGeneration.current!==wire||!controlling.current||!permissions.current.canControl||!visibleRef.current)throw Error('连接或权限已变化，已停止粘贴；未发送的内容不会重放');
+        await window.cshell.desktopViewInput(session,{kind:'text',text:chunk},wire);
+      }
+    }catch(error){if(id.current===session)setError(String(error));}finally{pasteBusy.current=false;}
   };
   const validateQuality = () => {
     const parsed = desktopQualitySchema.safeParse(quality);
@@ -549,6 +569,7 @@ export function AgentDesktopView({
             height={1}
             onBlur={release}
             onKeyDown={(e) => {if(!pan)key(e, true);}}
+            onPaste={e=>{if(!pan)void pasteText(e);}}
             onKeyUp={(e) => {if(!pan)key(e, false);}}
             onContextMenu={(e) => e.preventDefault()}
             onPointerDown={(e) => {
