@@ -30,3 +30,8 @@ Windows 本机成品、真实 SSH/SFTP、ConPTY、RDP 多标签、云数据恢�
 
 OpenCode 目录可读取不等于模型请求成功；当前账号部分免费模型受上游地区或额度限制，不自动改用付费模型。完整范围见 [同步矩阵](CLOUD-SYNC-MATRIX.md)、[逐项验收](UNIFIED-FINAL-AUDIT-20261101.md)、[候选包核验](PRO-0.8.18-CANDIDATE.md) 和 [Android 实机记录](ANDROID-FOLLOWUP-20261101.md)。
 
+
+
+### CAgent 能力包同步范围
+
+CAgent 能力包当前恢复安装选择、精确版本与清单摘要。portableConfiguration 是适配器可选的非敏感配置白名单契约，目前生产适配器尚未声明，不能称全部扩展配置已同步。既有 CShell 命令配置按原有字段恢复；微信本机监听、进程与账号绑定、联系人收发范围和操作授权不迁移。

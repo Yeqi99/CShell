@@ -687,6 +687,7 @@ else
         }:undefined, network, tavily, desktopLooks,identityNetwork);await identityNetwork.activate();ssh.networkShell=profile=>identityNetwork!.shell(profile.id);handle('network:identity',input=>identityNetwork!.call(input));window.once('closed',()=>void identityNetwork?.close());})();},
         () => [...processExtensions.applicationTools(),...(identityNetwork?.tools()??[])],
         new MachineNetworkRoute(store, clientProvider),
+        !accountProfiles || accountProfiles.current() === undefined || accountProfiles.current() === 'guest',
       );
       registerPresetHandlers(handle, window, app.getPath('userData'), store, text);
       registerConnectionImport(handle, window, store);

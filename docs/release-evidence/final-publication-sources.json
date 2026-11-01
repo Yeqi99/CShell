@@ -3,19 +3,32 @@
   "status": "candidate-not-published",
   "sources": {
     "opensource": {
-      "sha": "1d318a5e04b8f5de7a9b70e0e3cdaf180f6134b4",
-      "local": "3202d564c86a9e8969deff4e9324e15f8508787f",
-      "tree": "aff71761fbf6c91fd89d00c47b54678ed2c7ba6d"
+      "sha": "f23fa4194f218f5812abe46c4f8ff3d602201d8f",
+      "local": "961d3807d9f56ecd3fd8a4cee816ac53ae996d26",
+      "tree": "b4ffc74dd84074447fdbbe57299464c9b1f0ee18"
     },
     "pro": {
-      "sha": "d1ad08ea9bde9328821dcad974cecf62ecdf1f89",
-      "local": "ba02475a97734ac112abdf16d87a049deeffd153",
-      "tree": "a17285be0aa71d383058d5c4f4c776944ab19823"
+      "sha": "7d906ee2a858e7bbb0701d2277c3c95501dac46e",
+      "local": "bdfdc81037fecaf568194c7c666e2cffaba1b9fa",
+      "tree": "bbdc5bd4cd7d0b8a282071ec77a005ae5f169b32"
     }
   },
-  "runtimeProductionEquivalent": {
-    "opensource": "3202d564c86a9e8969deff4e9324e15f8508787f",
-    "pro": "c53e8f14fb9c09d4974a75518f831850c43c3191"
+  "productionProvenance": {
+    "unchangedDesktopAndPosix": {
+      "opensource": "3202d564c86a9e8969deff4e9324e15f8508787f",
+      "pro": "c53e8f14fb9c09d4974a75518f831850c43c3191",
+      "count": 24
+    },
+    "windowsCAgent": {
+      "opensource": "8d23feb",
+      "pro": "3d75fb01c78a3fd946f3fd5fd7e11a9632360576",
+      "count": 2
+    },
+    "android": {
+      "opensource": "f8821a65f294c4d24e5908738beea1cf2e31f8a6",
+      "pro": "8309398bce833b857057b36e08c0f3ac619e4f23",
+      "count": 2
+    }
   },
-  "note": "Remote Git Data trees were verified exactly equal to local committed trees. Pro changes after runtime production commit are documentation, receipts, and portal downloads only. Update control metadata is committed separately after source fixation; no tags or releases created."
+  "note": "Remote complete Git Data trees exactly match stated committed local trees. Since prior runtime build only native CAgent C# and Android source/test changes affect binaries; their four replaced artifacts are separately verified. Final control metadata is committed after these source targets to avoid self-reference. No tags/releases/activation."
 }

@@ -88,6 +88,13 @@ export const emptyAiPolicy = (): AiPolicy => ({
   capabilities: [],
   overrides: [],
 });
+/** Only explicit first-install initialization may use this; never a parse/recovery fallback. */
+export const newInstallationAiPolicy = (): AiPolicy => ({
+  ...emptyAiPolicy(),
+  application: [...aiPolicySchema.shape.application.element.options],
+  allMachines: true,
+  capabilities: [...aiCapabilities],
+});
 export type AiPermission = z.infer<typeof aiPermissionSchema>;
 export type AiLocation = (typeof aiLocations)[number];
 export type AiMode = 'review' | 'restricted' | 'allow';

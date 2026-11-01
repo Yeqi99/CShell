@@ -1,9 +1,9 @@
 {
   "edition": "pro",
-  "sha": "d1ad08ea9bde9328821dcad974cecf62ecdf1f89",
-  "status": "blocked-native-window-android-rebuild-required",
+  "sha": "7d906ee2a858e7bbb0701d2277c3c95501dac46e",
+  "status": "blocked-pending-fresh-ai-defaults-and-final-audit",
   "version": "0.8.18",
-  "verification": "All 30 candidate local assets rehashed after final SSL-fixed WeChat catalog rebuild. Publication source tree fixed before this control metadata to avoid self-reference. Android signed semantic APKs retained unchanged. Not published or deployed.",
+  "verification": "Exact final 30-file inventory f566ea0, full Hong Kong verification 7630135, Android physical evidence e49397a. Fixed complete source tree; only Lenovo account login and physical relay acceptance remain. Not published.",
   "assets": [
     {
       "name": "CAgent-0.8.18-linux-arm64.tar.gz",
@@ -27,13 +27,13 @@
     },
     {
       "name": "CAgent-Setup-0.8.18-win-x64.exe",
-      "size": 26231769,
-      "sha256": "631530736500dfe19405022f9b9b6b3fdba0c33d39d7ec7cbb26aa29b2030d85"
+      "size": 26230795,
+      "sha256": "7f60ff4c4d297586487bac9c604e150a0aa438a786b3fc6bf11d17dc681cffe3"
     },
     {
       "name": "CShell-Pro-0.8.18-android.apk",
-      "size": 4922450,
-      "sha256": "3ba6032307c67f135477eedd876dafbb9fa17237126bc4cf174fbcaf34a72032"
+      "size": 4923366,
+      "sha256": "7f9f866c1767f991370e4171619e29c53b29cf41487a08413c39ed7205adbd78"
     },
     {
       "name": "CShell-Pro-0.8.18-linux-amd64.deb",
@@ -73,8 +73,13 @@
     {
       "name": "SHA256SUMS.txt",
       "size": 1283,
-      "sha256": "63087653d4f713afa8303d889f654bdc3e77c7aff1afd783a93bfc685ac646fb"
+      "sha256": "e3a4260e2ff26a85f065912b4c31e19ef6a0fa5da34dd9787a80289a1f02fcf6"
     }
   ],
-  "blockReason": "Pending Windows native CAgent stale-host credential recovery and Android fresh editable-node/continuous-delete fixes. Replace only two Windows CAgent installers, two Android APKs, and two SHA256SUMS. Verified 22 POSIX binaries and two Windows CShell installers remain valid; no unrelated matrix rebuild."
+  "blockReason": "Pending Windows native CAgent stale-host credential recovery and Android fresh editable-node/continuous-delete fixes. Replace only two Windows CAgent installers, two Android APKs, and two SHA256SUMS. Verified 22 POSIX binaries and two Windows CShell installers remain valid; no unrelated matrix rebuild.",
+  "pendingGates": [
+    "new CShell profiles need explicitly requested default AI authorization factory; preserve existing grants and absent cloud fields, keep MCP listener disabled",
+    "final nineteen-requirement read-only audit and exact affected-package rebuild plan",
+    "Lenovo physical membership relay acceptance"
+  ]
 }
