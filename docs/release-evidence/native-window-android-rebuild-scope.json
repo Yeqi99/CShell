@@ -1,0 +1,67 @@
+{
+  "version": "0.8.18",
+  "status": "blocked-native-window-android-rebuild-required",
+  "scope": "Pending Windows native CAgent stale-host credential recovery and Android fresh editable-node/continuous-delete fixes. Replace only two Windows CAgent installers, two Android APKs, and two SHA256SUMS. Verified 22 POSIX binaries and two Windows CShell installers remain valid; no unrelated matrix rebuild.",
+  "actualWindowsInstallerAudit": [
+    {
+      "edition": "pro",
+      "installer": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\release\\pro-0.8.18\\CShell-Pro-0.8.18-win-x64.exe",
+      "sha256": "cd7d209967775649be63ebd91275965ab4ccc4b12294c7e841a738b144541a18",
+      "nsisEntriesExcludeNativeWindow": true,
+      "asarEntries": 10341,
+      "asarExcludesNativeWindow": true,
+      "embeddedAgentJsPresent": true,
+      "standaloneWindowsStageIncludesNativeWindow": true
+    },
+    {
+      "edition": "opensource",
+      "installer": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\release\\0.8.18\\CShell-0.8.18-win-x64.exe",
+      "sha256": "cfbd46aaf0afe839cecd4489fec218950ff6721ab65668ef35ce4dce311a639c",
+      "nsisEntriesExcludeNativeWindow": true,
+      "asarEntries": 10339,
+      "asarExcludesNativeWindow": true,
+      "embeddedAgentJsPresent": true,
+      "standaloneWindowsStageIncludesNativeWindow": true
+    }
+  ],
+  "buildGraph": [
+    "scripts/build.mjs bundles src/agent/cli.ts to dist/agent/agent.cjs, no CagentWindow.cs compiler or copy",
+    "Both Electron builders package dist/assets/package metadata, not standalone native Cagent.exe",
+    "scripts/agent-build.mjs compiles CagentWindow.cs only in win32 branch",
+    "scripts/package-agent.mjs requires and packages Cagent.exe only for win32"
+  ],
+  "invalidatedFiles": [
+    {
+      "edition": "opensource",
+      "name": "CAgent-Setup-0.8.18-win-x64.exe",
+      "previousSha256": "923df9ef48db38eaf32aa6ce5d4fc0c2e61230348a8f4250ea024cdd1ab5a513"
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-Setup-0.8.18-win-x64.exe",
+      "previousSha256": "631530736500dfe19405022f9b9b6b3fdba0c33d39d7ec7cbb26aa29b2030d85"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-android.apk",
+      "previousSha256": "ba932a8f7a64d5893fd42cbf416331501d853640ed71d92f33e93f3be875772c"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.18-android.apk",
+      "previousSha256": "3ba6032307c67f135477eedd876dafbb9fa17237126bc4cf174fbcaf34a72032"
+    },
+    {
+      "edition": "opensource",
+      "name": "SHA256SUMS.txt",
+      "previousSha256": "232488efc7eb5312b56506afe5061c759ed924a13becd83d4259db03424739d7"
+    },
+    {
+      "edition": "pro",
+      "name": "SHA256SUMS.txt",
+      "previousSha256": "63087653d4f713afa8303d889f654bdc3e77c7aff1afd783a93bfc685ac646fb"
+    }
+  ],
+  "unaffectedCount": 24,
+  "pendingCommits": "Await final native-window and Android production fixes; broaden scope if committed runtime dependencies change."
+}

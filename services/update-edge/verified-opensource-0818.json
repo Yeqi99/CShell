@@ -1,7 +1,7 @@
 {
   "edition": "opensource",
   "sha": "1d318a5e04b8f5de7a9b70e0e3cdaf180f6134b4",
-  "status": "blocked-final-staging-verification",
+  "status": "blocked-native-window-android-rebuild-required",
   "version": "0.8.18",
   "verification": "All 30 candidate local assets rehashed after final SSL-fixed WeChat catalog rebuild. Publication source tree fixed before this control metadata to avoid self-reference. Android signed semantic APKs retained unchanged. Not published or deployed.",
   "assets": [
@@ -86,5 +86,5 @@
       "sha256": "232488efc7eb5312b56506afe5061c759ed924a13becd83d4259db03424739d7"
     }
   ],
-  "blockReason": "Await exact final Hong Kong private staging receipt reconciliation and root publication decision. Local runtime rebuild is complete; this gate must remain closed until reconciliation."
+  "blockReason": "Pending Windows native CAgent stale-host credential recovery and Android fresh editable-node/continuous-delete fixes. Replace only two Windows CAgent installers, two Android APKs, and two SHA256SUMS. Verified 22 POSIX binaries and two Windows CShell installers remain valid; no unrelated matrix rebuild."
 }

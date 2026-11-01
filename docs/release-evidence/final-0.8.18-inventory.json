@@ -1,6 +1,6 @@
 {
   "version": "0.8.18",
-  "status": "candidate-not-published",
+  "status": "blocked-native-window-android-rebuild-required",
   "verifiedAt": "2026-11-01T11:23:36.663Z",
   "files": [
     {
@@ -226,5 +226,160 @@
       "tree": "1c5951f4d00fe6610ea2dcb7050a7f172726bc8d"
     }
   },
-  "note": "26 desktop/CAgent runtimes rebuilt against final SSL-fixed 0.1.2 catalog; original two verified semantic-fix Android APKs retained unchanged; both checksum lists regenerated. Update-channel verified metadata remains blocked until final publication-source and private HK staging reconciliation."
+  "note": "26 desktop/CAgent runtimes rebuilt against final SSL-fixed 0.1.2 catalog; original two verified semantic-fix Android APKs retained unchanged; both checksum lists regenerated. Update-channel verified metadata remains blocked until final publication-source and private HK staging reconciliation.",
+  "blockReason": "Pending Windows native CAgent stale-host credential recovery and Android fresh editable-node/continuous-delete fixes. Replace only two Windows CAgent installers, two Android APKs, and two SHA256SUMS. Verified 22 POSIX binaries and two Windows CShell installers remain valid; no unrelated matrix rebuild.",
+  "invalidatedFiles": [
+    {
+      "edition": "opensource",
+      "name": "CAgent-Setup-0.8.18-win-x64.exe",
+      "previousSha256": "923df9ef48db38eaf32aa6ce5d4fc0c2e61230348a8f4250ea024cdd1ab5a513"
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-Setup-0.8.18-win-x64.exe",
+      "previousSha256": "631530736500dfe19405022f9b9b6b3fdba0c33d39d7ec7cbb26aa29b2030d85"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-android.apk",
+      "previousSha256": "ba932a8f7a64d5893fd42cbf416331501d853640ed71d92f33e93f3be875772c"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.18-android.apk",
+      "previousSha256": "3ba6032307c67f135477eedd876dafbb9fa17237126bc4cf174fbcaf34a72032"
+    },
+    {
+      "edition": "opensource",
+      "name": "SHA256SUMS.txt",
+      "previousSha256": "232488efc7eb5312b56506afe5061c759ed924a13becd83d4259db03424739d7"
+    },
+    {
+      "edition": "pro",
+      "name": "SHA256SUMS.txt",
+      "previousSha256": "63087653d4f713afa8303d889f654bdc3e77c7aff1afd783a93bfc685ac646fb"
+    }
+  ],
+  "unaffectedFiles": [
+    {
+      "edition": "opensource",
+      "name": "CAgent-0.8.18-linux-x64.tar.gz",
+      "sha256": "3ca8f4e639ffe708138c2a55eff6d269f630e05e48f73733b150fb3319e6e4e6"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-linux-amd64.deb",
+      "sha256": "d113287a05c499e294d6b6898e4fdcc068fc57eebebefdf8652cb7776f913b9b"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-linux-x86_64.AppImage",
+      "sha256": "4b89b95b20e9b9816809eb1b489146130199bbbdfcbfd2831c8a9022965843e7"
+    },
+    {
+      "edition": "opensource",
+      "name": "CAgent-0.8.18-linux-arm64.tar.gz",
+      "sha256": "2ca667d2f497d791c99087d6cc91b71eaed87a4a05b3e0e46c6ab9477af964a7"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-linux-arm64.AppImage",
+      "sha256": "7153ced0ecc4e8308c94a6f40af9e6185c08a751b66926c30408f1a6183a754a"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-linux-arm64.deb",
+      "sha256": "b056997c5661a30f233526183a0ca53d441471afb8aa34e712e86267e7e0d41c"
+    },
+    {
+      "edition": "opensource",
+      "name": "CAgent-0.8.18-mac-arm64.tar.gz",
+      "sha256": "c41bc10b4888950c1be7b0c529b61d2cc7d7b5ae49ccf86bd4a1925590773e3b"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-mac-arm64.dmg",
+      "sha256": "fb172b70d8bab55d2e34819a23b633978ec28a47c30765a111bfc876975877b2"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-mac-arm64.zip",
+      "sha256": "f22797676143133f06b1a8ff862f246c60f5a9fe492fe231856f60f9991c5d87"
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-0.8.18-linux-arm64.tar.gz",
+      "sha256": "ef2f5877681716f302470cae617d20b6a51054e16233b0a9676f1d03dc7afd94"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.18-mac-x64.dmg",
+      "sha256": "30eb20ab03beb3364d4a677d4e639b304b791ab1c89bd3d2cb1aea92c3bedf65"
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-0.8.18-mac-arm64.tar.gz",
+      "sha256": "61f9e2bdc0246cdb82b39df141f8220f5a79f0d5e441d188a25d5b25afb49e46"
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-0.8.18-mac-x64.tar.gz",
+      "sha256": "b7bcbc3c9c0ebae2230fefa8e551ba495fe8e8ce3ee59517536573b1c462dac3"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.18-mac-arm64.dmg",
+      "sha256": "99416cb712779672d3cd4a4d7892470a2e121b8c396afd314089b675656b5679"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.18-linux-amd64.deb",
+      "sha256": "60ee644374a3a4138b59c635fa59491258aa41719e014d376a717ff249913011"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.18-linux-x86_64.AppImage",
+      "sha256": "251036bd4b39184ff0fd2e1474ca6b0084ddbc8eba3cd23b6e0852479c888d7d"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.18-linux-arm64.AppImage",
+      "sha256": "a04c96f7c244e7e09eee247382f4473b591238f9bace53f5b98d6442861dfc09"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.18-linux-arm64.deb",
+      "sha256": "4e00f767a22ecdf846a50c1f2a75bdd79a4f2411bbdae988c84fa89163381ae1"
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-0.8.18-linux-x64.tar.gz",
+      "sha256": "a3367334b43ba769b27ee60c11cb0664287eea21b5f0294c00d11d4edadff1c7"
+    },
+    {
+      "edition": "opensource",
+      "name": "CAgent-0.8.18-mac-x64.tar.gz",
+      "sha256": "4928a33c8e76fe66e90da1b3abbfbac61e434e08d464fa72207365fa8c2721db"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-mac-x64.dmg",
+      "sha256": "6da41db0647350bf9f443ccd78d396d5056604a8700a93572777ffaed3064059"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-mac-x64.zip",
+      "sha256": "2f9bb6477d7687bb6082ddea04443c0ddad6e64d5dd52acacb3aa88cce477707"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-win-x64.exe",
+      "sha256": "cfbd46aaf0afe839cecd4489fec218950ff6721ab65668ef35ce4dce311a639c"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.18-win-x64.exe",
+      "sha256": "cd7d209967775649be63ebd91275965ab4ccc4b12294c7e841a738b144541a18"
+    }
+  ]
 }
