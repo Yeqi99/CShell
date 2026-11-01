@@ -1,7 +1,7 @@
 {
   "edition": "pro",
   "sha": "7d906ee2a858e7bbb0701d2277c3c95501dac46e",
-  "status": "blocked-pending-lenovo-physical-relay",
+  "status": "blocked-pending-fresh-ai-defaults-and-final-audit",
   "version": "0.8.18",
   "verification": "Exact final 30-file inventory f566ea0, full Hong Kong verification 7630135, Android physical evidence e49397a. Fixed complete source tree; only Lenovo account login and physical relay acceptance remain. Not published.",
   "assets": [
@@ -76,5 +76,10 @@
       "sha256": "e3a4260e2ff26a85f065912b4c31e19ef6a0fa5da34dd9787a80289a1f02fcf6"
     }
   ],
-  "blockReason": "Pending Windows native CAgent stale-host credential recovery and Android fresh editable-node/continuous-delete fixes. Replace only two Windows CAgent installers, two Android APKs, and two SHA256SUMS. Verified 22 POSIX binaries and two Windows CShell installers remain valid; no unrelated matrix rebuild."
+  "blockReason": "Pending Windows native CAgent stale-host credential recovery and Android fresh editable-node/continuous-delete fixes. Replace only two Windows CAgent installers, two Android APKs, and two SHA256SUMS. Verified 22 POSIX binaries and two Windows CShell installers remain valid; no unrelated matrix rebuild.",
+  "pendingGates": [
+    "new CShell profiles need explicitly requested default AI authorization factory; preserve existing grants and absent cloud fields, keep MCP listener disabled",
+    "final nineteen-requirement read-only audit and exact affected-package rebuild plan",
+    "Lenovo physical membership relay acceptance"
+  ]
 }

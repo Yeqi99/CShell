@@ -214,11 +214,12 @@
       "sha256": "e3a4260e2ff26a85f065912b4c31e19ef6a0fa5da34dd9787a80289a1f02fcf6"
     }
   ],
-  "publicationGate": "blocked-pending-lenovo-physical-relay",
+  "publicationGate": "blocked-pending-fresh-ai-defaults-and-final-audit",
   "verification": "All 30 local files rehashed after final Windows native host reconnect and Android focused WebView/replay fixes; 22 POSIX and 2 CShell Windows binaries retained by exact production source impact audit. Does not assert physical phone or Lenovo acceptance.",
   "completedEvidence": {
     "hongKong": "7630135",
     "physicalAndroid": "e49397a",
     "inventory": "f566ea0"
-  }
+  },
+  "pendingImpactAssessment": "Do not discard existing verified binaries until fresh-profile implementation import and bundle impact is assessed; no rebuild started."
 }
