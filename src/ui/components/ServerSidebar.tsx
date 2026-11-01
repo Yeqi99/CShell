@@ -1,4 +1,5 @@
 import {PingButton} from './PingButton';
+import {PingAll} from './PingAll';
 import type { LocalConnectionTarget } from '../../shared/local-terminal';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -232,6 +233,7 @@ export function ServerSidebar({
       </button>
       <div className="server-groups-heading">
         <span>{t('groups')}</span>
+        <PingAll profiles={profiles} interval={preferences.sidebarPingIntervalSeconds} onInterval={onPreferences ? value=>onPreferences({...preferences,sidebarPingIntervalSeconds:value}) : undefined}/>
         <button onClick={() => beginGroup()} title={t('newGroup')}>
           <FolderPlus size={13} />
           {t('newGroup')}

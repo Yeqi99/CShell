@@ -319,15 +319,14 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
     setWslSetupTarget(null);
     setSurface(wslReturnSurface.current);
   };
-  const [quickConnections, setQuickConnections] = useState<Profile[]>([]);
+  const [quickConnections, setQuickConnections] = useState<(Profile & { instanceId: string })[]>([]);
   const [quickId, setQuickId] = useState('');
   const [quickVisual, setQuickVisual] = useState<Record<string, boolean>>({});
   const openSaved = (profile: Profile, visual = connectionUsesVisual(profile,config.preferences)) => {
     setQuickVisual(v => ({...v, [profile.id]: visual}));
-    setQuickConnections((items) =>
-      items.some((item) => item.id === profile.id) ? items : [...items, profile],
-    );
-    setQuickId(profile.id);
+    const instanceId = crypto.randomUUID();
+    setQuickConnections((items) => [...items, { ...profile, instanceId }]);
+    setQuickId(instanceId);
     setSurface('quick');
   };
   const openConnection = (profile: Profile | 'new') => {
@@ -447,9 +446,9 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
             },
           })),
           ...quickConnections.map((profile) => ({
-            key: `quick-${profile.id}`,
+            key: `quick-${profile.instanceId}`,
             select: () => {
-              setQuickId(profile.id);
+              setQuickId(profile.instanceId);
               setSurface('quick');
             },
           })),
@@ -911,16 +910,16 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
               )}
               {quickConnections.map((profile) => (
                 <div
-                  key={`quick-${profile.id}`}
-                  className={`tab ${surface === 'quick' && quickId === profile.id ? 'active' : ''}`}
+                  key={`quick-${profile.instanceId}`}
+                  className={`tab ${surface === 'quick' && quickId === profile.instanceId ? 'active' : ''}`}
                   onClick={() => {
-                    setQuickId(profile.id);
+                    setQuickId(profile.instanceId);
                     setSurface('quick');
                   }}
                 >
                   <button
                     onClick={() => {
-                      setQuickId(profile.id);
+                      setQuickId(profile.instanceId);
                       setSurface('quick');
                     }}
                   >
@@ -933,9 +932,9 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
                     onClick={(e) => {
                       e.stopPropagation();
                       setQuickConnections((items) =>
-                        items.filter((item) => item.id !== profile.id),
+                        items.filter((item) => item.instanceId !== profile.instanceId),
                       );
-                      if (quickId === profile.id) setSurface('terminal');
+                      if (quickId === profile.instanceId) setSurface('terminal');
                     }}
                   >
                     <X size={13} />
@@ -1130,18 +1129,18 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
           )}
           {quickConnections.map((profile) => (
             <div
-              key={`quick-${profile.id}`}
+              key={`quick-${profile.instanceId}`}
               className="workspace-editor"
-              hidden={surface !== 'quick' || quickId !== profile.id}
+              hidden={surface !== 'quick' || quickId !== profile.instanceId}
             >
-              {profile.protocol === 'rdp' ? <RdpMachineWorkspace active={surface === 'quick' && quickId === profile.id} profile={profile} profiles={config.profiles} onOpen={openSaved}/> : profile.protocol === 'http' ? (
+              {profile.protocol === 'rdp' ? <RdpMachineWorkspace active={surface === 'quick' && quickId === profile.instanceId} profile={profile} profiles={config.profiles} onOpen={openSaved}/> : profile.protocol === 'http' ? (
                 <HttpWorkbench
                   profile={config.profiles.find((p) => p.id === profile.id) ?? profile}
                   enabled={pluginEnabled(config.plugins, 'http')}
                   onSaveProfile={saveProfile}
                 />
               ) : profile.protocol === 'client' ? (
-                <SavedAgentConnection profile={profile} onConnect={openMachineDevice} onDone={()=>setQuickConnections(items=>items.filter(item=>item.id!==profile.id))}/>
+                <SavedAgentConnection profile={profile} onConnect={openMachineDevice} onDone={()=>setQuickConnections(items=>items.filter(item=>item.instanceId!==profile.instanceId))}/>
               ) : (
                 <SavedConnection
                   visual={!isFileConnection(profile) && (quickVisual[profile.id] ?? connectionUsesVisual(profile,config.preferences))}
@@ -1150,7 +1149,7 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
                   persist={config.profiles.some((p) => p.id === profile.id)}
                   onConnect={connect}
                   onDone={() =>
-                    setQuickConnections((items) => items.filter((item) => item.id !== profile.id))
+                    setQuickConnections((items) => items.filter((item) => item.instanceId !== profile.instanceId))
                   }
                 />
               )}
