@@ -59,3 +59,15 @@ test('pending configuration, cloud import and account restore exclude each other
   }
   await assistant.close();
 });
+
+test('CAgent resolves a cloud extension provider through its registered transport', async()=>{
+ const f=fixture(),assistant=f.create();await assistant.load();
+ const cloud=assistant.cloudExport(),id=randomUUID();
+ cloud.providers=[{id,name:'OpenCode',url:'https://model-extension.invalid',model:'old',key:'',extension:{id:'cshell.opencode',model:'account/model'}}];
+ await assistant.cloudImport(cloud);
+ assert.equal(assistant.snapshot().providerId,id);assert.equal(assistant.snapshot().keyConfigured,true);
+ let called=false;
+ assistant.resolveExtension=async(ref)=>{assert.equal(ref.id,'cshell.opencode');return {url:'https://bridge.invalid',model:'resolved',key:'',transport:async(_url,init)=>{called=true;assert.equal(JSON.parse(String(init?.body)).model,'resolved');return new Response(JSON.stringify({choices:[{message:{role:'assistant',content:'ok'}}]}),{headers:{'content-type':'application/json'}});}};};
+ await (assistant as any).modelRequest('https://unused.invalid',{method:'POST',body:JSON.stringify({model:'old',messages:[]})},new AbortController().signal,()=>{});
+ assert.equal(called,true);await assistant.close();
+});

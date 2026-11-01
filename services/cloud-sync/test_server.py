@@ -10,6 +10,19 @@ class ServiceTest(unittest.TestCase):
         self.mail = {}
         self.service = Service(self.directory.name + '/test.sqlite', secrets.token_bytes(32), lambda email, code: self.mail.update({email: code}))
 
+    def test_new_vault_schema_blocks_old_writers_without_losing_data(self):
+        import base64, uuid
+        account=self.login('schema@example.com','schema-ip')['accountId']
+        body={'baseRevision':0,'mutationId':str(uuid.uuid4()),'envelope':{'format':1,'nonce':base64.b64encode(bytes(12)).decode(),'ciphertext':base64.b64encode(bytes(20)).decode()}}
+        self.service.write(account,body)
+        self.assertEqual(self.service.read(account)['revision'],1)
+        body['baseRevision']=1;body['mutationId']=str(uuid.uuid4())
+        self.service.write(account,body,2)
+        with self.assertRaises(Failure): self.service.read(account)
+        body['baseRevision']=2;body['mutationId']=str(uuid.uuid4())
+        with self.assertRaises(Failure): self.service.write(account,body)
+        self.assertEqual(self.service.read(account,2)['revision'],2)
+
     def test_public_usage_is_deduplicated_and_consent_reversible(self):
         import time
         first=self.login('usage@example.com','usage-ip')

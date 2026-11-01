@@ -149,10 +149,14 @@ export class CloudSync {
     }
   }
   private async api(path: string, body?: unknown): Promise<any> {
+    const snapshot = path === '/v1/vault' && body !== undefined ? await this.adapter.export() as any : undefined;
+    const writeSchema = snapshot?.store?.extensions?.enabled !== undefined ? '2' : '1';
     const response = await this.request(this.endpoint + path, {
       method: body === undefined ? 'GET' : 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'X-CShell-Vault-Schema': '2',
+        ...(path === '/v1/vault' && body !== undefined ? {'X-CShell-Vault-Write-Schema': writeSchema} : {}),
         ...(this.data.session ? { Authorization: 'Bearer ' + this.data.session.token } : {}),
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
