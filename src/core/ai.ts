@@ -29,6 +29,7 @@ import {
   aiPermissionSchema,
   aiPolicySchema,
   emptyAiPolicy,
+  newInstallationAiPolicy,
   type AiPolicy,
   aiProviderSchema,
   aiLocations,
@@ -58,6 +59,9 @@ const eventToolDenied = (name:string) => eventDeniedTools.has(name) || (name.sta
 const idSchema = z.string().uuid();
 export const modeSchema = z.enum(['review', 'restricted', 'allow']);
 export class AiService {
+  private untouchedInstallationPolicy = false;
+  /** A generated first-run default is not guest data. Never export edited/loaded guest grants here. */
+  registrationPolicy() { return this.untouchedInstallationPolicy ? newInstallationAiPolicy() : emptyAiPolicy(); }
   requestTransport?: typeof fetch;
   private jobs=new AgentJobs();
   readonly providerExtensions=new AiExtensionRegistry();
@@ -210,7 +214,9 @@ export class AiService {
       throw error;
     }
   }
-  async load() {
+  async load(initializeNewInstallation = false) {
+    this.untouchedInstallationPolicy = false;
+    this.policy = emptyAiPolicy();
     try {
       const data = JSON.parse(
         await this.store.decryptPrivate(await readFile(join(this.directory, 'ai.enc'), 'utf8')),
@@ -218,6 +224,8 @@ export class AiService {
       this.providers = z.array(providerRecord).parse(data.providers);
       this.permissions = z.array(aiPermissionSchema).parse(data.permissions);
       this.policy = data.policy ? aiPolicySchema.parse(data.policy) : emptyAiPolicy();
+      this.untouchedInstallationPolicy = data.untouchedInstallationPolicy === true &&
+        JSON.stringify(this.policy) === JSON.stringify(newInstallationAiPolicy());
       if (data.textProviderIds)
         this.textProviderIds = z
           .object({ translate: idSchema.nullable(), compose: idSchema.nullable() })
@@ -251,6 +259,14 @@ export class AiService {
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== 'ENOENT')
         throw new Error('AI configuration could not be decrypted; original file preserved');
+      // Account workspaces and cloud restoration never opt into first-install defaults.
+      // Existing config without ai.enc is legacy data, not a fresh installation.
+      if (initializeNewInstallation && this.store.isNewInstallation()) {
+        this.policy = newInstallationAiPolicy();
+        this.untouchedInstallationPolicy = true;
+        try { await this.persist(); }
+        catch (error) { this.policy = emptyAiPolicy(); this.untouchedInstallationPolicy = false; throw error; }
+      }
     }
   }
   snapshot(): AiSnapshot {
@@ -271,6 +287,7 @@ export class AiService {
   private persist() {
     this.threads.forEach((t) => this.onThreadUpdate?.(t));
     const data = JSON.stringify({
+      untouchedInstallationPolicy: this.untouchedInstallationPolicy,
       providers: this.providers,
       permissions: this.permissions,
       policy: this.policy,
@@ -368,11 +385,14 @@ export class AiService {
     if (new Set(next.overrides.map((o) => o.profileId)).size !== next.overrides.length)
       throw new Error('Duplicate machine override');
     const previous = this.policy;
+    const previousOrigin = this.untouchedInstallationPolicy;
     this.policy = next;
+    this.untouchedInstallationPolicy = false;
     try {
       await this.persist();
     } catch (e) {
       this.policy = previous;
+      this.untouchedInstallationPolicy = previousOrigin;
       throw e;
     }
   }
