@@ -315,6 +315,7 @@ public class CagentWindow : Window {
     if(installed==null){p.Children.Add(Text("安装后按应用要求完成配置，可在这里调整工具权限。",11));ActionButton(p,"安装并核验能力包",async()=>{var installedNow=D(await Api("packages.install",Obj("id",id,"confirm",true)));await Api("packages.grant",Obj("id",id,"permissions",V(installedNow,"requiredPermissions")));await PackageDetail(item);});return;}
     p.Children.Add(Text(B(installed,"registered")?"工具已注册":"工具未注册",11));var grants=new HashSet<string>();foreach(var grant in A(V(installed,"grants")))grants.Add(Convert.ToString(grant));var choices=new Dictionary<string,CheckBox>();foreach(var value in A(V(installed,"requiredPermissions"))){string permission=Convert.ToString(value);choices[permission]=Check(p,PermissionName(permission),grants.Contains(permission));}
     if(id=="cagent.wechat")ActionButton(p,"微信账号与授权",WechatSettings);
+    if(id.StartsWith("cagent.wechat.v",StringComparison.Ordinal))ActionButton(p,"微信服务与消息订阅",async()=>await ManagedWechatSettings(id));
     if(id=="cagent.desktop"){var desktopBody=new StackPanel();var section=new Expander{Header="桌面服务与访问权限",Content=desktopBody,Margin=new Thickness(0,8,0,8)};bool loaded=false;section.Expanded+=async(s,e)=>{if(loaded)return;await Guard(async()=>{await DesktopSettings(desktopBody);loaded=true;});};p.Children.Add(section);}
     p.Children.Add(Text("选择仅修改草稿，保存后生效。系统应用安装还受独立安装权限限制。",11));
     ActionButton(p,"保存工具权限",async()=>{var allowed=new List<string>();foreach(var pair in choices)if(pair.Value.IsChecked==true)allowed.Add(pair.Key);await Api("packages.grant",Obj("id",id,"permissions",allowed.ToArray()));await PackageDetail(item);});
@@ -345,6 +346,27 @@ public class CagentWindow : Window {
     ActionButton(p,"安装 Linux",async()=>await install(false));if(B(state,"updateSupported"))ActionButton(p,"更新 WSL",async()=>await install(true));ActionButton(p,"重新检查",Linux);ActionButton(p,"返回应用市场",Apps);
   }
   void VerifyDesktopSettings(){var p=Panel("桌面服务设置");RenderDesktopSettings(p,Obj("enabled",false,"bindAddress","127.0.0.1","tcpPort",9998,"udpPort",9999,"local",Obj("view",false,"control",false),"ownerGrants",Obj()),false);UpdateLayout();var checks=new List<CheckBox>();FindChecks(p,checks);if(checks.Count!=4)throw new Exception("Desktop grants missing");foreach(var check in checks)if(check.IsChecked==true)throw new Exception("Desktop permissions default enabled");bool refused=false;try{DesktopPort("0");}catch{refused=true;}if(!refused||DesktopPort("65535")!=65535)throw new Exception("Desktop port validation failed");if(screenshot!=null)File.WriteAllText(screenshot+".json",json.Serialize(Obj("fixture",true,"serviceDefaultOff",true,"viewDefaultOff",true,"controlDefaultOff",true,"portValidation",true,"realDesktopStarted",false)),Encoding.UTF8);}
+  async Task ManagedWechatSettings(string id){
+    var state=D(await Api("managedWechat.status",Obj("id",id)));var config=D(V(state,"settings"));var p=Panel("微信服务");
+    var service=MarketCard(p,"本机服务",B(state,"running")?"服务运行中 · 已核验":"配置后核验实际微信版本，完成后自动随 CAgent 启动");
+    if(B(state,"validationUnknown"))service.Children.Add(Text("上次核验结果未知，已停止服务。请检查微信状态，不会自动重放核验。",11));
+    var enabled=Check(service,"启动微信 API 服务",B(config,"apiEnabled"));var port=Field(service,"本机端口",S(config,"port"));
+    var events=MarketCard(p,"消息事件", "收到消息后交给通用事件订阅处理，规则可指定条件与动作");
+    var subscription=Check(events,"接收消息回调",B(config,"subscriptionEnabled"));var account=Field(events,"微信账号 ID",S(config,"accountId"));
+    var fields=new Dictionary<string,TextBox>();string[] keys={"receiveTargets","sendTargets","historyTargets","remarkTargets"};string[] titles={"接收消息范围","发送消息范围","历史记录范围","修改备注范围"};
+    var scopes=new StackPanel();p.Children.Add(new Expander{Header="账号范围与操作",Content=scopes,Margin=new Thickness(0,8,0,8)});
+    scopes.Children.Add(Text("填写微信内部 ID，逗号分隔；* 表示全部。",11));
+    for(int i=0;i<keys.Length;i++){var values=new List<string>();foreach(var v in A(V(config,keys[i])))values.Add(Convert.ToString(v));fields[keys[i]]=Field(scopes,titles[i],string.Join(",",values.ToArray()));}
+    var checks=new Dictionary<string,CheckBox>();string[] flags={"readContacts","readSessions","sendFiles","momentsRead","momentsWrite","receiveTransfers","receiveRedPackets"};string[] labels={"读取通讯录","读取最近会话","发送文件","读取朋友圈","发布朋友圈","接收转账","接收红包"};for(int i=0;i<flags.Length;i++)checks[flags[i]]=Check(scopes,labels[i],B(config,flags[i]));
+    ActionButton(p,"保存服务设置",async()=>{int n=DesktopPort(port.Text);if(n<1024)throw new Exception("端口需要大于或等于 1024");config["apiEnabled"]=enabled.IsChecked==true;config["port"]=n;config["subscriptionEnabled"]=subscription.IsChecked==true;config["accountId"]=account.Text.Trim();foreach(var field in fields)config[field.Key]=field.Value.Text.Split(new[]{',','，',' ','\n','\r'},StringSplitOptions.RemoveEmptyEntries);foreach(var check in checks)config[check.Key]=check.Value.IsChecked==true;await Api("managedWechat.configure",Obj("id",id,"settings",config));panelStatus.Text="设置已保存";});
+    var validation=MarketCard(p,"版本与进程核验","仅接受能力包匹配的微信版本，不匹配时不会加载工具");var pid=Field(validation,"微信进程 PID", "");
+    ActionButton(validation,"检测本机微信",async()=>{var result=await Api("managedWechat.processes",Obj("id",id));var output=Field(validation,"检测结果",json.Serialize(result),true);output.IsReadOnly=true;output.MaxHeight=140;});
+    Func<int> selected=()=>{int n;if(!int.TryParse(pid.Text.Trim(),out n)||n<=0)throw new Exception("请填写检测到的微信 PID");return n;};
+    ActionButton(validation,"绑定此微信进程",async()=>{await Api("managedWechat.bind",Obj("id",id,"pid",selected()));panelStatus.Text="已绑定，需通过核验后启用工具";});
+    var confirm=Check(validation,"允许向文件传输助手发送核验消息",false);
+    ActionButton(validation,"核验并启动",async()=>{if(confirm.IsChecked!=true)throw new Exception("请先确认核验消息");await Api("managedWechat.validate",Obj("id",id,"pid",selected()));await ManagedWechatSettings(id);});
+    ActionButton(p,"返回应用市场",Apps);
+  }
   async Task WechatSettings(){
     var state=D(await Api("wechat.status"));RenderWechatSettings(state);
   }

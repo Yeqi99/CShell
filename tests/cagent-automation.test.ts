@@ -34,3 +34,14 @@ test('pause, delete, and revocation discard queued events without execution',asy
  if(action==='revoke'){f.revoke();await a.tick();}else await a.change({id:r.id,action},'local');assert.equal(f.stored().pending.length,0);assert.equal(f.stored().runs.at(-1).state,'skipped');f.idle();await a.tick();assert.equal(f.started.length,1);await a.close();
 }});
 test('event queue capacity is bounded with an explicit skipped record',async()=>{const f=fixture(),a=new CagentAutomation(f.vault,f.assistant,f.clock);await a.load(false);await a.create({name:'event',prompt:'inspect',trigger:{kind:'event',source:'extension.demo',type:'message'},enabled:true},'local');await f.assistant.start({},'local');for(let n=0;n<101;n++)await a.emit('extension.demo','message',String(n),{});assert.equal(a.list('local').pending.length,100);assert.match(a.list('local').runs.at(-1)!.error!,/队列已满/);await a.close();});
+
+test('goal memory and cadence updates persist, remain owner scoped, and feed next occurrence',async()=>{
+ const f=fixture(),a=new CagentAutomation(f.vault,f.assistant,f.clock);await a.load(false);
+ const r=await a.create({name:'goal',prompt:'inspect',trigger:{kind:'interval',everyMs:60000},enabled:true},'peer-a');
+ await assert.rejects(a.change({id:r.id,action:'update',memory:'foreign'},'peer-b'),/规则不存在/);
+ await a.change({id:r.id,action:'update',memory:'step one verified',everyMs:2000},'peer-a');
+ assert.equal(a.list('peer-a').rules[0].memory,'step one verified');
+ f.advance(2000);await a.tick();assert.equal(f.started.length,1);assert.match(f.started[0].input.prompt,/step one verified/);
+ await assert.rejects(a.change({id:r.id,action:'update',everyMs:0},'peer-a'));
+ await a.close();
+});
