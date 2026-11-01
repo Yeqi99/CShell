@@ -20,7 +20,7 @@ export function validatePlans(plans) {
     assert.equal(p.assets.length, p.edition === 'pro' ? 14 : 16);
     assert.equal(new Set(p.assets.map(a => a.name)).size, p.assets.length);
     for (const a of p.assets) {
-      assert.match(a.name, /^(?:CAgent[-\w.]+\.(?:exe|tar\.gz)|CShell[-\w.]+\.(?:exe|dmg|deb|AppImage|apk)|SHA256SUMS\.txt)$/);
+      assert.match(a.name, /^(?:CAgent[-\w.]+\.(?:exe|tar\.gz)|CShell[-\w.]+\.(?:exe|dmg|zip|deb|AppImage|apk)|SHA256SUMS\.txt)$/);
       assert.match(a.sha256, /^[a-f0-9]{64}$/);
       assert(Number.isSafeInteger(a.size) && a.size > 0);
       if (a.name !== 'SHA256SUMS.txt') assert(a.name.includes(version));
@@ -28,6 +28,14 @@ export function validatePlans(plans) {
     }
     assert.equal(p.assets.filter(a => a.name === 'SHA256SUMS.txt').length, 1);
   }
+}
+export function verifyRelease(release, plan, assets) {
+  assert.equal(release.tag_name, plan.tag);
+  assert.equal(release.target_commitish, plan.sha);
+  assert.equal(release.prerelease, false);
+  assert.equal(assets.length, plan.assets.length);
+  assert.equal(new Set(assets.map(a => a.name)).size, assets.length);
+  for (const a of plan.assets) { const x = assets.find(x => x.name === a.name); assert(x); assert.equal(x.size, a.size); assert.equal(x.digest, `sha256:${a.sha256}`); }
 }
 const hash = async path => { const h = createHash('sha256'); for await (const b of createReadStream(path)) h.update(b); return h.digest('hex'); };
 
@@ -59,7 +67,10 @@ export async function main() {
     if (tag) { assert.equal(tag.object.type, 'commit'); assert.equal(tag.object.sha, p.sha); }
     const matches = releases.filter(r => r.tag_name === p.tag);
     assert(matches.length <= 1);
-    if (matches.length) { assert(matches[0].draft, 'Refusing already public release'); assert.equal(matches[0].target_commitish, p.sha); }
+    if (matches.length) {
+      assert.equal(matches[0].target_commitish, p.sha);
+      if (!matches[0].draft) verifyRelease(matches[0], p, await api(`releases/${matches[0].id}/assets?per_page=100`));
+    }
     p.release = matches[0];
     for (const a of p.assets) {
       const url = `https://shell.canp.ai/downloads/${p.edition}/v${version}/${a.name}`;
@@ -74,6 +85,7 @@ export async function main() {
     assert.deepEqual(sums.trim().split(/\r?\n/).sort(), expected);
   }
   for (const p of plans) {
+    if (p.release && !p.release.draft) continue; // Exact existing public channel is read-only during interrupted-pair recovery.
     if (!p.release) p.release = await api('releases', 'POST', { tag_name: p.tag, target_commitish: p.sha, name: `CShell${p.edition === 'pro' ? ' Pro' : ''} ${version}`, draft: true, prerelease: false, body: p.notes });
     const existing = await api(`releases/${p.release.id}/assets?per_page=100`);
     for (const a of existing) { const expected = p.assets.find(e => e.name === a.name); assert(expected, 'Unexpected draft attachment'); assert.equal(a.size, expected.size); assert.equal(a.digest, `sha256:${expected.sha256}`); }
@@ -89,11 +101,11 @@ export async function main() {
   }
   // Verify BOTH complete drafts before publishing either. Never switches update catalogs.
   for (const p of plans) {
-    const draft = await api(`releases/${p.release.id}`); assert(draft.draft); assert.equal(draft.target_commitish, p.sha);
-    const actual = await api(`releases/${p.release.id}/assets?per_page=100`); assert.equal(actual.length, p.assets.length);
-    for (const a of p.assets) { const x = actual.find(x => x.name === a.name); assert(x); assert.equal(x.size, a.size); assert.equal(x.digest, `sha256:${a.sha256}`); }
+    const draft = await api(`releases/${p.release.id}`);
+    verifyRelease(draft, p, await api(`releases/${p.release.id}/assets?per_page=100`));
+    p.release = draft;
   }
-  if (mode === '--publish') for (const p of plans) { const result = await api(`releases/${p.release.id}`, 'PATCH', { draft: false }); assert.equal(result.draft, false); console.log(`Published ${p.tag} at verified source ${p.sha}`); }
+  if (mode === '--publish') for (const p of plans) { if (!p.release.draft) { console.log(`Already verified public: ${p.tag}; unchanged`); continue; } const result = await api(`releases/${p.release.id}`, 'PATCH', { draft: false }); assert.equal(result.draft, false); console.log(`Published ${p.tag} at verified source ${p.sha}`); }
   else console.log('Both drafts complete and verified; not published');
   await writeFile(join(work, 'receipt.json'), JSON.stringify(plans.map(p => ({ edition: p.edition, tag: p.tag, sha: p.sha, releaseId: p.release.id, published: mode === '--publish' })), null, 2));
 }
