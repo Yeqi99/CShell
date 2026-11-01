@@ -1,3 +1,4 @@
+import type {LocalClipboardBridge} from './local-clipboard';
 import type {CommandBridge} from './command-console';
 import type {LinuxWorkspaceBridge} from './linux-workspace';
 import type { CloudBridge } from './cloud-sync';
@@ -364,7 +365,7 @@ export type SessionEvent =
   | { type: 'closed'; sessionId: string; error?: string }
   | { type: 'transfer'; transfer: Transfer };
 export interface Bridge
-  extends CommandBridge, CloudBridge, LinuxWorkspaceBridge, MachineBrowserBridge,
+  extends LocalClipboardBridge, CommandBridge, CloudBridge, LinuxWorkspaceBridge, MachineBrowserBridge,
     AgentBridge,
     DesktopViewBridge,
     HttpBridge,

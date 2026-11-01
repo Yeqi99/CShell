@@ -1,13 +1,13 @@
 import { DesktopRecovery } from './DesktopRecovery';
 import { useEffect, useRef, useState } from 'react';
-import { Monitor, Square, SlidersHorizontal, Expand, Minimize, Maximize, MoreHorizontal } from 'lucide-react';
+import { Monitor, Square, SlidersHorizontal, Expand, Minimize, Maximize, MoreHorizontal, Copy, ClipboardPaste } from 'lucide-react';
 import {
   desktopQualitySchema,
   type DesktopVideoInfo,
   type DesktopQuality,
 } from '../../shared/agent-desktop';
 import { desktopScanCode, h264Codec } from '../desktop-keys';
-import {desktopTextChunks} from '../desktop-paste';
+import {pushDesktopClipboard,pullDesktopClipboard} from '../desktop-clipboard-transfer';
 import type { DesktopViewInput } from '../../shared/desktop-view';
 import './agent-desktop-view.css';
 import { ErrorNotice } from './ErrorNotice';
@@ -41,6 +41,7 @@ export function AgentDesktopView({
   visibleRef.current = visible;
   const requestedControl=useRef(true);
   const pasteBusy=useRef(false);
+  const [clipboardStatus,setClipboardStatus]=useState('');
   const [qualityOpen,setQualityOpen]=useState(false);
   const [toolsOpen,setToolsOpen]=useState(false);
   const [picture, setPicture] = useState('等待远端画面…');
@@ -367,7 +368,9 @@ export function AgentDesktopView({
     if(event.key==='Escape' && (fullscreen||expanded)){event.preventDefault();release();if(down){if(fullscreen)void document.exitFullscreen();else setExpanded(false);}return;}
     if (!controlling.current || event.nativeEvent.isComposing) return;
     // Allow Chromium's trusted paste event to supply only the user's chosen data.
-    if(event.code==='KeyV'&&(event.ctrlKey||event.metaKey))return;
+    if((event.code==='KeyV'||event.code==='KeyC')&&(event.ctrlKey||event.metaKey)){
+      event.preventDefault();if(down&&!event.repeat)void exchangeClipboard(event.code==='KeyV'?'paste':'copy');return;
+    }
     const code = desktopScanCode(event.code);
     if (!code) return;
     event.preventDefault();
@@ -376,21 +379,18 @@ export function AgentDesktopView({
     // remote chord when Command is released, so no remote modifier stays down.
     if(!down && (event.code==='MetaLeft'||event.code==='MetaRight'))release();
   };
-  const pasteText=async(event:React.ClipboardEvent<HTMLCanvasElement>)=>{
-    if(!controlling.current||!permissions.current.canControl||!visibleRef.current)return;
-    event.preventDefault();
-    if(pasteBusy.current){setError('上一段内容仍在粘贴，请稍候');return;}
-    if(event.clipboardData.files.length){setError('当前远控尚未支持图片或文件剪贴板，请使用文件窗口上传');return;}
-    const text=event.clipboardData.getData('text/plain');if(!text)return;
-    const session=id.current,wire=wireGeneration.current;if(!session)return;
-    pasteBusy.current=true;
+  const exchangeClipboard=async(action:'copy'|'paste')=>{
+    if(pasteBusy.current)return;
+    const session=id.current,wire=wireGeneration.current;
+    const valid=()=>!!session&&id.current===session&&wireGeneration.current===wire&&controlling.current&&permissions.current.canControl&&visibleRef.current;
+    if(!valid())return;pasteBusy.current=true;setClipboardStatus(action==='copy'?'正在复制远端内容…':'正在发送剪贴板…');
+    const chord=async(code:number)=>{for(const event of [{kind:'key' as const,code:29,down:true},{kind:'key' as const,code,down:true},{kind:'key' as const,code,down:false},{kind:'key' as const,code:29,down:false}]){if(!valid())throw Error('连接或权限已变化');await window.cshell.desktopViewInput(session,event,wire);}};
     try{
       await window.cshell.desktopViewRelease(session,wire);
-      for(const chunk of desktopTextChunks(text)){
-        if(id.current!==session||wireGeneration.current!==wire||!controlling.current||!permissions.current.canControl||!visibleRef.current)throw Error('连接或权限已变化，已停止粘贴；未发送的内容不会重放');
-        await window.cshell.desktopViewInput(session,{kind:'text',text:chunk},wire);
-      }
-    }catch(error){if(id.current===session)setError(String(error));}finally{pasteBusy.current=false;}
+      if(action==='paste'){if(await pushDesktopClipboard(window.cshell,session,wire,valid))await chord(47);}
+      else{await chord(46);await new Promise(resolve=>setTimeout(resolve,150));await pullDesktopClipboard(window.cshell,session,wire,valid);}
+    }catch(error){if(id.current===session)setError(String(error));}
+    finally{pasteBusy.current=false;setClipboardStatus('');if(id.current===session)void window.cshell.desktopViewRelease(session,wire).catch(()=>{});}
   };
   const validateQuality = () => {
     const parsed = desktopQualitySchema.safeParse(quality);
@@ -457,6 +457,7 @@ export function AgentDesktopView({
           </>
         )}
         {busy && <button onClick={() => void stop()}>取消连接</button>}
+        {active && <><button title="复制远端选中内容到本机（Ctrl+C）" aria-label="复制远端内容" disabled={!control||!canControl} onClick={()=>void exchangeClipboard('copy')}><Copy size={15}/></button><button title="粘贴本机剪贴板到远端（Ctrl+V）" aria-label="粘贴到远端" disabled={!control||!canControl} onClick={()=>void exchangeClipboard('paste')}><ClipboardPaste size={15}/></button></>}
         {active && info?.secureAttention && <button disabled={!control} onClick={() => input({kind:'secure-attention'})} title="向远端发送 Ctrl+Alt+Delete；是否显示登录界面由 Windows 决定">Ctrl+Alt+Delete</button>}
         <DesktopRecovery key={target} target={target} allowed={canControl&&!busy} beforeExecute={stop} onRecovered={start}/>
         {onFiles && <button onClick={onFiles} title="在当前机器选择目录，粘贴或拖入文件">传输文件</button>}
@@ -552,6 +553,7 @@ export function AgentDesktopView({
           {reconnecting}
         </p>
       )}
+      {clipboardStatus && <p role="status" className="desktop-info">{clipboardStatus}</p>}
       {info && (
         <p className="desktop-info">
           {info.width} × {info.height} · {info.encoder} · {info.hardware ? '硬件编码' : '软件编码'}
@@ -569,7 +571,7 @@ export function AgentDesktopView({
             height={1}
             onBlur={release}
             onKeyDown={(e) => {if(!pan)key(e, true);}}
-            onPaste={e=>{if(!pan)void pasteText(e);}}
+            onPaste={e=>{if(!pan){e.preventDefault();void exchangeClipboard('paste');}}}
             onKeyUp={(e) => {if(!pan)key(e, false);}}
             onContextMenu={(e) => e.preventDefault()}
             onPointerDown={(e) => {

@@ -1,0 +1,10 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {pushDesktopClipboard,pullDesktopClipboard} from '../src/ui/desktop-clipboard-transfer';
+test('desktop files flow through scoped tokens, bounded chunks and final commit',async()=>{
+ const data=Buffer.alloc(150000,42),calls:any[]=[];let local=Buffer.alloc(0),committed=false;
+ const bridge:any={localClipboardRead:async()=>({kind:'files',files:[{token:'local',name:'sample.bin',size:data.length}]}),localClipboardFileRead:async(token:string,offset:number,length:number)=>{assert.equal(token,'local');assert.ok(length<=65536);return data.subarray(offset,offset+length).toString('base64');},desktopViewClipboard:async(id:string,input:any,generation:number)=>{assert.equal(id,'view');assert.equal(generation,3);calls.push(input);if(input.action==='fileBegin')return {fileToken:'remote'};if(input.action==='read')return {kind:'files',files:[{token:'remote',name:'sample.bin',size:data.length}]};if(input.action==='fileRead')return {data:data.subarray(input.offset,input.offset+65536).toString('base64')};return {};},localClipboardFilesBegin:async()=> 'staging',localClipboardFilesChunk:async(id:string,index:number,offset:number,bytes:string)=>{assert.equal(id,'staging');assert.equal(index,0);assert.equal(offset,local.length);local=Buffer.concat([local,Buffer.from(bytes,'base64')]);},localClipboardFilesCommit:async()=>{committed=true;}};
+ await pushDesktopClipboard(bridge,'view',3,()=>true);assert.equal(calls.filter(c=>c.action==='fileChunk').length,3);assert.equal(calls.at(-1).action,'filesCommit');
+ await pullDesktopClipboard(bridge,'view',3,()=>true);assert.ok(local.equals(data));assert.ok(committed);
+});
+test('revocation after local read prevents remote transfer',async()=>{let allowed=true;const bridge:any={localClipboardRead:async()=>{allowed=false;return {kind:'text',text:'private'};},desktopViewClipboard:async()=>assert.fail('must not transmit')};await assert.rejects(pushDesktopClipboard(bridge,'view',1,()=>allowed),/权限/);});
+

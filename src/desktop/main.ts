@@ -53,6 +53,7 @@ import { MonitorWindows } from './monitor-windows';
 import { registerExtensionHandlers } from './extensions';
 import { createExtensionServices } from '../core/api/extensions';
 import { registerUpdateHandlers } from './updates';
+import {LocalClipboard} from './local-clipboard';
 import { initialWindowBounds } from './window-bounds';
 import { registerAiHandlers } from './ai';
 import { toolsSettingsSchema, dockerActionSchema, dockerId } from '../shared/docker';
@@ -60,6 +61,7 @@ import {
   app,
   BrowserWindow,
   clipboard,
+  ClipboardItem,
   dialog,
   ipcMain,
   Menu,
@@ -903,6 +905,16 @@ else
         clipboard.writeText(z.string().max(2_000_000).parse(value)),
       );
       handle('clipboard:read', async () => (await clipboard.readText()).slice(0, 2_000_000));
+      const readClipboardMime=async(type:string)=>{const item=(await clipboard.read()).find(item=>item.types.includes(type));return item?Buffer.from(await (await item.getType(type) as Blob).arrayBuffer()):Buffer.alloc(0);};
+      const writeClipboardMime=(type:string,data:Buffer)=>clipboard.write([new ClipboardItem({[type]:new Blob([new Uint8Array(data)])})]);
+      const dropMime='electron application/osclipboard;format="CF_HDROP"';
+      const localClipboard=new LocalClipboard({text:()=>clipboard.readText(),png:()=>readClipboardMime('image/png'),files:()=>readClipboardMime(dropMime),writeText:text=>clipboard.writeText(text),writePng:data=>writeClipboardMime('image/png',data),writeFiles:data=>writeClipboardMime(dropMime,data)},join(app.getPath('userData'),'clipboard-files'));
+      handle('clipboard:content-read',()=>localClipboard.read());
+      handle('clipboard:content-write',value=>localClipboard.write(value as any));
+      handle('clipboard:file-read',(token,offset,length)=>localClipboard.fileRead(String(token),Number(offset),Number(length)));
+      handle('clipboard:files-begin',files=>localClipboard.begin(files as any));
+      handle('clipboard:files-chunk',(id,index,offset,data)=>localClipboard.chunk(String(id),Number(index),Number(offset),String(data)));
+      handle('clipboard:files-commit',id=>localClipboard.commit(String(id)));
       handle('profile:save', (value) => {
         const profile = profileSchema.parse(value);
         const old = store.snapshot().profiles.find((p) => p.id === profile.id);

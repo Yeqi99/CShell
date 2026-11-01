@@ -1,6 +1,13 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { Bridge, SessionEvent } from '../shared/contracts';
 const bridge: Bridge = {
+  desktopViewClipboard:(id,input,generation)=>ipcRenderer.invoke('desktop:view-clipboard',id,input,generation),
+  localClipboardRead:()=>ipcRenderer.invoke('clipboard:content-read'),
+  localClipboardWrite:value=>ipcRenderer.invoke('clipboard:content-write',value),
+  localClipboardFileRead:(token,offset,length)=>ipcRenderer.invoke('clipboard:file-read',token,offset,length),
+  localClipboardFilesBegin:files=>ipcRenderer.invoke('clipboard:files-begin',files),
+  localClipboardFilesChunk:(id,index,offset,data)=>ipcRenderer.invoke('clipboard:files-chunk',id,index,offset,data),
+  localClipboardFilesCommit:id=>ipcRenderer.invoke('clipboard:files-commit',id),
   nativeDesktopSetup:(id,action)=>ipcRenderer.invoke('native-desktop:setup',id,action),
   nativeDesktopOpen:(id,endpoint)=>ipcRenderer.invoke('native-desktop:open',id,endpoint),
   nativeDesktopRead:id=>ipcRenderer.invoke('native-desktop:read',id),

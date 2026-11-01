@@ -42,3 +42,11 @@
 - Windows系统代理显式启用/恢复按钮已接入，要求先应用机器出口；fixture验证未点击不会改系统设置，点击后调用networkSystemSet。真实系统代理未在UI验收中擅自启用。
 - CAgent已打开工作区后台每15秒探活，失败同步左栏在线状态，切换标签不重置计时；仍须最终包实测断网恢复。
 - AI管理连接managementOnly进入机器工作区，不再给Android等无Shell机器创建PowerShell终端。
+
+## 远控剪贴板补齐与测试限制
+
+- 新增显式复制/粘贴按钮及 Ctrl+C / Ctrl+V，绑定当前可见远控view与generation；每个分块前检查控制权限，断连不重放。
+- 文本、PNG使用有界分块；文件通过私有token读取与专用接收目录，完整收齐后才写Windows CF_HDROP；拒绝目录、路径穿越、保留名、超额数据。
+- 本地剪贴板服务与双向文件传输模拟集成测试、renderer粘贴/关闭控制测试通过；不等于远端native实机成功，等待native构建与双机验证。
+- Electron新版ClipboardItem原生测试确认文本和CF_HDROP格式往返；测试错误地尝试将read()对象直接write恢复，Electron拒绝且进程退出，因此未能恢复原剪贴板，已向主任务报告并由主任务告知用户。未修改用户文件。此测试不得作为完整安全恢复通过。
+- 后续真实剪贴板测试必须先将各格式payload完整保存并验证可重建成new ClipboardItem，修改后只有当前仍是测试内容才恢复；空剪贴板也应恢复，敏感备份及时清理。
