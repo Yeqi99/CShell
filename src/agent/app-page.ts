@@ -79,10 +79,11 @@ $('refresh-machine').onclick=action(machine);
 $('save-access').onclick=action(async()=>{const shells=[...document.querySelectorAll('input[name=shell]:checked')].map(i=>i.value);if(!shells.length)throw new Error('请选择至少一个实际 Shell');await api('client.access',{password:$('remote-password').value,shells:[...new Set(shells)],allowHttp:$('allow-http').checked,allowManage:$('allow-manage').checked,allowHosting:$('allow-hosting').checked,allowRelay:$('allow-relay').checked});$('remote-password').value='';await machine();$('feedback').textContent='远程访问配置已保存';});
 $('start-remote').onclick=action(async()=>{await api('client.start',{bind:$('bind').value,port:Number($('port').value)});await machine();});
 $('stop-remote').onclick=action(async()=>{await api('client.stop');await machine();});
-$('theme').onclick=()=>{document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark';localStorage.setItem('cagent-theme',document.documentElement.dataset.theme);};
 document.documentElement.dataset.theme=localStorage.getItem('cagent-theme')||'light';
-let appearanceSignature='';
-async function refreshAppearance(){const p=await api('account.appearance');const signature=JSON.stringify(p);if(signature===appearanceSignature)return;appearanceSignature=signature;const root=document.documentElement;root.dataset.theme=p.theme==='dark'?'dark':'light';root.style.fontSize=Math.max(9,Math.min(20,Number(p.uiFontSize)||14))+'px';root.style.fontFamily=p.uiFont||"system-ui, 'Microsoft YaHei', sans-serif";}
+let appearanceSignature='',appearanceGeneration=0;
+function applyAppearance(p){const signature=JSON.stringify(p);if(signature===appearanceSignature)return;appearanceSignature=signature;const root=document.documentElement;root.dataset.theme=p.theme==='dark'?'dark':'light';root.style.fontSize=Math.max(9,Math.min(20,Number(p.uiFontSize)||14))+'px';root.style.fontFamily=p.uiFont||"system-ui, 'Microsoft YaHei', sans-serif";localStorage.setItem('cagent-theme',root.dataset.theme);}
+async function refreshAppearance(){if(theme.disabled)return;const generation=appearanceGeneration,p=await api('account.appearance');if(generation===appearanceGeneration&&!theme.disabled)applyAppearance(p);}
+$('theme').onclick=action(async()=>{const button=$('theme');if(button.disabled)return;button.disabled=true;++appearanceGeneration;try{applyAppearance(await api('account.appearance',{theme:document.documentElement.dataset.theme==='dark'?'light':'dark'}));}finally{++appearanceGeneration;button.disabled=false;}});
 void refreshAppearance().catch(()=>{});
 setInterval(()=>void refreshAppearance().catch(()=>{}),30000);
 setInterval(async()=>{if(polling)return;polling=true;try{if(selected)renderTask(await api('assistant.task',{id:selected}));if(plan?.state==='running'){plan=await api('applications.status',{id:plan.id});renderPlan();}}catch(e){error(e);}finally{polling=false;}},1500);
