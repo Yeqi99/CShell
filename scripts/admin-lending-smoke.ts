@@ -33,5 +33,16 @@ try{
   await page.getByRole('button',{name:'确认撤销',exact:true}).click();
   await page.getByText('已撤销',{exact:true}).waitFor();
   assert.deepEqual(payload,{id:'loan-1',reason:'用户要求收回'});
+  await page.goto('http://127.0.0.1:'+(server.address() as any).port+'/#settings');
+  await page.getByText('生产服务已连接',{exact:true}).waitFor();
+  assert.equal(await page.getByText('本页不能修改生产账号',{exact:false}).count(),0);
+  assert.equal(await page.locator('.settings-row').filter({hasText:'机器借用授权'}).getByText('已连接',{exact:true}).count(),1);
+  assert.equal(await page.locator('.settings-row').filter({hasText:'支付与点数'}).getByText('本地草稿',{exact:true}).count(),1);
+  for(const width of [1200,390]){
+    await page.setViewportSize({width,height:900});
+    if(width<650)await page.waitForFunction(()=>document.querySelector('.sidebar')!.getBoundingClientRect().right<=1);
+    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+    await page.screenshot({path:`test-results/admin/settings-${width}.png`,fullPage:true});
+  }
   console.log('PASS admin lending responsive list and explicit audited revocation');
 }finally{await browser.close();server.close();}
