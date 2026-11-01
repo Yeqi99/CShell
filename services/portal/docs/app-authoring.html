@@ -17,6 +17,10 @@
 <h2 id="section-4">实现可信适配器</h2>
 <p>内置适配器的 adapterId 必须对应主程序已实现的适配器；只写清单不会增加原生适配能力。内置实现提供 register、invoke、quiesce、stop、unregister，并随主程序审查构建。若需要分发自己的 JavaScript 工具，使用独立的 <a href="/docs/plugin-authoring.html#process-tools">process 自定义扩展</a>，按其清单与 stdin/stdout 协议包装；在安装宿主单独授权后运行，不在渲染进程动态加载代码。</p>
 <p>只有文件、平台、版本、配置、授权和注册全部通过，状态才能为 available。未知适配器是 incompatible；安装不授予权限。升级仅保留旧权限与新清单的交集，新增权限需明确授权。</p>
+<h2 id="portable-settings">让扩展设置随账号恢复</h2>
+<p>可信适配器可声明 <code>portableConfiguration</code>，包含 <code>export()</code>、<code>validate(input)</code> 和异步 <code>import(input)</code>。仅导出经过校验的可迁移偏好；导入前再次校验，不直接复制整个本机配置文件。</p>
+<ol><li>为字段建立明确白名单，例如界面语言、显示顺序和非敏感偏好。拒绝未知字段。</li><li>返回最多 100 个键的对象；值限字符串、有限数值、布尔值、null 或字符串数组。字符串最多 4096 字符，数组最多 100 项。</li><li>密码、令牌、本机路径与端口、进程身份、设备绑定和执行权限留在目标机器；微信收发范围也不能随配置授权。</li><li>恢复时核对包 ID、版本和清单 SHA-256。缺少精确匹配包、下载失败或配置校验失败时显示待恢复，不标记能力可用。</li></ol>
+<p>没有声明此契约的适配器只恢复包选择，不接受任意配置。请同时测试账号切换、未知字段、旧版本及安装失败后的恢复状态。</p>
 <h2 id="section-5">验证与提交</h2>
 <p>覆盖路径穿越、摘要变化、未知适配器、撤权、重启恢复及停止失败。卸载包不能误删用户系统软件和资料。PR 附上支持平台、工具副作用、实机结果和尚未验证的范围。</p>
 <p><a href="https://github.com/Yeqi99/CShell/blob/main/docs/CAGENT-CAPABILITY-PACKAGES.md">能力包完整规范</a> · <a href="https://github.com/Yeqi99/CShell/blob/main/docs/AGENT-APPLICATIONS.md">应用安装协议</a></p><div class="doc-bottom"><a href="/docs/start.html">← 文档首页</a> · <a href="https://github.com/Yeqi99/CShell/issues">反馈文档问题 ↗</a></div></article></main><footer><span>CShell / CanpShell · MIT 开源核心</span><div><a href="/docs/releases.html">版本状态</a><a href="https://github.com/Yeqi99/CShell/issues">问题反馈 ↗</a><a href="/docs/developers.html">开发者</a></div></footer></body></html>
