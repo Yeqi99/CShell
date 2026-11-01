@@ -179,7 +179,16 @@ final class AndroidInputTest implements AutoCloseable {
       check(done.await(2,TimeUnit.SECONDS),"WebView value query timed out");actual=value.get();
       if(expected.equals(actual))return;Thread.sleep(50);
     }while(System.nanoTime()<end);
-    throw new AssertionError("Remote WebView input mismatch: expected="+expected+", actual="+actual+", service="+AndroidControlService.editState());
+    throw new AssertionError("Remote WebView input mismatch: expected="+expected+", actual="+actual+", service="+AndroidControlService.editState()+", focus="+webFocusDiagnostics(view));
+  }
+  private String webFocusDiagnostics(android.webkit.WebView view)throws Exception {
+    AtomicReference<String> report=new AtomicReference<>("");
+    test.runOnMainSync(()->{try{
+      java.lang.reflect.Field instance=AndroidControlService.class.getDeclaredField("instance");instance.setAccessible(true);
+      java.lang.reflect.Method focused=AndroidControlService.class.getDeclaredMethod("focused");focused.setAccessible(true);
+      android.view.accessibility.AccessibilityNodeInfo node=(android.view.accessibility.AccessibilityNodeInfo)focused.invoke(instance.get(null));
+      try{report.set("nativeEditor="+editor.hasFocus()+",webView="+view.hasFocus()+",node="+(node==null?"none":node.getClassName()+",focused="+node.isFocused()+",editable="+node.isEditable()+",window="+node.getWindowId()));}finally{if(node!=null)node.recycle();}
+    }catch(Exception e){report.set(e.getClass().getSimpleName());}});return report.get();
   }
   private void awaitSemanticText(String expected,String stale)throws Exception {
     long end=System.nanoTime()+TimeUnit.SECONDS.toNanos(3);boolean found=false,old=false;
