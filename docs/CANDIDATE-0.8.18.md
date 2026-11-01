@@ -30,3 +30,16 @@ GitHub 候选分支 `codex/candidate-core-0.8.18` 首轮远端提交 `706cddcd25
 第三轮 CI 的 Linux/macOS 挂起定位为 WindowsSystemProxy.close 在非 Windows 平台调用拒绝支持的 set(false)，事件 fixture 清理被异常打断后遗留 HTTP socket。已修正为非 Windows 无副作用关闭，仍拒绝显式启用系统代理；同时测试在初始化失败时也释放 socket。定向测试通过，真实平台须以修复后的 CI 结果为准，不把 Windows 上模拟平台分支视为 Linux 实机验证。
 
 修复候选本地 `0aa0388` 对应远端树等值提交 `93cf1938523d2d365b3b777fa5eea55132fec1c7`，Release 验证 run `41283521122`；该提交未发布。候选构建后续有源码变化时需重新核验最终附件，不能沿用上表声明最终发布成功。
+
+## 机器网络规则与最终 Windows 候选
+
+本地 `cf476c02882ebcf1cdac669b06aac5c5af81ba03` 对应远端候选 `6defedb073b00fbbd74b3e1b930d3a9f18b3932a`，两者 Git tree 均为 `9b9fecc19ca80ead827ec958680eebd118acdab2`。包含本机、SSH、CAgent 多条网络出口规则、循环拒绝、实际 API 授权及持久化提交前撤权复查。开源版没有引入 Pro 账号服务或云凭据。
+
+通用模块同步后的全量测试 725 项，721 通过、4 跳过、0 失败；最后授权提交另经真实 API 定向测试、全选权限测试及类型检查通过。Release 工作流 `41288451105`、Windows checks `41288451186` 继续验证最终整树；Android 控制另有实际仪器验证，不能仅凭 APK 编译成功宣布通过。
+
+| Windows 候选附件 | 字节数 | SHA-256 |
+|---|---:|---|
+| CShell-0.8.18-win-x64.exe | 123696553 | 90944f50cee973b6f38af04ef71acd195462868fe93f9c11ce0e891b01646b25 |
+| CAgent-Setup-0.8.18-win-x64.exe | 26178012 | b615b4f17a069005fc363ec77d906fb0eef16f796c5bdd54aaba7aa23edfcf2b |
+
+两个附件均未签名。实际 CShell win-unpacked 程序通过 platform-package 与 release-desktop：SSH、SFTP、隔离数据目录、原生/可视化共享会话、设置、MCP 和重启恢复。CAgent 安装器实际解包后通过摘要、原生 CMD PTY、TLS、受限权限与停止验收。没有覆盖用户已安装应用，没有改变发布标签或下载源。
