@@ -13,14 +13,14 @@ async function start(){
  child=spawn(join(staged,process.platform==='win32'?'node.exe':'node'),[join(staged,'agent.cjs'),'run'],{env:{...process.env,CSHELL_AGENT_DATA:data},stdio:'ignore',windowsHide:true});
  let launchError:Error|undefined;child.once('error',error=>{launchError=error});
  const deadline=Date.now()+60000;
- while(Date.now()<deadline){if(launchError)throw launchError;if(child.exitCode!==null)throw Error('Packaged Pro CAgent exited during startup');try{await callAgent('account.status',{},data,AbortSignal.timeout(1000));return}catch{}await new Promise(r=>setTimeout(r,100));}
+ while(Date.now()<deadline){if(launchError)throw launchError;if(child.exitCode!==null||child.signalCode!==null)throw Error('Packaged Pro CAgent exited during startup');try{await callAgent('account.status',{},data,AbortSignal.timeout(1000));return}catch{}await new Promise(r=>setTimeout(r,100));}
  throw Error('Packaged Pro account API unavailable');
 }
 async function stop(){
  const target=child;if(!target)return;
  await callAgent('agent.shutdown',{confirm:true},data,AbortSignal.timeout(3000)).catch(()=>{});
- if(target.exitCode===null){await Promise.race([once(target,'exit'),new Promise(r=>setTimeout(r,3000))]);if(target.exitCode===null){target.kill();await Promise.race([once(target,'exit'),new Promise(r=>setTimeout(r,3000))]);}}
- assert.notEqual(target.exitCode,null,'isolated fixture did not exit before cleanup');
+ if(target.exitCode===null&&target.signalCode===null){await Promise.race([once(target,'exit'),new Promise(r=>setTimeout(r,3000))]);if(target.exitCode===null&&target.signalCode===null){target.kill();await Promise.race([once(target,'exit'),new Promise(r=>setTimeout(r,3000))]);}}
+ assert.ok(target.exitCode!==null||target.signalCode!==null,'isolated fixture did not exit before cleanup');
  child=undefined;
 }
 try{
