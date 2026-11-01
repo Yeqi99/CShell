@@ -47,8 +47,8 @@ export function registerUpdateHandlers(
   };
   let agentPackages:AgentDownload[]=[];
   handle('agent:download-list',async()=>{
-    const catalogs=await Promise.all(['pro','opensource'].map(async channel=>(await request('https://shell.canp.ai/downloads/'+channel+'/releases.json')).json()));
-    agentPackages=agentDownloads(catalogs);
+    const channel=isPro?'pro':'opensource';const catalogs=[await(await request('https://shell.canp.ai/downloads/'+channel+'/releases.json')).json()];
+    agentPackages=agentDownloads(catalogs,channel);
     return agentPackages.map(({url,...item})=>item);
   });
   handle('agent:download-open',async(id:unknown)=>{
@@ -230,3 +230,4 @@ export function registerUpdateHandlers(
     }
   });
 }
+

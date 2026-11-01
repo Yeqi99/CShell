@@ -170,8 +170,9 @@ export async function registerAiHandlers(
     ai.dispose();
     clearTimeout(timer);
     pending.clear();
-    disposal = Promise.all([events.close(),ai.flush(),remoteClose,systemProxy.close().finally(()=>network.close()),drafts.snapshot()]).then(()=>{});
+    disposal = Promise.all([events.close(),ai.flush(),officialOpenCode.dispose(),remoteClose,systemProxy.close().finally(()=>network.close()),drafts.snapshot()]).then(()=>{});
     return disposal;
   };
-  return Object.assign(dispose, { classroomModels:()=>ai.classroomModels(),classroomModel:(id:string)=>ai.classroomModel(id), hasActiveWork: () => ai.hasActiveWork });
+  return Object.assign(dispose, { classroomModels:()=>ai.classroomModels(),classroomModel:(id:string)=>ai.classroomModel(id), hasActiveWork: () => ai.hasActiveWork || officialOpenCode.status().active > 0 });
 }
+
