@@ -154,7 +154,8 @@ window.addEventListener('hashchange',()=>go(pages[location.hash.slice(1)]?locati
 window.addEventListener('popstate',()=>{page=pages[location.hash.slice(1)]?location.hash.slice(1):'overview';go(page);});
 document.addEventListener('keydown',e=>{if(e.ctrlKey&&e.key.toLowerCase()==='k'){e.preventDefault();document.getElementById('global-search')?.focus();}if(e.key==='Escape'&&!document.querySelector('dialog[open]')){if(editor){captureEditor();editor=null;render();}else if(mobile){mobile=false;render();}else{const r=document.getElementById('search-results');if(r)r.hidden=true;}}});
 document.addEventListener('click',e=>{if(!e.target.closest('.searchwrap')){const r=document.getElementById('search-results');if(r)r.hidden=true;}});
-render();
+// Complete production state and page decorators before a direct #settings visit.
+queueMicrotask(()=>render());
 
 // Production account and membership data. Other modules retain explicitly labelled drafts.
 let modelUsage={usage:[],recent:[]};
