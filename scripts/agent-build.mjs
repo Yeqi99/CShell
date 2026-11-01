@@ -221,7 +221,7 @@ if (process.platform === 'win32') {
 }
 await writeFile(
   join(output, 'README.txt'),
-  `CAgent (Canp Agent) ${version}\n\nOpen cagent-app.vbs (Windows) or run cagent app for the standalone local assistant.\nWindows uses a compact native WPF window; other platforms use the system browser. No bundled browser runtime.\nConfigure the model and explicit permissions in Settings.\nLegacy cshell-agent commands and data remain compatible.\n\nRun cshell-agent init to choose shells and create credentials.\nRun cshell-agent run (Windows: Start Agent.cmd) to start the user process.\nIt does not install a Windows service and does not open remote access automatically.\nConfigure and explicitly start the listener from the CShell Agent extension.\nNo Electron or Chromium is bundled.\nKeep the complete Agent data directory, including vault-key, for recovery.\n`,
+  `CAgent (Canp Agent) ${version}\n\nOpen cagent-app.vbs (Windows) or run cagent app for the standalone local assistant.\nWindows uses a compact native WPF window; other platforms use the system browser. No bundled browser runtime.\nConfigure the model and explicit permissions in Settings.\nLegacy cshell-agent commands and data remain compatible.\n\nRun cshell-agent init to choose shells and create credentials.\nRun cshell-agent run (Windows: Start Agent.cmd) to start the user process.\nIt does not install a Windows service and does not open remote access automatically.\nConfigure and explicitly start the listener in CAgent connection settings.\nNo Electron or Chromium is bundled.\nKeep the complete Agent data directory, including vault-key, for recovery.\n`,
 );
 await writeFile(
   join(output, 'build-info.json'),
