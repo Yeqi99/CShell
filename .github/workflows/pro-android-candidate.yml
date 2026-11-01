@@ -1,7 +1,7 @@
 name: Pro Android candidate
 on:
   push:
-    branches: ['codex/candidate-pro-0.8.18']
+    branches: ['codex/candidate-pro-0.8.18', 'codex/android-diagnostic-0.8.18']
   workflow_dispatch:
 permissions:
   contents: read

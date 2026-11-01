@@ -28,3 +28,12 @@
 GitHub候选工作流41281283583成功，使用既有release密钥，没有创建新签名身份。下载的artifact压缩包SHA-256为2f601caf2ce0c6a3d47392e2b9f682eb11783a328e58420e3ab9792d9caf2e58，与GitHub记录一致；APK摘要4f7efbd66da73bad7af7d4c80d41a919435a59de4e7fb8a665291e1d30fce552，与附件清单一致。apksigner验证通过，证书SHA-256为34cc1c9a0eacafc512a0837c3d286081879822f047e5637a65cdbc5b525914c5。
 
 用户确认开启USB安装后，向已授权Android16手机重试此签名APK，仍立即返回INSTALL_FAILED_USER_RESTRICTED: Install canceled by user。系统没有显示安装页，手机上没有CShell包；不能标记实机验收通过。没有修改手机安全设置或绕过系统确认。
+
+## 收口重建 · 本机 Windows
+
+后续真实RDP多标签隔离、CAgent网页偏好/自动化、原生验收入口隔离及远控状态提示已纳入重新构建。此前本文首轮摘要仅保留为历史，不作为最新发布附件。
+
+- Pro NSIS最新SHA-256：fd5d6ec9c2f7808fe227c90f0cb0373c57a976f775206e05e701c20d70d18b78。实际win-unpacked应用完成platform-package-smoke与release-desktop-smoke，真实SSH/文件/布局/字体草稿/权限MCP等通过。
+- CAgent NSIS最新SHA-256：6732ee491149e85849969e2a1175aee4b8279570af83cbcf0e97a27891bacef9，26,227,803字节。安装到隔离目录后真实CMD/TLS/授权/退出通过；原生模型/自动化/主题及身份跨重启验证通过。签名状态仍为未签名。
+- 手机已改用系统文件管理器正常安装上述正式签名Android候选并启动；USB安装限制未绕过。实际视频已成功，键鼠和系统授权验收继续，详见Android记录。
+- 本机实际用户应用仍未被候选替换，正式渠道未切换。
