@@ -42,3 +42,13 @@
 - 4.2.0.12：264767587 bytes，SHA256 `8abcdd38e8a984b1e80cc737fe731a6fe6c162b0aa0440e3b86545d79ddd3ff6`
 
 目录 `.local/wechat-0.1.2-diagnostic-candidate`。候选未挂载当前微信、未上传，内嵌市场目录仍0.1.1。等待新安全生命周期先短监听退订诊断；真实入站到唯一任务与实机安全退订仍是发布门槛。
+
+## 2026-11-01 完整冻结进程退出问题定位
+
+本轮新微信进程的只读短监听已输出 native `unloaded=true/codeRestored=true/retained=false/errorCount=0`，但旧父进程读管道等待 EOF 导致 15 秒停止预算耗尽。未强行清除该进程的 ACTIVE 租约，也未再次挂接。
+
+随后使用独立自建 Python 进程替代微信目标，冻结完整实际 server/listener/worker：保留 Frida attach/unload/detach、stdin 心跳与 EOF、Memory.close、receive.lock 与 worker finally，仅替换绑定、guard 和注入脚本为零事件无副作用 fixture。旧实现复现 cleanup 后约 30.65 秒才获得 stdout EOF；实际 worker 已退出，继承写端令父进程继续等待。不能把这种等待当作 native 卸载失败。
+
+私有修复提交 `1c28459`：Windows 使用 PeekNamedPipe + 实际子进程状态有界读取，读完已退出 worker 的缓冲后结束；调用方仍要求明确 cleanup 成功和 exit 0，不杀子进程或目标。不确定清理保留隔离租约并返回非零状态。阶段日志统一由父进程写入，防止进程间 JSONL 交错；普通单 JSON worker 协议保持不变。
+
+最终完整 fixture：目标存活，cleanup 至 worker exit 约 30 ms，服务正常 exit 0；无需 frida.shutdown。真实子/孙进程继承管道、活 worker 不提前退出、分片尾行、不伪造 cleanup、未确认状态拒绝正常服务退出回归共 4 项通过；诊断脱敏与轮转 3 项通过。生产微信真实消息回调与新包正常停止尚需后续实机验收，不以 fixture 替代。
