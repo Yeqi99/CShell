@@ -221,12 +221,12 @@ public final class AndroidControlService extends AccessibilityService {
     // focus, never an arbitrary editable field or a remembered node.
     for(int attempt=0;attempt<4;attempt++){
       AccessibilityNodeInfo node=findFocus(AccessibilityNodeInfo.FOCUS_INPUT);
-      if(node!=null){if(node.refresh()&&node.isFocused())return node;node.recycle();}
+      if(node!=null){if(node.isFocused())return node;node.recycle();}
       for(android.view.accessibility.AccessibilityWindowInfo window:getWindows()){
         try{
           if(window.getType()!=android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION||!window.isFocused())continue;
           AccessibilityNodeInfo root=window.getRoot();if(root==null)continue;
-          try{node=root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);if(node!=null){if(node.refresh()&&node.isFocused())return node;node.recycle();}}finally{root.recycle();}
+          try{node=root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);if(node!=null){if(node.isFocused())return node;node.recycle();}}finally{root.recycle();}
         }finally{window.recycle();}
       }
       android.os.SystemClock.sleep(24);
@@ -268,18 +268,19 @@ public final class AndroidControlService extends AccessibilityService {
         boolean retry=false,confirmed=false;
         try{
           if(instance!=AndroidControlService.this){lastEditState="edit:service-changed";return;}
-          rounds++;long refreshStarted=android.os.SystemClock.uptimeMillis();boolean refreshed=node.refresh();
+          rounds++;long refreshStarted=android.os.SystemClock.uptimeMillis();
+          // Refreshing a pre-edit node can block for Android's five-second
+          // accessibility timeout. Query actual current focus instead; never
+          // infer the target from a remembered editable node.
+          AccessibilityNodeInfo fresh=focused();
           refreshMillis+=android.os.SystemClock.uptimeMillis()-refreshStarted;
-          if(!refreshed||!node.isFocused()){
-            // Text updates invalidate cached node snapshots on older Android.
-            // Reacquire actual input focus, but only accept the exact same node;
-            // a different focused editor must never inherit queued input.
-            AccessibilityNodeInfo fresh=focused();
+          {
             if(fresh==null){
               retry=android.os.SystemClock.uptimeMillis()<deadline;
               lastEditState=retry?"edit:focus-pending":"edit:focus-unconfirmed";return;
             }
             if(!fresh.equals(node)){fresh.recycle();lastEditState="edit:focus-changed";return;}
+            if(!fresh.isEditable()||fresh.isPassword()){fresh.recycle();lastEditState="edit:target-unavailable";return;}
             // Replacing a stale snapshot is not a new editor or a content event.
             // Keep stability samples; the actual values/revision below decide
             // whether the operation settled.
