@@ -1,0 +1,324 @@
+{
+  "status": "candidate-not-published",
+  "artifacts": [
+    {
+      "id": 13080985349,
+      "name": "desktop-mac-x64",
+      "digest": "sha256:42820e708a24d6aa49432c804269947d86cacb30f1e2fdbf1a277155061ac038",
+      "edition": "opensource",
+      "run": 41298530074,
+      "source": "b9ea7be6ef53f7e21228559e5b588ddfa91b3a58",
+      "remoteCommit": "2a624b13e7f02919c76bf4090002504b0274056c",
+      "zipPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-desktop-mac-x64.zip",
+      "files": [
+        {
+          "name": "CAgent-0.8.18-mac-x64.tar.gz",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-desktop-mac-x64\\CAgent-0.8.18-mac-x64.tar.gz",
+          "bytes": 40730639,
+          "sha256": "c49b7e023f52a4761ee04af7fe73e4bdc2643de22a60292de6e5ae9d2433a60d",
+          "embeddedCatalogVerified": true,
+          "editionImplementationVerified": true,
+          "abnormalExitCleanupGuardVerified": true
+        },
+        {
+          "name": "CShell-0.8.18-mac-x64.zip",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-desktop-mac-x64\\CShell-0.8.18-mac-x64.zip",
+          "bytes": 146016234,
+          "sha256": "01bb50f8c73d805e0227bd0ea033191b5c67364240680fb3a7a4f186e00947a4"
+        },
+        {
+          "name": "CShell-0.8.18-mac-x64.dmg",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-desktop-mac-x64\\CShell-0.8.18-mac-x64.dmg",
+          "bytes": 146127901,
+          "sha256": "497d6dd8f6af30fd3f624cbd287976abf495d5f34336ccc08a9d444b75976c2a"
+        }
+      ]
+    },
+    {
+      "id": 13080651414,
+      "name": "desktop-linux-x64",
+      "digest": "sha256:866cc7414a8e75bd64038f85c7987bb7fde43444c3f4a2e0f83a39cbcbf094f8",
+      "edition": "opensource",
+      "run": 41298530074,
+      "source": "b9ea7be6ef53f7e21228559e5b588ddfa91b3a58",
+      "remoteCommit": "2a624b13e7f02919c76bf4090002504b0274056c",
+      "zipPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-desktop-linux-x64.zip",
+      "files": [
+        {
+          "name": "CAgent-0.8.18-linux-x64.tar.gz",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-desktop-linux-x64\\CAgent-0.8.18-linux-x64.tar.gz",
+          "bytes": 44817892,
+          "sha256": "2fb535225e4ee207824d5a4caaae1c4eadedbddfbff525182cbc7b5e776554d0",
+          "embeddedCatalogVerified": true,
+          "editionImplementationVerified": true,
+          "abnormalExitCleanupGuardVerified": true
+        },
+        {
+          "name": "CShell-0.8.18-linux-amd64.deb",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-desktop-linux-x64\\CShell-0.8.18-linux-amd64.deb",
+          "bytes": 108879012,
+          "sha256": "24a2cb9d4f67456ca10cf36e993d0301008381138c4a23e5bcab7506edfb3d0b"
+        },
+        {
+          "name": "CShell-0.8.18-linux-x86_64.AppImage",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-desktop-linux-x64\\CShell-0.8.18-linux-x86_64.AppImage",
+          "bytes": 139464076,
+          "sha256": "da575c19f8eb3469384f96ed305e481763593edeafbe9e3586a3317f08e197c4"
+        }
+      ]
+    },
+    {
+      "id": 13080123161,
+      "name": "desktop-linux-arm64",
+      "digest": "sha256:a8038551e1ac980663592d3bb7307606e5014936a1a8ab55475dbc653e87e3bb",
+      "edition": "opensource",
+      "run": 41298530074,
+      "source": "b9ea7be6ef53f7e21228559e5b588ddfa91b3a58",
+      "remoteCommit": "2a624b13e7f02919c76bf4090002504b0274056c",
+      "zipPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-desktop-linux-arm64.zip",
+      "files": [
+        {
+          "name": "CAgent-0.8.18-linux-arm64.tar.gz",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-desktop-linux-arm64\\CAgent-0.8.18-linux-arm64.tar.gz",
+          "bytes": 44507509,
+          "sha256": "81e45f783b7b7eff4ecf2760b0297999d3e62cede6e3a2a3f50d05ea08f01324",
+          "embeddedCatalogVerified": true,
+          "editionImplementationVerified": true,
+          "abnormalExitCleanupGuardVerified": true
+        },
+        {
+          "name": "CShell-0.8.18-linux-arm64.AppImage",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-desktop-linux-arm64\\CShell-0.8.18-linux-arm64.AppImage",
+          "bytes": 140723367,
+          "sha256": "cb4ecbc092ecedbfeeda486ad5e4bfd6f47a6c549b5e332e61d495f061ed5c85"
+        },
+        {
+          "name": "CShell-0.8.18-linux-arm64.deb",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-desktop-linux-arm64\\CShell-0.8.18-linux-arm64.deb",
+          "bytes": 103039548,
+          "sha256": "7dd8d7d23e1887331fdc39a8fc9c3521d5a6b0d84ff5adfe005c1090ba407b48"
+        }
+      ]
+    },
+    {
+      "id": 13080855528,
+      "name": "pro-linux-x64",
+      "digest": "sha256:30e099864b2cba13bbcbb241c4569ca5546037efc3d251a66acb4711f687734a",
+      "edition": "pro",
+      "run": 41298712191,
+      "source": "81f49bc2e5bb339cd580bd3e1faad5b18ee60e12",
+      "remoteCommit": "f43951624af944734c1952dc23b23919974848ba",
+      "zipPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-pro-linux-x64.zip",
+      "files": [
+        {
+          "name": "CShell-Pro-0.8.18-linux-amd64.deb",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-pro-linux-x64\\CShell-Pro-0.8.18-linux-amd64.deb",
+          "bytes": 107782220,
+          "sha256": "6e20ee944aebe432e79001ab240166bbdb831afc6b22e21ba95313c94b42c3da"
+        },
+        {
+          "name": "CShell-Pro-0.8.18-linux-x86_64.AppImage",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-pro-linux-x64\\CShell-Pro-0.8.18-linux-x86_64.AppImage",
+          "bytes": 139702015,
+          "sha256": "23b2d300c6c88f7b49e5042fbc75accfc0913969866da4ac23e14374195ba7c2"
+        }
+      ]
+    },
+    {
+      "id": 13080740905,
+      "name": "pro-cagent-linux-arm64",
+      "digest": "sha256:e7d147024a3987196c5e72cfd609fba32859be39094a9c76b206d9d262795b24",
+      "edition": "pro",
+      "run": 41298712191,
+      "source": "81f49bc2e5bb339cd580bd3e1faad5b18ee60e12",
+      "remoteCommit": "f43951624af944734c1952dc23b23919974848ba",
+      "zipPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-pro-cagent-linux-arm64.zip",
+      "files": [
+        {
+          "name": "CAgent-0.8.18-linux-arm64.tar.gz",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-pro-cagent-linux-arm64\\CAgent-0.8.18-linux-arm64.tar.gz",
+          "bytes": 44557425,
+          "sha256": "4be144ddc73b5118b26a91155b04007837766afbeb2e3970216c70f00c713bbf",
+          "embeddedCatalogVerified": true,
+          "editionImplementationVerified": true,
+          "abnormalExitCleanupGuardVerified": true
+        }
+      ]
+    },
+    {
+      "id": 13080224745,
+      "name": "pro-mac-x64",
+      "digest": "sha256:76bab523a02217b61be724f146d1edc12e89f0a5b20c232d104e051d1f2cb7f5",
+      "edition": "pro",
+      "run": 41298712191,
+      "source": "81f49bc2e5bb339cd580bd3e1faad5b18ee60e12",
+      "remoteCommit": "f43951624af944734c1952dc23b23919974848ba",
+      "zipPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-pro-mac-x64.zip",
+      "files": [
+        {
+          "name": "CShell-Pro-0.8.18-mac-x64.dmg",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-pro-mac-x64\\CShell-Pro-0.8.18-mac-x64.dmg",
+          "bytes": 146425677,
+          "sha256": "e8d6608b0fe8a5c54190a40d869529b9f35b82eddf4e2516737cff435a8308cf"
+        }
+      ]
+    },
+    {
+      "id": 13080088113,
+      "name": "pro-cagent-mac-arm64",
+      "digest": "sha256:b8e511845781aa5601c194351c0e7f3581e1c28b57ff0bc193bdcd8974d148da",
+      "edition": "pro",
+      "run": 41298712191,
+      "source": "81f49bc2e5bb339cd580bd3e1faad5b18ee60e12",
+      "remoteCommit": "f43951624af944734c1952dc23b23919974848ba",
+      "zipPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-pro-cagent-mac-arm64.zip",
+      "files": [
+        {
+          "name": "CAgent-0.8.18-mac-arm64.tar.gz",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-pro-cagent-mac-arm64\\CAgent-0.8.18-mac-arm64.tar.gz",
+          "bytes": 39550115,
+          "sha256": "a6252072a3fcd374a72258a79e8f9b747046237ad41137c941324b7c0fef11eb",
+          "embeddedCatalogVerified": true,
+          "editionImplementationVerified": true,
+          "abnormalExitCleanupGuardVerified": true
+        }
+      ]
+    },
+    {
+      "id": 13080074942,
+      "name": "pro-linux-arm64",
+      "digest": "sha256:58f751a045c65349cbd3c277fed68ecf65c865242e2139383e96bb7a9c55f1df",
+      "edition": "pro",
+      "run": 41298712191,
+      "source": "81f49bc2e5bb339cd580bd3e1faad5b18ee60e12",
+      "remoteCommit": "f43951624af944734c1952dc23b23919974848ba",
+      "zipPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-pro-linux-arm64.zip",
+      "files": [
+        {
+          "name": "CShell-Pro-0.8.18-linux-arm64.AppImage",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-pro-linux-arm64\\CShell-Pro-0.8.18-linux-arm64.AppImage",
+          "bytes": 140957195,
+          "sha256": "63c1b7bea154818b0f943088fc7394a02e0bceddba92ab13af9c05dda082a6ab"
+        },
+        {
+          "name": "CShell-Pro-0.8.18-linux-arm64.deb",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-pro-linux-arm64\\CShell-Pro-0.8.18-linux-arm64.deb",
+          "bytes": 103283472,
+          "sha256": "cdef77aee9f4fd568a03bf2f058a1235e198f5c97d2ed08c772049f6d807bb1f"
+        }
+      ]
+    },
+    {
+      "id": 13080043250,
+      "name": "pro-cagent-linux-x64",
+      "digest": "sha256:92577615ad8e2c976baf00ec3b5b68b6078a7c741cf9a9d2ce3a59fb609495ff",
+      "edition": "pro",
+      "run": 41298712191,
+      "source": "81f49bc2e5bb339cd580bd3e1faad5b18ee60e12",
+      "remoteCommit": "f43951624af944734c1952dc23b23919974848ba",
+      "zipPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-pro-cagent-linux-x64.zip",
+      "files": [
+        {
+          "name": "CAgent-0.8.18-linux-x64.tar.gz",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-pro-cagent-linux-x64\\CAgent-0.8.18-linux-x64.tar.gz",
+          "bytes": 44874727,
+          "sha256": "da8c1ebec05773d4a2ba8539dd7e01c80c1f965ed62d70df2685d63155585acc",
+          "embeddedCatalogVerified": true,
+          "editionImplementationVerified": true,
+          "abnormalExitCleanupGuardVerified": true
+        }
+      ]
+    },
+    {
+      "id": 13079649129,
+      "name": "pro-cagent-mac-x64",
+      "digest": "sha256:4d6ff085262d38b7bfb899a6a3241668568420dd047e5944905db17132ce0349",
+      "edition": "pro",
+      "run": 41298712191,
+      "source": "81f49bc2e5bb339cd580bd3e1faad5b18ee60e12",
+      "remoteCommit": "f43951624af944734c1952dc23b23919974848ba",
+      "zipPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-pro-cagent-mac-x64.zip",
+      "files": [
+        {
+          "name": "CAgent-0.8.18-mac-x64.tar.gz",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-pro-cagent-mac-x64\\CAgent-0.8.18-mac-x64.tar.gz",
+          "bytes": 40782700,
+          "sha256": "6bd29ebdad203a155cf3a3320220bb07f858006a6e225b4d65006cd345a0b3f7",
+          "embeddedCatalogVerified": true,
+          "editionImplementationVerified": true,
+          "abnormalExitCleanupGuardVerified": true
+        }
+      ]
+    },
+    {
+      "id": 13079544233,
+      "name": "pro-mac-arm64",
+      "digest": "sha256:f8409ed3c6ba775b256c1d412bba038f18cfd6c95c00dbb49c0acc3b618257a1",
+      "edition": "pro",
+      "run": 41298712191,
+      "source": "81f49bc2e5bb339cd580bd3e1faad5b18ee60e12",
+      "remoteCommit": "f43951624af944734c1952dc23b23919974848ba",
+      "zipPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-pro-mac-arm64.zip",
+      "files": [
+        {
+          "name": "CShell-Pro-0.8.18-mac-arm64.dmg",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-pro-mac-arm64\\CShell-Pro-0.8.18-mac-arm64.dmg",
+          "bytes": 142614600,
+          "sha256": "38affdf22e71a0b916862ad69307288bfd7fa82dc801cb6f41e282ab2c4087c2"
+        }
+      ]
+    },
+    {
+      "id": 13080363438,
+      "name": "desktop-mac-arm64",
+      "digest": "sha256:f1ea1bf5f08fef5be2542db33b3b0fb3ecfb21f1dcf5e36272785bc3c6c135e2",
+      "edition": "opensource",
+      "run": 41298958086,
+      "source": "400f43e96d4bb0a45acb899801414a52e344b0d7",
+      "remoteCommit": "bc0372012dae96566bd478c5e34aa149851ccaee",
+      "zipPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-desktop-mac-arm64.zip",
+      "files": [
+        {
+          "name": "CAgent-0.8.18-mac-arm64.tar.gz",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-desktop-mac-arm64\\CAgent-0.8.18-mac-arm64.tar.gz",
+          "bytes": 39500087,
+          "sha256": "78d8ea08c027517dc9b3ad693b40d55a87fa1899bed71014173fd90814b02db4",
+          "embeddedCatalogVerified": true,
+          "editionImplementationVerified": true,
+          "abnormalExitCleanupGuardVerified": true
+        },
+        {
+          "name": "CShell-0.8.18-mac-arm64.dmg",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-desktop-mac-arm64\\CShell-0.8.18-mac-arm64.dmg",
+          "bytes": 142333141,
+          "sha256": "f985f3c0cef1fb3b49b6ac157001b1d146a84f5859915801fdf857e33e874313"
+        },
+        {
+          "name": "CShell-0.8.18-mac-arm64.zip",
+          "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-desktop-mac-arm64\\CShell-0.8.18-mac-arm64.zip",
+          "bytes": 142174783,
+          "sha256": "b57cab98aa8ddae376e64bbe60a63850728d1bac72943e6ababaa5f2be8650d7"
+        }
+      ]
+    }
+  ],
+  "publicationBlockedBy": "Real WeChat incoming event acceptance is unresolved; private toolkit catalog may change. This receipt does not unblock final inventory or verified update channels.",
+  "verification": "12 GitHub artifact ZIP digests verified; 22 native-platform runtime files hashed. All 8 CAgent archives verified against both final 0.1.2 manifest digests, abnormal-exit cleanup guard, and correct edition cloud implementation. Native runner PTY/TLS and package smoke passed. Unsigned/not notarized; no claim of physical macOS/Linux device coverage.",
+  "workflowRuns": [
+    {
+      "id": 41298530074,
+      "scope": "Core linux x64/arm64 and mac x64",
+      "conclusion": "three target jobs passed; original mac arm64 fixture race failed"
+    },
+    {
+      "id": 41298958086,
+      "scope": "Core mac arm64",
+      "conclusion": "success with actual offline-attempt synchronization; production identical"
+    },
+    {
+      "id": 41298712191,
+      "scope": "Pro desktop four architectures and CAgent four architectures",
+      "conclusion": "success"
+    }
+  ]
+}

@@ -1,48 +1,90 @@
 {
   "version": "0.8.18",
   "status": "candidate-not-published",
-  "verifiedAt": "2026-11-01T17:19:23.9815683+08:00",
-  "note": "Rebuilt after cross-edition source audit: Core 99ff0e7 and Pro dc97880 production fixes. Both CShell packaged platform and desktop smoke passed; Core CAgent native PTY/TLS passed; unchanged Pro CAgent retains prior package evidence. Candidate only; physical Android and WeChat event acceptance still pending.",
+  "verifiedAt": "2026-11-01T10:50:38.370Z",
+  "note": "Final four Windows candidates. Both CShell installers extracted and embedded dist/agent/agent.cjs verified against both final 0.1.2 manifest URLs/SHA and lifecycle cleanup guard. Both CAgent fresh stages rebuilt explicitly, exact installers independently installed to isolated directories and same content checks passed. Both CShell platform/desktop smoke, both CAgent actual installed CMD/TLS, Pro account/native and app-host exit tests passed. User applications untouched; no publication.",
   "files": [
     {
       "edition": "opensource",
       "component": "CShell",
       "platform": "win32",
       "arch": "x64",
+      "source": "6350cec",
       "candidatePath": "release/0.8.18/CShell-0.8.18-win-x64.exe",
-      "bytes": 123698689,
-      "sha256": "8be70f11f3a129991006e4490b946f781eded5d3afda0de52f79564ac70d78aa",
-      "authenticode": "NotSigned"
+      "absolutePath": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\release\\0.8.18\\CShell-0.8.18-win-x64.exe",
+      "bytes": 123698873,
+      "sha256": "ab1da6d0505901e5258afa41abe6bbab209644c2730f11608d49e4c9cc8563bf",
+      "authenticode": "NotSigned",
+      "validation": [
+        "packaged platform smoke: native encryption, sandbox, SSH PTY, SFTP",
+        "packaged release desktop: groups, layout, settings, MCP, restart"
+      ],
+      "finalCatalogVerifiedInExactInstaller": true,
+      "abnormalExitGuardVerifiedInExactInstaller": true
     },
     {
       "edition": "opensource",
       "component": "CAgent",
       "platform": "win32",
       "arch": "x64",
+      "source": "6350cec",
       "candidatePath": "release/0.8.18/CAgent-Setup-0.8.18-win-x64.exe",
-      "bytes": 26181270,
-      "sha256": "eac2f6bc577b85fda9ddb9f5e36e9598e45f524789826db343216cad8e52850b",
-      "authenticode": "NotSigned"
+      "absolutePath": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\release\\0.8.18\\CAgent-Setup-0.8.18-win-x64.exe",
+      "bytes": 26186638,
+      "sha256": "94557f758374ec25b87f8ae7731274d325730fd77f559a20d6ac8b6bfcfeb34f",
+      "authenticode": "NotSigned",
+      "validation": [
+        "exact installer isolated /S /D install",
+        "installed runtime real CMD PTY, TLS, restricted authorization, stop"
+      ],
+      "finalCatalogVerifiedInExactInstaller": true,
+      "abnormalExitGuardVerifiedInExactInstaller": true
     },
     {
       "edition": "pro",
       "component": "CShell",
       "platform": "win32",
       "arch": "x64",
+      "source": "2075087",
       "candidatePath": "release/pro-0.8.18/CShell-Pro-0.8.18-win-x64.exe",
-      "bytes": 123907757,
-      "sha256": "6a8bdb323dabbf619cf9cdf65357b875194f5f3aa6c459ebc03728cb684ac993",
-      "authenticode": "NotSigned"
+      "absolutePath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\release\\pro-0.8.18\\CShell-Pro-0.8.18-win-x64.exe",
+      "bytes": 123908010,
+      "sha256": "ed8b532380708e3cbe4b902d12592606f25b4d2b77e4fb7e6e0c95162bb7cca1",
+      "authenticode": "NotSigned",
+      "validation": [
+        "packaged platform smoke: native encryption, sandbox, SSH PTY, SFTP",
+        "packaged release desktop: groups, layout, settings, MCP, restart"
+      ],
+      "finalCatalogVerifiedInExactInstaller": true,
+      "abnormalExitGuardVerifiedInExactInstaller": true
     },
     {
       "edition": "pro",
       "component": "CAgent",
       "platform": "win32",
       "arch": "x64",
-      "candidatePath": ".local/CAgent-Setup-0.8.18-win-x64-final.exe",
-      "bytes": 26231462,
-      "sha256": "e3663e4a6821aaa8f1a11edb88e91f4466dec9039dae3dff43c47f6307aff61d",
-      "authenticode": "NotSigned"
+      "source": "2075087",
+      "candidatePath": "release/0.8.18/CAgent-Setup-0.8.18-win-x64.exe",
+      "absolutePath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\release\\0.8.18\\CAgent-Setup-0.8.18-win-x64.exe",
+      "bytes": 26230409,
+      "sha256": "82eeadb6cf4a994a394dad6911d1c43e5a1dd77ec2395359d1a6aabe712c9910",
+      "authenticode": "NotSigned",
+      "validation": [
+        "exact installer isolated /S /D install",
+        "installed runtime real CMD PTY, TLS, restricted authorization, stop",
+        "packaged account API and encrypted appearance restart",
+        "native packaged model/automation/theme identity isolation"
+      ],
+      "finalCatalogVerifiedInExactInstaller": true,
+      "abnormalExitGuardVerifiedInExactInstaller": true
     }
-  ]
+  ],
+  "superseded": {
+    "commit": "513b292",
+    "reason": "Independent CAgent packages used a stale stage because current electron-builder configuration has no beforePack hook. Detected by exact manifest inspection; replaced through explicit fresh agent-build. CShell packages were independently confirmed current.",
+    "invalidCAgentSha256": [
+      "8adf4ae89370da37b3370aa32ba65e6c023189ba6d0717168fc3ce518db786fb",
+      "0b475c095449693bb962aaf93d813d3f7da6079a42fa9a72ac94416e1697a050"
+    ]
+  }
 }
