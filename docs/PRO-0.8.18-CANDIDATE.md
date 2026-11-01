@@ -1,17 +1,20 @@
 # 0.8.18 候选构建记录
 
-## 当前有效记录
+## 当前有效记录 · 最终 SSL 修复目录
 
-以下各轮构建保留为历史，不能直接从历史段落选取安装包。最终双版本源码复审修正了普通版终端代理继承、重复代理表单、CAgent 下载入口与渠道隔离，以及 Pro 官方 OpenCode 退出清理。受影响的旧包已作废，香港旧暂存目录也明确禁止发布。
+当前30件附件仅采用 `af309bb` 的 [最终库存](release-evidence/final-0.8.18-inventory.json)：26个重新构建的桌面/CAgent包、两个原样保留的已签名Android语义修复APK、两个重新生成的SHA256SUMS。以下历史摘要均不能直接用于发布或取包。
 
-- Windows 当前唯一取包清单：[最终 Windows 候选](release-evidence/final-windows-candidates.json)。Pro CShell 最新安装器为 123907757 字节，SHA-256 `6a8bdb323dabbf619cf9cdf65357b875194f5f3aa6c459ebc03728cb684ac993`；两版真实成品的 SSH、SFTP、布局、字体、分组、MCP 和重启验收通过。安装器未签名。
-- 跨平台重建：Core `41292173361`、Pro `41292194243` 已成功，8 个归档、18 个文件逐项摘要核验完成，见 [源码同步后的附件](release-evidence/final-source-sync-artifacts.json)。最终 28 个二进制与 2 个校验文件以 [30 件候选库存](release-evidence/final-0.8.18-inventory.json) 为准；候选库存不代表已公开发布。
-- 独立 Pro CAgent 未受本轮桌面修复影响。Android 后续另行修复无障碍语义树缓存，已重新构建并替换候选 APK，必须使用 [最新 Android 收据](release-evidence/final-android-candidates.json)，不能使用旧 APK 或混用两版包。
-- Android API29/35 仪器验收通过；物理手机仍待覆盖安装后完成输入验收。微信真实回调触发仍待验收。本机正式应用、官网和更新渠道尚未切换。
+- **Windows**：以 `e2c1966` 的 [四包收据](release-evidence/final-windows-candidates.json) 为准。两版CShell与独立CAgent均重新构建，精确安装器内的新微信目录两摘要及异常退出保护已核验；两CShell真实成品验收、两CAgent实际安装后的CMD/TLS、Pro账号/原生设置及退出验收通过。未签名，未覆盖用户安装。
+- **POSIX**：Core `41300796296` 四作业、Pro `41300827199` 八作业全部成功。12个GitHub归档摘要、22个附件SHA-256核验完成，八个CAgent归档内的最终目录和渠道实现已检查，见 [最终运行时收据](release-evidence/runtime-final-artifacts.json)。Core生产源码 `3202d56`，Pro生产源码 `c53e8f1`；其后纯文档/收据修改不要求重复构建。macOS未签名/未公证，原生CI不替代实体设备验收。
+- **Android**：本轮运行时目录变更不影响Android，继续使用 [最新Android收据](release-evidence/final-android-candidates.json) 的两个APK。API29/35及新旧WebView语义树断言已通过。物理手机17:25旧包的实际点击成功，但最新语义修复包待覆盖安装后再验，不能写成新包全部通过。
+- **微信**：真实手机B消息被原生监听捕获；诊断投递同事件完成一个任务；最终冻结包自动重投该事件返回204且无重复任务/模型调用；另有独立合成新事件的自动单任务验收。首次真实消息自动端到端成功尚不是本轮证据，4.2原生钩子也未实机。详见 [分段证据](release-evidence/wechat-final-native-lifecycle.json)。
+- **联想会员中继**：会员已幂等开通，实际联想设备仍signed-out，待登录后强制中继测试；不以局域网直连或其它隔离机器代替。
 
-源码差异与成品影响见 [最终源码核对](FINAL-SOURCE-SYNC-AUDIT-20261101.md)。
+仍未公开发布、修改线上渠道或升级实际安装。最终香港暂存、官网/docs/admin和发布源码/校验元数据一致核对后，由主任务统一决定发布；更新元数据门禁在香港收据核对前继续保留。
 
-2026-11-01。尚未发布；没有创建发行标签、替换线上更新清单或升级用户的实际安装。
+## 历史构建记录
+
+下文保留旧候选及失败过程，不代表当前附件状态。
 
 ## Windows Pro
 
