@@ -179,7 +179,12 @@ export class CagentCloud {
     this.timer = setInterval(() => void this.tick(), 15000);
     this.timer.unref();
   }
-  async call(method: string, input: unknown) {
+  private accountWrites:Promise<unknown>=Promise.resolve();
+  call(method:string,input:unknown):Promise<unknown>{
+    const next=this.accountWrites.catch(()=>{}).then(()=>this.performCall(method,input));
+    this.accountWrites=next;return next;
+  }
+  private async performCall(method: string, input: unknown) {
     if (method === 'account.status')
       return { ...(await this.sync.accountStatus()), transportError: this.transportError };
     if (method === 'account.login') {
@@ -240,7 +245,8 @@ export class CagentCloud {
       }
     }
     if (method === 'account.appearance') {
-      const change=z.object({theme:preferencesSchema.shape.theme.optional(),uiFont:preferencesSchema.shape.uiFont.optional(),uiFontSize:preferencesSchema.shape.uiFontSize.optional()}).strict().parse(input??{});
+      const parsed=z.object({theme:preferencesSchema.shape.theme.optional(),uiFont:preferencesSchema.shape.uiFont.optional(),uiFontSize:preferencesSchema.shape.uiFontSize.optional()}).strict().parse(input??{});
+      const change=Object.fromEntries(Object.entries(parsed).filter(([key])=>Object.hasOwn(input??{},key)));
       if(Object.keys(change).length){
         const wasPaused=this.paused;this.paused=true;
         try{

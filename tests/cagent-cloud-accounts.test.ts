@@ -44,7 +44,8 @@ test('CAgent keeps guest habits out of registration and restores isolated accoun
     const a=accounts.get('a@example.com'),key=unwrapRecoveryKey(a.keybox,'fixture-password',a.accountId);
     assert.deepEqual((decryptVault(a.envelope,key,a.accountId) as any).ai.habits,[]);
     await assistant.remember({text:'Account A preference'});
-    await cloud.call('account.logout',{});
+    await Promise.all([cloud.call('account.appearance',{theme:'dark'}),cloud.call('account.logout',{})]);
+    assert.notEqual((await cloud.call('account.appearance',{}) as any).theme,'dark','queued logout restores guest appearance without account mutation leaking');
     assert.equal(assistant.cloudExport().habits?.[0].text,'Guest preference');
     await cloud.call('account.register',{email:'b@example.com',password:'fixture-password',code:'123456'});
     assert.deepEqual(assistant.cloudExport().habits,[]);
@@ -78,5 +79,14 @@ test('CAgent appearance changes persist and synchronize without changing unrelat
  assert.equal((result as any).theme,'dark');assert.equal(synced,1);assert.deepEqual((cloud as any).cached.store.preferences,{...before,theme:'dark'});
  await assert.rejects(cloud.call('account.appearance',{mcp:{enabled:true}}));
  const saved=await vault.read('cloud-bundle',(await import('zod')).z.any());assert.equal(saved.store.preferences.theme,'dark');
+ }finally{await cloud.close();await assistant.close();await rm(directory,{recursive:true,force:true});}
+});
+
+test('concurrent CAgent appearance mutations serialize across slow encrypted persistence',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'cagent-appearance-race-'));const codec={encrypt:async(s:string)=>{await new Promise(r=>setTimeout(r,15));return s;},decrypt:async(s:string)=>s};
+ const vault=new ClientVault(directory,codec);const assistant=new CagentAssistant(vault,{shells:async()=>[],applications:async()=>[],execute:async()=>'',allowed:()=>false});const cloud=new CagentCloud(directory,codec,vault,assistant);
+ try{await assistant.load();await cloud.load();await Promise.all([cloud.call('account.appearance',{theme:'dark'}),cloud.call('account.appearance',{uiFontSize:18})]);
+ assert.deepEqual(await cloud.call('account.appearance',{}),{theme:'dark',uiFont:(cloud as any).cached.store.preferences.uiFont,uiFontSize:18});
+ const saved=await vault.read('cloud-bundle',(await import('zod')).z.any());assert.equal(saved.store.preferences.theme,'dark');assert.equal(saved.store.preferences.uiFontSize,18);
  }finally{await cloud.close();await assistant.close();await rm(directory,{recursive:true,force:true});}
 });
