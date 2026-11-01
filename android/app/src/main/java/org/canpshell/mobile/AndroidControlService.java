@@ -236,16 +236,34 @@ public final class AndroidControlService extends AccessibilityService {
     // focus, never an arbitrary editable field or a remembered node.
     {
       AccessibilityNodeInfo node=findFocus(AccessibilityNodeInfo.FOCUS_INPUT);
-      if(node!=null){if(node.isFocused())return node;node.recycle();}
+      if(node!=null){if(node.isFocused()&&node.isEditable())return node;node.recycle();}
       for(android.view.accessibility.AccessibilityWindowInfo window:getWindows()){
         try{
           if(window.getType()!=android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION||!window.isFocused())continue;
           AccessibilityNodeInfo root=window.getRoot();if(root==null)continue;
-          try{node=root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);if(node!=null){if(node.isFocused())return node;node.recycle();}}finally{root.recycle();}
+          try{node=root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);if(node!=null){if(node.isFocused()&&node.isEditable())return node;node.recycle();}node=focusedDescendant(root);if(node!=null)return node;}finally{root.recycle();}
         }finally{window.recycle();}
       }
     }
     return null;
+  }
+  // Embedded virtual editors may not implement findFocus, despite reporting
+  // actual input focus on their child. Require one visible focused editor in
+  // the currently focused application window; never choose an arbitrary field.
+  private AccessibilityNodeInfo focusedDescendant(AccessibilityNodeInfo root){
+    java.util.ArrayList<AccessibilityNodeInfo> matches=new java.util.ArrayList<>();
+    int[] remaining={300};collectFocused(root,0,remaining,matches);
+    if(matches.size()==1&&remaining[0]>0)return matches.get(0);
+    for(AccessibilityNodeInfo node:matches)node.recycle();return null;
+  }
+  private void collectFocused(AccessibilityNodeInfo node,int depth,int[] remaining,java.util.ArrayList<AccessibilityNodeInfo> matches){
+    if(depth>24){remaining[0]=0;return;}if(remaining[0]--<=0||matches.size()>1||!node.isVisibleToUser())return;
+    if(node.isFocused()&&node.isEditable())matches.add(AccessibilityNodeInfo.obtain(node));
+    if(node.isPassword())return;
+    for(int i=0;i<node.getChildCount()&&remaining[0]>0&&matches.size()<2;i++){
+      AccessibilityNodeInfo child=node.getChild(i);if(child==null)continue;
+      try{collectFocused(child,depth+1,remaining,matches);}finally{child.recycle();}
+    }
   }
   private void insert(String text){
     if(text.length()>4096)return;AccessibilityNodeInfo node=focused();if(node==null){lastEditState="text:no-input-focus";return;}

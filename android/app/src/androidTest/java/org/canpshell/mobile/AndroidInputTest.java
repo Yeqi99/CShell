@@ -169,6 +169,15 @@ final class AndroidInputTest implements AutoCloseable {
       awaitWebValue(semantic.get(),"document.getElementById('remoteEdit').value","\"CAgent42\"");
       for(int i=0;i<8;i++)pressBackspace(connection);
       awaitWebValue(semantic.get(),"document.getElementById('remoteEdit').value","\"\"");
+      // Multiple available editors without input focus are not permission to
+      // select the first one. A rejected request must leave both DOM values.
+      test.runOnMainSync(()->semantic.get().evaluateJavascript("document.activeElement.blur();document.body.innerHTML='<input id=first value=first><input id=second value=second>'",null));
+      awaitWebValue(semantic.get(),"document.activeElement.tagName","\"BODY\"");
+      long before=processedInputs();input(connection,new JSONObject().put("kind","text").put("text","MUST-NOT-TYPE"));
+      long unfocusedDeadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(3);
+      while(processedInputs()==before&&System.nanoTime()<unfocusedDeadline)Thread.sleep(25);
+      check(processedInputs()>before,"Unfocused edit request was not processed");
+      awaitWebValue(semantic.get(),"document.getElementById('first').value+'|'+document.getElementById('second').value","\"first|second\"");
     }finally{test.runOnMainSync(()->{android.webkit.WebView view=semantic.get();((ViewGroup)view.getParent()).removeView(view);view.destroy();});}
     return "PASS encrypted remote input → real Accessibility tap, editable text, scan-code letter, repeated/Unicode/selection backspace, held Shift across tap, fail-stop gesture outcomes, fresh input recovery and current semantic content; productEvents="+actualEvents+"\n";
   }
@@ -180,6 +189,11 @@ final class AndroidInputTest implements AutoCloseable {
       if(expected.equals(actual))return;Thread.sleep(50);
     }while(System.nanoTime()<end);
     throw new AssertionError("Remote WebView input mismatch: expected="+expected+", actual="+actual+", service="+AndroidControlService.editState()+", focus="+webFocusDiagnostics(view));
+  }
+  private long processedInputs()throws Exception {
+    java.lang.reflect.Field instance=AndroidControlService.class.getDeclaredField("instance");instance.setAccessible(true);
+    java.lang.reflect.Field processed=AndroidControlService.class.getDeclaredField("processed");processed.setAccessible(true);
+    return processed.getLong(instance.get(null));
   }
   private String webFocusDiagnostics(android.webkit.WebView view)throws Exception {
     AtomicReference<String> report=new AtomicReference<>("");
