@@ -28,3 +28,15 @@ test('unavailable exit prevents system changes and unsupported platforms reject 
  const p=new WindowsSystemProxy(dir,codec,async()=>{throw Error('unused')},async()=>{throw Error('exit unavailable')},'win32',async()=>{writes++;return JSON.stringify(previous)});
  try{await assert.rejects(p.set(true),/exit unavailable/);assert.equal(writes,0);assert.equal(p.status().enabled,false);}finally{await p.close();await rm(dir,{recursive:true,force:true});}
 });
+
+test('unsupported platform shutdown is inert even after a rejected enable request', async()=>{
+ let touched=0;
+ const unused=async()=>{touched++;throw Error('must not touch Windows state');};
+ const proxy=new WindowsSystemProxy('unused',{encryptPrivate:unused,decryptPrivate:unused},unused,unused,'linux',unused);
+ await proxy.recover();
+ await assert.rejects(proxy.set(true),/不支持/);
+ await proxy.close();
+ await proxy.close();
+ assert.equal(touched,0);
+ assert.deepEqual(proxy.status(),{supported:false,enabled:false,error:''});
+});
