@@ -248,9 +248,9 @@ public final class AndroidControlService extends AccessibilityService {
     return null;
   }
   private void insert(String text){
-    if(text.length()>4096)return;AccessibilityNodeInfo node=focused();if(node==null)return;
-    try{if(!node.isEditable()||node.isPassword())return;String old=node.isShowingHintText()||node.getText()==null?"":node.getText().toString();if(old.length()>1_000_000)return;
-      int start=node.getTextSelectionStart(),end=node.getTextSelectionEnd();if(start<0||end<0){start=old.length();end=start;}int lo=Math.min(start,end),hi=Math.max(start,end);if(hi>old.length())return;
+    if(text.length()>4096)return;AccessibilityNodeInfo node=focused();if(node==null){lastEditState="text:no-input-focus";return;}
+    try{if(!node.isEditable()||node.isPassword()){lastEditState="text:target-unavailable:editable="+node.isEditable()+",password="+node.isPassword()+",class="+node.getClassName();return;}String old=node.isShowingHintText()||node.getText()==null?"":node.getText().toString();if(old.length()>1_000_000)return;
+      int start=node.getTextSelectionStart(),end=node.getTextSelectionEnd();if(start<0||end<0){start=old.length();end=start;}int lo=Math.min(start,end),hi=Math.max(start,end);if(hi>old.length()){lastEditState="text:invalid-selection";return;}
       Bundle args=new Bundle();args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,old.substring(0,lo)+text+old.substring(hi));
       if(node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT,args))settleEdit(node,old.substring(0,lo)+text+old.substring(hi),lo+text.length());
       else lastEditState="text:rejected";
