@@ -1,3 +1,4 @@
+import {portableCapabilitiesSchema} from '../shared/portable-capabilities';
 import { z } from 'zod';
 import { join, relative, isAbsolute } from 'node:path';
 import { rm } from 'node:fs/promises';
@@ -95,6 +96,17 @@ export class CapabilityRuntime {
   private mutate<T>(action:()=>Promise<T>):Promise<T>{const operation=this.mutation.then(()=>{if(this.closing)throw new Error('Capability runtime closing');return action();});this.mutation=operation.catch(()=>{});return operation;}
   async load(){await this.manager.init();for(const item of this.manager.list())await this.manager.refresh(item.id);}
   list(){return this.manager.list();}
+  cloudExport(){return this.manager.list().map(item=>({id:item.id,version:item.version,manifestSha256:this.installedManifestDigests.get(item.id)!})).filter(item=>!!item.manifestSha256);}
+  async cloudImport(input:unknown){
+    const desired=portableCapabilitiesSchema.parse(input),pending:{id:string;reason:string}[]=[];
+    for(const item of desired){
+      const entry=this.entries.find(entry=>entry.id===item.id&&entry.version===item.version&&entry.manifestSha256===item.manifestSha256);
+      if(!entry){pending.push({id:item.id,reason:'此机器尚无匹配且已核验的能力包来源'});continue;}
+      try{await this.install({id:item.id,confirm:true});}catch{pending.push({id:item.id,reason:'能力包恢复未完成，可在应用市场重试'});}
+    }
+    return pending;
+  }
+
   catalog(){return this.entries.map(({bundle:_,url:__,manifestSha256:___,bundleSha256:____,bundleBytes:_____,manifestJson:______,maxBundleBytes:_______,...entry})=>{
     const installed=this.manager.list().find(item=>item.id===entry.id);return {...entry,installed:!!installed,status:installed?.status??'not-installed',reason:installed?.reason,grants:installed?.grants??[]};
   });}

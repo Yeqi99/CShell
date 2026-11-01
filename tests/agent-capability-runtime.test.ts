@@ -95,3 +95,12 @@ test('event discovery exposes only installed, configured and granted adapter sou
  const runtime=new CapabilityRuntime({directory,vault,applications:{} as AgentApplicationService,agentVersion:'0.6.11',extraPackages:[{entry,adapter:{eventSource:'extension.fixture',inspect:async()=>({installed:true,configured:true}),invoke:async()=>({})}}]});
  try{await runtime.load();assert.deepEqual(runtime.events(),[]);await runtime.install({id:entry.id,confirm:true});assert.deepEqual(runtime.events(),[]);await runtime.grant({id:entry.id,permissions:['events.read']});assert.deepEqual(runtime.events().map(x=>[x.source,x.type]),[['extension.fixture','message.received']]);await runtime.grant({id:entry.id,permissions:[]});assert.deepEqual(runtime.events(),[]);}finally{await runtime.dispose();await rm(directory,{recursive:true,force:true});}
 });
+
+test('cloud capability selection automatically verifies trusted package files without transferring grants',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'capability-cloud-'));const vault=new ClientVault(directory,{encrypt:async s=>s,decrypt:async s=>s});
+ const runtime=new CapabilityRuntime({directory,vault,applications:{} as AgentApplicationService,agentVersion:'0.8.18'});await runtime.load();
+ try{const entry=capabilityCatalog()[0];const desired=[{id:entry.id,version:entry.version,manifestSha256:entry.manifestSha256}];assert.deepEqual(await runtime.cloudImport(desired),[]);assert.deepEqual(runtime.cloudExport(),desired);assert.equal(runtime.list()[0].status,'authorization-required');assert.deepEqual(runtime.list()[0].grants,[]);assert.deepEqual(runtime.tools(),[]);
+ const rejected=await runtime.cloudImport([{...desired[0],manifestSha256:'0'.repeat(64)}]);assert.equal(rejected.length,1);assert.deepEqual(runtime.cloudExport(),desired);
+ await assert.rejects(runtime.cloudImport([{...desired[0],grants:['applications.install']}]));
+ }finally{await runtime.dispose();await rm(directory,{recursive:true,force:true});}
+});

@@ -270,7 +270,7 @@ class Service:
         return {'ok':True}
 
     def check_vault_schema(self, db, account, schema):
-        if schema not in (1, 2):
+        if schema not in (1, 2, 3):
             raise Failure(426, "请更新 CShell / CAgent 后再同步账号数据")
         row=db.execute("SELECT schema FROM vault_versions WHERE account=?",(account,)).fetchone()
         if row and schema < row[0]:
@@ -432,7 +432,7 @@ def handler(service):
                 elif self.command == 'POST' and self.path == '/v1/auth/code':
                     value = service.request_code(body.get('email'), ip)
                 elif self.command == 'POST' and self.path == '/v1/auth/register':
-                    value = service.register(body, ip, 2 if self.headers.get('X-CShell-Vault-Schema') == '2' and self.headers.get('X-CShell-Vault-Write-Schema') == '2' else 1)
+                    value = service.register(body, ip, min(int(self.headers.get('X-CShell-Vault-Schema', '1')), int(self.headers.get('X-CShell-Vault-Write-Schema', '1'))) if self.headers.get('X-CShell-Vault-Schema') in ('1','2','3') and self.headers.get('X-CShell-Vault-Write-Schema') in ('1','2','3') else 1)
                 elif self.command == 'POST' and self.path == '/v1/auth/login':
                     value = service.login(body.get('email'), body.get('code'), ip)
                 elif self.command == 'POST' and self.path == '/v1/auth/password-login':
@@ -482,9 +482,9 @@ def handler(service):
                     elif self.path == '/v1/auth/password' and self.command == 'POST':
                         value = service.set_password(account, body.get('password'))
                     elif self.path == '/v1/vault' and self.command == 'GET':
-                        value = service.read(account, 2 if self.headers.get('X-CShell-Vault-Schema') == '2' else 1)
+                        value = service.read(account, int(self.headers.get('X-CShell-Vault-Schema')) if self.headers.get('X-CShell-Vault-Schema') in ('1','2','3') else 1)
                     elif self.path == '/v1/vault' and self.command == 'POST':
-                        value = service.write(account, body, 2 if self.headers.get('X-CShell-Vault-Schema') == '2' and self.headers.get('X-CShell-Vault-Write-Schema') == '2' else 1)
+                        value = service.write(account, body, min(int(self.headers.get('X-CShell-Vault-Schema', '1')), int(self.headers.get('X-CShell-Vault-Write-Schema', '1'))) if self.headers.get('X-CShell-Vault-Schema') in ('1','2','3') and self.headers.get('X-CShell-Vault-Write-Schema') in ('1','2','3') else 1)
                     elif self.path == '/v1/auth/logout' and self.command == 'POST':
                         value = service.logout(token)
                     else:

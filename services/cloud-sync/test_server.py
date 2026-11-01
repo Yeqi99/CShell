@@ -23,6 +23,21 @@ class ServiceTest(unittest.TestCase):
         with self.assertRaises(Failure): self.service.write(account,body)
         self.assertEqual(self.service.read(account,2)['revision'],2)
 
+    def test_schema_three_blocks_schema_two_without_rewriting_existing_vault(self):
+        import base64, uuid
+        account=self.login('schema-three@example.com','schema-three-ip')['accountId']
+        body={'baseRevision':0,'mutationId':str(uuid.uuid4()),'envelope':{'format':1,'nonce':base64.b64encode(bytes(12)).decode(),'ciphertext':base64.b64encode(bytes(20)).decode()}}
+        self.service.write(account,body,2)
+        self.assertEqual(self.service.read(account,2)['revision'],1)
+        self.assertEqual(self.service.read(account,3)['revision'],1)
+        body['baseRevision']=1;body['mutationId']=str(uuid.uuid4())
+        self.service.write(account,body,3)
+        before=self.service.read(account,3)
+        with self.assertRaises(Failure): self.service.read(account,2)
+        body['baseRevision']=2;body['mutationId']=str(uuid.uuid4())
+        with self.assertRaises(Failure): self.service.write(account,body,2)
+        self.assertEqual(self.service.read(account,3),before)
+
     def test_public_usage_is_deduplicated_and_consent_reversible(self):
         import time
         first=self.login('usage@example.com','usage-ip')

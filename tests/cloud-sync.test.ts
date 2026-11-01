@@ -153,3 +153,10 @@ test('registration initializes encrypted cloud and password login restores on a 
  try{const first=new CloudSync(join(dir,'a'),codec,{export:async()=>snapshot,validate:()=>{},import:async()=>{}},'https://test.invalid/api',request);await first.register('fixture@example.com','123456','fixture-password');assert.equal(first.status().state,'ready');assert(!JSON.stringify(registration.envelope).includes('private-fixture-key'));
  const second=new CloudSync(join(dir,'b'),codec,{export:async()=>({}),validate:()=>{},import:async(v)=>{restored=v;}},'https://test.invalid/api',request);await second.login('fixture@example.com','fixture-password',true);assert.deepEqual(restored,snapshot);assert.equal(second.status().state,'ready');}finally{await rm(dir,{recursive:true,force:true});}
 });
+
+test('vault schema advances only when new portable fields are present',async()=>{
+ const {vaultWriteSchema}=await import('../src/core/cloud-sync');
+ assert.equal(vaultWriteSchema({}),1);assert.equal(vaultWriteSchema({store:{extensions:{enabled:{}}}}),2);
+ assert.equal(vaultWriteSchema({store:{extensions:{enabled:{},external:[]}}}),3);
+ assert.equal(vaultWriteSchema({identityNetwork:[]}),3);
+});

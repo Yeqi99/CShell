@@ -65,3 +65,17 @@ test('cloud export/import carries credentials but never transfers MCP grants or 
 });
 
 test('connection view and sidebar preferences survive cloud restore and local reload',async()=>{const root=await mkdtemp(join(tmpdir(),'view-sync-'));try{const a=new Store(join(root,'a'),codec),b=new Store(join(root,'b'),codec);await a.load();await b.load();await a.preferences({...a.snapshot().preferences,defaultConnectionView:'visual',defaultConnectionViewExplicit:true,sidebarFontSize:14,sidebarGroupSize:17});await b.cloudImport(await a.cloudExport());const reloaded=new Store(join(root,'b'),codec);await reloaded.load();assert.equal(reloaded.snapshot().preferences.defaultConnectionView,'visual');assert.equal(reloaded.snapshot().preferences.sidebarFontSize,14);assert.equal(reloaded.snapshot().preferences.sidebarGroupSize,17);}finally{await rm(root,{recursive:true,force:true});}});
+
+test('external snippets restore selection and commands, executable selections only match installed identity',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'cloud-external-'));try{
+ const a=new Store(join(root,'a'),codec),b=new Store(join(root,'b'),codec);await a.load();await b.load();
+ const snippet={manifest:{protocol:1 as const,id:'example.shortcuts',version:'1.0.0',name:'Shortcuts',description:'',publisher:'Fixture',provider:'snippets' as const,permissions:['terminal.input' as const],commands:[{label:'list',text:'ls -la'}]},enabled:true,source:'custom:'+'a'.repeat(64)};
+ await a.setPlugins([...a.plugins(),snippet]);await b.cloudImport(await a.cloudExport());assert.deepEqual(b.plugins().find(p=>p.manifest.id===snippet.manifest.id),snippet);
+ await b.load();assert.equal(b.plugins().find(p=>p.manifest.id===snippet.manifest.id)?.enabled,true);
+ const bad=await a.cloudExport();bad.extensions.external![0].manifest.name='tampered';const before=b.cloudCheckpoint();await assert.rejects(b.cloudImport(bad),/摘要/);assert.equal(b.cloudCheckpoint(),before);
+ const executable={...snippet,manifest:{...snippet.manifest,id:'example.native',provider:'process' as const,permissions:['remote.execute' as const],commands:[]}};
+ await a.setPlugins([...a.plugins(),executable]);await b.cloudImport(await a.cloudExport());assert(!b.plugins().some(p=>p.manifest.id==='example.native'),'missing executable is not fabricated as installed');
+ assert((await b.cloudExport()).extensions.external!.some(p=>p.manifest.id==='example.native'),'pending selection survives another sync');
+ await b.setPlugins([...b.plugins(),{...executable,enabled:false}]);await b.cloudImport(await a.cloudExport());assert.equal(b.plugins().find(p=>p.manifest.id==='example.native')?.enabled,true);
+ }finally{await rm(root,{recursive:true,force:true});}
+});
