@@ -199,7 +199,7 @@ const bridge: Bridge = {
   onAiConnection: (listener) => {
     const handler = (
       _event: Electron.IpcRendererEvent,
-      value: { sessionId: string; profile: import('../shared/contracts').Profile },
+      value: { sessionId: string; profile: import('../shared/contracts').Profile; managementOnly?:boolean },
     ) => listener(value);
     ipcRenderer.on('ai:connected', handler);
     return () => ipcRenderer.removeListener('ai:connected', handler);

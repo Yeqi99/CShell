@@ -155,7 +155,7 @@ export interface AiBridge {
   aiText(input: import('./ai-text').TextRequest): Promise<import('./ai-text').TextResult>;
   aiTextProviderSave(kind: 'translate' | 'compose', id: string | null): Promise<void>;
   onAiConnection(
-    listener: (value: { sessionId: string; profile: import('./contracts').Profile }) => void,
+    listener: (value: { sessionId: string; profile: import('./contracts').Profile; managementOnly?:boolean }) => void,
   ): () => void;
   onMinimalHover(listener: (hovered: boolean) => void): () => void;
   aiExtractConnection(

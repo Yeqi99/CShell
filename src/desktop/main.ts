@@ -645,7 +645,7 @@ else
             if(signal.aborted||!authorize())throw new Error('Agent connection cancelled');
             const sessionId = await connections!.connect('cshell.client',config,undefined,signal);
             if (signal.aborted || !authorize() || window.isDestroyed()) { await connections!.disconnect(sessionId); throw new Error('Agent connection cancelled'); }
-            window.webContents.send('ai:connected', { sessionId, profile }); return sessionId;
+            window.webContents.send('ai:connected', { sessionId, profile, managementOnly:config.managementOnly===true }); return sessionId;
           }
           const secret = await store.secret(profile.id);
           if (
