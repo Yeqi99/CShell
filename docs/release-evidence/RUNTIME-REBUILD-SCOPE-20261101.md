@@ -1,6 +1,10 @@
 # 微信受管服务退出修复：候选作废范围
 
-状态：等待私有工具诊断稳定；尚未启动新构建，禁止发布旧候选。
+状态：最终重建完成，尚未公开发布。仅使用 final-0.8.18-inventory.json 的最终 30 项；下文重建计划保留为历史。
+
+最终源码 Core 3202d56、Pro c53e8f1，含受管退出修复及 SSL 信任文件修复后的微信目录。Core 工作流 41300796296、Pro 工作流 41300827199 共 12 个原生作业通过；22 个 POSIX 附件收据见 runtime-final-artifacts.json。4 个 Windows 安装器及实际包内运行时验收见 final-windows-candidates.json（e2c1966）。两份 Android 签名 APK 保留已验证的语义修复构建。af309bb 汇总 28 个二进制及 2 个重新生成的校验文件。
+
+最终库存已更新；verified-0818 发布控制文件暂时仍保持门禁，待最终源码、香港附件及剩余实机验收核对。旧候选不得发布。
 
 Core `cd6ddfd`、Pro `d3be149` 修改 `src/agent/managed-wechat.ts`。依赖链为 `agent/cli.ts → runtime.ts → managed-wechat-capability.ts → managed-wechat.ts`。
 
