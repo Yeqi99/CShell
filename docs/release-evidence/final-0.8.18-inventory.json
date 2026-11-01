@@ -1,6 +1,6 @@
 {
   "version": "0.8.18",
-  "status": "candidate-not-published",
+  "status": "candidate-awaiting-android-refresh-do-not-publish",
   "verifiedAt": "2026-11-01T09:29:24.018Z",
   "files": [
     {
@@ -213,5 +213,6 @@
       "size": 1283,
       "sha256": "180e223df66460861ff7880057bb8248a8c7a91ced8ed78a8ef16eabfb4a1170"
     }
-  ]
+  ],
+  "pendingRevision": "Physical Android navigation succeeded, but semantic tree remained on previous page. Android UI freshness fix is in progress; replace both APK receipts and regenerate both checksum files before publication. The 26 desktop/runtime binaries are unaffected."
 }
