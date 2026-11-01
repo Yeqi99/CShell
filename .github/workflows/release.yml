@@ -114,6 +114,8 @@ jobs:
       - if: matrix.platform == 'win'
         run: pnpm exec tsx scripts/connection-lifecycle-smoke.ts
       - if: matrix.platform == 'win'
+        run: pnpm exec tsx scripts/terminal-focus-race-smoke.ts
+      - if: matrix.platform == 'win'
         run: pnpm exec tsx scripts/ai-work-smoke.ts
       - if: matrix.platform == 'win'
         run: pnpm exec tsx scripts/ai-exit-smoke.ts
