@@ -26,6 +26,7 @@ export interface CloudStatus {
   error?: string;
 }
 export interface CloudBridge extends importAccountBridge {
+  cloudLending(input:{action:'list'|'create'|'redeem'|'revoke';body?:Record<string,unknown>}):Promise<{devices?:{id:string;name:string}[];loans?:{id:string;owned:boolean;deviceIds:string[];email?:string;expiresAt:number;maxUses:number;revoked:boolean;uses:number}[];shareCode?:string;id?:string}>;
   cloudMemory():Promise<import('./account-memory').AccountHabit[]>;
   cloudRemember(input:{id?:string;text:string}):Promise<import('./account-memory').AccountHabit[]>;
   cloudForget(id:string):Promise<import('./account-memory').AccountHabit[]>;

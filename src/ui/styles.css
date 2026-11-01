@@ -6071,3 +6071,4 @@ input[type='radio']:focus-visible {
 .ping-all-menu{position:absolute;top:100%;right:0;z-index:40;display:grid;gap:10px;width:180px;padding:12px;background:var(--panel);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px #172a4120}
 .ping-all-menu label{display:grid;gap:8px}.ping-all-menu select{width:100%;min-width:0}
 .sidebar .ping-button{font-size:10px;padding:3px 5px;max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.connection-probe{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:16px 0}.connection-probe>button{display:inline-flex;align-items:center;gap:6px;font-size:12px;min-height:32px}.connection-probe>span{display:flex;align-items:flex-start;gap:6px;font-size:12px;max-width:100%}.connection-probe .notice{color:var(--muted)}.connection-probe .ok{color:#16835d}.connection-probe small{display:block;font-size:11px;color:var(--muted);margin-top:4px}

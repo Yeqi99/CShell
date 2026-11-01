@@ -307,8 +307,8 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
     await window.cshell.openCurrentView(sources, mode);
   };
   async function openMachineDevice(device:ClientDevice){
-    const existing=machines.find(m=>m.device.deviceId===device.deviceId);
-    const latest=await configLoader.load();const opened=existing?.target??await window.cshell.agentMachineOpen(device.deviceId);
+
+    const latest=await configLoader.load();const opened=await window.cshell.agentMachineOpen(device.deviceId);
     const target={...opened,name:latest.profiles.find(p=>p.id===device.deviceId)?.name??device.name};
     setMachines(v=>v.some(m=>m.target.id===target.id)?v:[...v,{device,target}]);setMachineId(target.id);setSurface('machine');
     await configLoader.load();
