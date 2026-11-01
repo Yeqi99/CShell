@@ -42,3 +42,18 @@
 - 原生窗口：实际Models菜单、AutomationRules页面可达；真实API创建暂停间隔规则、更新记忆与秒级间隔、删除、重新显示列表；未启用规则执行。
 - 从隔离加密云快照恢复dark/字号偏好并经account.appearance应用；前后connection.settings等值。关闭重启后identity.enc摘要不变。
 - 临时数据在测试结束清理，不接触真实账号/设备数据；没有发送微信消息、短信、电话或模型请求。此验收证明本机包/UI/API链路，不替代用户账号云端登录、真实事件交付或自动化任务效果。报告 test-results/cagent-native-runtime-capabilities.json。
+
+实际微信事件验收补充：正式.56包监听进入listening，限定filehelper及指定测试文字，等待600秒后未收到匹配事件（匹配0、任务0）。已正常停止服务并恢复隔离订阅配置，没有发送任何消息。此项仍未通过，不能以synthetic event测试代替。
+原生验收测试入口进一步限制：Main启动后端前要求显式系统临时目录直属的native-ui-acceptance-data-随机目录且非重解析点；未设变量/工作区伪装前缀均在运行时启动前拒绝。误调用不会连默认CAgent或执行shutdown。重复实际包验收及两种误调用测试通过。
+
+### 非 Windows CAgent 网页设置一致性（2026-11-01）
+- 网页端消费 `account.appearance` 的主题、字体和字号，首次加载及每 30 秒检查云偏好；仅偏好实际变化时应用，保留当前页面、聊天草稿和临时主题切换。不写监听、设备身份或访问权限。
+- 已有账号共享模型与自动化入口继续使用真实 API；缺少凭据的模型禁用，运行/待授权任务期间阻止模型切换，避免隐式中止任务。
+- 自动化规则可在原位编辑任务、目标记忆和秒级检查间隔；新建规则仍先保存为暂停，不扩大权限。
+- `scripts/cagent-web-capabilities-smoke.ts` 在真实 Edge 页面和隔离 mock API 下验证主题/字号/字体、模型选择与任务保护、目标记忆更新、秒级参数、聊天草稿与权限隔离。通过；TypeScript 检查通过。这是网页交互证据，不冒充 Linux/macOS 实机发布包验收。
+
+### RDP 多标签隔离补验（2026-11-01）
+- 修复每个 RDP 标签虽然有独立 UI instanceId、实际 native 宿主仍按保存连接 ID 复用的问题。打开 IPC 分别携带 profileId 和 sessionId；凭据仍只从保存的 profileId 后端读取，状态、位置、隐藏、重连与关闭均按 sessionId。
+- 更新 `rdp-saved-smoke.ts`：双击同一机器产生两个独立标签，可视化入口建立第三个；切换保留对应宿主，关闭/重连不关闭兄弟标签，安装指引及菜单覆盖时仅隐藏当前宿主。真实 Electron 隔离数据验收通过，保存密码仍加密、不回填明文。
+- `rdp-embedded-smoke.ts` 实际 Windows ActiveX 宿主测试通过：同 profile 两个 sessionId 的 PID 不同；关闭/重连一个不替换另一个；并保留取消构建、连接失败及输入上限检查。此测试目标为本机拒绝连接端口，不冒充两路远端桌面登录验收。
+- TypeScript、renderer/main 构建通过。
