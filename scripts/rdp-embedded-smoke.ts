@@ -17,6 +17,10 @@ try {
  await service.open(profile,'',Buffer.alloc(8));assert.throws(()=>service.send(profile.id,{op:'bounds',padding:'x'.repeat(131073)}),/超出限制/);
  const child=(service as any).sessions.get(profile.id).child;child.stdin.write('x'.repeat(131074)+'\n');const inputDeadline=Date.now()+10000;while(service.status(profile.id).state==='connecting'&&Date.now()<inputDeadline)await new Promise(r=>setTimeout(r,50));assert.equal(service.status(profile.id).state,'failed');assert.match(service.status(profile.id).message,/输入超出限制/);
  service.close(profile.id);
+ const a='00000000-0000-4000-8000-000000000002',b='00000000-0000-4000-8000-000000000003';
+ await Promise.all([service.open(profile,'',Buffer.alloc(8),a),service.open(profile,'',Buffer.alloc(8),b)]);
+ const sessions=(service as any).sessions;assert.notEqual(sessions.get(a).child.pid,sessions.get(b).child.pid);const other=sessions.get(b);service.close(a);assert.equal(sessions.get(b),other);assert.equal(sessions.has(a),false);await service.open(profile,'',Buffer.alloc(8),a);assert.equal(sessions.get(b),other);service.close(a);service.close(b);
+ console.log('PASS independent native hosts for same saved profile, closing/reconnecting one preserves sibling');
  console.log('PASS real ActiveX creation, concurrent open reuse, pending cancellation, close');
 } finally {service.dispose();await new Promise(r=>setTimeout(r,2000));await rm(directory,{recursive:true,force:true});}
 

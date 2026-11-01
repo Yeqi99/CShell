@@ -169,7 +169,7 @@ export function AgentDesktopView({
       }
       if (event.type === 'closed') {
         generation.current++;
-        setError(event.reason==='CAPTURE_ACCESS_DENIED'?'Windows 拒绝采集当前桌面。请检查远端是否锁屏，以及 Windows 远程桌面是否最小化或已断开，再重试。':event.reason==='CAPTURE_CLOSED'?'远端画面采集退出，请检查远端登录会话后重新连接（CAPTURE_CLOSED）':event.reason);
+        setError(event.reason==='CAPTURE_ACCESS_DENIED'?'当前没有可采集的用户桌面。请在目标机器登录或解锁原用户；若此前使用 RDP，可在恢复原会话后检查“转为独立远控”，无需长期保持 RDP 窗口可见。':event.reason==='CAPTURE_FAILED'?'远端桌面采集未成功。请检查目标用户是否已登录并解锁，以及远端 CAgent 与桌面组件是否已更新；可展开“转为独立远控”检查会话状态。':event.reason==='CAPTURE_CLOSED'?'远端画面采集退出，请检查远端登录会话后重新连接（CAPTURE_CLOSED）':event.reason);
         setActive(false);
         setReconnecting('');
         setBusy(false);
