@@ -22,3 +22,9 @@
 以 [最终验收矩阵](UNIFIED-FINAL-AUDIT-20261101.md) 为准，继续实际微信事件、新设备云恢复与CAgent出口、双机Windows剪贴板、Android系统授权后的验收。候选源码与跨平台构建只生成核验附件，不自动发布。
 
 完成验收后再发布递增标签、核验附件/香港下载源/更新通道、更新官网文档，并保留数据升级和打开本机对应应用。
+
+## Android 正式签名候选核验
+
+GitHub候选工作流41281283583成功，使用既有release密钥，没有创建新签名身份。下载的artifact压缩包SHA-256为2f601caf2ce0c6a3d47392e2b9f682eb11783a328e58420e3ab9792d9caf2e58，与GitHub记录一致；APK摘要4f7efbd66da73bad7af7d4c80d41a919435a59de4e7fb8a665291e1d30fce552，与附件清单一致。apksigner验证通过，证书SHA-256为34cc1c9a0eacafc512a0837c3d286081879822f047e5637a65cdbc5b525914c5。
+
+用户确认开启USB安装后，向已授权Android16手机重试此签名APK，仍立即返回INSTALL_FAILED_USER_RESTRICTED: Install canceled by user。系统没有显示安装页，手机上没有CShell包；不能标记实机验收通过。没有修改手机安全设置或绕过系统确认。
