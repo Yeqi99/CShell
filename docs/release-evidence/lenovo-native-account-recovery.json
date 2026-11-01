@@ -1,0 +1,23 @@
+{
+  "target": "saved Lenovo LAN CAgent",
+  "installedVersion": "0.8.17",
+  "diagnosis": "Old native window retained an obsolete app-host endpoint. Default launch restored the same single-instance window rather than creating a new host connection.",
+  "backendUpdateCheck": {"current":"0.8.17","available":false,"error":null},
+  "accountStatusBeforeLogin": "signed-out",
+  "dataContext": "Standard and packaged discovery paths resolved to matching endpoint and token digest; no split account directory established.",
+  "temporaryRecovery": {
+    "installedExecutableOnly": true,
+    "ordinaryWindowArguments": true,
+    "verificationOrFixtureMode": false,
+    "newNativeWindowCount": 1,
+    "sharedBackendPreserved": true,
+    "existingSessionsPreserved": true,
+    "oldTrayWindowRetained": true,
+    "accountButtonInvoked": true,
+    "realLoginFormVisible": true,
+    "credentialsReadOrEntered": false,
+    "installedOrUpgraded": false
+  },
+  "permanentFix": "3d75fb0",
+  "membershipRelayAcceptance": "awaiting user login on recovered account form"
+}
