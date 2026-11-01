@@ -96,3 +96,7 @@
 - 界面修正 CAPTURE_FAILED / ACCESS_DENIED 的操作说明，已断开会话优先显示真实状态，不再暗示需要长期保持 RDP 窗口可见。
 
 证据：`test-results/unified-ui/clipboard-physical.json`、`remote-windows-physical-session.json`、`remote-windows-candidate-diagnostics.json`、`remote-windows-cleanup.json`。最后 tsc 通过，桌面恢复/视图 13 测试通过。
+
+### 临时连接重连实包回归
+
+修复独立标签的 instanceId/visual 被带入严格 Profile IPC 导致临时 SSH 重连失败。工作区元数据与连接数据在组件边界分开，HTTP/RDP/CAgent 同样不携带标签字段。真实 SSH fixture + Electron 完整 lifecycle 验证通过：临时认证重连产生第二个有效会话、旧滚动历史保留、未重放输入、未保存临时密码；取消和切换工作区保留草稿，浅/深紧凑布局均通过。tsc 与 Pro renderer build 通过。
