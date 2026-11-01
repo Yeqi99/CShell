@@ -2,6 +2,7 @@ name: Release
 on:
   push:
     tags: ['v*']
+    branches: ['codex/candidate-core-0.8.18']
   workflow_dispatch:
     inputs:
       publish:
