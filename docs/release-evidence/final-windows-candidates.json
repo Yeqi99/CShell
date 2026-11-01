@@ -1,8 +1,8 @@
 {
   "version": "0.8.18",
   "status": "candidate-not-published",
-  "verifiedAt": "2026-11-01T10:44:48.175Z",
-  "note": "Rebuilt after final WeChat 0.1.2 catalog and lifecycle fixes: Core6350cec/Pro2075087. Four fresh installers; both CShell packaged platform/desktop smoke and both CAgent exact-installer PTY/TLS smoke passed. Pro native/account acceptance passed. No user installations changed. Physical Android semantic recheck and WeChat event delivery remain separate gates.",
+  "verifiedAt": "2026-11-01T10:50:38.370Z",
+  "note": "Final four Windows candidates. Both CShell installers extracted and embedded dist/agent/agent.cjs verified against both final 0.1.2 manifest URLs/SHA and lifecycle cleanup guard. Both CAgent fresh stages rebuilt explicitly, exact installers independently installed to isolated directories and same content checks passed. Both CShell platform/desktop smoke, both CAgent actual installed CMD/TLS, Pro account/native and app-host exit tests passed. User applications untouched; no publication.",
   "files": [
     {
       "edition": "opensource",
@@ -18,7 +18,9 @@
       "validation": [
         "packaged platform smoke: native encryption, sandbox, SSH PTY, SFTP",
         "packaged release desktop: groups, layout, settings, MCP, restart"
-      ]
+      ],
+      "finalCatalogVerifiedInExactInstaller": true,
+      "abnormalExitGuardVerifiedInExactInstaller": true
     },
     {
       "edition": "opensource",
@@ -28,13 +30,15 @@
       "source": "6350cec",
       "candidatePath": "release/0.8.18/CAgent-Setup-0.8.18-win-x64.exe",
       "absolutePath": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\release\\0.8.18\\CAgent-Setup-0.8.18-win-x64.exe",
-      "bytes": 26189508,
-      "sha256": "8adf4ae89370da37b3370aa32ba65e6c023189ba6d0717168fc3ce518db786fb",
+      "bytes": 26186638,
+      "sha256": "94557f758374ec25b87f8ae7731274d325730fd77f559a20d6ac8b6bfcfeb34f",
       "authenticode": "NotSigned",
       "validation": [
         "exact installer isolated /S /D install",
         "installed runtime real CMD PTY, TLS, restricted authorization, stop"
-      ]
+      ],
+      "finalCatalogVerifiedInExactInstaller": true,
+      "abnormalExitGuardVerifiedInExactInstaller": true
     },
     {
       "edition": "pro",
@@ -50,7 +54,9 @@
       "validation": [
         "packaged platform smoke: native encryption, sandbox, SSH PTY, SFTP",
         "packaged release desktop: groups, layout, settings, MCP, restart"
-      ]
+      ],
+      "finalCatalogVerifiedInExactInstaller": true,
+      "abnormalExitGuardVerifiedInExactInstaller": true
     },
     {
       "edition": "pro",
@@ -60,15 +66,25 @@
       "source": "2075087",
       "candidatePath": "release/0.8.18/CAgent-Setup-0.8.18-win-x64.exe",
       "absolutePath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\release\\0.8.18\\CAgent-Setup-0.8.18-win-x64.exe",
-      "bytes": 26236814,
-      "sha256": "0b475c095449693bb962aaf93d813d3f7da6079a42fa9a72ac94416e1697a050",
+      "bytes": 26230409,
+      "sha256": "82eeadb6cf4a994a394dad6911d1c43e5a1dd77ec2395359d1a6aabe712c9910",
       "authenticode": "NotSigned",
       "validation": [
         "exact installer isolated /S /D install",
         "installed runtime real CMD PTY, TLS, restricted authorization, stop",
         "packaged account API and encrypted appearance restart",
         "native packaged model/automation/theme identity isolation"
-      ]
+      ],
+      "finalCatalogVerifiedInExactInstaller": true,
+      "abnormalExitGuardVerifiedInExactInstaller": true
     }
-  ]
+  ],
+  "superseded": {
+    "commit": "513b292",
+    "reason": "Independent CAgent packages used a stale stage because current electron-builder configuration has no beforePack hook. Detected by exact manifest inspection; replaced through explicit fresh agent-build. CShell packages were independently confirmed current.",
+    "invalidCAgentSha256": [
+      "8adf4ae89370da37b3370aa32ba65e6c023189ba6d0717168fc3ce518db786fb",
+      "0b475c095449693bb962aaf93d813d3f7da6079a42fa9a72ac94416e1697a050"
+    ]
+  }
 }
