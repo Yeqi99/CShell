@@ -104,3 +104,15 @@ test('cloud capability selection automatically verifies trusted package files wi
  await assert.rejects(runtime.cloudImport([{...desired[0],grants:['applications.install']}]));
  }finally{await runtime.dispose();await rm(directory,{recursive:true,force:true});}
 });
+
+test('portable adapter configuration uses host allowlist and never imports unknown permission fields',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'capability-config-cloud-'));const vault=new ClientVault(directory,{encrypt:async s=>s,decrypt:async s=>s});
+ const original=capabilityCatalog()[0],base=parseCapabilityManifest(JSON.parse(original.bundle!).manifest,original.manifestSha256);
+ const entry=createBundledCapabilityEntry({...base,id:'cagent.configfixture',adapterId:'cagent.configfixture',name:'Config',permissions:[],tools:[]},{'NOTICE.txt':Buffer.from('fixture')});
+ let settings={compact:false};const validate=(input:unknown)=>{const value=input as any;if(!value||typeof value.compact!=='boolean'||Object.keys(value).some(k=>k!=='compact'))throw Error('Unsupported portable setting');return {compact:value.compact};};
+ const adapter={inspect:async()=>({installed:true,configured:true}),invoke:async()=>({}),portableConfiguration:{export:()=>settings,validate,import:async(input:unknown)=>{settings=validate(input);}}};
+ const runtime=new CapabilityRuntime({directory,vault,applications:{} as AgentApplicationService,agentVersion:'0.8.18',extraPackages:[{entry,adapter}]});await runtime.load();
+ try{const selection={id:entry.id,version:entry.version,manifestSha256:entry.manifestSha256,configuration:{compact:true}};assert.deepEqual(await runtime.cloudImport([selection]),[]);assert.equal(settings.compact,true);assert.deepEqual(runtime.cloudExport()[0].configuration,{compact:true});
+ const pending=await runtime.cloudImport([{...selection,configuration:{compact:false,allowExecute:true}}]);assert.equal(pending.length,1);assert.equal(settings.compact,true);assert.deepEqual(runtime.list()[0].grants,[]);
+ }finally{await runtime.dispose();await rm(directory,{recursive:true,force:true});}
+});
