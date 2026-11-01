@@ -35,3 +35,6 @@ CAgent 对不消费的顶层字段保留原值。桌面解析当前已知格式�
 
 ## OpenCode 真实账号验证（2026-11-01）
 使用已安装 Pro 的一个现有账号，只读解密至进程内存，在隔离目录用官方 OpenCode 1.19.4 发起最小回复请求；未修改用户配置或使用收费模型。目录读取成功，但 beam-free 的 Go / Zen 调用返回地区限制 403；iceman-contributor-free 返回 400；deepseek-v4.1-flash-free、flint-40b-free、glm-5.3-flash-free、mimo-v2.6-flash-free、nemotron-3.5-lightning-free 返回 429。因此尚未获得该账号当前网络下的成功回复，不能以目录可见代替模型调用通过。后续需要上游恢复额度或账号可用模型后再验收，不自动切到付费目录。
+
+
+CAgent 真实链路已验证：云 revision 92 的15个基座及插件/偏好/OpenCode数据等值恢复；修复基础URL端点追加后，原有GPT-6.1 Terra经美国SSH出口实际回复OK。测试未改变用户默认基座、账号状态或系统代理。本机7897代理对OpenAI仍存在TLS超时。

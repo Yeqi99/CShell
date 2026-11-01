@@ -191,7 +191,6 @@ export class CagentCloud {
       try {
         await this.pending;
         await this.hooks?.stop();
-    await this.official.dispose();
         const result = await this.sync.login(q.email, q.password, true);
         this.lastEnroll = 0;
         return result;
@@ -260,5 +259,6 @@ export class CagentCloud {
     if (this.timer) clearInterval(this.timer);
     await this.pending;
     await this.hooks?.stop();
+    await this.official.dispose();
   }
 }

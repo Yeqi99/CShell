@@ -201,3 +201,19 @@ test('cloud import invalidates transient catalog failures but preserves account 
     assert.equal(f.saved.length, 1);
   } finally { await f.close(); }
 });
+
+test('quota and request incompatibility immediately disable model choices until a successful retest', async () => {
+ for (const code of [400,401,429]) {
+  let status=code;
+  const f=await fixture(async(_url,init)=>!init?.method?Response.json({data:[{id:'beam-free'}]}):Response.json({error:'private-fixture-secret'},{status}));
+  try {
+   const provider=await f.extension.resolve('go/beam-free','test');
+   const input={body:JSON.stringify({model:'beam-free',messages:[],stream:false})};
+   await assert.rejects(provider.transport('',input),e=>{assert.match(String(e),new RegExp('HTTP '+code));assert.doesNotMatch(String(e),/private-fixture/);return true;});
+   const catalog=await f.extension.call('catalog',{reference:'go/beam-free',refresh:true});
+   assert.equal(catalog.current.available,false);
+   status=200;await provider.transport('',input);
+   assert.equal((await f.extension.call('catalog',{reference:'go/beam-free'})).current.available,true);
+  } finally {await f.close();}
+ }
+});

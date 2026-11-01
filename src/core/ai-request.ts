@@ -41,6 +41,9 @@ export async function requestAiReply(
     return await readAiResponse(response, onContent, activity);
   } catch (error) {
     if (combined.aborted) throw combined.reason;
+    const code=(error as {cause?:{code?:string};code?:string})?.cause?.code ?? (error as {code?:string})?.code;
+    if ((error instanceof TypeError && error.message==='fetch failed') || /^(?:ECONN|ENOTFOUND|EAI_AGAIN|ETIMEDOUT|UND_ERR_CONNECT)/.test(code ?? ''))
+      throw new Error('无法连接模型服务，请检查所选网络出口或系统代理。账号与密钥已保留；请求没有自动改用直连。');
     throw error;
   } finally {
     clearTimeout(idle);

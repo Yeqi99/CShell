@@ -58,6 +58,7 @@ test('CAgent keeps guest habits out of registration and restores isolated accoun
     remote.futureExtension={enabled:true,opaque:'preserve-me'};
     a.envelope=encryptVault(remote,key,a.accountId);a.revision++;
     await cloud.call('account.login',{email:'a@example.com',password:'fixture-password'});
+    assert.equal((cloud as any).official.closed,false,'login must keep the OpenCode runtime available');
     assert.equal(assistant.cloudExport().habits?.[0].text,'Account A preference');
     const updated=decryptVault(a.envelope,key,a.accountId) as any;
     assert.deepEqual(updated.opencode,remote.opencode);
