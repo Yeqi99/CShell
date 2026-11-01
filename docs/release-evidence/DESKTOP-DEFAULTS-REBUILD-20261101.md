@@ -21,4 +21,4 @@ The new shared AI factory is not retained by the Agent bundle; no Core AI/store 
 - Pro POSIX workflow: run `41313105393`, commit `ac129ac690fee37d0f748d59d478af6b6bbd4312`, tree `dbaa3197f647aa4e47400456ae344dd2f5f72763` equals local `910243d`.
 - Core POSIX workflow: run `41313107314`, commit `bb6e547e2ec765dfe203a416beb4c4aef05995c6`, tree `a3e65e974d8c0fed3eeaca68741c5928c5480ba7` equals local `d73ed54`.
 
-The POSIX workflows are still running at this record. Their outputs must not be treated as verified until artifact digests and package file hashes are checked. The prior 16 desktop hashes are superseded; the publication gate remains closed.
+Both POSIX workflows completed successfully on all eight jobs. All eight artifact ZIP digests and fourteen contained package SHA256/size values were verified locally; see `desktop-defaults-artifacts.json`. Together with the two Windows installers and twelve retained binaries, all thirty final files (including two regenerated checksum manifests) were rehashed. The prior sixteen desktop hashes are superseded. Publication still waits for the updated Hong Kong staging verification and Lenovo account relay acceptance.
