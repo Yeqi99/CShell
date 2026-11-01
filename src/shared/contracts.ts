@@ -395,6 +395,7 @@ export interface Bridge
   networkRemoteOpen?(input:{source:string;exit:string}):Promise<{port:number}>;
   networkStatus?(): Promise<import('./network-route').NetworkRouteStatus>;
   networkSystemStatus?():Promise<{supported:boolean;enabled:boolean;error:string}>;
+  identityNetwork(input:import('./identity-network').IdentityNetworkCommand):Promise<import('./identity-network').IdentityNetworkStatus>;
   networkSystemSet?(enabled:boolean):Promise<{supported:boolean;enabled:boolean;error:string}>;
   desktopLookGet?(id:string,legacy?:import('./desktop-look').DesktopLook):Promise<import('./desktop-look').DesktopLook|null>;
   desktopLookSave?(id:string,value:import('./desktop-look').DesktopLook|null):Promise<import('./desktop-look').DesktopLook|null>;

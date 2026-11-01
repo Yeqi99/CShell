@@ -1,9 +1,10 @@
-import { connect, type Socket } from 'node:net';
+import type {Duplex} from 'node:stream';
+import { connect } from 'node:net';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 type Channel = {
   owner: string;
-  socket: Socket;
+  socket: Duplex;
   data: Buffer;
   ended: boolean;
   error?: string;
@@ -15,7 +16,7 @@ type Channel = {
 export class AgentBrowserNetwork {
   private channels = new Map<string, Channel>();
   get activity(){return this.channels.size;}
-  constructor(private allowed: (owner: string) => boolean) {}
+  constructor(private allowed: (owner: string) => boolean,private route?: (host:string,port:number)=>Promise<Duplex>) {}
   private guard(owner: string) {
     if (!this.allowed(owner)) {
       for (const [id, c] of this.channels)
@@ -48,7 +49,7 @@ export class AgentBrowserNetwork {
       )
         throw Error('浏览器连接数已达上限');
       const id = randomUUID(),
-        socket = connect({ host: p.host, port: p.port }),
+        socket = this.route?await this.route(p.host,p.port):connect({ host: p.host, port: p.port }),
         c: Channel = {
           owner,
           socket,
@@ -82,13 +83,13 @@ export class AgentBrowserNetwork {
         c.ended = true;
         c.wait?.();
       });
-      socket.setTimeout(60000, () => {
+      if(socket instanceof (await import('node:net')).Socket)socket.setTimeout(60000, () => {
         c.error = '连接空闲超时';
         socket.destroy();
         this.channels.delete(id);
       });
       try {
-        await new Promise<void>((done, reject) => {
+        if(!this.route)await new Promise<void>((done, reject) => {
           const timer = setTimeout(() => {
             socket.destroy();
             reject(Error('服务器连接超时'));

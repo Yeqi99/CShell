@@ -1,3 +1,7 @@
+import {executeHttp} from '../core/http-transport';
+import {AgentNetworkProxy} from './network-proxy';
+import {modelTransport} from './model-request';
+import {connect as connectNetwork} from 'node:net';
 import {createLanRegistration} from './lan-registration';
 import {ManagedEnvironment,ManagedScripts} from './managed-classroom';
 import { machineSnapshot } from './machine-info';
@@ -117,6 +121,7 @@ export async function createAgentRuntime(
       ...(s.distribution ? { distribution: s.distribution } : {}),
     }));
   server = new ClientServer(vault, terminal, {
+    http:(request,signal)=>executeHttp(request,signal,networkProxy.configured?(host,port,abort)=>networkProxy.open(host,port,abort):undefined,65536),
     manage: (method, params, signal, owner) => dispatch(method, params, signal, false, owner),
     desktopStream: async (socket,owner) => {if(updateAdmissionClosed){socket.destroy();return;}await desktop.service.acceptAuthenticated(socket,owner);},
     shells,
@@ -188,7 +193,11 @@ export async function createAgentRuntime(
   const coding=new CodingService(vault,directory,owner=>owner==='local'||(server.managementAllowed(owner)&&server.status().peers.some(p=>p.fingerprint===owner&&p.shells.some(s=>server.status().allowedShells?.includes(s)))));
   await coding.load();
   const ide=new IdeService(vault,directory,owner=>owner==='local'||server.managementAllowed(owner));await ide.load();
-  const browserNetwork=new AgentBrowserNetwork(owner=>owner==='local'||server.browserAllowed(owner));
+  const networkProxy=new AgentNetworkProxy(owner=>owner==='local'||(server.managementAllowed(owner)&&server.browserAllowed(owner)),async(selected,owner,binding)=>{await vault.write('identity-network-selection',{selected,owner,binding});});
+  const proxySelection=await vault.read('identity-network-selection',z.object({selected:z.boolean(),owner:z.string().optional(),binding:z.string().uuid().optional()}));await networkProxy.load(proxySelection?.selected??false,proxySelection?.owner,proxySelection?.binding);
+  terminal.networkEnvironment=()=>networkProxy.configured?networkProxy.environment():{};
+  assistant.networkTransport=(input,init)=>networkProxy.configured?networkProxy.fetch(input,init):modelTransport(input,init);
+  const browserNetwork=new AgentBrowserNetwork(owner=>owner==='local'||server.browserAllowed(owner),(host,port)=>networkProxy.configured?networkProxy.open(host,port,AbortSignal.timeout(15000)):new Promise((resolve,reject)=>{const socket=connectNetwork({host,port});socket.once('error',reject);socket.once('connect',()=>{socket.removeListener('error',reject);resolve(socket);});}));
   const hosting = new HostingService(join(directory, 'hosting'));
   await hosting.load();
   let relay = new AgentRelayService({ vault, identity: await vault.identity() });
@@ -286,6 +295,7 @@ export async function createAgentRuntime(
       throw new Error('未知更新操作');
     }
     const admin=local || (owner!=='local' && server.managementAllowed(owner));
+    if(method.startsWith('network.proxy.')){if(!admin||(!local&&!server.browserAllowed(owner)))throw Error('网络代理未授权');return networkProxy.call(method,params,owner);}
     if(method==='machine.snapshot'){if(!admin)throw Error('未授权远程管理');z.object({}).strict().parse(params??{});return machineSnapshot(signal);}
     if (method === 'network.probe') {
       if (!local && (owner === 'local' || !server.browserAllowed(owner))) throw new Error('未授权网络访问');
@@ -643,7 +653,7 @@ export async function createAgentRuntime(
     const failures:unknown[]=[];
     // A failed optional service must not leave the authenticated control socket
     // or listener half alive when an update needs to restore the old runtime.
-    for(const stop of [()=>lanRegistration.close(),()=>visual.dispose(),()=>files.close(),()=>browserNetwork.close(),()=>coding.close(),()=>ide.close(),
+    for(const stop of [()=>lanRegistration.close(),()=>visual.dispose(),()=>files.close(),()=>networkProxy.dispose(),()=>browserNetwork.close(),()=>coding.close(),()=>ide.close(),
       ()=>managedScripts.close(),()=>automation.close(),()=>assistant.close(),()=>control?.close(),()=>mutation,()=>packages.dispose(),...managedWechat.map(pack=>()=>pack.shutdown()),()=>wechat?.shutdown(),()=>desktop.shutdown(),
       ()=>applications.dispose(),()=>wsl.dispose(),()=>hosting.dispose(),()=>reverseRelay.stop(),()=>relay.stop(),()=>server.stop(),
       ()=>terminal.dispose(),()=>vault.flush(),()=>options.onClose?.()])try{await stop();}catch(error){failures.push(error);}

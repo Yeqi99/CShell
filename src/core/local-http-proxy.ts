@@ -6,6 +6,8 @@ export async function localHttpProxy(tunnel:HttpTunnel){
  const sockets=new Set<Duplex>();const abort=new AbortController();
  const track=(s:Duplex)=>{sockets.add(s);s.once('close',()=>sockets.delete(s));s.on('error',()=>{});return s;};
  const server=createServer({maxHeaderSize:16384});
+ // Keep the response side open when a client finishes its request with FIN.
+ (server as typeof server & {httpAllowHalfOpen:boolean}).httpAllowHalfOpen=true;
  server.on('connection',socket=>{if(sockets.size>=128){socket.destroy();return;}track(socket);});
  server.on('connect',(req,client,head)=>{void(async()=>{try{
   const url=new URL('https://'+req.url);if(url.username||url.password||url.pathname!=='/'||url.search||url.hash)throw Error('Invalid CONNECT');
