@@ -34,8 +34,6 @@ import './linux-desktop.css';
 const apps = [
   { id: 'machine-info', label: '机器信息', icon: Monitor, color: 'blue' },
   { id: 'ide', label: '代码编辑器', icon: Terminal, color: 'blue' },
-  { id: 'codex', label: 'Codex', icon: Terminal, color: 'green' },
-  { id: 'claude', label: 'Claude Code', icon: Terminal, color: 'amber' },
   { id: 'browser', label: '浏览器', icon: Globe, color: 'blue' },
   { id: 'native', label: '应用', icon: Folder, color: 'slate' },
   { id: 'files', label: '文件', icon: Folder, color: 'amber' },

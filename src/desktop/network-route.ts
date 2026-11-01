@@ -30,11 +30,14 @@ export class ApplicationNetworkRoute {
   async status(): Promise<NetworkRouteStatus> {
     return { route: structuredClone(this.route), machines: await this.machine?.list() ?? [] };
   }
-  async save(input: unknown) {
+  cloudExport(){return structuredClone(this.route);}
+  cloudValidate(input:unknown){return networkRouteSchema.parse(input);}
+  async cloudImport(input:unknown){await this.save(input,false);}
+  async save(input: unknown, connect = true) {
     const next = networkRouteSchema.parse(input);
     const task = this.queue.catch(() => {}).then(async () => {
       if (this.closed) throw new Error('网络服务已关闭');
-      if (next.mode === 'machine') {
+      if (next.mode === 'machine' && connect) {
         if (!this.machine) throw new Error('当前版本不支持机器网络出口');
         await this.machine.proxy(next.id);
       }

@@ -29,6 +29,7 @@ const bundleSchema = z
     opencode: z.unknown().optional(),
     tavily: z.unknown().optional(),
     desktopLooks:z.unknown().optional(),
+    networkRoute:z.unknown().optional(),
     assets: z.record(assetName, z.string().max(11 * 1024 * 1024)).default({}),
   })
   .strict();
@@ -71,6 +72,7 @@ export async function registerCloudHandlers(
       format: 1,
       store: data,
       ai: ai.cloudExport(),
+      ...(network?{networkRoute:network.cloudExport()}:{}),
       opencode: await openCode.cloudExport(),
       ...(tavilyData===undefined?{}:{tavily:tavilyData}),
       ...(desktopLookData===undefined?{}:{desktopLooks:desktopLookData}),
@@ -85,6 +87,7 @@ export async function registerCloudHandlers(
     store.cloudValidate(data.store);
     if(data.desktopLooks!==undefined){if(!desktopLooks)throw Error('桌面外观同步未就绪');desktopLooks.cloudValidate(data.desktopLooks);}
     ai.cloudValidate(data.ai);
+    if(data.networkRoute!==undefined){if(!network)throw Error("网络设置同步未就绪");network.cloudValidate(data.networkRoute);}
     if(data.opencode!==undefined)openCode.cloudValidate(data.opencode);
     if(data.tavily!==undefined){if(!tavily)throw Error('Tavily 同步服务尚未就绪');tavily.cloudValidate(data.tavily);}
     client.cloudValidate(data.devices);
@@ -104,6 +107,7 @@ export async function registerCloudHandlers(
     for (const [name, encoded] of Object.entries(data.assets))
       await writeFile(join(directory, 'appearance', name), Buffer.from(encoded, 'base64'));
     const stages: CloudImportStage[] = [];
+    if(data.networkRoute!==undefined&&network)stages.push({read:()=>network.cloudExport(),value:network.cloudValidate(data.networkRoute),apply:value=>network.cloudImport(value),restore:value=>network.cloudImport(value)});
     if (data.desktopLooks !== undefined && desktopLooks) stages.push({
       read: () => desktopLooks.cloudExport(), value: desktopLooks.cloudValidate(data.desktopLooks),
       apply: value => desktopLooks.cloudImport(value), restore: value => desktopLooks.cloudImport(value, true),

@@ -50,6 +50,7 @@ export function WslPlugin({ onOpen }: { onOpen: (shell: LocalShell) => Promise<v
     <section className="wsl-plugin">
       <div className="local-env-heading">
         <h2>Linux 发行版</h2>
+      <a href="https://shell.canp.ai/docs/wsl-offline.html" target="_blank" rel="noreferrer">离线安装与国内下载源 ↗</a>
         <button
           className="icon"
           aria-label="刷新 WSL"
