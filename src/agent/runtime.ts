@@ -1,3 +1,5 @@
+import {executeHttp} from '../core/http-transport';
+import {AgentNetworkProxy} from './network-proxy';
 import {createLanRegistration} from './lan-registration';
 import {ManagedEnvironment,ManagedScripts} from './managed-classroom';
 import {AccountNetwork} from './account-network';
@@ -121,7 +123,7 @@ export async function createAgentRuntime(
     }));
   server = new ClientServer(vault, terminal, {
     delegation:async(credential,fingerprint,continuation=false)=>{try{return (await account.sync.accountRequest('/v1/devices/delegation/verify',{deviceId:(await vault.identity()).id,credential,fingerprint,continuation})).allowed===true;}catch{return false;}},
-    http:(request,signal)=>accountNetwork.http(request,signal),
+    http:(request,signal)=>networkProxy.configured?executeHttp(request,signal,(host,port,abort)=>networkProxy.open(host,port,abort),65536):accountNetwork.http(request,signal),
     manage: (method, params, signal, owner) => dispatch(method, params, signal, false, owner),
     desktopStream: async (socket,owner) => {if(updateAdmissionClosed){socket.destroy();return;}await desktop.service.acceptAuthenticated(socket,owner);},
     shells,
@@ -188,14 +190,15 @@ export async function createAgentRuntime(
     return terminal.execute(input,signal,output);
   },automation:async(action,input,owner)=>{if(action==='list')return {...automation.list(owner),sources:packages.events()};if(action==='create')return automation.create(input,owner);return automation.change({...z.record(z.string(),z.unknown()).parse(input),action},owner);},allowed:owner=>server.managementAllowed(owner),capabilityTools:()=>packages.tools(),capabilityInvoke:(input,signal,owner)=>packages.invoke(input,owner,signal)});
   await assistant.load();
-  const account=new CagentCloud(directory,codec,vault,assistant);
+  const account=new CagentCloud(directory,codec,vault,assistant);account.setCapabilities(packages);
   automation=new CagentAutomation(vault,assistant);await automation.load();
   await automation.emit('agent','started',crypto.randomUUID(),{startedAt:new Date().toISOString()});
   const coding=new CodingService(vault,directory,owner=>owner==='local'||(server.managementAllowed(owner)&&server.status().peers.some(p=>p.fingerprint===owner&&p.shells.some(s=>server.status().allowedShells?.includes(s)))));
   await coding.load();
   const ide=new IdeService(vault,directory,owner=>owner==='local'||server.managementAllowed(owner));await ide.load();
-  const accountNetwork=new AccountNetwork(account,new ClientVault(join(directory,'account-network'),codec));accountNetwork.setUpdateGuard(()=>updateAdmissionClosed);await accountNetwork.load();terminal.networkEnvironment=()=>accountNetwork.environment();assistant.networkTransport=accountNetwork.fetch;account.setNetworkTransport(accountNetwork.fetch);
-  const browserNetwork=new AgentBrowserNetwork(owner=>owner==='local'||server.browserAllowed(owner),(host,port)=>accountNetwork.open(host,port));
+  const networkProxy=new AgentNetworkProxy(owner=>owner==='local'||(server.managementAllowed(owner)&&server.browserAllowed(owner)),async(selected,owner,binding)=>{await vault.write('identity-network-selection',{selected,owner,binding});});const proxySelection=await vault.read('identity-network-selection',z.object({selected:z.boolean(),owner:z.string().optional(),binding:z.string().uuid().optional()}));await networkProxy.load(proxySelection?.selected??false,proxySelection?.owner,proxySelection?.binding);
+  const accountNetwork=new AccountNetwork(account,new ClientVault(join(directory,'account-network'),codec));accountNetwork.setUpdateGuard(()=>updateAdmissionClosed);await accountNetwork.load();terminal.networkEnvironment=()=>networkProxy.configured?networkProxy.environment():accountNetwork.environment();const appFetch:typeof fetch=(input,init)=>networkProxy.configured?networkProxy.fetch(input,init):accountNetwork.fetch(input,init);assistant.networkTransport=appFetch;account.setNetworkTransport(appFetch);
+  const browserNetwork=new AgentBrowserNetwork(owner=>owner==='local'||server.browserAllowed(owner),(host,port)=>networkProxy.configured?networkProxy.open(host,port,AbortSignal.timeout(15000)):accountNetwork.open(host,port));
   const hosting = new HostingService(join(directory, 'hosting'));
   await hosting.load();
   let relay = new AgentRelayService({ vault, identity: await vault.identity() });
@@ -248,7 +251,7 @@ export async function createAgentRuntime(
     relay:relay.status().activeConnections,reverseRelay:reverseRelay.status().activeConnections,
     // An external extension does not expose a provable idle contract yet.
     externalExtensions:wechat?1:0,
-    account:account.activity,accountNetwork:accountNetwork.activity,accountRelay:accountReverse.status().activeConnections,
+    account:account.activity,accountNetwork:accountNetwork.activity+networkProxy.activity,accountRelay:accountReverse.status().activeConnections,
     peers:server.status().peers.reduce((sum,peer)=>sum+peer.connected,0),
   });
   const safeUpdate=new SafeAgentUpdate({available:()=>updater.status(),activity:updateActivity,
@@ -297,6 +300,7 @@ export async function createAgentRuntime(
       throw new Error('未知更新操作');
     }
     const admin=local || (owner!=='local' && server.managementAllowed(owner));
+    if(method.startsWith('network.proxy.')){if(!admin||(!local&&!server.browserAllowed(owner)))throw Error('网络代理未授权');return networkProxy.call(method,params,owner);}
     if(method==='network.status')return accountNetwork.status();
     if(method==='network.configure')return accountNetwork.configure(params);
     if(method==='machine.snapshot'){if(!admin)throw Error('未授权远程管理');z.object({}).strict().parse(params??{});return machineSnapshot(signal);}
@@ -376,9 +380,9 @@ export async function createAgentRuntime(
         try{return await packages.invoke(params,owner,AbortSignal.any([signal,controller.signal]));}finally{clearInterval(guard);}
       }
       if(!admin)throw new Error('未授权管理能力包');
-      if(method==='packages.install')return packages.install(params,signal);
+      if(method==='packages.install'){const result=await packages.install(params,signal);await account.setCapabilitySelection(z.object({id:z.string()}).parse(params).id,true);return result;}
       if(method==='packages.grant')return packages.grant(params);
-      if(method==='packages.uninstall')return packages.uninstall(params);
+      if(method==='packages.uninstall'){const result=await packages.uninstall(params);await account.setCapabilitySelection(z.object({id:z.string()}).parse(params).id,false);return result;}
       if(method==='packages.refresh')return packages.refresh(params);
       throw new Error('未知能力包操作');
     }
@@ -649,7 +653,7 @@ export async function createAgentRuntime(
     const failures:unknown[]=[];
     // A failed optional service must not leave the authenticated control socket
     // or listener half alive when an update needs to restore the old runtime.
-    for(const stop of [()=>lanRegistration.close(),()=>visual.dispose(),()=>files.close(),()=>accountNetwork.close(),()=>account.close(),()=>accountReverse.stop(),()=>browserNetwork.close(),()=>coding.close(),()=>ide.close(),
+    for(const stop of [()=>lanRegistration.close(),()=>visual.dispose(),()=>files.close(),()=>networkProxy.dispose(),()=>accountNetwork.close(),()=>account.close(),()=>accountReverse.stop(),()=>browserNetwork.close(),()=>coding.close(),()=>ide.close(),
       ()=>managedScripts.close(),()=>automation.close(),()=>assistant.close(),()=>control?.close(),()=>mutation,()=>packages.dispose(),...managedWechat.map(pack=>()=>pack.shutdown()),()=>wechat?.shutdown(),()=>desktop.shutdown(),
       ()=>applications.dispose(),()=>wsl.dispose(),()=>hosting.dispose(),()=>reverseRelay.stop(),()=>relay.stop(),()=>server.stop(),
       ()=>terminal.dispose(),()=>vault.flush(),()=>options.onClose?.()])try{await stop();}catch(error){failures.push(error);}

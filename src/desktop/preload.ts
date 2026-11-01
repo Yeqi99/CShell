@@ -45,6 +45,7 @@ const bridge: Bridge = {
   connectionImportPreview: (token, options) => ipcRenderer.invoke('connections:import-preview', token, options),
   connectionImportApply: (token, rows, policy) => ipcRenderer.invoke('connections:import-apply', token, rows, policy),
   connectionImportDiscard: token => ipcRenderer.invoke('connections:import-discard', token),
+  identityNetwork: input => ipcRenderer.invoke('network:identity',input),
   networkRemoteSources: () => ipcRenderer.invoke('network:remote-sources'),
   networkRemoteOpen: input => ipcRenderer.invoke('network:remote-open',input),
   networkStatus: () => ipcRenderer.invoke('network:status'),
@@ -236,6 +237,7 @@ const bridge: Bridge = {
   pythonSaveFile: (id, path, code, revision) =>
     ipcRenderer.invoke('python:save', id, path, code, revision),
   plugins: () => ipcRenderer.invoke('plugins:list'),
+  pluginsRestorePending:()=>ipcRenderer.invoke('plugins:restore-pending'),
   pluginInstall: (id) => ipcRenderer.invoke('plugins:install', id),
   pluginToggle: (id, enabled) => ipcRenderer.invoke('plugins:toggle', id, enabled),
   pluginRemove: (id) => ipcRenderer.invoke('plugins:remove', id),
@@ -325,3 +327,4 @@ const bridge: Bridge = {
   },
 };
 contextBridge.exposeInMainWorld('cshell', bridge);
+

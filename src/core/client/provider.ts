@@ -379,6 +379,14 @@ export class ClientProvider implements ManagedProvider {
     const channel=await dial(await this.cloudDevice(device),await(this.identity??=this.vault.identity()),()=>{},signal);
     try{const auth=this.verifyAuth(await channel.request('auth',{name:hostname(),...await this.authFields(device)}),deviceId);if(!auth.capabilities.includes('http.send'))throw Error('出口机器未授权 HTTP');return httpResponseSchema.parse(await channel.request('http',request,request.timeoutMs+5000));}finally{channel.socket.destroy();}
   }
+  async networkProxyTransport(deviceId:string){
+    const device=this.devices.find(d=>d.deviceId===deviceId);if(!device)throw Error('Agent 身份不可用');
+    const channel=await dial(
+      await this.cloudDevice(device),await(this.identity??=this.vault.identity()),()=>{},new AbortController().signal);
+    try{const auth=this.verifyAuth(await channel.request('auth',{name:hostname(),...await this.authFields(device)}),deviceId);if(!auth.capabilities.includes('http.send')||!auth.capabilities.includes('agent.manage'))throw Error('未授权浏览器网络访问');}
+    catch(e){channel.socket.destroy();throw e;}
+    channel.pulse();return {call:async(method:string,params?:unknown)=>{if(!method.startsWith('network.proxy.'))throw Error('浏览器通道操作无效');if(channel.socket.destroyed)throw Error('浏览器通道已断开');return channel.request('manage',agentCallSchema.parse({method,params}),30000);},validate:()=>{if(channel.socket.destroyed)throw Error('浏览器通道已断开');},close:()=>channel.socket.destroy()};
+  }
   async browserTransport(deviceId:string){
     const device=this.devices.find(d=>d.deviceId===deviceId);if(!device)throw Error('Agent 身份不可用');
     const channel=await dial(

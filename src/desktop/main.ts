@@ -1,3 +1,4 @@
+import {IdentityNetwork} from './identity-network';
 import {remoteAppProxy,proxyShellCommand} from './remote-app-proxy';
 import { EmbeddedRdpService } from './embedded-rdp';
 import { MachineNetworkRoute } from './machine-network-route';
@@ -635,6 +636,7 @@ else
         browser:(id,action,input,signal,guard)=>machineBrowser.automation(connections.tools.describe(id).providerId==='cshell.client'?'agent-session:'+id:id,action,input,signal,guard),
         desktop:(id,action,input,signal,guard)=>agent.desktopTool(id,action,input,signal,guard),
       }));
+      let identityNetwork:IdentityNetwork|undefined;
       const disposeAi = await registerAiHandlers(
         handle,
         app.getPath('userData'),
@@ -673,7 +675,7 @@ else
         },
         http,
         wechat,
-        (ai, openCode, network, tavily) => registerCloudHandlers(handle, store, ai, clientProvider, http, () => {
+        (ai, openCode, network, tavily) => {return (async()=>{identityNetwork=new IdentityNetwork(app.getPath('userData'),store,clientProvider,network);await identityNetwork.load();await registerCloudHandlers(handle, store, ai, clientProvider, http, () => {
           if (!window.isDestroyed()) {
             window.webContents.send('cloud:changed');
             window.webContents.send('ai:providers-changed');
@@ -682,8 +684,8 @@ else
           profiles:accountProfiles,
           assertIdle:()=>{if(ssh.size||ftp.size||localTerminal.size||clientProvider.size||transfers.size||http.running||classroomTasks?.hasActiveWork)throw Error('请先关闭连接并等待传输及机房任务结束，再切换账号');},
           block:(value:boolean)=>{accountTransition=value;if(value){classroomTasks?.dispose();enrollment?.clear();}},
-        }:undefined, network, tavily, desktopLooks),
-        () => processExtensions.applicationTools(),
+        }:undefined, network, tavily, desktopLooks,identityNetwork);await identityNetwork.activate();ssh.networkShell=profile=>identityNetwork!.shell(profile.id);handle('network:identity',input=>identityNetwork!.call(input));window.once('closed',()=>void identityNetwork?.close());})();},
+        () => [...processExtensions.applicationTools(),...(identityNetwork?.tools()??[])],
         new MachineNetworkRoute(store, clientProvider),
       );
       registerPresetHandlers(handle, window, app.getPath('userData'), store, text);
@@ -713,7 +715,7 @@ else
         {
           manager: connections,
           http,
-          applicationTools: extensionServices.applicationTools,
+          applicationTools: [...extensionServices.applicationTools,...(identityNetwork?.tools()??[])],
           connectEnvironment: async (parent, conda, prefix, signal, ready) => {
             let child: string | undefined;
             try {

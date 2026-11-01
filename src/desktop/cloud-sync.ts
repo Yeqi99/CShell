@@ -1,3 +1,4 @@
+import {identityRulesSchema} from '../shared/identity-network';
 import { syncClientProfiles } from '../core/client/profiles';
 import { importCloudStages, type CloudImportStage } from '../core/cloud-import';
 import { app, net } from 'electron';
@@ -30,6 +31,7 @@ const bundleSchema = z
     tavily: z.unknown().optional(),
     desktopLooks:z.unknown().optional(),
     networkRoute:z.unknown().optional(),
+    identityNetwork:identityRulesSchema.optional(),
     assets: z.record(assetName, z.string().max(11 * 1024 * 1024)).default({}),
   })
   .strict();
@@ -47,6 +49,7 @@ export async function registerCloudHandlers(
   network?: import('./network-route').ApplicationNetworkRoute,
   tavily?: import('../extensions/tavily/service').TavilyExtension,
   desktopLooks?:import('../core/desktop-looks').DesktopLooks,
+  identityNetwork?:{cloudExport():unknown;cloudImport(input:unknown):Promise<void>;hasPortableState?():boolean;reconcileAfterCloud?():Promise<void>},
 ) {
   const directory = app.getPath('userData');
   const assertAccountIdle=()=>{profileOptions?.assertIdle();if(ai.snapshot().threads.some(t=>t.state==='running'||t.state==='approval'||t.goal?.state==='active'))throw Error('请先停止智能体任务，再切换账号');};
@@ -73,6 +76,7 @@ export async function registerCloudHandlers(
       store: data,
       ai: ai.cloudExport(),
       ...(network?{networkRoute:network.cloudExport()}:{}),
+      ...(identityNetwork&&(identityNetwork.hasPortableState?.()??true)?{identityNetwork:identityNetwork.cloudExport()}:{}),
       opencode: await openCode.cloudExport(),
       ...(tavilyData===undefined?{}:{tavily:tavilyData}),
       ...(desktopLookData===undefined?{}:{desktopLooks:desktopLookData}),
@@ -87,6 +91,7 @@ export async function registerCloudHandlers(
     store.cloudValidate(data.store);
     if(data.desktopLooks!==undefined){if(!desktopLooks)throw Error('桌面外观同步未就绪');desktopLooks.cloudValidate(data.desktopLooks);}
     ai.cloudValidate(data.ai);
+    if(data.identityNetwork!==undefined&&!identityNetwork)throw Error("身份网络同步未就绪");
     if(data.networkRoute!==undefined){if(!network)throw Error("网络设置同步未就绪");network.cloudValidate(data.networkRoute);}
     if(data.opencode!==undefined)openCode.cloudValidate(data.opencode);
     if(data.tavily!==undefined){if(!tavily)throw Error('Tavily 同步服务尚未就绪');tavily.cloudValidate(data.tavily);}
@@ -107,6 +112,7 @@ export async function registerCloudHandlers(
     for (const [name, encoded] of Object.entries(data.assets))
       await writeFile(join(directory, 'appearance', name), Buffer.from(encoded, 'base64'));
     const stages: CloudImportStage[] = [];
+    if(data.identityNetwork!==undefined&&identityNetwork)stages.push({read:()=>identityNetwork.cloudExport(),value:data.identityNetwork,apply:value=>identityNetwork.cloudImport(value),restore:value=>identityNetwork.cloudImport(value)});
     if(data.networkRoute!==undefined&&network)stages.push({read:()=>network.cloudExport(),value:network.cloudValidate(data.networkRoute),apply:value=>network.cloudImport(value),restore:value=>network.cloudImport(value)});
     if (data.desktopLooks !== undefined && desktopLooks) stages.push({
       read: () => desktopLooks.cloudExport(), value: desktopLooks.cloudValidate(data.desktopLooks),
@@ -125,7 +131,8 @@ export async function registerCloudHandlers(
     }
     // Connections and groups commit last, against the snapshot taken before any
     // asynchronous module import. A concurrent local save aborts without touching it.
-    await importCloudStages(stages, () => store.cloudImport(data.store, false, checkpoint));
+    try {await importCloudStages(stages, () => store.cloudImport(data.store, false, checkpoint));}
+    finally {await identityNetwork?.reconcileAfterCloud?.();}
   };
   const cloud = new CloudSync(directory, clientCodec, {
     ...(profileOptions?{

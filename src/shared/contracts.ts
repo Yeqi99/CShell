@@ -392,6 +392,7 @@ export interface Bridge
   connectionImportPreview?(token: string, options: { mapping?: Partial<Record<import('./connection-batch').ImportColumn, number>>; username?: string }): Promise<import('./connection-batch').ConnectionImportPreview>;
   connectionImportApply?(token: string, rows: number[], policy: 'skip' | 'keep'): Promise<{ imported: string[]; skipped: number }>;
   connectionImportDiscard?(token: string): Promise<void>;
+  identityNetwork(input:import('./identity-network').IdentityNetworkCommand):Promise<import('./identity-network').IdentityNetworkStatus>;
   networkRemoteSources?():Promise<{id:string;name:string}[]>;
   networkRemoteOpen?(input:{source:string;exit:string}):Promise<{port:number}>;
   networkStatus?(): Promise<import('./network-route').NetworkRouteStatus>;
@@ -481,4 +482,5 @@ declare global {
     cshell: Bridge;
   }
 }
+
 
