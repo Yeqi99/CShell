@@ -31,7 +31,7 @@ jobs:
       - run: node scripts/prepare-pty.mjs
       - run: pnpm exec tsc --noEmit
       - name: Verify account restoration and safe portable configuration
-        run: pnpm exec tsx --test --test-timeout=120000 --test-concurrency=2 tests/agent-cloud.test.ts tests/capability-runtime.test.ts tests/cloud-sync.test.ts
+        run: pnpm exec tsx --test --test-timeout=120000 --test-concurrency=2 tests/cagent-cloud-accounts.test.ts tests/agent-capability-runtime.test.ts tests/cloud-sync.test.ts
       - name: Build standalone Pro CAgent on its native architecture
         run: node scripts/agent-build.mjs
       - name: Reject a package without the Pro account implementation
@@ -40,6 +40,8 @@ jobs:
           node -e "const fs=require('node:fs');const p='release/'+require('./package.json').version+'/agent-'+process.platform+'-'+process.arch+'/agent.cjs';if(!fs.readFileSync(p,'utf8').includes('CagentCloud'))throw Error('Missing Pro account implementation');"
       - name: Verify real native PTY and TLS using the packaged runtime
         run: pnpm exec tsx scripts/agent-package-smoke.ts
+      - name: Verify packaged Pro account API and guest appearance restart
+        run: pnpm exec tsx scripts/pro-agent-package-smoke.ts
       - name: Package and verify archive contents
         run: node scripts/package-agent.mjs
       - uses: actions/upload-artifact@v4
