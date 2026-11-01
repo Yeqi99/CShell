@@ -148,8 +148,8 @@ export const apiClientSchema = z
     allowedLocalShells: z.array(localShellSchema).max(100).optional(),
     localFileRoots: apiLocalFileRoots,
     applicationCapabilities: z
-      .array(z.enum(['plugins.read', 'plugins.manage']))
-      .max(2)
+      .array(z.enum(['plugins.read', 'plugins.manage', 'connections.read', 'http.use']))
+      .max(4)
       .optional(),
     targetPolicies: apiTargetPoliciesSchema,
     capabilities: z.array(apiCapabilitySchema).max(32),
@@ -173,8 +173,8 @@ export const mcpSettingsSchema = z
     allowedLocalShells: z.array(localShellSchema).max(100).optional(),
     localFileRoots: apiLocalFileRoots,
     applicationCapabilities: z
-      .array(z.enum(['plugins.read', 'plugins.manage']))
-      .max(2)
+      .array(z.enum(['plugins.read', 'plugins.manage', 'connections.read', 'http.use']))
+      .max(4)
       .optional(),
     targetPolicies: apiTargetPoliciesSchema,
     clients: z
@@ -392,6 +392,7 @@ export interface Bridge
   connectionImportPreview?(token: string, options: { mapping?: Partial<Record<import('./connection-batch').ImportColumn, number>>; username?: string }): Promise<import('./connection-batch').ConnectionImportPreview>;
   connectionImportApply?(token: string, rows: number[], policy: 'skip' | 'keep'): Promise<{ imported: string[]; skipped: number }>;
   connectionImportDiscard?(token: string): Promise<void>;
+  identityNetwork(input:import('./identity-network').IdentityNetworkCommand):Promise<import('./identity-network').IdentityNetworkStatus>;
   networkRemoteSources?():Promise<{id:string;name:string}[]>;
   networkRemoteOpen?(input:{source:string;exit:string}):Promise<{port:number}>;
   networkStatus?(): Promise<import('./network-route').NetworkRouteStatus>;
@@ -481,4 +482,5 @@ declare global {
     cshell: Bridge;
   }
 }
+
 

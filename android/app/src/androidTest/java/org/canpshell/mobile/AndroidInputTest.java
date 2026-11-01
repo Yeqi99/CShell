@@ -18,6 +18,7 @@ final class AndroidInputTest implements AutoCloseable {
   private Button button;
   private EditText editor;
   private final AtomicInteger clicks=new AtomicInteger();
+  private final AtomicBoolean delayedNativeCaret=new AtomicBoolean();
   private final java.util.ArrayDeque<String> touchTrace=new java.util.ArrayDeque<>();
   private void trace(String event){synchronized(touchTrace){if(touchTrace.size()==48)touchTrace.removeFirst();touchTrace.addLast(android.os.SystemClock.uptimeMillis()+":"+event);}}
   private String inputDiagnostics(){synchronized(touchTrace){return AndroidControlService.editState()+", nativeTouches="+touchTrace;}}
@@ -33,6 +34,13 @@ final class AndroidInputTest implements AutoCloseable {
       Settings.Secure.putString(app.getContentResolver(),Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,previousServices==null||previousServices.isEmpty()?component:previousServices+":"+component);
       Settings.Secure.putInt(app.getContentResolver(),Settings.Secure.ACCESSIBILITY_ENABLED,1);
     }finally{automation.dropShellPermissionIdentity();}
+    // Android 10 shares one AccessibilityInteractionClient node cache inside
+    // this process. Retaining UiAutomation's separate accessibility connection
+    // while the actual service edits our native view cross-contaminates cached
+    // connection IDs and causes five-second refresh/action timeouts. The test
+    // driver no longer needs accessibility after granting the real service.
+    // All following taps/edits still travel through TLS and AndroidControlService.
+    test.getUiAutomation(UiAutomation.FLAG_DONT_USE_ACCESSIBILITY|UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES);
     test.runOnMainSync(()->{
       panel=new LinearLayout(app);panel.setOrientation(LinearLayout.VERTICAL);panel.setBackgroundColor(0xffffffff);
       button=new Button(app){
@@ -43,7 +51,14 @@ final class AndroidInputTest implements AutoCloseable {
           boolean handled=super.dispatchTouchEvent(event);trace("handled="+handled);return handled;
         }
       };button.setText("CAgent native input fixture");button.setOnClickListener(v->{trace("click="+clicks.incrementAndGet());});panel.addView(button,new LinearLayout.LayoutParams(-1,80));
-      editor=new EditText(app);editor.setSingleLine(true);editor.setHint("Native text fixture");panel.addView(editor,new LinearLayout.LayoutParams(-1,80));
+      editor=new EditText(app){@Override protected void onSelectionChanged(int start,int end){super.onSelectionChanged(start,end);trace("selection="+start+":"+end);}};editor.setSingleLine(true);editor.setHint("Native text fixture");panel.addView(editor,new LinearLayout.LayoutParams(-1,80));
+      editor.addTextChangedListener(new android.text.TextWatcher(){
+        public void beforeTextChanged(CharSequence s,int start,int count,int after){}
+        public void onTextChanged(CharSequence s,int start,int before,int count){}
+        public void afterTextChanged(android.text.Editable text){
+          if(delayedNativeCaret.getAndSet(false))editor.postDelayed(()->editor.setSelection(editor.length()),40);
+        }
+      });
       FrameLayout.LayoutParams placement=new FrameLayout.LayoutParams(-1,180);placement.topMargin=120;
       ((FrameLayout)app.findViewById(android.R.id.content)).addView(panel,placement);
     });
@@ -80,7 +95,14 @@ final class AndroidInputTest implements AutoCloseable {
     pressBackspace(connection);awaitText("CAgent input check\ud83d\ude00");
     pressBackspace(connection);awaitText("CAgent input check");
     test.runOnMainSync(()->editor.setSelection(7,12));
+    // Reproduce the native posted end-selection after ACTION_SET_TEXT. The next
+    // edit must use the confirmed middle caret, not append at the stale end.
+    delayedNativeCaret.set(true);
     pressBackspace(connection);awaitText("CAgent  check");
+    AtomicReference<String> middleCaret=new AtomicReference<>();
+    test.runOnMainSync(()->middleCaret.set(editor.getSelectionStart()+":"+editor.getSelectionEnd()));
+    check(middleCaret.get().equals("7:7")&&AndroidControlService.editState().startsWith("edit:applied"),
+      "Middle caret was not confirmed before next input: "+middleCaret.get()+", "+inputDiagnostics());
     input(connection,new JSONObject().put("kind","text").put("text","input"));
     awaitText("CAgent input check");
     // A pointer release is not a keyboard release: keep Shift until key-up.

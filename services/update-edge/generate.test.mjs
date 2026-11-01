@@ -4,3 +4,18 @@ function fixture(){return Object.fromEntries(['opensource','pro'].map(e=>{const 
 test('all thirty old assets retained byte-for-byte; new catalogs stay in correct channels',()=>{const m=mergeRelease(previous,fixture());for(const[p,a]of Object.entries(previous.files))assert.deepEqual(m.files[p],a);assert.equal(Object.keys(m.files).length,60);for(const e of ['opensource','pro'])for(const a of m.catalogs[`/downloads/${e}/releases.json`][0].assets)assert.ok(a.browser_download_url.includes(`/downloads/${e}/v0.8.17/`));assert.equal(previous.version,'0.8.16');});
 test('draft, incomplete, duplicate, foreign URL or missing digest never become deployable',()=>{for(const mutate of [r=>r.pro.draft=true,r=>r.pro.assets.pop(),r=>r.pro.assets[1]=r.pro.assets[0],r=>r.pro.assets[0].browser_download_url='https://evil.test/x',r=>r.pro.assets[0].digest=null]){const r=fixture();mutate(r);assert.throws(()=>mergeRelease(previous,r));}});
 
+test('next release preserves verified historical assets and selects the requested version',()=>{
+ const current=mergeRelease(previous,fixture());
+ const next=JSON.parse(JSON.stringify(fixture()).replaceAll('0.8.17','0.8.18'));
+ const result=mergeRelease(current,next,'0.8.18');
+ assert.equal(result.version,'0.8.18');
+ for(const [path,asset] of Object.entries(current.files))assert.deepEqual(result.files[path],asset);
+ for(const edition of ['opensource','pro']){
+  const catalog=result.catalogs[`/downloads/${edition}/releases.json`][0];
+  assert.equal(catalog.tag_name,'v0.8.18');
+  for(const asset of catalog.assets)assert.ok(asset.browser_download_url.startsWith(`https://shell.canp.ai/downloads/${edition}/v0.8.18/`));
+ }
+ for(const version of ['0.8.16','0.8.17','../0.8.18','0.8.18-beta'])assert.throws(()=>mergeRelease(current,next,version));
+ assert.throws(()=>mergeRelease({...current,files:{}},next,'0.8.18'));
+});
+

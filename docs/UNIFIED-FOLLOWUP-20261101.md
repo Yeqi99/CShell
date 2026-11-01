@@ -118,3 +118,11 @@
 - 关闭并重建上述模块后全部再次等值；本机 MCP 保持默认关闭且未导入令牌。未修改真实账号配置，临时目录和内存密钥已清理。本次为真实云数据和模块落盘/重载验收，不包含浏览器 Cookie、外观资产、系统代理状态或新设备交互登录流程；这些不由此结果代替。
 - Windows 隔离 CAgent AccountNetwork 使用生产账号规则和会员中继，连接香港隔离 CAgent ClientServer/AgentBrowserNetwork，经真实 TLS 获取只监听香港 127.0.0.1 的 HTTP 服务。随机验证标记一致、HTTP 200，证明请求在出口机器执行，而非来源机器直接访问。账号仅为临时验收账号，没有变更用户设备。
 - 生产后端拒绝 B→A 的循环出口；停止香港出口后请求失败，不回退来源机器网络。临时账号、设备、规则、远端进程/回环监听/目录及本地数据均已清理。记录在 `.local/public-egress-acceptance.log`；这证明应用级 HTTP/TCP 代理，不是任意 UDP 或不遵循代理应用的全机透明接管。
+
+## Portable extension selection and configuration (0.8.18)
+
+Cloud schema 3 carries external plugin selection plus its manifest digest, and CAgent capability package id/version/manifest digest. The destination validates the exact identity. Safe command snippets restore directly; already verified local custom packages recover their selection. CAgent packages matching the host-pinned catalog are downloaded and verified through the existing package installer. This does not copy execution grants or run system installers. Missing sources and failed downloads are shown as pending, not available.
+
+Host-owned capability adapters may implement `portableConfiguration` with `export`, `validate`, and `import`. `validate` must use an exact allowlist of non-sensitive settings; the cloud envelope limits values to bounded primitives/string arrays. An adapter without this contract cannot import arbitrary configuration. Tokens, passwords, local paths/ports, process identity, granted permissions, and WeChat send/receive scopes stay on the target machine. Command snippet content and bundled plugin configuration continue to use the existing explicit portable fields.
+
+A changed CAgent theme/font is written into shared account preferences. Account mutations are serialized; concurrent appearance edits preserve unrelated fields and switching accounts restores the correct workspace. New-format fields advance the server minimum only when actually written. Existing schema 1/2 vaults remain readable by their old clients until then; incompatible readers/writers receive an update-required response before touching the ciphertext.

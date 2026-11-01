@@ -1,3 +1,4 @@
+import {portableCapabilitiesSchema} from '../shared/portable-capabilities';
 import { OpenCodeExtension } from '../extensions/opencode/service';
 import { OfficialOpenCode } from '../extensions/opencode/official-runtime';
 import { modelTransport } from './model-request';
@@ -5,7 +6,7 @@ import { CloudSync } from '../core/cloud-sync';
 import { AccountWorkspaces } from '../core/account-workspaces';
 import { join } from 'node:path';
 import { emptySharedAi } from '../shared/shared-ai';
-import { defaults } from '../shared/contracts';
+import { defaults, preferencesSchema } from '../shared/contracts';
 import { sharedAiConfigSchema } from '../shared/shared-ai';
 import type { SecretCodec } from '../core/store';
 import type { ClientVault } from '../core/client/identity';
@@ -19,10 +20,30 @@ const bundle = z
     devices: z.unknown(),
     http: z.unknown(),
     assets: z.unknown(),
+
   })
   .passthrough();
 export class CagentCloud {
   readonly sync: CloudSync;
+  private capabilities?:{cloudExport():unknown;cloudImport(input:unknown):Promise<unknown>};
+  setCapabilities(value:NonNullable<CagentCloud['capabilities']>){this.capabilities=value;}
+  private capabilityRestore:unknown=[];
+  setCapabilitySelection(id:string,installed:boolean):Promise<unknown>{
+    const next=this.accountWrites.catch(()=>{}).then(async()=>{
+      const wasPaused=this.paused;this.paused=true;
+      try { await this.pending;
+      const previous=portableCapabilitiesSchema.parse(this.cached.store?.capabilityPackages??[]);
+      const current=this.capabilities?portableCapabilitiesSchema.parse(this.capabilities.cloudExport()).find(p=>p.id===id):undefined;
+      if(installed&&!current)throw Error('能力包尚未核验安装');
+      const selected=[...previous.filter(p=>p.id!==id),...(installed&&current?[current]:[])];
+      const value={...this.cached,store:{...this.cached.store,capabilityPackages:selected}};
+      await this.vault.write('cloud-bundle',value);this.cached=value;
+      if(Array.isArray(this.capabilityRestore))this.capabilityRestore=this.capabilityRestore.filter(p=>p.id!==id);
+      }finally{this.paused=wasPaused;}
+    });this.accountWrites=next;return next;
+  }
+
+
   private networkTransport:typeof fetch=modelTransport;
   setNetworkTransport(transport:typeof fetch){this.networkTransport=transport;}
   private official:OfficialOpenCode;
@@ -138,17 +159,24 @@ export class CagentCloud {
       empty:()=>({bundle:this.emptyBundle(),assistant:assistant.emptyWorkspace()}),
       validate:(value)=>{const v=z.object({bundle,assistant:z.unknown()}).strict().parse(value);return {bundle:v.bundle,assistant:assistant.validateWorkspace(v.assistant)};},
       assertIdle:()=>assistant.assertAccountIdle(),
-      restore:async(value)=>{await assistant.restoreWorkspace(value.assistant);await vault.write('cloud-bundle',value.bundle);this.cached=structuredClone(value.bundle);},
+      restore:async(value)=>{await assistant.restoreWorkspace(value.assistant);await vault.write('cloud-bundle',value.bundle);this.cached=structuredClone(value.bundle);this.capabilityRestore=[];if(this.capabilities&&this.cached.store?.capabilityPackages)this.capabilityRestore=await this.capabilities.cloudImport(this.cached.store.capabilityPackages);},
     });
     this.sync = new CloudSync(directory, codec, {
       registrationSnapshot:async()=>this.emptyBundle(),
       accountChanged:async(id)=>{const previous=this.workspaces.current();await this.workspaces.switchTo(id??'guest');return async()=>this.workspaces.switchTo(previous);},
-      export: async () => ({ ...this.cached, ai: this.assistant.cloudExport() }),
+      export: async () => {
+        const desired=portableCapabilitiesSchema.parse(this.cached.store?.capabilityPackages??[]);
+        const local=this.capabilities?portableCapabilitiesSchema.parse(this.capabilities.cloudExport()):[];
+        const selected=desired.map(item=>local.find(current=>current.id===item.id&&current.version===item.version&&current.manifestSha256===item.manifestSha256&&item.configuration!==undefined)||item);
+        return {...this.cached,store:{...this.cached.store,...(this.cached.store?.capabilityPackages!==undefined?{capabilityPackages:selected}:{})},ai:this.assistant.cloudExport()};
+      },
       validate: (v) => {
         bundle.parse(v);
       },
       import: async (v) => {
         const next = bundle.parse(v);
+        this.capabilityRestore=[];
+        if((next.store as any)?.capabilityPackages&&this.capabilities)this.capabilityRestore=await this.capabilities.cloudImport((next.store as any).capabilityPackages);
         await assistant.cloudImport(next.ai);
         await vault.write('cloud-bundle', next);
         this.cached = next;
@@ -179,9 +207,14 @@ export class CagentCloud {
     this.timer = setInterval(() => void this.tick(), 15000);
     this.timer.unref();
   }
-  async call(method: string, input: unknown) {
+  private accountWrites:Promise<unknown>=Promise.resolve();
+  call(method:string,input:unknown):Promise<unknown>{
+    const next=this.accountWrites.catch(()=>{}).then(()=>this.performCall(method,input));
+    this.accountWrites=next;return next;
+  }
+  private async performCall(method: string, input: unknown) {
     if (method === 'account.status')
-      return { ...(await this.sync.accountStatus()), transportError: this.transportError };
+      return { ...(await this.sync.accountStatus()), transportError: this.transportError,capabilityRestore:this.capabilityRestore };
     if (method === 'account.login') {
       const q = z
         .object({ email: z.email(), password: z.string().min(8).max(128) })
@@ -239,7 +272,24 @@ export class CagentCloud {
         this.paused = false;
       }
     }
-    if (method === 'account.appearance') { const p=this.cached?.store?.preferences??defaults; return {theme:p.theme,uiFont:p.uiFont,uiFontSize:p.uiFontSize??14}; }
+    if (method === 'account.appearance') {
+      const parsed=z.object({theme:preferencesSchema.shape.theme.optional(),uiFont:preferencesSchema.shape.uiFont.optional(),uiFontSize:preferencesSchema.shape.uiFontSize.optional()}).strict().parse(input??{});
+      const change=Object.fromEntries(Object.entries(parsed).filter(([key])=>Object.hasOwn(input??{},key)));
+      if(Object.keys(change).length){
+        const wasPaused=this.paused;this.paused=true;
+        try{
+          await this.pending;
+          const next=structuredClone(this.cached);
+          next.store.preferences={...(next.store.preferences??defaults),...change};
+          await this.vault.write('cloud-bundle',next);
+          this.cached=next;
+        }finally{this.paused=wasPaused;}
+        // Guest appearance stays local. Signed-in changes use normal revision conflict handling.
+        if(this.sync.status().unlocked)await this.sync.autoSync();
+      }
+      const p=this.cached?.store?.preferences??defaults;
+      return {theme:p.theme,uiFont:p.uiFont,uiFontSize:p.uiFontSize??14};
+    }
     if (method === 'account.models')
       return this.assistant
         .cloudExport()

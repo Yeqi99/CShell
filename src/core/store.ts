@@ -1,3 +1,5 @@
+import {portableCapabilitiesSchema} from '../shared/portable-capabilities';
+import { portablePluginsSchema, portablePlugin, restorePortablePlugins } from './portable-plugins';
 import { defaultMcpPort } from '../shared/mcp-endpoint';
 import { CloudImportConflict, undoImportedFields } from './cloud-import';
 import {
@@ -29,12 +31,14 @@ import {
   type Preferences,
 } from '../shared/contracts';
 
-const portableExtensionsSchema=z.object({commandSuggestions:z.boolean(),dockerSocket:toolsSettingsSchema.shape.dockerSocket,commands:z.record(z.string().max(100),pluginManifestSchema.shape.commands),enabled:z.record(z.string().max(100),z.boolean()).optional()}).strict();
+const portableExtensionsSchema=z.object({commandSuggestions:z.boolean(),dockerSocket:toolsSettingsSchema.shape.dockerSocket,commands:z.record(z.string().max(100),pluginManifestSchema.shape.commands),enabled:z.record(z.string().max(100),z.boolean()).optional(),external:portablePluginsSchema.optional()}).strict();
 const schema = z.object({
   version: z.literal(1),
+  capabilityPackages:portableCapabilitiesSchema.optional(),
   monitorViews: z.array(monitorViewSchema).max(100).default([]),
   tools: toolsSettingsSchema.default(toolsDefaults),
   plugins: z.array(installedPluginSchema).max(100).optional(),
+  portablePlugins: portablePluginsSchema.optional(),
   pluginSource: z
     .object({ url: z.url().startsWith('https://'), entries: catalogSchema.shape.plugins })
     .nullable()
@@ -67,14 +71,16 @@ export class Store {
     for (const profile of snapshot.profiles) {
       if (snapshot.secrets[profile.id]) secrets[profile.id] = JSON.parse(await this.codec.decrypt(snapshot.secrets[profile.id]));
     }
-    return { profiles: snapshot.profiles, groups: snapshot.groups, preferences: snapshot.preferences,
-      presets: snapshot.presets, monitorViews: snapshot.monitorViews, hosts: snapshot.hosts, secrets, extensions:{commandSuggestions:snapshot.tools.commandSuggestions,dockerSocket:snapshot.tools.dockerSocket,commands:Object.fromEntries(this.plugins().map(p=>[p.manifest.id,p.manifest.commands])),enabled:Object.fromEntries(this.plugins().filter(p=>p.source==='bundled').map(p=>[p.manifest.id,p.enabled]))} };
+    return { ...(snapshot.capabilityPackages?{capabilityPackages:snapshot.capabilityPackages}:{}),profiles: snapshot.profiles, groups: snapshot.groups, preferences: snapshot.preferences,
+      presets: snapshot.presets, monitorViews: snapshot.monitorViews, hosts: snapshot.hosts, secrets, extensions:{commandSuggestions:snapshot.tools.commandSuggestions,dockerSocket:snapshot.tools.dockerSocket,commands:Object.fromEntries(this.plugins().map(p=>[p.manifest.id,p.manifest.commands])),enabled:Object.fromEntries(this.plugins().filter(p=>p.source==='bundled').map(p=>[p.manifest.id,p.enabled])),...((snapshot.portablePlugins?.length||this.plugins().some(p=>p.source!=='bundled'))?{external:[...(snapshot.portablePlugins??[]).filter(p=>!this.plugins().some(local=>local.manifest.id===p.manifest.id)),...this.plugins().filter(p=>p.source!=='bundled').map(portablePlugin)]}:{})} };
   }
   cloudValidate(value: unknown) {
     const result = schema.pick({profiles:true, groups:true, preferences:true, presets:true, monitorViews:true, hosts:true}).extend({
       extensions:portableExtensionsSchema.optional(),
+      capabilityPackages:portableCapabilitiesSchema.optional(),
       secrets: z.record(z.string().uuid(), z.object({password:z.string().max(65536).optional(), privateKey:z.string().max(262144).optional(), passphrase:z.string().max(65536).optional()}).strict()),
     }).strict().parse(value);
+    if(result.extensions?.external) restorePortablePlugins([],result.extensions.external);
     if (new Set(result.profiles.map(p=>p.id)).size !== result.profiles.length) throw new Error('云端存在重复连接');
     for (const [endpoint, fingerprint] of Object.entries(result.hosts)) {
       if (this.data.hosts[endpoint] && this.data.hosts[endpoint] !== fingerprint) throw new Error('云端主机身份与本机不一致，请手动核对');
@@ -87,6 +93,12 @@ export class Store {
     unchanged();
     const next = this.cloudValidate(value), secrets: Record<string,string> = {};
     for (const profile of next.profiles) if (next.secrets[profile.id]) secrets[profile.id] = await this.codec.encrypt(JSON.stringify(next.secrets[profile.id]));
+    const locallyVerified:InstalledPlugin[]=[];
+    if(next.extensions?.external?.some(p=>p.manifest.provider==='process')){
+      const {loadProcessExtensions}=await import('./custom-extensions');
+      const packages=await loadProcessExtensions();
+      for(const pkg of packages){const desired=next.extensions.external.find(p=>p.manifest.id===pkg.manifest.id&&p.source==='custom:'+pkg.digest);if(desired)locallyVerified.push({manifest:pkg.manifest,source:desired.source,enabled:false});}
+    }
     unchanged(); // OS credential encryption can overlap a local connection/group save.
     const task = this.writes.catch(() => {}).then(async () => {
       unchanged(); // Recheck at the same serialized boundary as ordinary saves.
@@ -95,6 +107,7 @@ export class Store {
       this.data = {...this.data, ...portable, secrets, hosts:restoreHosts?next.hosts:{...this.data.hosts,...next.hosts},
         ...(extensions ? {tools:{...this.data.tools,commandSuggestions:extensions.commandSuggestions,dockerSocket:extensions.dockerSocket},
           plugins:[...this.plugins(),...builtinPlugins.filter(p=>extensions.enabled?.[p.id]!==undefined&&!this.plugins().some(existing=>existing.manifest.id===p.id)).map(manifest=>({manifest,source:'bundled',enabled:false}))].map(p=>({...p,enabled:p.source==='bundled'?(extensions.enabled?.[p.manifest.id]??p.enabled):p.enabled,manifest:{...p.manifest,commands:extensions.commands[p.manifest.id]??p.manifest.commands}}))} : {})};
+      if (extensions?.external) {this.data.portablePlugins=extensions.external;this.data.plugins=restorePortablePlugins([...this.plugins(),...locallyVerified.filter(p=>!this.plugins().some(local=>local.manifest.id===p.manifest.id))],extensions.external);}
       if (extensions?.enabled) {
         this.data.tools.dockerEnabled = pluginEnabled(this.plugins(), 'docker');
         this.data.tools.commandSuggestions = pluginEnabled(this.plugins(), 'commands');
@@ -178,6 +191,7 @@ export class Store {
     this.data.pluginSource = schema.shape.pluginSource.parse(value);
     await this.persist();
   }
+  pluginsRestorePending(){return (this.data.portablePlugins??[]).filter(p=>!this.plugins().some(local=>local.manifest.id===p.manifest.id&&local.source===p.source&&portablePlugin(local).manifestSha256===p.manifestSha256)).map(({manifestSha256,...p})=>({...p,reason:'此机器尚未安装相同来源的扩展包，请导入已核验的安装文件'}));}
   plugins() {
     return structuredClone(
       this.data.plugins ??
@@ -185,7 +199,11 @@ export class Store {
     );
   }
   async setPlugins(plugins: InstalledPlugin[]) {
-    this.data.plugins = z.array(installedPluginSchema).max(100).parse(plugins);
+    const removed=new Set(this.plugins().filter(p=>!plugins.some(next=>next.manifest.id===p.manifest.id)).map(p=>p.manifest.id));
+    const previouslyInstalled=new Set(this.plugins().map(p=>p.manifest.id));
+    const parsed=z.array(installedPluginSchema).max(100).parse(plugins);
+    this.data.plugins=parsed.map(p=>previouslyInstalled.has(p.manifest.id)?p:restorePortablePlugins([p],this.data.portablePlugins??[]).find(item=>item.manifest.id===p.manifest.id)!);
+    if(this.data.portablePlugins)this.data.portablePlugins=this.data.portablePlugins.filter(p=>!removed.has(p.manifest.id));
     this.data.tools.dockerEnabled = pluginEnabled(plugins, 'docker');
     this.data.tools.commandSuggestions = pluginEnabled(plugins, 'commands');
     await this.persist();

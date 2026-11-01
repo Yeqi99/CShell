@@ -5,6 +5,7 @@ export const agentMethods = [
   'automation.list','automation.create','automation.change',
   'environment.read','environment.save','assistant.model.configure','management.script.start','management.script.status','management.script.cancel',
   'network.status','network.configure',
+  'network.proxy.clear','network.proxy.start','network.proxy.poll','network.proxy.read','network.proxy.write','network.proxy.close','network.proxy.stop',
   'network.probe',
   'machine.snapshot',
   ...codingMethods,

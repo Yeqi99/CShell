@@ -25,6 +25,7 @@ export interface Session {
   parent?: string;
 }
 export class SshService {
+  networkShell?: (profile:Profile)=>Promise<string|undefined>;
   jumpTransport?: (profile:Profile,signal:AbortSignal)=>Promise<{socket:import('node:stream').Duplex;close():void}>;
   private sessions = new Map<string, Session>();
   get size() {
@@ -133,15 +134,17 @@ export class SshService {
         session.sftp!.once('close', () => close('SFTP connection closed'));
         return { sessionId: session.id };
       }
+      const networkCommand=await this.networkShell?.(profile);
       session.shell = await new Promise<ClientChannel>((resolve, reject) => {
         rejectPending = reject;
-        client.shell({ term: 'xterm-256color', cols: 100, rows: 30 }, (error, stream) => {
+        const opened=(error:Error|undefined,stream:ClientChannel) => {
           if (error) return reject(error);
           if (controller.signal.aborted || session.closed) {
             stream.destroy();
             reject(controller.signal.reason ?? new Error('SSH connection closed'));
           } else resolve(stream);
-        });
+        };
+        if(networkCommand)client.exec(networkCommand,{pty:{term:'xterm-256color',cols:100,rows:30}},opened);else client.shell({term:'xterm-256color',cols:100,rows:30},opened);
       });
       controller.signal.throwIfAborted();
       const output = (data: Buffer, decoderForStream: StringDecoder) => {
