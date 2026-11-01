@@ -43,6 +43,14 @@ final class AndroidAgentHost implements AutoCloseable {
   private volatile byte[] passwordDigest; private byte[] passwordSalt;
   private volatile String failure="";
   private final AtomicLong epoch=new AtomicLong();
+  // Bounded private rejection evidence, inspected by protocol tests only.
+  // No controller identity, ciphertext, payload or secret is retained.
+  private volatile long desktopReplayRejections;
+  private volatile String desktopReplayReason="";
+  private synchronized void rejectDesktopSequence(){
+    if(desktopReplayRejections<Long.MAX_VALUE)desktopReplayRejections++;
+    desktopReplayReason="sequence-mismatch";
+  }
   AndroidAgentHost(Context context,Backend backend)throws Exception {this.backend=backend;phone=new AndroidPhoneCapabilities(context);identity=new AndroidHostIdentity(context);prefs=context.getSharedPreferences("cagent-host-peers",0);}
   synchronized void start(int port,String password)throws Exception {
     if(android.os.Build.VERSION.SDK_INT<29)throw new IOException("CAgent host requires Android 10 or newer");
@@ -70,6 +78,7 @@ final class AndroidAgentHost implements AutoCloseable {
   synchronized void stop(){epoch.incrementAndGet();SSLServerSocket old=listener;listener=null;try{if(old!=null)old.close();}catch(IOException ignored){}Desktop d=desktop;if(d!=null)d.close();for(SSLSocket s:sockets)try{s.close();}catch(IOException ignored){}sockets.clear();pending.clear();if(clients!=null)clients.shutdownNow();if(timer!=null)timer.shutdownNow();passwordDigest=null;backend.releaseInput();}
   public void close(){stop();}
   private void serve(SSLSocket socket,long generation){
+    boolean desktopProtocolOwned=false;
     try {socket.setSoTimeout(10000);socket.setTcpNoDelay(true);socket.startHandshake();String owner=AndroidHostIdentity.fingerprint(socket.getSession().getPeerCertificates()[0].getEncoded());boolean authenticated=false;InputStream in=new BufferedInputStream(socket.getInputStream());OutputStream out=socket.getOutputStream();
       while(epoch.get()==generation&&!socket.isClosed()){
         JSONObject request=line(in,131072);String id=request.getString("id"),op=request.getString("op");if(id.length()>128)throw new IOException("Request identity length");Object result;
@@ -79,11 +88,16 @@ final class AndroidAgentHost implements AutoCloseable {
           else {if(!authenticated||!prefs.getBoolean("peer."+owner,false)||epoch.get()!=generation)throw new IOException("CAgent authentication required");
             if(op.equals("ping"))result=new JSONObject();
             else if(op.equals("manage")){JSONObject p=request.getJSONObject("payload");result=manage(owner,p.getString("method"),p.optJSONObject("params"));}
-            else if(op.equals("desktop-stream")){writeLine(out,new JSONObject().put("id",id).put("result",new JSONObject().put("desktopStream",true)));new Desktop(socket,in,out,owner,generation).run();return;}
+            else if(op.equals("desktop-stream")){writeLine(out,new JSONObject().put("id",id).put("result",new JSONObject().put("desktopStream",true)));desktopProtocolOwned=true;new Desktop(socket,in,out,owner,generation).run();return;}
             else throw new IOException("Operation is not supported by Android CAgent");
           }
           writeLine(out,new JSONObject().put("id",id).put("result",result));
-        }catch(Exception e){writeLine(out,new JSONObject().put("id",id).put("error",safe(e)));if(!authenticated)return;}
+        }catch(Exception e){
+          // After upgrade, only the desktop protocol owns this TLS stream.
+          // Never append a JSON RPC error to an encrypted desktop record stream.
+          if(desktopProtocolOwned)return;
+          writeLine(out,new JSONObject().put("id",id).put("error",safe(e)));if(!authenticated)return;
+        }
       }
     }catch(Exception ignored){}finally{sockets.remove(socket);try{socket.close();}catch(IOException ignored){}}
   }
@@ -156,7 +170,7 @@ final class AndroidAgentHost implements AutoCloseable {
         watchdog=timer.scheduleAtFixedRate(()->{long now=System.nanoTime();if(hostEpoch!=epoch.get()||(writeStarted!=0&&now-writeStarted>TimeUnit.SECONDS.toNanos(5))||(awaiting>=0&&now-lastAck>TimeUnit.SECONDS.toNanos(15))){failure="DESKTOP_WATCHDOG";close();}},1,1,TimeUnit.SECONDS);
         DataInputStream in=new DataInputStream(input);
         while(!closed.get()){
-          int length=in.readInt();if(length<25||length>8216)throw new IOException("Invalid desktop control length");byte[] bytes=new byte[length];in.readFully(bytes);byte[] seq=Arrays.copyOf(bytes,8);if(ByteBuffer.wrap(seq).getLong()!=rx)throw new IOException("Desktop control replay");JSONObject message=new JSONObject(new String(crypt(false,rxKey,seq,ByteBuffer.allocate(16).put(session).put(seq).array(),Arrays.copyOfRange(bytes,8,length)),StandardCharsets.UTF_8));rx++;handle(message);
+          int length=in.readInt();if(length<25||length>8216)throw new IOException("Invalid desktop control length");byte[] bytes=new byte[length];in.readFully(bytes);byte[] seq=Arrays.copyOf(bytes,8);if(ByteBuffer.wrap(seq).getLong()!=rx){rejectDesktopSequence();throw new IOException("Desktop control replay");}JSONObject message=new JSONObject(new String(crypt(false,rxKey,seq,ByteBuffer.allocate(16).put(session).put(seq).array(),Arrays.copyOfRange(bytes,8,length)),StandardCharsets.UTF_8));rx++;handle(message);
         }
       }catch(Exception e){failure="DESKTOP_CONTROL_"+e.getClass().getSimpleName();throw e;}finally{close();}
     }

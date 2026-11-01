@@ -93,15 +93,25 @@ final class AndroidHostProtocolTest {
       check(invitation.getString("deviceId").equals(host.connectionInfo("127.0.0.1",port).getString("deviceId")),"Identity changed after restart");
       try(SSLSocket socket=connect(port)){InputStream in=socket.getInputStream();OutputStream out=socket.getOutputStream();rpc(in,out,"auth",new JSONObject().put("name","fixture"));rpc(in,out,"desktop-stream",null);JSONObject hello=AndroidAgentHost.line(in,4096);AndroidAgentHost.writeLine(out,new JSONObject().put("id",stale.getString("id")).put("proof",AndroidAgentHost.hex(AndroidAgentHost.hmac(DesktopTransport.hex(stale.getJSONObject("keys").getString("bootstrap")),"client:"+hello.getString("nonce")+":"+stale.getString("id")))));check(in.read()==-1,"Restart reused a stale desktop ticket");}
       // A valid controller cannot replay even its own authenticated control record.
+      int inputsBeforeReplay=capture.inputs.get();
+      java.lang.reflect.Field rejectCounter=AndroidAgentHost.class.getDeclaredField("desktopReplayRejections"),rejectReason=AndroidAgentHost.class.getDeclaredField("desktopReplayReason");rejectCounter.setAccessible(true);rejectReason.setAccessible(true);long rejectedBefore=rejectCounter.getLong(host);
       try(SSLSocket socket=connect(port)){
         InputStream in=socket.getInputStream();OutputStream out=socket.getOutputStream();rpc(in,out,"auth",new JSONObject().put("name","fixture"));
-        JSONObject ticket=(JSONObject)rpc(in,out,"manage",new JSONObject().put("method","desktop.open").put("params",new JSONObject().put("quality",QUALITY).put("control",false).put("transport","management").put("mediaTransport","tcp")));
+        JSONObject ticket=(JSONObject)rpc(in,out,"manage",new JSONObject().put("method","desktop.open").put("params",new JSONObject().put("quality",QUALITY).put("control",true).put("transport","management").put("mediaTransport","tcp")));
         rpc(in,out,"desktop-stream",null);JSONObject hello=AndroidAgentHost.line(in,4096);AndroidAgentHost.writeLine(out,new JSONObject().put("id",ticket.getString("id")).put("proof",AndroidAgentHost.hex(AndroidAgentHost.hmac(DesktopTransport.hex(ticket.getJSONObject("keys").getString("bootstrap")),"client:"+hello.getString("nonce")+":"+ticket.getString("id")))));AndroidAgentHost.line(in,4096);
         JSONObject greeting=new JSONObject().put("op","hello").put("identity",ticket.getString("owner")).put("generation",ticket.getString("generation")).put("port",0).put("transport","tcp");
-        record(out,ticket,0,greeting);record(out,ticket,0,new JSONObject().put("op","ping").put("sent",1));
-        int drained=0;while(in.read()!=-1){if(++drained>2000000)throw new AssertionError("Replay was not closed within bounded output");}
+        record(out,ticket,0,greeting);record(out,ticket,0,new JSONObject().put("op","input").put("value",new JSONObject().put("kind","text").put("text","REPLAY-MUST-NOT-EXECUTE").put("generation",1).put("sequence",1)));
+        // Fail-closed replay termination may interrupt an in-flight TLS record.
+        // Conscrypt then reports a protocol/reset exception rather than EOF.
+        // A timeout is deliberately not accepted as evidence of revocation.
+        try{int drained=0;while(in.read()!=-1){if(++drained>2000000)throw new AssertionError("Replay was not closed within bounded output");}}
+        catch(javax.net.ssl.SSLException|java.net.SocketException closed){}
       }
       long settled=System.nanoTime()+TimeUnit.SECONDS.toNanos(3);while(capture.delivery!=null&&System.nanoTime()<settled)Thread.sleep(20);
+      check(capture.delivery==null,"Replay closure retained desktop capture delivery");
+      check(capture.inputs.get()==inputsBeforeReplay,"Replay caused backend input");
+      check(rejectCounter.getLong(host)==rejectedBefore+1&&"sequence-mismatch".equals(rejectReason.get(host)),"Desktop closed without detecting the replayed sequence");
+      try(SSLSocket socket=connect(port)){InputStream in=socket.getInputStream();OutputStream out=socket.getOutputStream();rpc(in,out,"auth",new JSONObject().put("name","fixture"));check(rpc(in,out,"manage",new JSONObject().put("method","desktop.status")) instanceof JSONObject,"Host failed fresh authenticated RPC after rejecting replay");}
       host.stop();host.start(port,replacement);
       AgentConnection oldPeer=new AgentConnection((t,v)->{});boolean revoked=false;try{oldPeer.connect("127.0.0.1",port,"",cert->true);}catch(Exception expected){revoked=true;}finally{oldPeer.close();}check(revoked,"Changing password retained previous peer authorization");
       return "OK (Android host TLS 1.3, password rejection, 6 AEAD fragmented frames, input, pinned reconnect, stop ticket invalidation, replay rejection, password rotation)";
