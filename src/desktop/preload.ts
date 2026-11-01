@@ -216,6 +216,7 @@ const bridge: Bridge = {
   aiApprove: (id, request, allow) => ipcRenderer.invoke('ai:approve', id, request, allow),
   aiStop: (id) => ipcRenderer.invoke('ai:stop', id),
   aiMode: (id, mode) => ipcRenderer.invoke('ai:mode', id, mode),
+  aiThreadProvider: (id, provider, model) => ipcRenderer.invoke('ai:thread-provider', id, provider, model),
   pythonReadFile: (id, path) => ipcRenderer.invoke('python:read', id, path),
   textReadFile: (id, path) => ipcRenderer.invoke('text:read', id, path),
   textEnvironments: (id, path) => ipcRenderer.invoke('text:environments', id, path),

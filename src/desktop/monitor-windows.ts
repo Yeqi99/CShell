@@ -44,7 +44,7 @@ export class MonitorWindows {
       'clipboard:write', 'key:pick', 'agent:machine-open', 'agent:call',
       'desktop:view-start', 'desktop:view-stop', 'desktop:view-input', 'desktop:view-release',
       'desktop:view-ack', 'desktop:view-quality', 'views:save', 'views:list',
-      'ai:snapshot', 'ai:create', 'ai:send', 'ai:stop', 'ai:approve', 'ai:mode', 'ai:text'];
+      'ai:snapshot', 'ai:create', 'ai:send', 'ai:stop', 'ai:approve', 'ai:thread-provider', 'ai:mode', 'ai:text'];
     if (!allowed.includes(channel)) throw new Error('此操作不属于监控视图');
     assertMonitorAiRequest(channel, args, view.view.tiles, this.aiThreads.get(event.sender.id), view.cleanup);
     if (channel === 'ai:create' && view.desktopIds.has(args[3])) throw new Error('请从终端输出发起 AI 分析');

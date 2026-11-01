@@ -5,6 +5,7 @@ import {machineInspectionInstructions,toolAwareHistory} from './ai-tool-context'
 import {checkpointSchema,compactContext,continuityInstructions,RunBudget} from './agent-continuity';
 import {AgentJobs,jobQuery} from './agent-jobs';
 import {remoteWechatTools} from './remote-wechat-tools';
+import {remoteAndroidTools} from './remote-android-tools';
 import { permissionLinkTool } from './permission-link-tool';
 import type { Profile } from '../shared/contracts';
 import { AiWork } from './ai-work';
@@ -477,6 +478,21 @@ export class AiService {
     this.threads = this.threads.filter((t) => t.id !== id);
     await this.persist();
   }
+  async changeThreadProvider(id:string,providerId:string,extensionModel?:string){
+    const t=this.thread(id);
+    if(t.parentId)throw Error('子任务不能单独切换模型');
+    if(this.runs.has(id))throw Error('请等待当前回复结束或停止后再切换模型');
+    const provider=this.providers.find(p=>p.id===idSchema.parse(providerId));
+    if(!provider)throw Error('所选基座不可用');
+    if(extensionModel&&!provider.extension)throw Error('此基座不支持扩展模型选择');
+    if(provider.extension){
+      const model=extensionModel??provider.extension.model;
+      await this.providerExtensions.resolve({...provider.extension,model},'configuration');
+    }
+    if(this.runs.has(id)||!this.threads.includes(t))throw Error('会话状态已变化，请在回复结束后重试');
+    t.providerId=provider.id;t.extensionModel=provider.extension?(extensionModel??provider.extension.model):undefined;
+    await this.persist();
+  }
   async mode(id: string, mode: unknown) {
     const t = this.thread(id);
     if (t.parentId) throw new Error('子任务继承父任务的审核模式');
@@ -926,7 +942,12 @@ export class AiService {
       if(t.sessionId){
         try{
           const scope=this.connections.scope(t.sessionId);
-          if(scope&&allowsCapability(aiCallerPolicy(this.policy),scope,'agent.manage'))this.remoteWechat.set(t.id,await remoteWechatTools(this.connections.agent(t.sessionId),signal));
+          if(scope&&allowsCapability(aiCallerPolicy(this.policy),scope,'agent.manage')){
+            const call=this.connections.agent(t.sessionId);
+            const results=await Promise.allSettled([remoteWechatTools(call,signal),remoteAndroidTools(call,signal)]);
+            signal.throwIfAborted();
+            this.remoteWechat.set(t.id,results.flatMap(result=>result.status==='fulfilled'?result.value:[]));
+          }
         }catch(error){signal.throwIfAborted();/* Older/non-Agent targets do not advertise these tools. */}
       }
       const available = [...this.applicationTools(t), ...machineTools]

@@ -153,6 +153,7 @@ export async function registerAiHandlers(
   handle('ai:approve', (id, request, allow) => ai.approve(id, request, allow));
   handle('ai:stop', (id) => ai.stopAndSave(id));
   handle('ai:mode', (id, mode) => ai.mode(id, mode));
+  handle('ai:thread-provider', (id, provider, model) => ai.changeThreadProvider(id, provider, model));
   let disposal: Promise<void> | undefined;
   const dispose = () => {
     if (disposal) return disposal;

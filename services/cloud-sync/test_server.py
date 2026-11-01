@@ -76,6 +76,26 @@ class ServiceTest(unittest.TestCase):
             self.service.register(body, 'register-ip')
         self.assertEqual(self.service.read(body['accountId'])['revision'], 1)
 
+    def test_registration_guards_new_schema_atomically(self):
+        import base64
+        email = 'new@example.com'
+        self.service.request_code(email, 'register-ip')
+        encrypted = {'format': 1, 'nonce': base64.b64encode(bytes(12)).decode(), 'ciphertext': base64.b64encode(bytes(32)).decode()}
+        body = {'email': email, 'code': self.mail[email], 'password': 'test-password-only', 'accountId': 'b'*32, 'keybox': {'salt': base64.b64encode(bytes(32)).decode(), 'envelope': encrypted}, 'envelope': encrypted}
+        wrong = dict(body, code='wrong')
+        with self.assertRaises(Failure):
+            self.service.register(wrong, 'register-ip')
+        self.assertEqual(len(self.service.admin_accounts()['accounts']), 0)
+        session = self.service.register(body, 'register-ip', 2)
+        self.assertEqual(self.service.authenticate(session['token']), body['accountId'])
+        self.assertEqual(self.service.read(body['accountId'],2)['revision'], 1)
+        with self.assertRaises(Failure): self.service.read(body['accountId'])
+        login = self.service.password_login(email, body['password'], 'password-ip')
+        self.assertEqual(login['keybox'], body['keybox'])
+        with self.assertRaises(Failure):
+            self.service.register(body, 'register-ip', 2)
+        self.assertEqual(self.service.read(body['accountId'],2)['revision'], 1)
+
     def test_quotas_upgrade_and_downgrade_preserve_existing_cloud(self):
         import base64,time,uuid
         from unittest.mock import patch

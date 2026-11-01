@@ -181,4 +181,5 @@ export interface AiBridge {
   aiApprove(id: string, requestId: string, allow: boolean): Promise<void>;
   aiStop(id: string): Promise<void>;
   aiMode(id: string, mode: AiMode): Promise<void>;
+  aiThreadProvider(id: string, providerId: string, extensionModel?: string): Promise<void>;
 }

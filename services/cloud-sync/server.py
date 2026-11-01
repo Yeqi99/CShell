@@ -155,7 +155,6 @@ class Service:
                     account = db.execute('SELECT id FROM accounts WHERE email=?', (email,)).fetchone()[0]
                     token = secrets.token_urlsafe(32)
                     db.execute('DELETE FROM sessions WHERE expires<?', (time.time(),))
-                    db.execute('INSERT INTO vault_versions VALUES(?,?)',(account,schema))
                     db.execute('INSERT INTO sessions VALUES(?,?,?)', (self.digest(token), account, time.time() + 30 * 86400))
         if not valid:
             raise Failure(401, '验证码无效、过期或尝试次数已用尽')
@@ -203,6 +202,7 @@ class Service:
                     db.execute('INSERT INTO passwords VALUES(?,?,?)', (account, salt, digest))
                     db.execute('INSERT INTO keyboxes VALUES(?,?)', (account, json.dumps(box)))
                     db.execute('INSERT INTO vaults(account,revision,envelope,mutation,byte_size) VALUES(?,?,?,?,?)', (account, 1, vault, secrets.token_hex(16),len(base64.b64decode(body['envelope']['ciphertext']))-16))
+                    db.execute('INSERT INTO vault_versions VALUES(?,?)',(account,schema))
                     db.execute('INSERT INTO sessions VALUES(?,?,?)', (self.digest(token), account, time.time()+30*86400))
                     db.execute('DELETE FROM codes WHERE email=?', (email,))
         if not valid:
@@ -297,6 +297,7 @@ class Service:
         encoded = json.dumps(envelope, separators=(',', ':'))
         with self.db() as db:
             db.execute('BEGIN IMMEDIATE')
+            self.check_vault_schema(db,account,schema)
             row = db.execute('SELECT revision,mutation,envelope FROM vaults WHERE account=?', (account,)).fetchone()
             if row and row[1] == mutation:
                 if row[2] != encoded:
