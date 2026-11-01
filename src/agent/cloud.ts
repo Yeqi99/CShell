@@ -159,12 +159,17 @@ export class CagentCloud {
       empty:()=>({bundle:this.emptyBundle(),assistant:assistant.emptyWorkspace()}),
       validate:(value)=>{const v=z.object({bundle,assistant:z.unknown()}).strict().parse(value);return {bundle:v.bundle,assistant:assistant.validateWorkspace(v.assistant)};},
       assertIdle:()=>assistant.assertAccountIdle(),
-      restore:async(value)=>{await assistant.restoreWorkspace(value.assistant);await vault.write('cloud-bundle',value.bundle);this.cached=structuredClone(value.bundle);this.capabilityRestore=[];},
+      restore:async(value)=>{await assistant.restoreWorkspace(value.assistant);await vault.write('cloud-bundle',value.bundle);this.cached=structuredClone(value.bundle);this.capabilityRestore=[];if(this.capabilities&&this.cached.store?.capabilityPackages)this.capabilityRestore=await this.capabilities.cloudImport(this.cached.store.capabilityPackages);},
     });
     this.sync = new CloudSync(directory, codec, {
       registrationSnapshot:async()=>this.emptyBundle(),
       accountChanged:async(id)=>{const previous=this.workspaces.current();await this.workspaces.switchTo(id??'guest');return async()=>this.workspaces.switchTo(previous);},
-      export: async () => ({...this.cached,ai:this.assistant.cloudExport()}),
+      export: async () => {
+        const desired=portableCapabilitiesSchema.parse(this.cached.store?.capabilityPackages??[]);
+        const local=this.capabilities?portableCapabilitiesSchema.parse(this.capabilities.cloudExport()):[];
+        const selected=desired.map(item=>local.find(current=>current.id===item.id&&current.version===item.version&&current.manifestSha256===item.manifestSha256&&item.configuration!==undefined)||item);
+        return {...this.cached,store:{...this.cached.store,...(this.cached.store?.capabilityPackages!==undefined?{capabilityPackages:selected}:{})},ai:this.assistant.cloudExport()};
+      },
       validate: (v) => {
         bundle.parse(v);
       },
