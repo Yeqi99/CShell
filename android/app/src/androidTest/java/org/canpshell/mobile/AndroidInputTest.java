@@ -20,8 +20,10 @@ final class AndroidInputTest implements AutoCloseable {
   private final AtomicInteger clicks=new AtomicInteger();
   private final AtomicBoolean delayedNativeCaret=new AtomicBoolean();
   private final java.util.ArrayDeque<String> touchTrace=new java.util.ArrayDeque<>();
+  private final java.util.ArrayDeque<String> editStacks=new java.util.ArrayDeque<>();
+  private final java.util.concurrent.ScheduledExecutorService sampler=java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
   private void trace(String event){synchronized(touchTrace){if(touchTrace.size()==48)touchTrace.removeFirst();touchTrace.addLast(android.os.SystemClock.uptimeMillis()+":"+event);}}
-  private String inputDiagnostics(){synchronized(touchTrace){return AndroidControlService.editState()+", nativeTouches="+touchTrace;}}
+  private String inputDiagnostics(){synchronized(touchTrace){synchronized(editStacks){return AndroidControlService.editState()+", nativeTouches="+touchTrace+", editStacks="+editStacks;}}}
   AndroidInputTest(Instrumentation test,MainActivity app)throws Exception {
     this.test=test;this.app=app;
     if(!android.os.Build.HARDWARE.equals("ranchu")&&!android.os.Build.HARDWARE.equals("goldfish"))throw new IllegalStateException("Emulator only");
@@ -41,6 +43,13 @@ final class AndroidInputTest implements AutoCloseable {
     // driver no longer needs accessibility after granting the real service.
     // All following taps/edits still travel through TLS and AndroidControlService.
     test.getUiAutomation(UiAutomation.FLAG_DONT_USE_ACCESSIBILITY|UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES);
+    sampler.scheduleAtFixedRate(()->{
+      if(!AndroidControlService.isEditing())return;
+      StackTraceElement[] stack=android.os.Looper.getMainLooper().getThread().getStackTrace();
+      StringBuilder value=new StringBuilder().append(android.os.SystemClock.uptimeMillis());
+      for(int i=0;i<Math.min(stack.length,16);i++)value.append(" > ").append(stack[i]);
+      synchronized(editStacks){if(editStacks.size()>=8)editStacks.removeFirst();editStacks.addLast(value.toString());}
+    },500,500,TimeUnit.MILLISECONDS);
     test.runOnMainSync(()->{
       panel=new LinearLayout(app);panel.setOrientation(LinearLayout.VERTICAL);panel.setBackgroundColor(0xffffffff);
       button=new Button(app){
@@ -214,6 +223,7 @@ final class AndroidInputTest implements AutoCloseable {
   }
   private static void input(AgentConnection connection,JSONObject value)throws Exception {connection.queueDesktopCommand(new JSONObject().put("op","input").put("value",value).toString());}
   public void close(){
+    sampler.shutdownNow();
     UiAutomation automation=test.getUiAutomation(UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES);automation.adoptShellPermissionIdentity(android.Manifest.permission.WRITE_SECURE_SETTINGS);
     try {Settings.Secure.putString(app.getContentResolver(),Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,previousServices);Settings.Secure.putString(app.getContentResolver(),Settings.Secure.ACCESSIBILITY_ENABLED,previousEnabled);}finally{automation.dropShellPermissionIdentity();}
     test.runOnMainSync(()->{if(panel!=null&&panel.getParent() instanceof ViewGroup)((ViewGroup)panel.getParent()).removeView(panel);});
