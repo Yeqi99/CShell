@@ -37,3 +37,9 @@ GitHub候选工作流41281283583成功，使用既有release密钥，没有创�
 - CAgent NSIS最新SHA-256：6732ee491149e85849969e2a1175aee4b8279570af83cbcf0e97a27891bacef9，26,227,803字节。安装到隔离目录后真实CMD/TLS/授权/退出通过；原生模型/自动化/主题及身份跨重启验证通过。签名状态仍为未签名。
 - 手机已改用系统文件管理器正常安装上述正式签名Android候选并启动；USB安装限制未绕过。实际视频已成功，键鼠和系统授权验收继续，详见Android记录。
 - 本机实际用户应用仍未被候选替换，正式渠道未切换。
+
+### 最新 Windows Pro 候选
+
+包含非Windows代理清理、临时连接重连与独立小窗DPI修复的正确Pro配置安装器已重建：release/pro-0.8.18/CShell-Pro-0.8.18-win-x64.exe，SHA-256 `69188fad9fbe886dcfa8b55c6434a2a17de0ae222091a606167b005bb011c88b`。platform-package-smoke及release-desktop-smoke针对该目录的真实CShell Pro.exe全部通过。尚未签名、安装到用户目录或发布。
+
+本轮曾误以默认builder配置产生Pro工作树release/0.8.18/CShell-0.8.18-win-x64.exe；它明确排除于所有发行清单，不属于有效开源或Pro附件，未安装或上传。开源只采用Core工作树构建；Pro仅采用显式electron-builder.pro.cjs产物。CAgent按独立已核验清单取包，不使用release目录全量glob上传。
