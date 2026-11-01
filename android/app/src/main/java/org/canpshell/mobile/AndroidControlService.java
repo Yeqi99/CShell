@@ -278,7 +278,10 @@ public final class AndroidControlService extends AccessibilityService {
               lastEditState=retry?"edit:focus-pending":"edit:focus-unconfirmed";return;
             }
             if(!fresh.equals(node)){fresh.recycle();lastEditState="edit:focus-changed";return;}
-            node.recycle();node=fresh;stableText=0;stableCaret=0;
+            // Replacing a stale snapshot is not a new editor or a content event.
+            // Keep stability samples; the actual values/revision below decide
+            // whether the operation settled.
+            node.recycle();node=fresh;
           }
           String actual=node.getText()==null?"":node.getText().toString();
           long currentRevision=editRevision.get();
@@ -304,7 +307,7 @@ public final class AndroidControlService extends AccessibilityService {
             if(textSeen){lastEditState="edit:content-changed";return;}
           }
           retry=android.os.SystemClock.uptimeMillis()<deadline;
-          if(!retry)lastEditState="edit:caret-unconfirmed";
+          if(!retry)lastEditState="edit:caret-unconfirmed:text="+stableText+",selectionSent="+selectionSent+",caret="+stableCaret;
         }finally{if(retry)inputHandler.postDelayed(this,32);else{
           node.recycle();
           // Later keystrokes depend on this edit's caret. If it was not

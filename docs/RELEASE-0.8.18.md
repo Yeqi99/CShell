@@ -26,6 +26,7 @@ Android 候选已用持久发行证书签名并在 Android 16 手机正常安装
 
 ## 验证与限制
 
-Windows 本机成品、真实 SSH/SFTP、ConPTY、RDP 多标签、云数据恢复、公网会员中继和跨 CAgent 网络出口已有实证。macOS/Linux 构建仍在处理跨平台测试挂起，不能标为通过。Windows 安装器未进行 Authenticode 签名。
+Windows 本机成品、真实 SSH/SFTP、ConPTY、RDP 多标签、云数据恢复、公网会员中继和跨 CAgent 网络出口已有实证。Pro macOS/Linux 的 x64、arm64 候选构建已通过，macOS 原位 DMG 更新检查通过；归档与六个安装包的摘要已逐一核验。开源最终矩阵及 Android 输入回归仍在进行，不能概括为所有平台全部通过。Windows 安装器未进行 Authenticode 签名；macOS 签名与公证限制仍保留。
 
 OpenCode 目录可读取不等于模型请求成功；当前账号部分免费模型受上游地区或额度限制，不自动改用付费模型。完整范围见 [同步矩阵](CLOUD-SYNC-MATRIX.md)、[逐项验收](UNIFIED-FINAL-AUDIT-20261101.md)、[候选包核验](PRO-0.8.18-CANDIDATE.md) 和 [Android 实机记录](ANDROID-FOLLOWUP-20261101.md)。
+
