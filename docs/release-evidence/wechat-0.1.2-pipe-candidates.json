@@ -1,0 +1,27 @@
+{
+  "status": "candidate-not-published-real-inbound-pending",
+  "privateCommit": "1c28459",
+  "coldPackages": "both standalone selftest/authenticated capabilities/401/stop exit0 passed",
+  "fullFrozenFixture": "self-owned Python target, actual listener server worker heartbeat EOF locks and Frida cleanup; stop exits normally while target remains alive",
+  "tests": 22,
+  "packages": [
+    {
+      "id": "cagent.wechat.v411556",
+      "version": "0.1.2",
+      "url": "https://github.com/Yeqi99/CShell/releases/download/wechat-toolkit-v0.1.2/Weixin-4.1.15.56-0.1.2.cagent-package.json",
+      "bundleBytes": 264769283,
+      "bundleSha256": "2e581952bc0eba427c4ee7e8ad5f81f843660273fd1286638d022cbffca8e6f4",
+      "manifestSha256": "0359b9d816811eb25e69fd0fa77467a3645c32041e1edda3c57f08c3e23ed12a",
+      "stagedFiles": 92
+    },
+    {
+      "id": "cagent.wechat.v42012",
+      "version": "0.1.2",
+      "url": "https://github.com/Yeqi99/CShell/releases/download/wechat-toolkit-v0.1.2/Weixin-4.2.0.12-0.1.2.cagent-package.json",
+      "bundleBytes": 264769135,
+      "bundleSha256": "22093d070410f796cc4c81f2f3bfd1fe9a00f9115bd1004dd0691ad530905e79",
+      "manifestSha256": "6029644fb944747f9b9836148ab6b50f16a02c729fea0a56786a5b66f0692620",
+      "stagedFiles": 92
+    }
+  ]
+}
