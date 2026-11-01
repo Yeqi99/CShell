@@ -69,3 +69,11 @@ run **41290463479**（候选源码 **2d04a984f3bef3417a4aa1c60fea1e4fdff7c45e**�
 经产品远控流向已观察到的“连接”导航发送一次点击：processed=3、gesture=completed；独立手机截图明确已进入服务器列表，证明实际手势产生页面变化。但packages.invoke android_ui_read仍返回旧CAgent页节点，不能据此继续点击旧位置。未输入文字、未更改手机连接设置，密码保持隐藏。
 
 e179197修复该生产语义缺口：API33+显式读取前调用公开clearCache；订阅窗口内容和滚动变更以维护低版本缓存；过期排队读取不再执行，主线程错误完整返回。新增实际WebView DOM切换后的新节点出现/旧节点消失断言。Java编译通过，签名候选与API29/35新轮待验；需该包覆盖后再完成实机文字、返回及断线恢复。没有使用ADB输入作为产品验收，也没有发送短信或拨号。
+
+### 语义修复候选已通过双 API 并放入手机
+
+run **41293851767**：API29 job124810471336、API35 job124810471314及build均success；真实WebView DOM页面一→页面二的新节点出现/旧节点消失断言通过，原所有输入断言保持；产品事件45/49。
+
+新的正式签名APK来自run **41293851783** / artifact **13078527421**，源码f21b312d73fbc1dcf3399b16e6a8fee35b5d2d35（生产语义修复e179197）。ZIP SHA-256 `9739847a8e4bf186d08bd5dd86f1d7b4431a51f4fb68901d647fe32c36d7adf9` 与GitHub digest一致；APK SHA-256 `3ba6032307c67f135477eedd876dafbb9fa17237126bc4cf174fbcaf34a72032`，证书仍34cc1c9a0eacafc512a0837c3d286081879822f047e5637a65cdbc5b525914c5，apksigner验证通过。
+
+已替换手机Download/CShell-Pro-0.8.18-input-check.apk并核验手机sha256相同。此新文件取代旧413a09候选；尚待系统覆盖安装后继续实际语义树、文字、返回及断线恢复，不把文件推送当作已安装。
