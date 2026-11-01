@@ -1,0 +1,58 @@
+{
+  "version": "0.8.18",
+  "status": "candidate-not-published",
+  "verifiedAt": "2026-11-01T13:46:46.763Z",
+  "scope": "Only two CShell Windows installers rebuilt. CAgent and Android unchanged. User applications not installed, restarted or altered.",
+  "files": [
+    {
+      "edition": "pro",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\release\\pro-0.8.18\\CShell-Pro-0.8.18-win-x64.exe",
+      "bytes": 123909057,
+      "sha256": "976b7cf19a3ceb41c385a995e49d3998cb65bb37124f3d0a033d6840f06ee3d3",
+      "exactInstallerMatchesSmokedArchive": true,
+      "firstInstallationPolicyVerified": true,
+      "embeddedAgentUnchanged": true,
+      "source": "6b0375d",
+      "authenticode": "NotSigned",
+      "validation": [
+        "exact installer app.asar equals tested packaged executable archive",
+        "packaged fresh generated permissions persist, explicit denial restart preserved, MCP disabled",
+        "native sandbox, SSH PTY and SFTP platform smoke",
+        "full release desktop groups/settings/fonts/layout/credentials/MCP/restart smoke",
+        "simultaneous Core/Pro separate identity, locks, data, ports and tokens; cross-token 401; restart persistence"
+      ]
+    },
+    {
+      "edition": "opensource",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\release\\0.8.18\\CShell-0.8.18-win-x64.exe",
+      "bytes": 123699494,
+      "sha256": "c401acdbb335b0c43412ae1c5148268142f2df35e1990681b680df84fe8d8a14",
+      "exactInstallerMatchesSmokedArchive": true,
+      "firstInstallationPolicyVerified": true,
+      "embeddedAgentUnchanged": true,
+      "source": "96e04df",
+      "authenticode": "NotSigned",
+      "validation": [
+        "exact installer app.asar equals tested packaged executable archive",
+        "packaged fresh generated permissions persist, explicit denial restart preserved, MCP disabled",
+        "native sandbox, SSH PTY and SFTP platform smoke",
+        "full release desktop groups/settings/fonts/layout/credentials/MCP/restart smoke",
+        "simultaneous Core/Pro separate identity, locks, data, ports and tokens; cross-token 401; restart persistence"
+      ]
+    }
+  ],
+  "logs": [
+    "test-results/final-default-core.log",
+    "test-results/final-default-pro.log",
+    "test-results/final-default-platform-core.log",
+    "test-results/final-default-platform-pro.log",
+    "test-results/final-default-desktop-core.log",
+    "test-results/final-default-desktop-pro.log",
+    "test-results/final-default-edition-isolation.log"
+  ],
+  "limitations": [
+    "unsigned Windows installers",
+    "isolated acceptance data; no claim to have migrated or changed the current user installation",
+    "default grants do not bypass target credentials, device identity, installed capability availability or per-conversation review mode"
+  ]
+}
