@@ -1,8 +1,8 @@
 {
   "edition": "toolkit",
   "version": "0.1.2",
-  "status": "blocked-pending-final-publication-source",
-  "sha": "d1ad08ea9bde9328821dcad974cecf62ecdf1f89",
+  "status": "blocked-pending-lenovo-physical-relay",
+  "sha": "7d906ee2a858e7bbb0701d2277c3c95501dac46e",
   "verification": "Exact six binary distribution assets from private receipt 54b6715; no implementation sources. Pending final root publication gates and fixed public source SHA.",
   "assets": [
     {
