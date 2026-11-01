@@ -13,6 +13,7 @@
 ## CAgent 与 Android
 
 - 0.8.18 CAgent独立运行包构建通过，真实CMD PTY/TLS/权限限制/停止通过。
+- CAgent候选EXE已在独立目录静默安装，逐个核验48个payload文件摘要，再运行安装后的真实终端/TLS验收通过。未替换实际安装、快捷方式或开机启动项。EXE SHA-256：`e6d0626f390bbcc9ebb94e00286d6c7874791e43ea9dc11ec9495caf05d69dfb`，未签名；收据 `test-results/pro-cagent-0.8.18-installer.json`。
 - 对此候选原生窗口执行实际API验收，模型选择、自动化规则管理、主题应用、权限与身份保持通过；使用临时配置，没有调用真实模型或微信。
 - Android Pro debug和androidTest包、lint完成（71项Gradle任务，构建成功）；debug不是正式签名包。手机系统仍拒绝USB安装，不能据此宣称安卓实机验收通过。
 
