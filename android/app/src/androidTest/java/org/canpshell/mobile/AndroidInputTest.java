@@ -20,8 +20,10 @@ final class AndroidInputTest implements AutoCloseable {
   private final AtomicInteger clicks=new AtomicInteger();
   private final AtomicBoolean delayedNativeCaret=new AtomicBoolean();
   private final java.util.ArrayDeque<String> touchTrace=new java.util.ArrayDeque<>();
+  private final java.util.ArrayDeque<String> editStacks=new java.util.ArrayDeque<>();
+  private final java.util.concurrent.ScheduledExecutorService sampler=java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
   private void trace(String event){synchronized(touchTrace){if(touchTrace.size()==48)touchTrace.removeFirst();touchTrace.addLast(android.os.SystemClock.uptimeMillis()+":"+event);}}
-  private String inputDiagnostics(){synchronized(touchTrace){return AndroidControlService.editState()+", nativeTouches="+touchTrace;}}
+  private String inputDiagnostics(){synchronized(touchTrace){synchronized(editStacks){return AndroidControlService.editState()+", nativeTouches="+touchTrace+", editStacks="+editStacks;}}}
   AndroidInputTest(Instrumentation test,MainActivity app)throws Exception {
     this.test=test;this.app=app;
     if(!android.os.Build.HARDWARE.equals("ranchu")&&!android.os.Build.HARDWARE.equals("goldfish"))throw new IllegalStateException("Emulator only");
@@ -40,7 +42,32 @@ final class AndroidInputTest implements AutoCloseable {
     // connection IDs and causes five-second refresh/action timeouts. The test
     // driver no longer needs accessibility after granting the real service.
     // All following taps/edits still travel through TLS and AndroidControlService.
-    test.getUiAutomation(UiAutomation.FLAG_DONT_USE_ACCESSIBILITY|UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES);
+    if(android.os.Build.VERSION.SDK_INT>=31){
+      test.getUiAutomation(UiAutomation.FLAG_DONT_USE_ACCESSIBILITY|UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES);
+    }else{
+      // API29 ignores the later DONT_USE flag. Its still-running UiAutomation
+      // thread was observed holding AccessibilityCache while awaiting the main
+      // thread, which itself waited for that cache lock. Stop only the test
+      // driver's event subscription; keep the product service fully enabled.
+      android.accessibilityservice.AccessibilityServiceInfo info=automation.getServiceInfo();
+      check(info!=null,"Test driver accessibility settings unavailable");
+      info.packageNames=new String[]{"org.canpshell.instrumentation.no-accessibility-target"};
+      info.eventTypes=0;automation.setServiceInfo(info);
+      android.accessibilityservice.AccessibilityServiceInfo applied=automation.getServiceInfo();
+      check(applied!=null&&applied.eventTypes==0&&java.util.Arrays.equals(applied.packageNames,info.packageNames),"Test driver event filter not applied");
+    }
+    sampler.scheduleAtFixedRate(()->{
+      if(!AndroidControlService.isEditing())return;
+      StackTraceElement[] stack=android.os.Looper.getMainLooper().getThread().getStackTrace();
+      StringBuilder value=new StringBuilder().append(android.os.SystemClock.uptimeMillis());
+      for(int i=0;i<Math.min(stack.length,16);i++)value.append(" > ").append(stack[i]);
+      for(java.util.Map.Entry<Thread,StackTraceElement[]> entry:Thread.getAllStackTraces().entrySet()){
+        if(entry.getKey()==android.os.Looper.getMainLooper().getThread())continue;
+        boolean relevant=false;for(StackTraceElement frame:entry.getValue())if(frame.getClassName().contains("AccessibilityInteractionClient")||frame.getClassName().contains("AccessibilityCache")){relevant=true;break;}
+        if(relevant){value.append(" [thread=").append(entry.getKey().getName()).append(",state=").append(entry.getKey().getState());for(int i=0;i<Math.min(entry.getValue().length,22);i++)value.append(" > ").append(entry.getValue()[i]);value.append(']');}
+      }
+      synchronized(editStacks){if(editStacks.size()>=8)editStacks.removeFirst();editStacks.addLast(value.toString());}
+    },500,500,TimeUnit.MILLISECONDS);
     test.runOnMainSync(()->{
       panel=new LinearLayout(app);panel.setOrientation(LinearLayout.VERTICAL);panel.setBackgroundColor(0xffffffff);
       button=new Button(app){
@@ -65,6 +92,7 @@ final class AndroidInputTest implements AutoCloseable {
   }
   void awaitReady()throws Exception{long end=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);while(!AndroidControlService.isAvailable()&&System.nanoTime()<end)Thread.sleep(50);check(AndroidControlService.isAvailable(),"Accessibility service did not bind");}
   String verify(AgentConnection connection)throws Exception {
+    long initialEvents=serviceEventRevision();
     verifyGestureSettling();
     tap(connection,button);long end=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);while(clicks.get()==0&&System.nanoTime()<end)Thread.sleep(50);check(clicks.get()==1,"Remote native tap did not click fixture button; "+inputDiagnostics());
     // Queue clicks without waiting for gesture callbacks. Each accepted click
@@ -121,7 +149,15 @@ final class AndroidInputTest implements AutoCloseable {
     awaitText("CAgent input check");
     input(connection,new JSONObject().put("kind","text").put("text","Z"));
     awaitText("CAgent input checkZ");pressBackspace(connection);awaitText("CAgent input check");
-    return "PASS encrypted remote input → real Accessibility tap, editable text, scan-code letter, repeated/Unicode/selection backspace, held Shift across tap, fail-stop gesture outcomes and fresh input recovery\n";
+    long actualEvents=serviceEventRevision()-initialEvents;
+    check(actualEvents>0,"Product accessibility event path did not receive native edit events");
+    return "PASS encrypted remote input → real Accessibility tap, editable text, scan-code letter, repeated/Unicode/selection backspace, held Shift across tap, fail-stop gesture outcomes and fresh input recovery; productEvents="+actualEvents+"\n";
+  }
+  private long serviceEventRevision()throws Exception {
+    java.lang.reflect.Field instance=AndroidControlService.class.getDeclaredField("instance");instance.setAccessible(true);
+    Object service=instance.get(null);check(service!=null,"Product accessibility service disconnected");
+    java.lang.reflect.Field revision=AndroidControlService.class.getDeclaredField("editRevision");revision.setAccessible(true);
+    return ((java.util.concurrent.atomic.AtomicLong)revision.get(service)).get();
   }
   private void verifyGestureSettling()throws Exception {
     Class<AndroidControlService> type=AndroidControlService.class;
@@ -214,6 +250,7 @@ final class AndroidInputTest implements AutoCloseable {
   }
   private static void input(AgentConnection connection,JSONObject value)throws Exception {connection.queueDesktopCommand(new JSONObject().put("op","input").put("value",value).toString());}
   public void close(){
+    sampler.shutdownNow();
     UiAutomation automation=test.getUiAutomation(UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES);automation.adoptShellPermissionIdentity(android.Manifest.permission.WRITE_SECURE_SETTINGS);
     try {Settings.Secure.putString(app.getContentResolver(),Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,previousServices);Settings.Secure.putString(app.getContentResolver(),Settings.Secure.ACCESSIBILITY_ENABLED,previousEnabled);}finally{automation.dropShellPermissionIdentity();}
     test.runOnMainSync(()->{if(panel!=null&&panel.getParent() instanceof ViewGroup)((ViewGroup)panel.getParent()).removeView(panel);});
