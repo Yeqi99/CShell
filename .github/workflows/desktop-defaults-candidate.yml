@@ -1,0 +1,60 @@
+name: Core desktop defaults candidates
+on:
+  push:
+    branches: ['codex/desktop-defaults-opensource-0.8.18']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  desktop:
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: macos-latest, platform: mac, arch: arm64}
+          - {os: macos-15-intel, platform: mac, arch: x64}
+          - {os: ubuntu-24.04, platform: linux, arch: x64}
+          - {os: ubuntu-24.04-arm, platform: linux, arch: arm64}
+    runs-on: ${{ matrix.os }}
+    env:
+      CSHELL_EDITION: ''
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/prepare-pty.mjs
+      - run: pnpm build
+      - name: Verify fresh defaults and preserved permissions
+        run: pnpm exec tsx --test --test-timeout=120000 tests/ai-first-install.test.ts
+      - run: pnpm test
+        timeout-minutes: 8
+      - run: pnpm run licenses
+      - run: pnpm exec electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish never
+      - if: matrix.platform == 'mac'
+        name: Verify in-place DMG update
+        run: pnpm exec tsx scripts/mac-update-smoke.ts
+      - if: matrix.platform == 'mac'
+        run: pnpm exec tsx scripts/platform-package-smoke.ts
+      - if: matrix.platform == 'linux'
+        name: Verify packaged Linux application on its native architecture
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb gnome-keyring libsecret-1-0 libsecret-tools
+          dbus-run-session -- xvfb-run -a bash scripts/linux-package-smoke.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: defaults-opensource-${{ matrix.platform }}-${{ matrix.arch }}
+          if-no-files-found: error
+          path: |
+            release/0.8.18/*.dmg
+            release/0.8.18/*.zip
+            release/0.8.18/*.AppImage
+            release/0.8.18/*.deb
