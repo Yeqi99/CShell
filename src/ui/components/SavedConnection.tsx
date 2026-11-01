@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import {LinuxDesktop} from './LinuxDesktop';
 import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, FileKey2, LoaderCircle } from 'lucide-react';
@@ -132,12 +133,7 @@ export function SavedConnection({
             </label>
           )}
           {error && (
-            <p
-              className={cancelled ? 'connection-notice' : 'form-error'}
-              role={cancelled ? 'status' : 'alert'}
-            >
-              {error}
-            </p>
+            cancelled ? <p role="status" className="connection-notice">连接已取消</p> : <ErrorNotice title="连接未完成" error={error}/>
           )}
           <button className="primary" disabled={profile.auth === 'key' && !key && !saved}>
             <ArrowRight size={14} />

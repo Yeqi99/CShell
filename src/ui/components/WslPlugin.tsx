@@ -67,9 +67,7 @@ export function WslPlugin({ onOpen }: { onOpen: (shell: LocalShell) => Promise<v
         <ErrorNotice title="WSL 操作未完成" error={error}/>
       )}
       {setup.message && (
-        <p role="status" className={setup.phase === 'error' ? 'form-error' : 'muted'}>
-          {setup.message}
-        </p>
+        setup.phase === 'error' ? <ErrorNotice title="WSL 安装未完成" error={setup.message}/> : <p role="status" className="muted">{setup.message}</p>
       )}
       {setup.details && (
         <details className="wsl-install-log" open={setup.phase === 'error'}>

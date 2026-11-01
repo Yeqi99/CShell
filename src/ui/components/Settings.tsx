@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import {UsageConsent} from './UsageStats';
 import { LocalEnvironmentSettings } from './LocalEnvironmentSettings';
 import { CloudSettings } from './CloudSettings';
@@ -148,6 +149,7 @@ export function Settings({
         ))}
       </nav>
       <div className="settings-content">
+        {error && <ErrorNotice title="设置未保存" error={error}/>}
         <header className="settings-category-heading">
           <h1>{categories.find(([id]) => id === category)?.[2]}</h1>
           <p>{categoryHelp[category]?.[cn ? 0 : 1]}</p>
@@ -422,10 +424,7 @@ export function Settings({
         </div>
       </div>
       <footer className="settings-savebar">
-        <span role={error ? 'alert' : 'status'} className={error ? 'form-error' : 'muted'}>
-          {error ||
-            (['appearance', 'terminal', 'workspace'].includes(category) ? t('previewHint') : '')}
-        </span>
+        <span role="status" className="muted">{['appearance', 'terminal', 'workspace'].includes(category) ? t('previewHint') : ''}</span>
         <button type="button" className="secondary" disabled={busy || mcp.busy} onClick={onClose}>
           {t('cancel')}
         </button>
