@@ -106,7 +106,7 @@ try {
     .locator('.ai-provider-form input')
     .first()
     .evaluate((el) => el.getBoundingClientRect().height);
-  assert.ok(height <= 34);
+  assert.ok(height >= 36 && height <= 40, `provider field should use the shared 36px settings control, got ${height}`);
   await page.getByLabel('名称', { exact: true }).fill('Local UI fixture');
   await page.getByLabel('API URL', { exact: true }).fill('http://127.0.0.1:9/v1');
   await page.getByLabel('模型 ID', { exact: true }).fill('fixture');
