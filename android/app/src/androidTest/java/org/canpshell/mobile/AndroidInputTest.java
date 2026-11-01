@@ -169,6 +169,9 @@ final class AndroidInputTest implements AutoCloseable {
       awaitWebValue(semantic.get(),"document.getElementById('remoteEdit').value","\"CAgent42\"");
       for(int i=0;i<8;i++)pressBackspace(connection);
       awaitWebValue(semantic.get(),"document.getElementById('remoteEdit').value","\"\"");
+      long settledDeadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(3);
+      while(AndroidControlService.isEditing()&&System.nanoTime()<settledDeadline)Thread.sleep(25);
+      check(!AndroidControlService.isEditing(),"WebView edit did not settle before fixture navigation");
       // Multiple available editors without input focus are not permission to
       // select the first one. A rejected request must leave both DOM values.
       test.runOnMainSync(()->semantic.get().evaluateJavascript("document.activeElement.blur();document.body.innerHTML='<input id=first value=first><input id=second value=second>'",null));
@@ -302,7 +305,7 @@ final class AndroidInputTest implements AutoCloseable {
     input(connection,new JSONObject().put("kind","key").put("code",14).put("down",true));
     input(connection,new JSONObject().put("kind","key").put("code",14).put("down",false));
   }
-  private void awaitText(String expected)throws Exception {AtomicReference<String> actual=new AtomicReference<>("");AtomicReference<String> selection=new AtomicReference<>("");long end=System.nanoTime()+TimeUnit.SECONDS.toNanos(15);while((!expected.equals(actual.get())||AndroidControlService.isEditing())&&System.nanoTime()<end){test.runOnMainSync(()->{actual.set(editor.getText().toString());selection.set(editor.getSelectionStart()+":"+editor.getSelectionEnd()+", focused="+editor.hasFocus());});Thread.sleep(50);}check(expected.equals(actual.get()),"Remote edit mismatch: "+actual.get()+", expected="+expected+", selection="+selection.get()+", service="+AndroidControlService.editState());}
+  private void awaitText(String expected)throws Exception {AtomicReference<String> actual=new AtomicReference<>("");AtomicReference<String> selection=new AtomicReference<>("");long end=System.nanoTime()+TimeUnit.SECONDS.toNanos(15);while((!expected.equals(actual.get())||AndroidControlService.isEditing())&&System.nanoTime()<end){test.runOnMainSync(()->{actual.set(editor.getText().toString());selection.set(editor.getSelectionStart()+":"+editor.getSelectionEnd()+", focused="+editor.hasFocus());});Thread.sleep(50);}check(expected.equals(actual.get())&&!AndroidControlService.isEditing(),"Remote edit mismatch: "+actual.get()+", expected="+expected+", selection="+selection.get()+", service="+AndroidControlService.editState());}
   private void tap(AgentConnection connection,View target)throws Exception {
     AtomicReference<double[]> point=new AtomicReference<>();test.runOnMainSync(()->{int[] at=new int[2];target.getLocationOnScreen(at);android.util.DisplayMetrics metrics=new android.util.DisplayMetrics();app.getSystemService(WindowManager.class).getDefaultDisplay().getRealMetrics(metrics);point.set(new double[]{(at[0]+target.getWidth()/2.0)/metrics.widthPixels,(at[1]+target.getHeight()/2.0)/metrics.heightPixels});});
     input(connection,new JSONObject().put("kind","move").put("x",point.get()[0]).put("y",point.get()[1]));

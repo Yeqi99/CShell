@@ -237,13 +237,12 @@ public final class AndroidControlService extends AccessibilityService {
     {
       AccessibilityNodeInfo node=findFocus(AccessibilityNodeInfo.FOCUS_INPUT);
       if(node!=null){if(node.isFocused()&&node.isEditable())return node;node.recycle();}
-      for(android.view.accessibility.AccessibilityWindowInfo window:getWindows()){
-        try{
+      java.util.List<android.view.accessibility.AccessibilityWindowInfo> windows=getWindows();
+      try{for(android.view.accessibility.AccessibilityWindowInfo window:windows){
           if(window.getType()!=android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION||!window.isFocused())continue;
           AccessibilityNodeInfo root=window.getRoot();if(root==null)continue;
           try{node=root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);if(node!=null){if(node.isFocused()&&node.isEditable())return node;node.recycle();}node=focusedDescendant(root);if(node!=null)return node;}finally{root.recycle();}
-        }finally{window.recycle();}
-      }
+      }}finally{for(android.view.accessibility.AccessibilityWindowInfo window:windows)window.recycle();}
     }
     return null;
   }
