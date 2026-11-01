@@ -29,6 +29,7 @@ final class AndroidAgentHost implements AutoCloseable {
     void requestKeyFrame(); void quality(JSONObject quality)throws Exception;
   }
   private final Backend backend;
+  private final AndroidPhoneCapabilities phone;
   private final AndroidHostIdentity identity;
   private final SharedPreferences prefs;
   private final Set<SSLSocket> sockets=ConcurrentHashMap.newKeySet();
@@ -42,7 +43,7 @@ final class AndroidAgentHost implements AutoCloseable {
   private volatile byte[] passwordDigest; private byte[] passwordSalt;
   private volatile String failure="";
   private final AtomicLong epoch=new AtomicLong();
-  AndroidAgentHost(Context context,Backend backend)throws Exception {this.backend=backend;identity=new AndroidHostIdentity(context);prefs=context.getSharedPreferences("cagent-host-peers",0);}
+  AndroidAgentHost(Context context,Backend backend)throws Exception {this.backend=backend;phone=new AndroidPhoneCapabilities(context);identity=new AndroidHostIdentity(context);prefs=context.getSharedPreferences("cagent-host-peers",0);}
   synchronized void start(int port,String password)throws Exception {
     if(android.os.Build.VERSION.SDK_INT<29)throw new IOException("CAgent host requires Android 10 or newer");
     if(port<1024||port>65535||password==null||password.length()<1||password.length()>128)throw new IOException("Invalid CAgent port or password");
@@ -97,14 +98,15 @@ final class AndroidAgentHost implements AutoCloseable {
     switch(method){
       case "agent.shells":case "agent.environments":case "applications.list":case "agent.logs":return new JSONArray();
       case "packages.tools":{
-        JSONArray tools=new JSONArray();
+        JSONArray tools=phone.tools();
         if(backend.controlAvailable())tools.put(new JSONObject().put("packageId","cagent.android").put("id","android_ui_read").put("toolId","android_ui_read")
           .put("description","Read the current Android accessibility UI; password text is omitted.").put("sideEffect",false)
           .put("permissions",new JSONArray().put("desktop.view")));
         return tools;
       }
       case "packages.invoke":{
-        if(!"cagent.android".equals(params.optString("packageId"))||!"android_ui_read".equals(params.optString("toolId")))throw new IOException("Unknown Android capability");
+        if(!"cagent.android".equals(params.optString("packageId")))throw new IOException("Unknown Android capability");
+        if(!"android_ui_read".equals(params.optString("toolId")))return phone.invoke(owner,params.optString("toolId"),params.optJSONObject("args")==null?new JSONObject():params.getJSONObject("args"));
         if(!backend.controlAvailable())throw new IOException("请先在手机系统设置中启用 CAgent 辅助控制");
         return AndroidControlService.snapshot();
       }
