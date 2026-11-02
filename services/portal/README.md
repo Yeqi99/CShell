@@ -6,15 +6,15 @@
 
 - 首页：`index.html` + `home.css`，单一样式入口。四客户端平台与连接协议分层；`showcase.js` 提供带键盘支持的真实界面导览。
 - 下载：`downloads.html` + `download-picker.css/js`。按产品/平台筛选；保留无JS全部附件访问、原架构与摘要。
-- 文档：`docs/*.html` + `docs-reader.css/js`；24篇文章，全文搜索索引由构建工具生成。首页搜索参数可直达结果。
+- 文档：`docs/*.html` + `docs-reader.css/js`；文档按功能分类，全文搜索索引由构建工具生成。首页搜索参数可直达结果。
 - 调研与设计依据：`docs/PORTAL-DESIGN-RESEARCH-20261024.md`，10个官网与收录来源。
 - 平台事实：CShell/Pro支持Windows、macOS、Linux、Android；CAgent独立包支持Windows/macOS/Linux，Android被控能力在CShell扩展内。不能用OS列表替代连接协议，也不能承诺各系统原生桌面能力相同。
 
 ## 编辑与验证
 
-直接编辑HTML，不用旧生成器覆盖内容。`scripts/build-portal.mjs`验证26个页面、内部链接并生成137个章节索引。`scripts/portal-smoke.cjs`检查4设备选择、所有文档与搜索；`scripts/portal-redesign-smoke.cjs`检查4平台入口、场景切换、320/390/1440布局、图片、首页搜索交接与下载空态。设置PORTAL_ORIGIN可对线上执行新版验证。
+直接编辑HTML，不用旧生成器覆盖内容。`scripts/build-portal.mjs`验证28个页面、内部链接并生成212个章节索引。`scripts/portal-smoke.cjs`检查4设备选择、所有文档与搜索；`scripts/portal-redesign-smoke.cjs`检查4平台入口、场景切换、320/390/1440布局、图片、首页搜索交接与下载空态。设置PORTAL_ORIGIN可对线上执行新版验证。
 
-下载改动必须对比所有既有附件URL与摘要，开源CShell走GitHub，Pro与CAgent走香港源。当前0.8.8，macOS未公证，macOS/Linux实体设备覆盖有限，限制靠近下载操作呈现。
+下载改动必须对比所有既有附件URL与摘要，各产品提供官网直达下载，按开源/Pro与平台架构分离更新渠道。0.8.18发行附件与校验清单以正式发布验收记录为准，macOS未公证，macOS/Linux实体设备覆盖有限，限制靠近下载操作呈现。
 
 ## 发布
 
