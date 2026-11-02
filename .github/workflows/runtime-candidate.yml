@@ -1,7 +1,7 @@
 name: Pro runtime rebuild candidates
 on:
   push:
-    branches: ['codex/runtime-pro-0.8.19']
+    branches: ['codex/runtime-pro-0.8.20']
   workflow_dispatch:
 permissions:
   contents: read
@@ -91,6 +91,6 @@ jobs:
         with:
           name: pro-cagent-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
-            release/0.8.19/CAgent-0.8.19-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz
-            release/0.8.19/CAgent-0.8.19-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz.sha256
+            release/0.8.20/CAgent-0.8.20-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz
+            release/0.8.20/CAgent-0.8.20-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz.sha256
           if-no-files-found: error

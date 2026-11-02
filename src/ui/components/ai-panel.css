@@ -666,6 +666,29 @@
   font-size: 11px;
   line-height: 1.6;
 }
+.permission-application-list {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.permission-global-section label.permission-application-option {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  line-height: 1.5;
+  min-width: 0;
+}
+.permission-application-option:hover,
+.permission-application-option:focus-within { background: var(--hover); }
+.permission-application-option > input[type='checkbox'] { margin: 2px 0 0; }
+.permission-application-option > span { min-width: 0; overflow-wrap: anywhere; }
+.permission-option-title { display: block; }
+.permission-application-option small { margin-top: 5px; }
+.permission-application-option.permission-location { outline-offset: -2px; }
 .permission-default-tools {
   display: flex;
   flex-wrap: wrap;

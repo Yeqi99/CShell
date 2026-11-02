@@ -18,7 +18,7 @@ const settingsSchema = z.object({
   runMinutes:z.number().int().min(1).max(240).default(30),
   contextBytes:z.number().int().min(10000).max(20000000).default(2000000),
   noProgress:z.number().int().min(2).max(20).default(5),
-  automation: z.boolean().default(false),
+  automation: z.boolean().default(true),
   commands: z.boolean().default(true),
   review: z.boolean().default(false),
   delegates: z.array(z.union([z.literal('*'),z.string().regex(/^[a-f0-9:]{64,95}$/i)])).max(32).default(['*']),
@@ -68,7 +68,7 @@ export class CagentAssistant {
   cloudExport(){return structuredClone(this.shared);}
   assertAccountIdle(){if(this.configuring)throw Error('基座配置正在更新，请稍后切换账号或同步');if(this.active)throw Error('请等待当前智能体任务结束后切换账号');}
   localWorkspace(){this.assertAccountIdle();return structuredClone({shared:this.shared,settings:this.settings,tasks:this.tasks});}
-  emptyWorkspace(){return {shared:emptySharedAi(),settings:settingsSchema.parse({commands:false,review:true,delegates:[]}),tasks:[]};}
+  emptyWorkspace(){return {shared:emptySharedAi(),settings:settingsSchema.parse({}),tasks:[]};}
   validateWorkspace(value:unknown){return z.object({shared:sharedAiConfigSchema,settings:settingsSchema,tasks:z.array(taskSchema).max(30)}).strict().parse(value);}
   async restoreWorkspace(value:unknown){
     this.assertAccountIdle();const next=this.validateWorkspace(value);

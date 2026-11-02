@@ -26,6 +26,24 @@ async function fixture(){
  await service.load();return {service,data,get executions(){return executions;},revoke:()=>{allowed=false;}};
 }
 async function until(fn:()=>boolean){for(let n=0;n<100;n++){if(fn())return;await new Promise(r=>setTimeout(r,10));}throw new Error('timeout');}
+test('new signed-in workspace retains fresh assistant defaults without importing another workspace grants',async()=>{
+ const f=await fixture();try{
+  const fresh=f.service.emptyWorkspace();
+  assert.equal(fresh.settings.commands,true);assert.equal(fresh.settings.review,false);
+  assert.equal(fresh.settings.automation,true);assert.deepEqual(fresh.settings.delegates,['*']);
+  await f.service.restoreWorkspace(fresh);
+  assert.deepEqual(f.service.list('a'.repeat(64)),[]);
+  f.service.authorizeAutomation('a'.repeat(64));
+  f.revoke();assert.throws(()=>f.service.list('a'.repeat(64)),/未授权/);
+  await f.service.configure({...config,commands:false,automation:false,review:true,delegates:[]});
+  const optedOut=f.service.localWorkspace();
+  await f.service.restoreWorkspace(fresh);await f.service.restoreWorkspace(optedOut);
+  const saved=f.service.snapshot();assert.equal(saved.commands,false);assert.equal(saved.automation,false);
+  assert.equal(saved.review,true);assert.deepEqual(saved.delegates,[]);
+  await f.service.cloudImport(fresh.shared);
+  assert.equal(f.service.snapshot().commands,false);assert.equal(f.service.snapshot().automation,false);
+ }finally{await f.service.close();}
+});
 test('cagent fresh defaults, explicit opt-out, approval, task ownership, live revocation and encrypted-store contract',async()=>{
  const f=await fixture();try{
  assert.equal(f.service.snapshot().commands,true);assert.equal(f.service.snapshot().model,'');await f.service.configure({...config,commands:false,delegates:[]});assert(!('key' in f.service.snapshot()));
