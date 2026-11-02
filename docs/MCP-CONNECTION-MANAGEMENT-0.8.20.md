@@ -1,0 +1,11 @@
+# MCP connection management and recovery (0.8.20)
+
+The authenticated MCP/HTTP API now exposes `permission_diagnostics`, `connection_preflight`, `session_list`, and paged `task_list`. Lists contain only this caller’s currently authorized sessions/tasks. Task IDs and output cursors support reconnecting the API transport within the current CShell process; application restart is not durable task recovery, and unknown operations must not be replayed.
+
+Saved connection tools are `connection_list`, `connection_create`, `connection_update`, `connection_credentials`, `connection_probe`, and `connection_accept`. The independent application grants are `connections.read`, `connections.manage`, `credentials.manage`, and `identity.trust`. Saving a connection does not authorize connecting to it. Existing targets also require the caller’s target scope. Supplying credentials during creation additionally requires `credentials.manage`. Existing policies do not acquire these new grants automatically.
+
+`connection_preflight` checks saved configuration/provider availability, credential presence and the SSH trust pin without network activity. `connection_probe` performs an actual SSH handshake without authentication and returns a short-lived owner/account/revision-bound fingerprint challenge; explicit `connection_accept` records that observed pin. Changed existing keys are refused, and jump-host probes cannot silently bypass the configured transport. Credentials are not returned or included in audit/confirmation arguments.
+
+SSH `execute_command` and provider invocation return separate stdout, stderr and the actual exitCode, including nonzero exits. Structured results retain a bounded tail of 16,000 UTF-16 units for each stream and expose truncation flags. The legacy top-level tool keeps `output` as the stdout compatibility field. Existing internal installation callers retain the old throwing-on-nonzero behavior.
+
+Validation: real authenticated HTTP with two API clients, real SSH handshake and failed command (exit 7/23), independent credential/trust grants, unauthorized save-to-connect rejection, cross-owner session/task isolation, audit secret exclusion, pagination/revocation, legacy command compatibility. The targeted 27-test suite and TypeScript check passed. These tests use isolated fixture servers/data, not user machine credentials.
