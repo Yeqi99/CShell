@@ -25,3 +25,15 @@ test('account route restore preserves chosen unavailable exit without connecting
  await assert.rejects(route.fetch('https://example.invalid'),/offline/);assert.equal(connects,1);await loaded.close();
  }finally{await route.close();await rm(dir,{recursive:true,force:true});}
 });
+test('cloud local exits never overwrite device selection and fresh device stays system',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'cshell-route-local-'));const codec={encryptPrivate:async(s:string)=>s,decryptPrivate:async(s:string)=>s};
+ const route=new ApplicationNetworkRoute(dir,codec as any);
+ try {await route.load();for(const value of [{mode:'direct'},{mode:'proxy',url:'http://127.0.0.1:7897'},{mode:'system'}]){await route.cloudImport(value);assert.deepEqual(route.cloudExport(),{mode:'system'});}
+ await route.save({mode:'direct'});await route.cloudImport({mode:'system'});assert.deepEqual(route.cloudExport(),{mode:'direct'});
+ const restarted=new ApplicationNetworkRoute(dir,codec as any);await restarted.load();await restarted.cloudImport({mode:'machine',id:'88cf3f77-74f1-4201-9920-aa7c8b97d173'});assert.deepEqual(restarted.cloudExport(),{mode:'direct'});await restarted.close();
+ }finally{await route.close();await rm(dir,{recursive:true,force:true});}
+});
+test('failed cloud transaction restores fresh default without persisting a foreign route',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'cshell-route-rollback-'));const codec={encryptPrivate:async(s:string)=>s,decryptPrivate:async(s:string)=>s};const route=new ApplicationNetworkRoute(dir,codec as any);
+ try{await route.load();const checkpoint=route.cloudCheckpoint();await route.cloudImport({mode:'machine',id:'88cf3f77-74f1-4201-9920-aa7c8b97d173'});await route.cloudRestore(checkpoint);const restarted=new ApplicationNetworkRoute(dir,codec as any);await restarted.load();assert.deepEqual(restarted.cloudCheckpoint(),{route:{mode:'system'},saved:false});await restarted.close();}finally{await route.close();await rm(dir,{recursive:true,force:true});}
+});

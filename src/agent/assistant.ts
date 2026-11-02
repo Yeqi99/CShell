@@ -14,7 +14,7 @@ const settingsSchema = z.object({
   runMinutes:z.number().int().min(1).max(240).default(30),
   contextBytes:z.number().int().min(10000).max(20000000).default(2000000),
   noProgress:z.number().int().min(2).max(20).default(5),
-  automation: z.boolean().default(false),
+  automation: z.boolean().default(true),
   commands: z.boolean().default(true),
   review: z.boolean().default(false),
   delegates: z.array(z.union([z.literal('*'),z.string().regex(/^[a-f0-9:]{64,95}$/i)])).max(32).default(['*']),

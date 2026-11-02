@@ -1,7 +1,7 @@
 name: Core Android candidate
 on:
   push:
-    branches: ['codex/candidate-core-0.8.19']
+    branches: ['codex/candidate-core-0.8.20']
   workflow_dispatch:
 permissions:
   contents: read

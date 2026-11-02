@@ -1042,7 +1042,7 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
               <div role="menu">
                 <button role="menuitem" onClick={e=>{e.currentTarget.closest('details')!.open=false;setLinuxModes(v=>({...v,[active]:false}));}}><TerminalIcon size={15}/>SSH 终端</button>
                 <button role="menuitem" onClick={e=>{e.currentTarget.closest('details')!.open=false;setLinuxWorkspaces(v=>v.includes(active)?v:[...v,active]);setLinuxModes(v=>({...v,[active]:true}));}}><LayoutDashboard size={15}/>CShell 可视化桌面</button>
-                <button role="menuitem" disabled={!!current.closed} onClick={e=>{e.currentTarget.closest('details')!.open=false;setLinuxWorkspaces(v=>v.includes(active)?v:[...v,active]);setLinuxModes(v=>({...v,[active]:true}));setNativeDesktopRequests(v=>({...v,[active]:(v[active]??0)+1}));}}><Monitor size={15}/>服务器原生桌面</button>
+                <button role="menuitem" disabled={!!current.closed} onClick={e=>{e.currentTarget.closest('details')!.open=false;setLinuxWorkspaces(v=>v.includes(active)?v:[...v,active]);setLinuxModes(v=>({...v,[active]:true}));setNativeDesktopRequests(v=>({...v,[active]:(v[active]??0)+1}));}}><Monitor size={15}/>检测服务器桌面</button>
               </div>
             </details>}
             {navigator.platform.startsWith('Win') && (
