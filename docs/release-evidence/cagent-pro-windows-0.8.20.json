@@ -1,0 +1,23 @@
+{
+  "sha256": "71fc2178181cfbd5c6f56261cb00f0fff0a1a4104a25301f7cd04241a5724fff",
+  "source": "fcdc510189f7cf0738b60da9ffc551974d9f99f6",
+  "bytes": 26228508,
+  "deployment": "C:\\Users\\35097\\.codex\\worktrees\\pro-020-model-market\\CShell\\.local\\cagent-020-final-fcdc510-deployment",
+  "status": "verified-candidate-not-published",
+  "stage": "C:\\Users\\35097\\.codex\\worktrees\\pro-020-model-market\\CShell\\.local\\cagent-020-final-fcdc510",
+  "version": "0.8.20",
+  "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-020-model-market\\CShell\\.local\\CAgent-Setup-0.8.20-win-x64.exe",
+  "edition": "pro",
+  "preparedPath": "C:\\Users\\35097\\AppData\\Local\\Temp\\cagent-020-prepare-pro-7b3409c366ae461ca9fe25538ceb037f\\versions\\0.8.20-ea91af37a356dade",
+  "payloadCount": 48,
+  "authenticode": "NotSigned",
+  "verifiedAt": "2026-11-02T08:52:04.6421665Z",
+  "validation": [
+    "Exact EXE /S /PREPARE isolated version directory; all 48 payload sizes and SHA256 match",
+    "Actual packaged CMD PTY, TLS, restricted authorization rejection, clean stop",
+    "Native host read reconnect; mutation not replayed; concurrent single replacement; shared runtime preserved; 401/403 not retried",
+    "Actual packaged WPF market fixture at 340/540/900; draft retained; install does not grant; no overflow",
+    "Actual packaged account API and encrypted guest appearance restart",
+    "Actual native models, automation, appearance and identity isolation; invalid test invocation rejected before runtime"
+  ]
+}
