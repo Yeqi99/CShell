@@ -1,6 +1,6 @@
 import type { Session } from 'electron';
 import { randomUUID } from 'node:crypto';
-import { readFile, writeFile, rename } from 'node:fs/promises';
+import { readFile, writeFile, rename, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { networkRouteSchema, type NetworkRoute, type NetworkRouteStatus } from '../shared/network-route';
 import type { Store } from '../core/store';
@@ -8,6 +8,7 @@ import type { Store } from '../core/store';
 /** Dedicated application requests; never changes the browser or OS proxy. */
 export class ApplicationNetworkRoute {
   private route: NetworkRoute = { mode: 'system' };
+  private hasSavedRoute = false;
   private current?: Session;
   private control?:Session;
   async captureControlProxy(previous:import('./system-proxy').SystemProxyState){
@@ -34,6 +35,7 @@ export class ApplicationNetworkRoute {
     try {
       this.route = networkRouteSchema.parse(JSON.parse(await this.store.decryptPrivate(
         await readFile(join(this.directory, 'network-route.enc'), 'utf8'))));
+      this.hasSavedRoute = true;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw new Error('网络出口配置无法读取，已保留原文件');
     }
@@ -43,11 +45,18 @@ export class ApplicationNetworkRoute {
   }
   cloudExport(){return structuredClone(this.route);}
   cloudValidate(input:unknown){return networkRouteSchema.parse(input);}
-  async cloudImport(input:unknown){await this.save(input,false);}
-  async save(input: unknown, connect = true) {
+  // System/direct/manual exits depend on this device's network environment.
+  // Retain the old cloud field without letting a different computer replace it.
+  async cloudImport(input:unknown){await this.save(input,false,true);}
+  cloudCheckpoint(){return {route:this.cloudExport(),saved:this.hasSavedRoute};}
+  async cloudRestore(input:{route:NetworkRoute;saved:boolean}){
+    await this.save(input.route,false,false,input.saved);
+  }
+  async save(input: unknown, connect = true, fromCloud = false, restoredSaved?:boolean) {
     const next = networkRouteSchema.parse(input);
     const task = this.queue.catch(() => {}).then(async () => {
       if (this.closed) throw new Error('网络服务已关闭');
+      if(fromCloud && (this.hasSavedRoute || next.mode !== 'machine')) return this.status();
       if (next.mode === 'machine' && connect) {
         if (!this.machine) throw new Error('当前版本不支持机器网络出口');
         await this.machine.proxy(next.id);
@@ -55,7 +64,9 @@ export class ApplicationNetworkRoute {
       const file = join(this.directory, 'network-route.enc');
       await writeFile(file + '.tmp', await this.store.encryptPrivate(JSON.stringify(next)), { mode: 0o600 });
       await rename(file + '.tmp', file);
+      if(restoredSaved===false) await unlink(file);
       this.route = next;
+      this.hasSavedRoute = restoredSaved ?? true;
       const previous = this.current;
       this.current = undefined;
       // Explicit application of a new route invalidates pooled old connections.

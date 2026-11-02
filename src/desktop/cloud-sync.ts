@@ -114,7 +114,7 @@ export async function registerCloudHandlers(
       await writeFile(join(directory, 'appearance', name), Buffer.from(encoded, 'base64'));
     const stages: CloudImportStage[] = [];
     if(data.identityNetwork!==undefined&&identityNetwork)stages.push({read:()=>identityNetwork.cloudExport(),value:data.identityNetwork,apply:value=>identityNetwork.cloudImport(value),restore:value=>identityNetwork.cloudImport(value)});
-    if(data.networkRoute!==undefined&&network)stages.push({read:()=>network.cloudExport(),value:network.cloudValidate(data.networkRoute),apply:value=>network.cloudImport(value),restore:value=>network.cloudImport(value)});
+    if(data.networkRoute!==undefined&&network)stages.push({read:()=>network.cloudCheckpoint(),value:network.cloudValidate(data.networkRoute),apply:value=>network.cloudImport(value),restore:value=>network.cloudRestore(value as ReturnType<typeof network.cloudCheckpoint>)});
     if (data.desktopLooks !== undefined && desktopLooks) stages.push({
       read: () => desktopLooks.cloudExport(), value: desktopLooks.cloudValidate(data.desktopLooks),
       apply: value => desktopLooks.cloudImport(value), restore: value => desktopLooks.cloudImport(value, true),
