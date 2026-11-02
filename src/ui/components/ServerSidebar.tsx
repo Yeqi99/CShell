@@ -16,6 +16,7 @@ import {
   Pencil,
   Plus,
   Search,
+  Share2,
   Server,
   Globe,
   Star,
@@ -40,6 +41,7 @@ export function ServerSidebar({
   onOpen,
   onConnect,
   onVisual,
+  onShare,
   onSave,
   onMove,
   onDelete,
@@ -56,6 +58,7 @@ export function ServerSidebar({
   onOpen: (p?: Profile) => void;
   onConnect: (p: Profile) => void;
   onVisual?: (p: Profile) => void;
+  onShare?: (p: Profile) => void;
   onSave: (p: Profile) => Promise<void>;
   onMove?: (id: string, group: string, before?: string) => Promise<void>;
   onDelete: (p: Profile) => void;
@@ -581,6 +584,7 @@ export function ServerSidebar({
             ) : (
               <>
                 <div className="context-caption">{menu.profile.name}</div>
+                {onShare&&<button role="menuitem" onClick={()=>{onShare(menu.profile);closeMenu();}}><Share2 size={14}/>{locale==='zh-CN'?'分享机器…':'Share machine…'}</button>}
                 {onVisual && !['http','ftp','ftps','sftp'].includes(menu.profile.protocol??'ssh') && <button role="menuitem" onClick={() => {onVisual(menu.profile);closeMenu();}}><Server size={14}/>{locale === 'zh-CN' ? '打开可视化桌面' : 'Open visual desktop'}</button>}
                 {['ssh','rdp'].includes(menu.profile.protocol??'ssh')&&<button role="menuitemcheckbox" aria-checked={connectionUsesVisual(menu.profile,preferences)} disabled={working} onClick={()=>{setWorking(true);const current=profiles.find(item=>item.id===menu.profile.id)??menu.profile;void onSave({...current,defaultConnectionView:connectionUsesVisual(current,preferences)?'original':'visual'}).then(()=>closeMenu()).catch(report).finally(()=>setWorking(false));}}><span style={{width:14,display:'flex'}}>{connectionUsesVisual(menu.profile,preferences)&&<Check size={14}/>}</span>{locale==='zh-CN'?'默认以可视化打开':'Open in visual mode by default'}</button>}
                 <button

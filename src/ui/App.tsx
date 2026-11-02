@@ -285,6 +285,7 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
     [confirmDelete, setConfirmDelete] = useState<Profile | null>(null),
     [confirmClose, setConfirmClose] = useState<Tab | null>(null);
   const [accountOpen,setAccountOpen]=useState(false);
+  const [shareRequest,setShareRequest]=useState<{id:string;name:string;nonce:number}>();
   const [linuxWorkspaces,setLinuxWorkspaces]=useState<string[]>([]);
   const [classroomTabs,setClassroomTabs]=useState<ClassroomSource[]>([]),[classroomId,setClassroomId]=useState('');
   const [classroomStatus,setClassroomStatus]=useState<ClassroomStatus|null>(null);
@@ -785,6 +786,7 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
               onOpen={(p) => openConnection(p || 'new')}
               onConnect={openSaved}
               onVisual={profile => openSaved(profile, true)}
+              onShare={isPro?profile=>{setShareRequest({id:profile.id,name:profile.name,nonce:Date.now()});setAccountOpen(true);setSurface("account");}:undefined}
               onSave={saveProfile}
               onMove={async (id, group, before) => { await window.cshell.moveProfile!(id, group, before); await refresh(); }}
               onManageGroup={async (action) => {
@@ -1290,7 +1292,7 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
               />
             </div>
           )}
-          {accountOpen && <div className="workspace-editor account-workspace" hidden={surface!=="account"}><CloudSettings/></div>}
+          {accountOpen && <div className="workspace-editor account-workspace" hidden={surface!=="account"}><CloudSettings shareRequest={shareRequest}/></div>}
           {viewsOpen && <div className="workspace-editor" hidden={surface !== 'views'}><MonitorViews config={config}/></div>}{machines.map(m=><div key={m.target.id} className="workspace-editor" hidden={surface!=='machine'||machineId!==m.target.id}><AgentMachineWorkspace onConnectionState={connected=>setMachineConnectionState(v=>v[m.target.id]===connected?v:{...v,[m.target.id]:connected})} onDisconnect={()=>closeMachine(m.target.id)} device={m.device} target={m.target} preferences={preferences} onSessionCount={(count,ids)=>{setMachineSessionCounts(v=>v[m.target.id]===count?v:{...v,[m.target.id]:count});setMachineSessionIds(v=>JSON.stringify(v[m.target.id])===JSON.stringify(ids)?v:{...v,[m.target.id]:ids});}} active={surface==='machine'&&machineId===m.target.id}/></div>)}
           <div className="workspace-editor" hidden={surface !== 'home' && !(surface === 'terminal' && !tabs.length)}>
             <WorkbenchHome config={config} active={surface === 'home' || (surface === 'terminal' && !tabs.length)} currentCount={currentSsh.length + currentDevices.length}

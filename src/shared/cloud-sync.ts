@@ -29,7 +29,7 @@ export interface AccountDiscoveryStatus {enabled:boolean;devices:{id:string;onli
 export interface CloudBridge extends importAccountBridge {
   cloudDiscovery(enabled?:boolean):Promise<AccountDiscoveryStatus>;
   cloudNetwork(input?:{source:string;target:string|null}):Promise<{mode:'applications';routes:{source:string;target:string}[];devices:{id:string;name:string}[]}>;
-  cloudLending(input:{action:'list'|'create'|'redeem'|'revoke';body?:Record<string,unknown>}):Promise<{devices?:{id:string;name:string}[];loans?:{id:string;owned:boolean;deviceIds:string[];email?:string;expiresAt:number;maxUses:number;revoked:boolean;uses:number}[];shareCode?:string;id?:string}>;
+  cloudLending(input:{action:'list'|'create'|'redeem'|'revoke';body?:Record<string,unknown>}):Promise<{devices?:{id:string;name:string}[];loans?:{id:string;owned:boolean;accepted?:boolean;deviceIds:string[];email?:string;expiresAt:number;maxUses:number;revoked:boolean;uses:number}[];shareCode?:string;id?:string}>;
   cloudMemory():Promise<import('./account-memory').AccountHabit[]>;
   cloudRemember(input:{id?:string;text:string}):Promise<import('./account-memory').AccountHabit[]>;
   cloudForget(id:string):Promise<import('./account-memory').AccountHabit[]>;

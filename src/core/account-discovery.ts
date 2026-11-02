@@ -16,8 +16,8 @@ export class AccountDiscovery {
   private path(id:string){return join(this.directory,'account-discovery-'+createHash('sha256').update(id).digest('hex')+'.json');}
   private exclusive<T>(fn:()=>Promise<T>):Promise<T>{const result=this.serial.then(fn);this.serial=result.catch(()=>{});return result;}
   private async load(){const id=this.accountId();if(id===this.account)return;this.account=id;this.value={enabled:false,devices:[],pending:0};if(!id)return;
-    try{const data=JSON.parse(await readFile(this.path(id),'utf8'));this.value.enabled=data.enabled===true;}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e;}}
-  status(){return structuredClone(this.value);}
+    try{const data=JSON.parse(await readFile(this.path(id),'utf8'));if(this.accountId()!==id)return;this.value.enabled=data.enabled===true;}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e;}}
+  status():AccountDiscoveryStatus{return this.accountId()===this.account?structuredClone(this.value):{enabled:false,devices:[],pending:0};}
   get(){return this.exclusive(async()=>{await this.load();return this.status();});}
   set(enabled:boolean){return this.exclusive(async()=>{await this.load();const id=this.account;if(!id)throw Error('请先登录账号');
     const file=this.path(id);await writeFile(file+'.tmp',JSON.stringify({enabled}),{mode:0o600});
