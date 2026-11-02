@@ -1,7 +1,7 @@
 name: Core runtime rebuild candidates
 on:
   push:
-    branches: ['codex/runtime-core-0.8.18']
+    branches: ['codex/runtime-core-0.8.19']
   workflow_dispatch:
 permissions:
   contents: read
