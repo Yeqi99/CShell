@@ -29,6 +29,7 @@ import { fileChunkOutput } from './api/sftp-read';
 import { ServerPages, serverPageInput } from './api/server-pages';
 import { baseResultSchemas, baseResultJson } from './api/result-contracts';
 import { ApiTasks } from './api/tasks';
+import { preflightSsh, uncheckedStages } from './api/connection-preflight';
 import { ConnectionManagement, connectionManagementSchema, sshEndpoint } from './api/connection-management';
 import { createSshManager } from './connections/ssh-provider';
 import { profileProvider } from '../shared/file-connections';
@@ -1192,15 +1193,22 @@ export class McpService {
       'connection_preflight',
       {
         description:
-          'Inspect an authorized saved target before connecting: installed provider, credential presence and SSH trust pin. No login, shell or network mutation; missing state is not a successful connectivity test.',
-        inputSchema: { profileId: z.string().uuid() },
+          'Inspect an authorized saved target. probe=true performs one bounded SSH/SFTP network, pinned-host and saved-credential authentication check without shell/commands or trust changes. Untrusted/changed identity never receives credentials. Jump transports are explicitly unsupported, never bypassed.',
+        inputSchema: { profileId: z.string().uuid(), probe:z.boolean().default(false) },
         annotations: { readOnlyHint: true },
         permission: 'Authorized saved target',
         target: 'saved-profile',
       },
-      async ({ profileId }) =>
-        run('connection_preflight', () => {
+      async ({ profileId, probe }) =>
+        run('connection_preflight', async () => {
           const p = this.allowed(profileId, owner);
+          const revision=this.store.connectionRevision(profileId),pin=this.store.host(sshEndpoint(p));
+          const guard=()=>{
+            this.allowed(profileId,owner);
+            if(generation!==this.generation||revision!==this.store.connectionRevision(profileId)||pin!==this.store.host(sshEndpoint(p)))throw new ApiError('FORBIDDEN','Connection or authorization changed during preflight.','Inspect current settings before retrying.');
+          };
+          const result=probe?await preflightSsh(p,pin,await this.store.secret(profileId),guard,signal):{stages:uncheckedStages(),reason:'configuration_only'};
+          guard();
           return {
             profileId,
             providerId: profileProvider(p),
@@ -1208,7 +1216,8 @@ export class McpService {
             hostIdentityTrusted: ['ssh', 'sftp'].includes(p.protocol ?? 'ssh')
               ? Boolean(this.store.host(sshEndpoint(p)))
               : null,
-            networkTested: false,
+            networkTested: result.stages.network.checked,
+            ...result,
           };
         }),
     );
