@@ -125,7 +125,7 @@ try {
     await new Promise((r) => setTimeout(r, 50));
   assert.ok(server.shellInputs.join('').includes(marker), 'Packaged terminal must transmit input');
   stage('Terminal input verified; opening files');
-  await page.getByRole('button',{name:'最小化终端',exact:true}).click();
+  await page.getByRole('button',{name:/^最小化\s*终端$/}).click();
   await page.locator('.linux-desktop:visible .desktop-icons').getByRole('button',{name:'文件',exact:true}).dblclick();
   await page.locator('.linux-desktop:visible').getByText('hello.txt', { exact: true }).waitFor();
   await mkdir('test-results', { recursive: true });
