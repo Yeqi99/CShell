@@ -23,6 +23,7 @@ final class AndroidAgentHost implements AutoCloseable {
   interface Events { void video(JSONObject info); void frame(byte[] annexB,long timestampUs,boolean key); void error(String reason); }
   interface Backend {
     boolean available(); boolean controlAvailable();
+    default boolean delegation(String device,String credential,String fingerprint,boolean continuation){return false;}
     default String unavailableReason(){return "请在手机上开始屏幕共享并确认系统授权";}
     void start(JSONObject quality,Events events)throws Exception;
     void stop(); void input(JSONObject event)throws Exception; void releaseInput();
@@ -40,6 +41,11 @@ final class AndroidAgentHost implements AutoCloseable {
   private volatile ThreadPoolExecutor clients;
   private volatile ScheduledExecutorService timer;
   private volatile Desktop desktop;
+  private volatile String cloudOwner=""; private byte[] cloudPasswordDigest;
+  private final Set<String> cloudPeers=ConcurrentHashMap.newKeySet();
+  synchronized void accountPassword(String owner,String password)throws Exception{if(!cloudOwner.equals(owner)){cloudPeers.clear();cloudOwner=owner;}cloudPasswordDigest=password==null?null:passwordHash(password);}
+  synchronized void clearAccount(){Desktop d=desktop;if(d!=null&&cloudPeers.contains(d.owner)&&!prefs.getBoolean("peer."+d.owner,false))d.close();cloudOwner="";cloudPasswordDigest=null;cloudPeers.clear();}
+  private boolean authorized(String owner){return prefs.getBoolean("peer."+owner,false)||cloudPeers.contains(owner);}
   private volatile byte[] passwordDigest; private byte[] passwordSalt;
   private volatile String failure="";
   private final AtomicLong epoch=new AtomicLong();
@@ -75,19 +81,30 @@ final class AndroidAgentHost implements AutoCloseable {
   JSONObject status()throws JSONException{return new JSONObject().put("running",listener!=null&&!listener.isClosed()).put("deviceId",identity.id).put("port",listener==null?0:listener.getLocalPort()).put("bind","0.0.0.0").put("sharing",backend.available()).put("accessibilityEnabled",backend.controlAvailable()).put("connections",sockets.size()).put("error",failure);}
   JSONObject connectionInfo(String host,int port)throws Exception {if(host==null||!host.matches("[a-zA-Z0-9.:-]{1,253}")||port<1||port>65535)throw new IOException("Invalid public endpoint");return new JSONObject().put("protocol",1).put("deviceId",identity.id).put("name",name()).put("certificate",identity.pem()).put("host",host).put("port",port);}
   private String name(){return (android.os.Build.MANUFACTURER+" "+android.os.Build.MODEL).trim();}
-  synchronized void stop(){epoch.incrementAndGet();SSLServerSocket old=listener;listener=null;try{if(old!=null)old.close();}catch(IOException ignored){}Desktop d=desktop;if(d!=null)d.close();for(SSLSocket s:sockets)try{s.close();}catch(IOException ignored){}sockets.clear();pending.clear();if(clients!=null)clients.shutdownNow();if(timer!=null)timer.shutdownNow();passwordDigest=null;backend.releaseInput();}
+  synchronized void stop(){epoch.incrementAndGet();SSLServerSocket old=listener;listener=null;try{if(old!=null)old.close();}catch(IOException ignored){}Desktop d=desktop;if(d!=null)d.close();for(SSLSocket s:sockets)try{s.close();}catch(IOException ignored){}sockets.clear();pending.clear();if(clients!=null)clients.shutdownNow();if(timer!=null)timer.shutdownNow();passwordDigest=null;clearAccount();backend.releaseInput();}
   public void close(){stop();}
   private void serve(SSLSocket socket,long generation){
-    boolean desktopProtocolOwned=false;
-    try {socket.setSoTimeout(10000);socket.setTcpNoDelay(true);socket.startHandshake();String owner=AndroidHostIdentity.fingerprint(socket.getSession().getPeerCertificates()[0].getEncoded());boolean authenticated=false;InputStream in=new BufferedInputStream(socket.getInputStream());OutputStream out=socket.getOutputStream();
+    boolean desktopProtocolOwned=false;ScheduledFuture<?> delegatedWatch=null;
+    try {socket.setSoTimeout(10000);socket.setTcpNoDelay(true);socket.startHandshake();String owner=AndroidHostIdentity.fingerprint(socket.getSession().getPeerCertificates()[0].getEncoded());boolean authenticated=false;String delegatedToken=null;InputStream in=new BufferedInputStream(socket.getInputStream());OutputStream out=socket.getOutputStream();
       while(epoch.get()==generation&&!socket.isClosed()){
         JSONObject request=line(in,131072);String id=request.getString("id"),op=request.getString("op");if(id.length()>128)throw new IOException("Request identity length");Object result;
         try {
           if(op.equals("info")&&!authenticated)result=new JSONObject().put("protocol",1).put("deviceId",identity.id).put("name",name());
-          else if(op.equals("auth")&&!authenticated){JSONObject p=request.getJSONObject("payload");pair(owner,p,generation);authenticated=true;result=new JSONObject().put("protocol",1).put("deviceId",identity.id).put("shells",new JSONArray()).put("capabilities",new JSONArray().put("agent.manage"));socket.setSoTimeout(45000);}
-          else {if(!authenticated||!prefs.getBoolean("peer."+owner,false)||epoch.get()!=generation)throw new IOException("CAgent authentication required");
+          else if(op.equals("auth")&&!authenticated){JSONObject p=request.getJSONObject("payload");
+            if(p.has("delegation")){
+              String credential=p.getString("delegation");if(!credential.matches("[a-f0-9]{64}")||!backend.delegation(identity.id,credential,owner,false))throw new IOException("Borrowed device authorization expired");
+              delegatedToken=credential;final AtomicBoolean checking=new AtomicBoolean();final AtomicLong checkStarted=new AtomicLong();
+              delegatedWatch=timer.scheduleAtFixedRate(()->{
+                if(socket.isClosed())return;
+                if(checking.get()){if(System.nanoTime()-checkStarted.get()>TimeUnit.SECONDS.toNanos(5))try{socket.close();}catch(IOException ignored){}return;}
+                checking.set(true);checkStarted.set(System.nanoTime());
+                try{clients.execute(()->{try{if(!backend.delegation(identity.id,credential,owner,true))socket.close();}catch(Exception ignored){try{socket.close();}catch(IOException ignored2){}}finally{checking.set(false);}});}catch(RejectedExecutionException e){try{socket.close();}catch(IOException ignored){}}
+              },2,2,TimeUnit.SECONDS);
+            }else pair(owner,p,generation);authenticated=true;result=new JSONObject().put("protocol",1).put("deviceId",identity.id).put("shells",new JSONArray()).put("capabilities",new JSONArray().put("agent.manage"));socket.setSoTimeout(45000);}
+          else {if(!authenticated||(delegatedToken==null&&!authorized(owner))||epoch.get()!=generation)throw new IOException("CAgent authentication required");
+            if(delegatedToken!=null&&!backend.delegation(identity.id,delegatedToken,owner,true))throw new IOException("Borrowed device authorization expired");
             if(op.equals("ping"))result=new JSONObject();
-            else if(op.equals("manage")){JSONObject p=request.getJSONObject("payload");result=manage(owner,p.getString("method"),p.optJSONObject("params"));}
+            else if(op.equals("manage")){JSONObject p=request.getJSONObject("payload");String method=p.getString("method");if(delegatedToken!=null&&method.matches("^(connection\\.|account\\.|relay\\.|hosting\\.|packages\\.(grant|install|uninstall)|assistant\\.configure).*"))throw new IOException("借用连接不能修改设备身份与授权");result=manage(owner,method,p.optJSONObject("params"));}
             else if(op.equals("desktop-stream")){writeLine(out,new JSONObject().put("id",id).put("result",new JSONObject().put("desktopStream",true)));desktopProtocolOwned=true;new Desktop(socket,in,out,owner,generation).run();return;}
             else throw new IOException("Operation is not supported by Android CAgent");
           }
@@ -99,12 +116,12 @@ final class AndroidAgentHost implements AutoCloseable {
           writeLine(out,new JSONObject().put("id",id).put("error",safe(e)));if(!authenticated)return;
         }
       }
-    }catch(Exception ignored){}finally{sockets.remove(socket);try{socket.close();}catch(IOException ignored){}}
+    }catch(Exception ignored){}finally{if(delegatedWatch!=null)delegatedWatch.cancel(false);sockets.remove(socket);try{socket.close();}catch(IOException ignored){}}
   }
   private synchronized void pair(String owner,JSONObject payload,long generation)throws Exception {
-    if(epoch.get()!=generation)throw new IOException("CAgent restarted");if(prefs.getBoolean("peer."+owner,false))return;
+    if(epoch.get()!=generation)throw new IOException("CAgent restarted");if(authorized(owner))return;
     long now=System.currentTimeMillis();while(!attempts.isEmpty()&&now-attempts.peekFirst()>60000)attempts.removeFirst();if(attempts.size()>=5)throw new IOException("Authentication rate limited; retry in a minute");attempts.addLast(now);
-    String password=payload.optString("password","");if(password.length()<1||password.length()>128||passwordDigest==null||!MessageDigest.isEqual(passwordDigest,passwordHash(password)))throw new IOException("CAgent authentication failed");
+    String password=payload.optString("password","");if(password.length()>0&&password.length()<=128&&cloudPasswordDigest!=null&&MessageDigest.isEqual(cloudPasswordDigest,passwordHash(password))){if(cloudPeers.size()>=24)throw new IOException("Account controller limit reached");cloudPeers.add(owner);return;}if(password.length()<1||password.length()>128||passwordDigest==null||!MessageDigest.isEqual(passwordDigest,passwordHash(password)))throw new IOException("CAgent authentication failed");
     if(prefs.getAll().size()>32)throw new IOException("Controller limit reached");if(!prefs.edit().putBoolean("peer."+owner,true).commit())throw new IOException("Could not save controller");
   }
   private synchronized Object manage(String owner,String method,JSONObject params)throws Exception {

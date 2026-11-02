@@ -20,6 +20,8 @@ final class AndroidHostProtocolTest {
     volatile ScheduledFuture<?> delivery;volatile AndroidAgentHost.Events events;
     final AtomicInteger inputs=new AtomicInteger(),releases=new AtomicInteger();
     volatile boolean accessible=true,projecting=true;
+    volatile String delegationCredential="",delegationFingerprint="";volatile boolean delegationAllowed;
+    public boolean delegation(String device,String credential,String fingerprint,boolean continuation){if(!delegationAllowed||!credential.equals(delegationCredential))return false;if(delegationFingerprint.isEmpty())delegationFingerprint=fingerprint;return delegationFingerprint.equals(fingerprint);}
     public boolean available(){return projecting;} public boolean controlAvailable(){return projecting&&accessible;}
     public String unavailableReason(){return "PROJECTION_STOPPED: 请在手机上重新授权屏幕共享";}
     public void start(JSONObject quality,AndroidAgentHost.Events e)throws Exception{
