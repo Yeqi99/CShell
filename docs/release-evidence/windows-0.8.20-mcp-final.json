@@ -37,5 +37,18 @@
       ]
     }
   ],
-  "localInstallation": "Pending idle window; real Pro remains 0.8.18; no verified Core installation found."
+  "localInstallation": {
+    "edition": "pro",
+    "version": "0.8.20",
+    "directory": "E:\\CShell\\CShell Pro",
+    "normalExit": true,
+    "installerExitCode": 0,
+    "reopened": true,
+    "installedAsarMatchesValidatedPackage": true,
+    "keyConfigurationFilesShaUnchanged": 5,
+    "machines": 8,
+    "groups": 6,
+    "visualVerification": "Stopped by user Escape after reopen; no further UI operation.",
+    "core": "No existing installation verified; did not install a second edition."
+  }
 }
