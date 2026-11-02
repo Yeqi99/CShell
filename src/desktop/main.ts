@@ -116,6 +116,7 @@ const accountProfiles=cliIndex<0&&isPro&&!clientMode?new DesktopAccountProfiles(
 if(accountProfiles)app.setPath('userData',accountProfiles.bootDirectory());
 if(accountProfiles||process.env.CSHELL_TEST_DATA)app.setPath('sessionData',app.getPath('userData'));
 let accountTransition=false;
+let accountContextEpoch=0;
 const diagnostics = new Diagnostics(app.getPath('userData'), app.getVersion());
 process.on('uncaughtExceptionMonitor', error => diagnostics.record('main.uncaught', error));
 process.on('unhandledRejection', error => diagnostics.record('main.rejection', error));
@@ -683,7 +684,7 @@ else
         }, machineBrowser, openCode, accountProfiles?{
           profiles:accountProfiles,
           assertIdle:()=>{if(ssh.size||ftp.size||localTerminal.size||clientProvider.size||transfers.size||http.running||classroomTasks?.hasActiveWork)throw Error('请先关闭连接并等待传输及机房任务结束，再切换账号');},
-          block:(value:boolean)=>{accountTransition=value;if(value){classroomTasks?.dispose();enrollment?.clear();}},
+          block:(value:boolean)=>{accountTransition=value;if(value){accountContextEpoch++;mcp?.invalidateAccountContext();classroomTasks?.dispose();enrollment?.clear();}},
         }:undefined, network, tavily, desktopLooks,identityNetwork);await identityNetwork.activate();ssh.networkShell=profile=>identityNetwork!.shell(profile.id);handle('network:identity',input=>identityNetwork!.call(input));window.once('closed',()=>void identityNetwork?.close());})();},
         () => [...processExtensions.applicationTools(),...(identityNetwork?.tools()??[])],
         new MachineNetworkRoute(store, clientProvider),
@@ -715,6 +716,7 @@ else
         },
         {
           manager: connections,
+          accountContext:()=>({key:`${accountProfiles?.current()??'local'}:${accountContextEpoch}`,transitioning:accountTransition}),
           http,
           applicationTools: [...extensionServices.applicationTools,...(identityNetwork?.tools()??[])],
           connectEnvironment: async (parent, conda, prefix, signal, ready) => {
