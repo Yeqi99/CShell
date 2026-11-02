@@ -1,0 +1,186 @@
+{
+  "verifiedAt": "2026-11-02T15:14:43.439Z",
+  "version": "0.8.20",
+  "checks": [
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.20-mac-arm64.zip",
+      "status": 206,
+      "bytes": 142205935
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.20-mac-arm64.dmg",
+      "status": 206,
+      "bytes": 142356914
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.20-linux-arm64.deb",
+      "status": 206,
+      "bytes": 103063924
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.20-linux-arm64.AppImage",
+      "status": 206,
+      "bytes": 140752123
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.20-linux-amd64.deb",
+      "status": 206,
+      "bytes": 108861688
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.20-mac-x64.dmg",
+      "status": 206,
+      "bytes": 146178312
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.20-mac-x64.zip",
+      "status": 206,
+      "bytes": 146047386
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.20-linux-x86_64.AppImage",
+      "status": 206,
+      "bytes": 139496897
+    },
+    {
+      "edition": "opensource",
+      "name": "CAgent-0.8.20-linux-arm64.tar.gz",
+      "status": 206,
+      "bytes": 44505697
+    },
+    {
+      "edition": "opensource",
+      "name": "CAgent-0.8.20-linux-x64.tar.gz",
+      "status": 206,
+      "bytes": 44823799
+    },
+    {
+      "edition": "opensource",
+      "name": "CAgent-0.8.20-mac-arm64.tar.gz",
+      "status": 206,
+      "bytes": 39501213
+    },
+    {
+      "edition": "opensource",
+      "name": "CAgent-0.8.20-mac-x64.tar.gz",
+      "status": 206,
+      "bytes": 40730816
+    },
+    {
+      "edition": "opensource",
+      "name": "CAgent-Setup-0.8.20-win-x64.exe",
+      "status": 206,
+      "bytes": 26182280
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.20-win-x64.exe",
+      "status": 206,
+      "bytes": 123802075
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.20-android.apk",
+      "status": 206,
+      "bytes": 4913982
+    },
+    {
+      "edition": "opensource",
+      "name": "SHA256SUMS.txt",
+      "status": 206,
+      "bytes": 1437
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.20-linux-arm64.deb",
+      "status": 206,
+      "bytes": 103312464
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.20-mac-x64.dmg",
+      "status": 206,
+      "bytes": 146487204
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.20-linux-x86_64.AppImage",
+      "status": 206,
+      "bytes": 139734516
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.20-linux-arm64.AppImage",
+      "status": 206,
+      "bytes": 140993817
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.20-mac-arm64.dmg",
+      "status": 206,
+      "bytes": 142671433
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.20-linux-amd64.deb",
+      "status": 206,
+      "bytes": 107813928
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-0.8.20-linux-arm64.tar.gz",
+      "status": 206,
+      "bytes": 44558664
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-0.8.20-linux-x64.tar.gz",
+      "status": 206,
+      "bytes": 44877002
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-0.8.20-mac-arm64.tar.gz",
+      "status": 206,
+      "bytes": 39552508
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-0.8.20-mac-x64.tar.gz",
+      "status": 206,
+      "bytes": 40785167
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-Setup-0.8.20-win-x64.exe",
+      "status": 206,
+      "bytes": 26231742
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.20-win-x64.exe",
+      "status": 206,
+      "bytes": 124019214
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.20-android.apk",
+      "status": 206,
+      "bytes": 4940870
+    },
+    {
+      "edition": "pro",
+      "name": "SHA256SUMS.txt",
+      "status": 206,
+      "bytes": 1283
+    }
+  ]
+}

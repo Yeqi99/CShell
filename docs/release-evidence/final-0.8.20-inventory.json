@@ -391,5 +391,9 @@
     }
   ],
   "nativeValidation": "Both editions passed API29/API35 emulators; physical device not retested",
-  "checkedAt": "2026-11-02T12:56:50.7655354Z"
+  "checkedAt": "2026-11-02T12:56:50.7655354Z",
+  "publication": {
+    "receipt": "docs/release-evidence/publication-0.8.20-final.json",
+    "verifiedAt": "2026-11-02T15:14:43.442Z"
+  }
 }

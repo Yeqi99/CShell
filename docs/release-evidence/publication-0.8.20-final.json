@@ -1,6 +1,6 @@
 {
   "version": "0.8.20",
-  "status": "github-and-hong-kong-published-edge-deployment-pending",
+  "status": "github-hong-kong-edge-published",
   "publishedAt": "2026-11-02T13:19:21Z",
   "releases": {
     "opensource": {
@@ -42,7 +42,8 @@
   "edge": {
     "worker": ".local/020-final-refined/worker-0.8.20.mjs",
     "sha256": "61cfe50c2e9eb9eab07ca3b3e2701dd8b861ccf2b6478bb4d85557e41d8c1ea8",
-    "status": "awaiting root/user Cloudflare deployment"
+    "status": "public catalogs and all 30 asset Range responses verified",
+    "verifiedAt": "2026-11-02T15:14:43.441Z"
   },
   "limitations": [
     "Windows packages unsigned",

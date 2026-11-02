@@ -1,0 +1,270 @@
+{
+  "version": "0.8.20",
+  "deployedAt": "2026-11-02T15:15:38.408Z",
+  "root": "/opt/cshell-web-stage/portal",
+  "backup": "/opt/cshell-release-staging/web-backups/portal-before-0.8.20-1793632522626",
+  "archiveSha256": "014151a7b48a957e560e19a1b4132433f7535c4e1f7197fa064c0f907ac668b9",
+  "files": [
+    {
+      "name": ".gitattributes",
+      "bytes": 24,
+      "sha256": "c664ae1249f77573b25d6c3f1d228bd6f43da061e043017ad74c0b77c0cf89f4"
+    },
+    {
+      "name": "cagent.svg",
+      "bytes": 1545,
+      "sha256": "767928f9d457ffffd8986dc0711ad15d6cad689c1b50928fcdb7c41af26b50aa"
+    },
+    {
+      "name": "classroom.css",
+      "bytes": 6527,
+      "sha256": "01e30ffa0c3b29a102ad0ce9bf5c308433f5d28577de81422e3c2806e06cb19d"
+    },
+    {
+      "name": "classroom.html",
+      "bytes": 465,
+      "sha256": "dad36d89368675011f6fbf67f88aa04aebb68a4f5d032c6734b0e12123668d76"
+    },
+    {
+      "name": "developer-route.css",
+      "bytes": 2439,
+      "sha256": "796dd38849cf77160dcbceb53f256ae9b70482f50a2a3f6f679845a1148368ef"
+    },
+    {
+      "name": "docs/ai.html",
+      "bytes": 11935,
+      "sha256": "a9f17e85e28cc023f93861fbb605313064dc5f6b3cda200fb85ed3008ab86fd0"
+    },
+    {
+      "name": "docs/android.html",
+      "bytes": 9459,
+      "sha256": "450f07b3eecafffa1ece96985dc30d093c5fe94ca562c5144da124a5467edaa9"
+    },
+    {
+      "name": "docs/app-authoring.html",
+      "bytes": 8712,
+      "sha256": "4d1b7ed2c9a831b10c0db70ff75af408443e66e21c483bc4ab7fcbb3d6c86e6e"
+    },
+    {
+      "name": "docs/automation.html",
+      "bytes": 10084,
+      "sha256": "35d85a89c5be3add043596ea73450c0fa9937c2283166840f9ad6149ae113a27"
+    },
+    {
+      "name": "docs/cagent.html",
+      "bytes": 8306,
+      "sha256": "b610daa7097601b72569664643a85b1a18d9ef2b3911df2abfdd6203b11b8ed5"
+    },
+    {
+      "name": "docs/cli.html",
+      "bytes": 14663,
+      "sha256": "397ea8c8d176296c862ef18e19950bfba79ce9b60a54ddcede6ac8ccbc29c30a"
+    },
+    {
+      "name": "docs/cloud.html",
+      "bytes": 12627,
+      "sha256": "b6246e8f6f14b02841151c6eba0d12caaefc108dc1d40aca52ab27766e657b54"
+    },
+    {
+      "name": "docs/connections.html",
+      "bytes": 9660,
+      "sha256": "7845afce81a47b85692e57dea76dff769a687951165e1a497e534eee417d00f2"
+    },
+    {
+      "name": "docs/desktop.html",
+      "bytes": 11442,
+      "sha256": "587832499bd0fe980f44a33d9f871878fe4d166e764e7800c66df9714c0c6121"
+    },
+    {
+      "name": "docs/developers.html",
+      "bytes": 7931,
+      "sha256": "2efc961a01457f2fc8f4db0add5cf17bd32b22618736a674a8146c3f6ed1f16a"
+    },
+    {
+      "name": "docs/extensions.html",
+      "bytes": 9845,
+      "sha256": "fe4416ccfba09217ceedf1c70d3d6e1a3d25bb358afa173abef0b3a77e0a558b"
+    },
+    {
+      "name": "docs/http.html",
+      "bytes": 5076,
+      "sha256": "eb03fe96265fdbb65ff9ebdabe711335d3284ccf7a9051c0b772507837ca5a58"
+    },
+    {
+      "name": "docs/imports.html",
+      "bytes": 7623,
+      "sha256": "a98f7f47a9a0a916b8b6477615893701bcd0c8f84b3bd86b3a75c038b8332816"
+    },
+    {
+      "name": "docs/linux.html",
+      "bytes": 7559,
+      "sha256": "24829b9791590b33c452b872866b19737cce972a1066bcde0e4d4459d131fbe2"
+    },
+    {
+      "name": "docs/machine-info.html",
+      "bytes": 7719,
+      "sha256": "b3bdb3d57cd89ea4d0f52add0285e7d5959e567ef469f3a3b4598374db549b1f"
+    },
+    {
+      "name": "docs/macos.html",
+      "bytes": 5010,
+      "sha256": "bf170b1904033bc6e9a7a43cc6c82a0c92753c0de4a738f1012fcb653ac30cec"
+    },
+    {
+      "name": "docs/network.html",
+      "bytes": 10470,
+      "sha256": "d9a18b0b27ace3473a5c505005b07c048a66345bfffc4c0a89e86965b4857d1f"
+    },
+    {
+      "name": "docs/opencode.html",
+      "bytes": 7756,
+      "sha256": "2f3319293e4e0f6b80697a7b36d1f890675ed9b709d5b605ec7136426e45aafe"
+    },
+    {
+      "name": "docs/plugin-authoring.html",
+      "bytes": 9555,
+      "sha256": "19f3a17429b04f2e56442a4307e032e986318b25a5ec79d28578482a2f49a068"
+    },
+    {
+      "name": "docs/releases.html",
+      "bytes": 30948,
+      "sha256": "a9676e057482f3281313de0d2550aa33f372c676c10dbfb44f8d9763f1181589"
+    },
+    {
+      "name": "docs/settings.html",
+      "bytes": 9158,
+      "sha256": "308c9affeaff742c64e28e646d25b34e6f6ef5177acdfe24d764375d704b73cd"
+    },
+    {
+      "name": "docs/start.html",
+      "bytes": 6508,
+      "sha256": "470eb2a7ebf7c471759bfcc3226977335de56faa823bbb14d3e5a6cf62aae5e4"
+    },
+    {
+      "name": "docs/terminal.html",
+      "bytes": 11232,
+      "sha256": "edd80187f1cb4d9e9f5ee9fd7705a46834267384864b5c3427acdbd779cb6a11"
+    },
+    {
+      "name": "docs/troubleshooting.html",
+      "bytes": 7051,
+      "sha256": "296d4a7fae3f51274e58f7f8be480125f5511eb5ea00b33614e9cab2e6bc58a0"
+    },
+    {
+      "name": "docs/windows.html",
+      "bytes": 5197,
+      "sha256": "d2eaf2361f841fd06a571c2f8e03d278b3edfa0a261dc2a87450481821e767e1"
+    },
+    {
+      "name": "docs/wsl-offline.html",
+      "bytes": 6847,
+      "sha256": "9795e1dfe04a5bc04acae442f0fcd67ca94463f2a473c758e4ec498ef09080b5"
+    },
+    {
+      "name": "docs-index.json",
+      "bytes": 151492,
+      "sha256": "416f607a5e1ab584d6b40a86baf4865454b4e572dad18d64a86603c0e87f19ca"
+    },
+    {
+      "name": "docs-reader.css",
+      "bytes": 6104,
+      "sha256": "896d04fd51f6e8536caa23ffbcb6a711fbd1a149eb9e8eb149e20781205c317e"
+    },
+    {
+      "name": "docs-reader.js",
+      "bytes": 5739,
+      "sha256": "4824bde8e308c022a35c7eb44cd9fc5e129d90e2c0ac961943c45ad2e912d4d3"
+    },
+    {
+      "name": "download-picker.css",
+      "bytes": 9199,
+      "sha256": "2b756f66d082e4b5ec5d8f8470337303f6a95e2cde7424adce5ca0f0eab9abe8"
+    },
+    {
+      "name": "download-picker.js",
+      "bytes": 4960,
+      "sha256": "4dd9d961bc602daf6a57d43643651037da4c7eb5ec3c6b79da6e48a58bb9ff9b"
+    },
+    {
+      "name": "downloads.html",
+      "bytes": 20303,
+      "sha256": "04dc49f9365f6e8a8addd4a73adde899f595c9f6df179d68ad37ac9a66e7d56c"
+    },
+    {
+      "name": "editorial.css",
+      "bytes": 13740,
+      "sha256": "400cf2dd57dfe24fdefd1b89d8f54c17a72f230e98b7fc30382c3c145df6f7a5"
+    },
+    {
+      "name": "home.css",
+      "bytes": 15957,
+      "sha256": "ce0d3ccfe6903f063b4f2de533aaff67185f41991561a4e10e7f2ca1080ef294"
+    },
+    {
+      "name": "icon.svg",
+      "bytes": 1771,
+      "sha256": "0286b9b08b67c6dfdbb8c29518dbdbcb4c9f0f9e806c324475defa5b27285777"
+    },
+    {
+      "name": "index.html",
+      "bytes": 16843,
+      "sha256": "7baa9b7714310a08be6390cc771867fdfb4990bd7a5266d993ad3d4929281559"
+    },
+    {
+      "name": "install.sh",
+      "bytes": 9641,
+      "sha256": "a552cd2f821db5782de3f1494de2b76c3d18c7054f183febd3a87c0c220f0436"
+    },
+    {
+      "name": "media/extensions.png",
+      "bytes": 166145,
+      "sha256": "ae675f58488f0aae3d8049d8d44b2fa789d65ba2d2ebfcce82491933aef0234b"
+    },
+    {
+      "name": "media/linux-workspace.png",
+      "bytes": 339091,
+      "sha256": "0d57498f930af39686d42f17cfacf12db049f4d39ae2bebe1d32d1f41ab05db3"
+    },
+    {
+      "name": "media/windows-workspace.png",
+      "bytes": 348930,
+      "sha256": "6c07376ef2fa3d991b8c54c9182fc719b8551de3b08f55f1c9df884bbc3bc5f5"
+    },
+    {
+      "name": "README.md",
+      "bytes": 2028,
+      "sha256": "308cebc18c300480283ce2845b81f2d216ec70d1f0eae205c1bb52e75d075a14"
+    },
+    {
+      "name": "showcase.js",
+      "bytes": 3972,
+      "sha256": "2847c9ac1e07e169422e04da66f4b134470cf50e6c40b54449d72845464ac1a2"
+    },
+    {
+      "name": "site.js",
+      "bytes": 3482,
+      "sha256": "709c32c7f9943e9aa0f9607aeb3376b110be8290564b0eeb7e24212a7f1832bf"
+    },
+    {
+      "name": "style.css",
+      "bytes": 3920,
+      "sha256": "3bf82c052f4e77afc7721e4c8d82191026c8f5216b23018a2d50ed5f9de83e7b"
+    },
+    {
+      "name": "theme.css",
+      "bytes": 14670,
+      "sha256": "f5a023d6f8a1a2ae623dc9d4d28ae3e521bad49cc3a4869b1db653ecbdf79aa9"
+    },
+    {
+      "name": "usage.html",
+      "bytes": 2642,
+      "sha256": "673409347e3241906643197c775acf4adc2b19b8879d7c72141d98fd0c7573db"
+    },
+    {
+      "name": "workbench.css",
+      "bytes": 7038,
+      "sha256": "40b2f220bfa6b293a3dddeae305420a5a43afbad63ca4326a1c0d6359ad45a3e"
+    }
+  ],
+  "catalogsChanged": false
+}
