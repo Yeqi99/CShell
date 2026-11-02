@@ -1,0 +1,62 @@
+{
+  "version": "0.8.20",
+  "status": "verified-candidate-not-published",
+  "files": [
+    {
+      "edition": "pro",
+      "name": "CAgent-0.8.20-mac-arm64.tar.gz",
+      "path": "C:/Users/35097/.codex/worktrees/pro-020-model-market/CShell/.local/020-final/pro/CAgent-0.8.20-mac-arm64.tar.gz",
+      "bytes": 39552508,
+      "sha256": "24e0d36f5c59d866e5fd93c664bf72b9ace8cc66f39a9ac1ec9da33c26571c93",
+      "source": {
+        "local": "69511a3d72e9e50fea8abefb24c7aca4b2bdb50f",
+        "remote": "43a12fc779f98b09c32bf2e978efc89a2bf07365",
+        "runId": 41423267456,
+        "artifactId": 13130786770,
+        "zipDigest": "sha256:8d9a9a02756d6b51d2ebf4767f9a6a705d88135475fbf523f89cf96c47b9a20c"
+      }
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-0.8.20-linux-arm64.tar.gz",
+      "path": "C:/Users/35097/.codex/worktrees/pro-020-model-market/CShell/.local/020-final/pro/CAgent-0.8.20-linux-arm64.tar.gz",
+      "bytes": 44558664,
+      "sha256": "627ee736262a4e69824cad70325025a74967a46ce6b368e0044d09e750fec344",
+      "source": {
+        "local": "69511a3d72e9e50fea8abefb24c7aca4b2bdb50f",
+        "remote": "43a12fc779f98b09c32bf2e978efc89a2bf07365",
+        "runId": 41423267456,
+        "artifactId": 13130473478,
+        "zipDigest": "sha256:83eac8dc3ebbca26868ec6613ed662ee644ab8afe232230c599d782a202c0cf4"
+      }
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-0.8.20-mac-x64.tar.gz",
+      "path": "C:/Users/35097/.codex/worktrees/pro-020-model-market/CShell/.local/020-final/pro/CAgent-0.8.20-mac-x64.tar.gz",
+      "bytes": 40785167,
+      "sha256": "afe707a858d5150e85ae9559d9be90c4b776cea094af9df3c1f266af0905c8dd",
+      "source": {
+        "local": "69511a3d72e9e50fea8abefb24c7aca4b2bdb50f",
+        "remote": "43a12fc779f98b09c32bf2e978efc89a2bf07365",
+        "runId": 41423267456,
+        "artifactId": 13130159497,
+        "zipDigest": "sha256:470c9192eb0cfa12c44506b9cdf965676a19bdecd2c212ffff185f36b9fa3b42"
+      }
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-0.8.20-linux-x64.tar.gz",
+      "path": "C:/Users/35097/.codex/worktrees/pro-020-model-market/CShell/.local/020-final/pro/CAgent-0.8.20-linux-x64.tar.gz",
+      "bytes": 44877002,
+      "sha256": "440afec01039520abedc38fd9441394b71984f2b3edb042fb563bc5173c3741e",
+      "source": {
+        "local": "69511a3d72e9e50fea8abefb24c7aca4b2bdb50f",
+        "remote": "43a12fc779f98b09c32bf2e978efc89a2bf07365",
+        "runId": 41423267456,
+        "artifactId": 13129564706,
+        "zipDigest": "sha256:10e24b7e9ec19bf7851cb342ca441130003f2727ef21272d696ad203b0eb0539"
+      }
+    }
+  ]
+}
