@@ -301,24 +301,32 @@ public class CagentWindow : Window {
     UpdateLayout();var checks=new List<CheckBox>();FindChecks(overlay,checks);if(checks.Count!=3)throw new Exception("Package permission controls missing");foreach(var check in checks)if(check.IsChecked==true)throw new Exception("Installation implicitly granted capability");
     if(PackageState("not-installed")==PackageState("available"))throw new Exception("Uninstalled state hidden");
     RenderMarket(Obj("platform","win32","manager","winget","applications",new[]{Obj("id","git","package","Git.Git")}),Obj("enabled",true),new[]{item,Obj("id","cagent.desktop","name","远程桌面","installed",true)});
-    if(screenshot!=null)File.WriteAllText(screenshot+".json",json.Serialize(Obj("fixture",true,"marketOverlay",true,"chatDraftPreserved",true,"installedWithoutGrants","待授权","realSoftwareInstalled",false)),Encoding.UTF8);
+    if(screenshot!=null){foreach(int width in new[]{340,540,900}){Width=width;Height=620;UpdateLayout();var grids=new List<WrapPanel>();FindMarketGrids(overlay,grids);foreach(var grid in grids){FitMarketTiles(grid);UpdateLayout();foreach(FrameworkElement tile in grid.Children)if(tile is Button&&tile.ActualWidth+tile.Margin.Left+tile.Margin.Right>grid.ActualWidth+1)throw new Exception("Market card overflow");}SaveImage(screenshot+"-"+width+".png");}File.WriteAllText(screenshot+".json",json.Serialize(Obj("fixture",true,"marketOverlay",true,"chatDraftPreserved",true,"installedWithoutGrants","待授权","responsiveWidths",new[]{340,540,900},"realSoftwareInstalled",false)),Encoding.UTF8);}
+  }
+  void FindMarketGrids(DependencyObject parent,List<WrapPanel> result){var grid=parent as WrapPanel;if(grid!=null)result.Add(grid);for(int i=0;i<VisualTreeHelper.GetChildrenCount(parent);i++)FindMarketGrids(VisualTreeHelper.GetChild(parent,i),result);
   }
   void FindChecks(DependencyObject parent,List<CheckBox> result){var check=parent as CheckBox;if(check!=null)result.Add(check);for(int i=0;i<VisualTreeHelper.GetChildrenCount(parent);i++)FindChecks(VisualTreeHelper.GetChild(parent,i),result);}
   string PermissionName(string value){switch(value){case "wechat.read":return "读取微信与监听消息";case "wechat.send":return "发送微信与发布朋友圈";case "wechat.contacts.manage":return "修改好友备注";case "applications.read":return "读取系统应用目录";case "applications.plan":return "检查并生成安装计划";case "applications.install":return "按计划安装系统应用";default:return value;}}
   StackPanel MarketCard(StackPanel p,string title,string subtitle){var content=new StackPanel();var heading=Text(title,14);heading.FontWeight=FontWeights.SemiBold;content.Children.Add(heading);content.Children.Add(Text(subtitle,11));p.Children.Add(new Border{Background=Brushes.White,BorderBrush=Brush("#E5E8ED"),BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(12),Padding=new Thickness(12,7,12,7),Margin=new Thickness(0,5,0,7),Child=content});return content;}
   void AppTile(WrapPanel grid,string name,string symbol,string state,Func<Task> action){
-    var body=new StackPanel{Margin=new Thickness(8),HorizontalAlignment=HorizontalAlignment.Center};
-    var icon=new Border{Width=42,Height=42,CornerRadius=new CornerRadius(12),Background=Brush("#E7F1EE"),Margin=new Thickness(0,0,0,8),Child=new TextBlock{Text=symbol,FontSize=24,Foreground=Brush("#244B48"),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,FontFamily=new FontFamily("Segoe MDL2 Assets")}};body.Children.Add(icon);
-    body.Children.Add(new TextBlock{Text=name,FontSize=12,FontWeight=FontWeights.SemiBold,TextAlignment=TextAlignment.Center,TextTrimming=TextTrimming.CharacterEllipsis,MaxWidth=118});body.Children.Add(new TextBlock{Text=state,FontSize=10,Foreground=Brush("#78878C"),TextAlignment=TextAlignment.Center,Margin=new Thickness(0,5,0,0)});
-    var button=Button("",name);button.Width=136;button.Height=126;button.Margin=new Thickness(3);button.Background=Brushes.White;button.Content=body;button.Click+=async(sender,e)=>await Guard(action);grid.Children.Add(button);
+    var body=new Grid{Margin=new Thickness(12)};body.ColumnDefinitions.Add(new ColumnDefinition{Width=GridLength.Auto});body.ColumnDefinitions.Add(new ColumnDefinition());
+    var icon=new Border{Width=36,Height=36,CornerRadius=new CornerRadius(11),Background=Brush("#E7F1EE"),Margin=new Thickness(0,0,12,0),Child=new TextBlock{Text=symbol,FontSize=20,Foreground=Brush("#244B48"),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,FontFamily=new FontFamily("Segoe MDL2 Assets")}};body.Children.Add(icon);
+    var labels=new StackPanel{VerticalAlignment=VerticalAlignment.Center};Grid.SetColumn(labels,1);body.Children.Add(labels);
+    labels.Children.Add(new TextBlock{Text=name,FontSize=13,FontWeight=FontWeights.SemiBold,TextTrimming=TextTrimming.CharacterEllipsis});labels.Children.Add(new TextBlock{Text=state,FontSize=11,Foreground=Brush("#78878C"),Margin=new Thickness(0,5,0,0),TextTrimming=TextTrimming.CharacterEllipsis});
+    var button=Button("",name+" · "+state);button.Height=84;button.Margin=new Thickness(0,0,10,10);button.HorizontalContentAlignment=HorizontalAlignment.Stretch;button.Background=Brushes.White;button.Content=body;button.Click+=async(sender,e)=>await Guard(action);grid.Children.Add(button);
   }
+  void FitMarketTiles(WrapPanel cards){double width=cards.ActualWidth;if(width<=0)return;int columns=Math.Max(1,(int)Math.Floor((width+10)/210));double tile=Math.Max(1,width/columns);foreach(FrameworkElement child in cards.Children){if(child is Button)child.Width=Math.Max(1,tile-10);}}
   void RenderMarket(Dictionary<string,object> catalog,Dictionary<string,object> policy,IEnumerable packages){
-    var p=Panel("应用市场");var search=Field(p,"搜索应用","");var cards=new WrapPanel();p.Children.Add(cards);
-    Action render=()=>{cards.Children.Clear();string query=search.Text.Trim().ToLowerInvariant();
-      if(S(catalog,"platform")=="win32"&&("linux wsl ubuntu 虚拟机".Contains(query)))AppTile(cards,"Linux 虚拟机","\uE756","WSL · 检查与安装",Linux);
-      foreach(var value in packages){var item=D(value);if(!(S(item,"name")+S(item,"id")).ToLowerInvariant().Contains(query))continue;AppTile(cards,S(item,"name"),S(item,"id")=="cagent.desktop"?"\uE7F4":"\uE71D",B(item,"installed")?"已安装 · 配置":"安装",async()=>await PackageDetail(item));}
-      foreach(var value in A(V(catalog,"applications"))){var item=D(value);if(!(S(item,"id")+S(item,"package")).ToLowerInvariant().Contains(query))continue;AppTile(cards,S(item,"id"),"\uE74C","查看安装",async()=>await Plan(D(await Api("applications.plan",Obj("app",S(item,"id"))))));}
-      if(cards.Children.Count==0)cards.Children.Add(Text("没有匹配的应用",11));
+    var p=Panel("应用市场");var search=Field(p,"搜索应用","");
+    var packageTitle=Text("能力工具",12);packageTitle.FontWeight=FontWeights.SemiBold;p.Children.Add(packageTitle);
+    var cards=new WrapPanel{Margin=new Thickness(0,6,-10,12)};p.Children.Add(cards);cards.SizeChanged+=(sender,e)=>FitMarketTiles(cards);
+    var appTitle=Text("系统应用",12);appTitle.FontWeight=FontWeights.SemiBold;p.Children.Add(appTitle);
+    var apps=new WrapPanel{Margin=new Thickness(0,6,-10,0)};p.Children.Add(apps);apps.SizeChanged+=(sender,e)=>FitMarketTiles(apps);
+    Action render=()=>{cards.Children.Clear();apps.Children.Clear();string query=search.Text.Trim().ToLowerInvariant();
+      foreach(var value in packages){var item=D(value);if(!(S(item,"name")+S(item,"id")).ToLowerInvariant().Contains(query))continue;string id=S(item,"id");AppTile(cards,S(item,"name"),id=="cagent.desktop"?"\uE7F4":id.StartsWith("cagent.wechat")?"\uE8F2":"\uE71D",PackageState(S(item,"status")),async()=>await PackageDetail(item));}
+      if(S(catalog,"platform")=="win32"&&("linux wsl ubuntu 虚拟机".Contains(query)))AppTile(apps,"Linux 虚拟机","\uE756","WSL · 检查与安装",Linux);
+      foreach(var value in A(V(catalog,"applications"))){var item=D(value);if(!(S(item,"id")+S(item,"package")).ToLowerInvariant().Contains(query))continue;AppTile(apps,S(item,"id"),"\uE74C","查看安装计划",async()=>await Plan(D(await Api("applications.plan",Obj("app",S(item,"id"))))));}
+      if(cards.Children.Count==0)cards.Children.Add(Text("没有匹配的能力工具",11));if(apps.Children.Count==0)apps.Children.Add(Text("没有匹配的系统应用",11));FitMarketTiles(cards);FitMarketTiles(apps);
     };search.TextChanged+=(sender,e)=>render();render();
     var settings=new StackPanel();p.Children.Add(new Expander{Header="安装设置",Content=settings,Margin=new Thickness(0,12,0,0)});var enabled=Check(settings,"允许应用安装",B(policy,"enabled"));ActionButton(settings,"保存",async()=>{policy["enabled"]=enabled.IsChecked==true;await Api("applications.configure",policy);});
   }
