@@ -22,8 +22,9 @@ class LendingTests(unittest.TestCase):
   self.d.lending.revoke('owner',{'id':loan['id']});self.assertFalse(self.d.authorize(payload)['allowed']);self.assertFalse(self.d.verify_delegation('owner',verify)['allowed']);self.assertEqual(self.d.list('borrower')['devices'],[])
  def test_email_expiry_ownership_and_membership(self):
   loan=self.create(email='borrower@test.com')
+  self.assertFalse(self.d.lending.list('borrower')['loans'][0]['accepted'])
   with self.assertRaises(Failure):self.d.lending.redeem('other',{'id':loan['id']})
-  self.d.lending.redeem('borrower',{'id':loan['id']});self.assertEqual(len(self.d.list('borrower')['devices']),1)
+  self.d.lending.redeem('borrower',{'id':loan['id']});self.assertTrue(self.d.lending.list('borrower')['loans'][0]['accepted']);self.assertEqual(len(self.d.list('borrower')['devices']),1)
   with self.s.db() as db:db.execute('UPDATE device_loans SET expires=?',(time.time()-1,))
   with self.assertRaises(Failure):self.d.lease('borrower',{'deviceId':self.device})
   with self.assertRaises(Failure):self.d.lending.create('borrower',{'deviceIds':[self.device],'expiresAt':time.time()+60})

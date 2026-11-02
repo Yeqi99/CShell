@@ -1,0 +1,399 @@
+{
+  "status": "public-static-ready-catalogs-unchanged",
+  "verifiedAt": "2026-11-02T00:51:12.539Z",
+  "count": 36,
+  "verification": {
+    "serverSourceAndDestinationSha256": true,
+    "serverSize": true,
+    "externalHeadStatus": 200,
+    "externalHeadSizes": true,
+    "redirects": false,
+    "externalFullDownloadDigest": "pending CI workflow; local streaming check incomplete",
+    "retry": "one HEAD timeout retried successfully"
+  },
+  "webBackup": "/opt/cshell-release-staging/web-backups/before-0.8.18-20261102.tar.gz",
+  "files": [
+    {
+      "edition": "opensource",
+      "name": "CAgent-0.8.18-linux-x64.tar.gz",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-desktop-linux-x64\\CAgent-0.8.18-linux-x64.tar.gz",
+      "bytes": 44818935,
+      "sha256": "3ca8f4e639ffe708138c2a55eff6d269f630e05e48f73733b150fb3319e6e4e6",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-trusted-final/opensource/CAgent-0.8.18-linux-x64.tar.gz",
+      "publicPath": "/opt/cshell-downloads/opensource/v0.8.18/CAgent-0.8.18-linux-x64.tar.gz",
+      "url": "https://shell.canp.ai/downloads/opensource/v0.8.18/CAgent-0.8.18-linux-x64.tar.gz"
+    },
+    {
+      "edition": "opensource",
+      "name": "CAgent-0.8.18-linux-arm64.tar.gz",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-desktop-linux-arm64\\CAgent-0.8.18-linux-arm64.tar.gz",
+      "bytes": 44504621,
+      "sha256": "2ca667d2f497d791c99087d6cc91b71eaed87a4a05b3e0e46c6ab9477af964a7",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-trusted-final/opensource/CAgent-0.8.18-linux-arm64.tar.gz",
+      "publicPath": "/opt/cshell-downloads/opensource/v0.8.18/CAgent-0.8.18-linux-arm64.tar.gz",
+      "url": "https://shell.canp.ai/downloads/opensource/v0.8.18/CAgent-0.8.18-linux-arm64.tar.gz"
+    },
+    {
+      "edition": "opensource",
+      "name": "CAgent-0.8.18-mac-arm64.tar.gz",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-desktop-mac-arm64\\CAgent-0.8.18-mac-arm64.tar.gz",
+      "bytes": 39500398,
+      "sha256": "c41bc10b4888950c1be7b0c529b61d2cc7d7b5ae49ccf86bd4a1925590773e3b",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-trusted-final/opensource/CAgent-0.8.18-mac-arm64.tar.gz",
+      "publicPath": "/opt/cshell-downloads/opensource/v0.8.18/CAgent-0.8.18-mac-arm64.tar.gz",
+      "url": "https://shell.canp.ai/downloads/opensource/v0.8.18/CAgent-0.8.18-mac-arm64.tar.gz"
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-0.8.18-linux-arm64.tar.gz",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-pro-cagent-linux-arm64\\CAgent-0.8.18-linux-arm64.tar.gz",
+      "bytes": 44560384,
+      "sha256": "ef2f5877681716f302470cae617d20b6a51054e16233b0a9676f1d03dc7afd94",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-trusted-final/pro/CAgent-0.8.18-linux-arm64.tar.gz",
+      "publicPath": "/opt/cshell-downloads/pro/v0.8.18/CAgent-0.8.18-linux-arm64.tar.gz",
+      "url": "https://shell.canp.ai/downloads/pro/v0.8.18/CAgent-0.8.18-linux-arm64.tar.gz"
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-0.8.18-mac-arm64.tar.gz",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-pro-cagent-mac-arm64\\CAgent-0.8.18-mac-arm64.tar.gz",
+      "bytes": 39550110,
+      "sha256": "61f9e2bdc0246cdb82b39df141f8220f5a79f0d5e441d188a25d5b25afb49e46",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-trusted-final/pro/CAgent-0.8.18-mac-arm64.tar.gz",
+      "publicPath": "/opt/cshell-downloads/pro/v0.8.18/CAgent-0.8.18-mac-arm64.tar.gz",
+      "url": "https://shell.canp.ai/downloads/pro/v0.8.18/CAgent-0.8.18-mac-arm64.tar.gz"
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-0.8.18-mac-x64.tar.gz",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-pro-cagent-mac-x64\\CAgent-0.8.18-mac-x64.tar.gz",
+      "bytes": 40782689,
+      "sha256": "b7bcbc3c9c0ebae2230fefa8e551ba495fe8e8ce3ee59517536573b1c462dac3",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-trusted-final/pro/CAgent-0.8.18-mac-x64.tar.gz",
+      "publicPath": "/opt/cshell-downloads/pro/v0.8.18/CAgent-0.8.18-mac-x64.tar.gz",
+      "url": "https://shell.canp.ai/downloads/pro/v0.8.18/CAgent-0.8.18-mac-x64.tar.gz"
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-0.8.18-linux-x64.tar.gz",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-pro-cagent-linux-x64\\CAgent-0.8.18-linux-x64.tar.gz",
+      "bytes": 44874504,
+      "sha256": "a3367334b43ba769b27ee60c11cb0664287eea21b5f0294c00d11d4edadff1c7",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-trusted-final/pro/CAgent-0.8.18-linux-x64.tar.gz",
+      "publicPath": "/opt/cshell-downloads/pro/v0.8.18/CAgent-0.8.18-linux-x64.tar.gz",
+      "url": "https://shell.canp.ai/downloads/pro/v0.8.18/CAgent-0.8.18-linux-x64.tar.gz"
+    },
+    {
+      "edition": "opensource",
+      "name": "CAgent-0.8.18-mac-x64.tar.gz",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\runtime-final-desktop-mac-x64\\CAgent-0.8.18-mac-x64.tar.gz",
+      "bytes": 40730782,
+      "sha256": "4928a33c8e76fe66e90da1b3abbfbac61e434e08d464fa72207365fa8c2721db",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-trusted-final/opensource/CAgent-0.8.18-mac-x64.tar.gz",
+      "publicPath": "/opt/cshell-downloads/opensource/v0.8.18/CAgent-0.8.18-mac-x64.tar.gz",
+      "url": "https://shell.canp.ai/downloads/opensource/v0.8.18/CAgent-0.8.18-mac-x64.tar.gz"
+    },
+    {
+      "edition": "opensource",
+      "name": "CAgent-Setup-0.8.18-win-x64.exe",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\release\\0.8.18\\CAgent-Setup-0.8.18-win-x64.exe",
+      "bytes": 26187452,
+      "sha256": "59dc9978ae2193cbfca6a705e07c90b9af0815e6cf364ec9df6b3de982249572",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-trusted-final/opensource/CAgent-Setup-0.8.18-win-x64.exe",
+      "publicPath": "/opt/cshell-downloads/opensource/v0.8.18/CAgent-Setup-0.8.18-win-x64.exe",
+      "url": "https://shell.canp.ai/downloads/opensource/v0.8.18/CAgent-Setup-0.8.18-win-x64.exe"
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-Setup-0.8.18-win-x64.exe",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\release\\0.8.18\\CAgent-Setup-0.8.18-win-x64.exe",
+      "bytes": 26230795,
+      "sha256": "7f60ff4c4d297586487bac9c604e150a0aa438a786b3fc6bf11d17dc681cffe3",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-trusted-final/pro/CAgent-Setup-0.8.18-win-x64.exe",
+      "publicPath": "/opt/cshell-downloads/pro/v0.8.18/CAgent-Setup-0.8.18-win-x64.exe",
+      "url": "https://shell.canp.ai/downloads/pro/v0.8.18/CAgent-Setup-0.8.18-win-x64.exe"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-android.apk",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\android-core-focused-final\\CShell-0.8.18-android.apk",
+      "bytes": 4897942,
+      "sha256": "b958ccd6b618ced4b1bb564d4274d95ec66cd647978aa316e740ffea7d037495",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-trusted-final/opensource/CShell-0.8.18-android.apk",
+      "publicPath": "/opt/cshell-downloads/opensource/v0.8.18/CShell-0.8.18-android.apk",
+      "url": "https://shell.canp.ai/downloads/opensource/v0.8.18/CShell-0.8.18-android.apk"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.18-android.apk",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\ci-artifacts\\android-focused-final\\CShell-Pro-0.8.18-android.apk",
+      "bytes": 4923366,
+      "sha256": "7f9f866c1767f991370e4171619e29c53b29cf41487a08413c39ed7205adbd78",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-trusted-final/pro/CShell-Pro-0.8.18-android.apk",
+      "publicPath": "/opt/cshell-downloads/pro/v0.8.18/CShell-Pro-0.8.18-android.apk",
+      "url": "https://shell.canp.ai/downloads/pro/v0.8.18/CShell-Pro-0.8.18-android.apk"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.18-win-x64.exe",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\release\\pro-0.8.18\\CShell-Pro-0.8.18-win-x64.exe",
+      "bytes": 123909057,
+      "sha256": "976b7cf19a3ceb41c385a995e49d3998cb65bb37124f3d0a033d6840f06ee3d3",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-trusted-final/pro/CShell-Pro-0.8.18-win-x64.exe",
+      "publicPath": "/opt/cshell-downloads/pro/v0.8.18/CShell-Pro-0.8.18-win-x64.exe",
+      "url": "https://shell.canp.ai/downloads/pro/v0.8.18/CShell-Pro-0.8.18-win-x64.exe"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-win-x64.exe",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\core-unified-followup\\CShell\\release\\0.8.18\\CShell-0.8.18-win-x64.exe",
+      "bytes": 123699494,
+      "sha256": "c401acdbb335b0c43412ae1c5148268142f2df35e1990681b680df84fe8d8a14",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-trusted-final/opensource/CShell-0.8.18-win-x64.exe",
+      "publicPath": "/opt/cshell-downloads/opensource/v0.8.18/CShell-0.8.18-win-x64.exe",
+      "url": "https://shell.canp.ai/downloads/opensource/v0.8.18/CShell-0.8.18-win-x64.exe"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.18-linux-arm64.AppImage",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\defaults-pro-linux-arm64\\CShell-Pro-0.8.18-linux-arm64.AppImage",
+      "bytes": 140957024,
+      "sha256": "d4c49a85333ee8c7e8d16aaf6ace4f1b8ca1bdd47304f2cfd929cac8a7a5fc58",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-trusted-final/pro/CShell-Pro-0.8.18-linux-arm64.AppImage",
+      "result": "uploaded-verified",
+      "publicPath": "/opt/cshell-downloads/pro/v0.8.18/CShell-Pro-0.8.18-linux-arm64.AppImage",
+      "url": "https://shell.canp.ai/downloads/pro/v0.8.18/CShell-Pro-0.8.18-linux-arm64.AppImage"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.18-linux-arm64.deb",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\defaults-pro-linux-arm64\\CShell-Pro-0.8.18-linux-arm64.deb",
+      "bytes": 103284072,
+      "sha256": "bfd7181c7ee28a2000fffc9dc3cdd499dc64c20c81c9191ca7217a8e8b8a72d6",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-trusted-final/pro/CShell-Pro-0.8.18-linux-arm64.deb",
+      "result": "uploaded-verified",
+      "publicPath": "/opt/cshell-downloads/pro/v0.8.18/CShell-Pro-0.8.18-linux-arm64.deb",
+      "url": "https://shell.canp.ai/downloads/pro/v0.8.18/CShell-Pro-0.8.18-linux-arm64.deb"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.18-mac-arm64.dmg",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\defaults-pro-mac-arm64\\CShell-Pro-0.8.18-mac-arm64.dmg",
+      "bytes": 142614693,
+      "sha256": "9a621cba49849ed0535fadfb0c346bf6bb09ad332f6c1c90325bf4ad01d19c1f",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-trusted-final/pro/CShell-Pro-0.8.18-mac-arm64.dmg",
+      "result": "uploaded-verified",
+      "publicPath": "/opt/cshell-downloads/pro/v0.8.18/CShell-Pro-0.8.18-mac-arm64.dmg",
+      "url": "https://shell.canp.ai/downloads/pro/v0.8.18/CShell-Pro-0.8.18-mac-arm64.dmg"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.18-linux-amd64.deb",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\defaults-pro-linux-x64\\CShell-Pro-0.8.18-linux-amd64.deb",
+      "bytes": 107786032,
+      "sha256": "1bfcb75c7325f7583d5f9abb8a6574340670aff4016d0db4b2da96c0c45f7650",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-trusted-final/pro/CShell-Pro-0.8.18-linux-amd64.deb",
+      "result": "uploaded-verified",
+      "publicPath": "/opt/cshell-downloads/pro/v0.8.18/CShell-Pro-0.8.18-linux-amd64.deb",
+      "url": "https://shell.canp.ai/downloads/pro/v0.8.18/CShell-Pro-0.8.18-linux-amd64.deb"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.18-linux-x86_64.AppImage",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\defaults-pro-linux-x64\\CShell-Pro-0.8.18-linux-x86_64.AppImage",
+      "bytes": 139701812,
+      "sha256": "9540f5615d14da4fc6a168226b7a2808623d3d32df54abeacf6feffb1cbb75d1",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-trusted-final/pro/CShell-Pro-0.8.18-linux-x86_64.AppImage",
+      "result": "uploaded-verified",
+      "publicPath": "/opt/cshell-downloads/pro/v0.8.18/CShell-Pro-0.8.18-linux-x86_64.AppImage",
+      "url": "https://shell.canp.ai/downloads/pro/v0.8.18/CShell-Pro-0.8.18-linux-x86_64.AppImage"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-mac-arm64.dmg",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\defaults-opensource-mac-arm64\\CShell-0.8.18-mac-arm64.dmg",
+      "bytes": 142333581,
+      "sha256": "07bed2e371a3566eb544f378842b868b8a70b999ebe6dd2f8ac67c80c2f7772b",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-trusted-final/opensource/CShell-0.8.18-mac-arm64.dmg",
+      "result": "uploaded-verified",
+      "publicPath": "/opt/cshell-downloads/opensource/v0.8.18/CShell-0.8.18-mac-arm64.dmg",
+      "url": "https://shell.canp.ai/downloads/opensource/v0.8.18/CShell-0.8.18-mac-arm64.dmg"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-mac-arm64.zip",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\defaults-opensource-mac-arm64\\CShell-0.8.18-mac-arm64.zip",
+      "bytes": 142176270,
+      "sha256": "5c13b5a394d51f6cabc1161dc365bfeaf9e7640709b774d5c3860b161e4dc1bf",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-trusted-final/opensource/CShell-0.8.18-mac-arm64.zip",
+      "result": "uploaded-verified",
+      "publicPath": "/opt/cshell-downloads/opensource/v0.8.18/CShell-0.8.18-mac-arm64.zip",
+      "url": "https://shell.canp.ai/downloads/opensource/v0.8.18/CShell-0.8.18-mac-arm64.zip"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-linux-amd64.deb",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\defaults-opensource-linux-x64\\CShell-0.8.18-linux-amd64.deb",
+      "bytes": 107543400,
+      "sha256": "f3de08f12adc004e66cfcc5fdfeecc1ecca4949dfb4ee622d61dceb330168590",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-trusted-final/opensource/CShell-0.8.18-linux-amd64.deb",
+      "result": "uploaded-verified",
+      "publicPath": "/opt/cshell-downloads/opensource/v0.8.18/CShell-0.8.18-linux-amd64.deb",
+      "url": "https://shell.canp.ai/downloads/opensource/v0.8.18/CShell-0.8.18-linux-amd64.deb"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-linux-x86_64.AppImage",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\defaults-opensource-linux-x64\\CShell-0.8.18-linux-x86_64.AppImage",
+      "bytes": 139468198,
+      "sha256": "5c565da9284912ff464a76123e3871e378f89a79f87fb8a03f43b671cfa2ca10",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-trusted-final/opensource/CShell-0.8.18-linux-x86_64.AppImage",
+      "result": "uploaded-verified",
+      "publicPath": "/opt/cshell-downloads/opensource/v0.8.18/CShell-0.8.18-linux-x86_64.AppImage",
+      "url": "https://shell.canp.ai/downloads/opensource/v0.8.18/CShell-0.8.18-linux-x86_64.AppImage"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-linux-arm64.AppImage",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\defaults-opensource-linux-arm64\\CShell-0.8.18-linux-arm64.AppImage",
+      "bytes": 140723392,
+      "sha256": "8d68d280cd2d383ed45b434f66606514b73696bbff547726a27b46126388c2ea",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-trusted-final/opensource/CShell-0.8.18-linux-arm64.AppImage",
+      "result": "uploaded-verified",
+      "publicPath": "/opt/cshell-downloads/opensource/v0.8.18/CShell-0.8.18-linux-arm64.AppImage",
+      "url": "https://shell.canp.ai/downloads/opensource/v0.8.18/CShell-0.8.18-linux-arm64.AppImage"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-linux-arm64.deb",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\defaults-opensource-linux-arm64\\CShell-0.8.18-linux-arm64.deb",
+      "bytes": 103040424,
+      "sha256": "9457570bd6bdf68fb3a78584f71060ef2e6d0348ad671260cb199853e01b8cee",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-trusted-final/opensource/CShell-0.8.18-linux-arm64.deb",
+      "result": "uploaded-verified",
+      "publicPath": "/opt/cshell-downloads/opensource/v0.8.18/CShell-0.8.18-linux-arm64.deb",
+      "url": "https://shell.canp.ai/downloads/opensource/v0.8.18/CShell-0.8.18-linux-arm64.deb"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.18-mac-x64.dmg",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\defaults-pro-mac-x64\\CShell-Pro-0.8.18-mac-x64.dmg",
+      "bytes": 146425126,
+      "sha256": "b6aafea0cde1bd20ba2f643fef29cd606e37229c8546b3730138b29eeb341d8d",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-trusted-final/pro/CShell-Pro-0.8.18-mac-x64.dmg",
+      "result": "uploaded-verified",
+      "publicPath": "/opt/cshell-downloads/pro/v0.8.18/CShell-Pro-0.8.18-mac-x64.dmg",
+      "url": "https://shell.canp.ai/downloads/pro/v0.8.18/CShell-Pro-0.8.18-mac-x64.dmg"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-mac-x64.dmg",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\defaults-opensource-mac-x64\\CShell-0.8.18-mac-x64.dmg",
+      "bytes": 146128653,
+      "sha256": "fe631973313c25601e032a809a1d0fd916bceac360bb43c361bb522e0c368ad5",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-trusted-final/opensource/CShell-0.8.18-mac-x64.dmg",
+      "result": "already-matched",
+      "publicPath": "/opt/cshell-downloads/opensource/v0.8.18/CShell-0.8.18-mac-x64.dmg",
+      "url": "https://shell.canp.ai/downloads/opensource/v0.8.18/CShell-0.8.18-mac-x64.dmg"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.18-mac-x64.zip",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\candidate-artifacts\\defaults-opensource-mac-x64\\CShell-0.8.18-mac-x64.zip",
+      "bytes": 146017721,
+      "sha256": "985fb4b8aeff851a3cefa116926c78d93f9197c1e8052c6bb3f66ca215ab5c6c",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-trusted-final/opensource/CShell-0.8.18-mac-x64.zip",
+      "result": "already-matched",
+      "publicPath": "/opt/cshell-downloads/opensource/v0.8.18/CShell-0.8.18-mac-x64.zip",
+      "url": "https://shell.canp.ai/downloads/opensource/v0.8.18/CShell-0.8.18-mac-x64.zip"
+    },
+    {
+      "edition": "opensource",
+      "name": "SHA256SUMS.txt",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\final-checksums\\opensource\\SHA256SUMS.txt",
+      "bytes": 1437,
+      "sha256": "911007348921ada7b8fc0e15425143ee94be0c283cf2afddcafc9f57b66995bb",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-trusted-final/opensource/SHA256SUMS.txt",
+      "result": "uploaded-verified",
+      "publicPath": "/opt/cshell-downloads/opensource/v0.8.18/SHA256SUMS.txt",
+      "url": "https://shell.canp.ai/downloads/opensource/v0.8.18/SHA256SUMS.txt"
+    },
+    {
+      "edition": "pro",
+      "name": "SHA256SUMS.txt",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\final-checksums\\pro\\SHA256SUMS.txt",
+      "bytes": 1283,
+      "sha256": "b6da45caebb892b447141f28e1a8931aa2e5e1a2704a0ec0f99fc722fdded9e0",
+      "remotePath": "/opt/cshell-release-staging/0.8.18-trusted-final/pro/SHA256SUMS.txt",
+      "result": "uploaded-verified",
+      "publicPath": "/opt/cshell-downloads/pro/v0.8.18/SHA256SUMS.txt",
+      "url": "https://shell.canp.ai/downloads/pro/v0.8.18/SHA256SUMS.txt"
+    },
+    {
+      "edition": "toolkit",
+      "name": "Weixin-4.1.15.56-0.1.2.cagent-package.json",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\wechat-0.1.2-trusted-final-candidate\\Weixin-4.1.15.56-0.1.2.cagent-package.json",
+      "bytes": 264771703,
+      "sha256": "52eb044cf5870124dbf704292c232225a6156658bc153ce3c8659cb85a7d33c4",
+      "remotePath": "/opt/cshell-release-staging/wechat-0.1.2-trusted-final/toolkit/Weixin-4.1.15.56-0.1.2.cagent-package.json",
+      "result": "uploaded-verified",
+      "publicPath": "/opt/cshell-downloads/toolkit/v0.1.2/Weixin-4.1.15.56-0.1.2.cagent-package.json",
+      "url": "https://shell.canp.ai/downloads/toolkit/v0.1.2/Weixin-4.1.15.56-0.1.2.cagent-package.json"
+    },
+    {
+      "edition": "toolkit",
+      "name": "Weixin-4.1.15.56-0.1.2.manifest.json",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\wechat-0.1.2-trusted-final-candidate\\Weixin-4.1.15.56-0.1.2.manifest.json",
+      "bytes": 16528,
+      "sha256": "d9d2f2d8b51032c78e06d36d4ced77e7115b208029568ce1f1c1906d80ca88b4",
+      "remotePath": "/opt/cshell-release-staging/wechat-0.1.2-trusted-final/toolkit/Weixin-4.1.15.56-0.1.2.manifest.json",
+      "result": "uploaded-verified",
+      "publicPath": "/opt/cshell-downloads/toolkit/v0.1.2/Weixin-4.1.15.56-0.1.2.manifest.json",
+      "url": "https://shell.canp.ai/downloads/toolkit/v0.1.2/Weixin-4.1.15.56-0.1.2.manifest.json"
+    },
+    {
+      "edition": "toolkit",
+      "name": "WeixinToolkit-4.1.15.56-win-x64.zip",
+      "localPath": "C:\\Users\\35097\\Documents\\ChatGPT\\微信工具包开发\\.local\\private-binary\\trusted-delivery-final-20261101-1904\\WeixinToolkit-4.1.15.56-win-x64.zip",
+      "bytes": 73350264,
+      "sha256": "0af4e1585b2d8528caff0f3eb460b19e3ee59c31b3c227da642cb652375c5ef9",
+      "remotePath": "/opt/cshell-release-staging/wechat-0.1.2-trusted-final/toolkit/WeixinToolkit-4.1.15.56-win-x64.zip",
+      "result": "uploaded-verified",
+      "publicPath": "/opt/cshell-downloads/toolkit/v0.1.2/WeixinToolkit-4.1.15.56-win-x64.zip",
+      "url": "https://shell.canp.ai/downloads/toolkit/v0.1.2/WeixinToolkit-4.1.15.56-win-x64.zip"
+    },
+    {
+      "edition": "toolkit",
+      "name": "Weixin-4.2.0.12-0.1.2.cagent-package.json",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\wechat-0.1.2-trusted-final-candidate\\Weixin-4.2.0.12-0.1.2.cagent-package.json",
+      "bytes": 264771599,
+      "sha256": "aab70f092aed4a1b622be9a086cd89711b69d37bf401c11d18be9c6c6ffe4604",
+      "remotePath": "/opt/cshell-release-staging/wechat-0.1.2-trusted-final/toolkit/Weixin-4.2.0.12-0.1.2.cagent-package.json",
+      "result": "uploaded-verified",
+      "publicPath": "/opt/cshell-downloads/toolkit/v0.1.2/Weixin-4.2.0.12-0.1.2.cagent-package.json",
+      "url": "https://shell.canp.ai/downloads/toolkit/v0.1.2/Weixin-4.2.0.12-0.1.2.cagent-package.json"
+    },
+    {
+      "edition": "toolkit",
+      "name": "Weixin-4.2.0.12-0.1.2.manifest.json",
+      "localPath": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\wechat-0.1.2-trusted-final-candidate\\Weixin-4.2.0.12-0.1.2.manifest.json",
+      "bytes": 16524,
+      "sha256": "98b558f680746112d09c6b76e78ebf219dd514585cbacfb7526edd70210ed0d5",
+      "remotePath": "/opt/cshell-release-staging/wechat-0.1.2-trusted-final/toolkit/Weixin-4.2.0.12-0.1.2.manifest.json",
+      "result": "uploaded-verified",
+      "publicPath": "/opt/cshell-downloads/toolkit/v0.1.2/Weixin-4.2.0.12-0.1.2.manifest.json",
+      "url": "https://shell.canp.ai/downloads/toolkit/v0.1.2/Weixin-4.2.0.12-0.1.2.manifest.json"
+    },
+    {
+      "edition": "toolkit",
+      "name": "WeixinToolkit-4.2.0.12-win-x64.zip",
+      "localPath": "C:\\Users\\35097\\Documents\\ChatGPT\\微信工具包开发\\.local\\private-binary\\trusted-delivery-final-20261101-1904\\WeixinToolkit-4.2.0.12-win-x64.zip",
+      "bytes": 73348611,
+      "sha256": "d29fa702bd7870e86005bc220db27a6c26ca135d640ddef8a056ff68c0ae705e",
+      "remotePath": "/opt/cshell-release-staging/wechat-0.1.2-trusted-final/toolkit/WeixinToolkit-4.2.0.12-win-x64.zip",
+      "result": "uploaded-verified",
+      "publicPath": "/opt/cshell-downloads/toolkit/v0.1.2/WeixinToolkit-4.2.0.12-win-x64.zip",
+      "url": "https://shell.canp.ai/downloads/toolkit/v0.1.2/WeixinToolkit-4.2.0.12-win-x64.zip"
+    }
+  ]
+}

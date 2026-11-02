@@ -52,7 +52,7 @@ class Lending:
   email=self.s.profile(account)['email'].lower()
   with self.s.db() as db:
    rows=db.execute('SELECT id,owner,devices,email,expires,max_uses,revoked FROM device_loans WHERE owner=? OR email=? OR id IN(SELECT loan FROM loan_recipients WHERE account=?) ORDER BY created DESC LIMIT 300',(account,email,account)).fetchall()
-   return {'devices':[{'id':r[0],'name':r[1]} for r in db.execute('SELECT id,name FROM cloud_devices WHERE account=?',(account,)).fetchall()],'loans':[{'id':r[0],'owned':r[1]==account,'deviceIds':json.loads(r[2]),'email':r[3] if r[1]==account else None,'expiresAt':r[4],'maxUses':r[5],'revoked':bool(r[6]),'uses':db.execute('SELECT count(*) FROM loan_recipients WHERE loan=?',(r[0],)).fetchone()[0]} for r in rows]}
+   return {'devices':[{'id':r[0],'name':r[1]} for r in db.execute('SELECT id,name FROM cloud_devices WHERE account=?',(account,)).fetchall()],'loans':[{'id':r[0],'owned':r[1]==account,'accepted':bool(db.execute('SELECT 1 FROM loan_recipients WHERE loan=? AND account=?',(r[0],account)).fetchone()),'deviceIds':json.loads(r[2]),'email':r[3] if r[1]==account else None,'expiresAt':r[4],'maxUses':r[5],'revoked':bool(r[6]),'uses':db.execute('SELECT count(*) FROM loan_recipients WHERE loan=?',(r[0],)).fetchone()[0]} for r in rows]}
 
  def admin_list(self):
   with self.s.db() as db:

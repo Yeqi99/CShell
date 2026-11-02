@@ -1,9 +1,9 @@
 {
   "edition": "toolkit",
   "version": "0.1.2",
-  "status": "blocked-pending-fresh-ai-defaults-and-final-audit",
-  "sha": "7d906ee2a858e7bbb0701d2277c3c95501dac46e",
-  "verification": "Exact six binary distribution assets from private receipt 54b6715; no implementation sources. Pending final root publication gates and fixed public source SHA.",
+  "status": "candidate-not-published",
+  "sha": "670b89d3bc588de1d83abab5f713f7aff9cf79d7",
+  "verification": "Final thirty-file inventory fdf3454 and Hong Kong full verification 74d96a2 complete. Desktop defaults and Android physical input evidence retained. Lenovo physical relay deferred by explicit user authorization; not claimed verified.",
   "assets": [
     {
       "name": "Weixin-4.1.15.56-0.1.2.cagent-package.json",
@@ -36,9 +36,10 @@
       "sha256": "d29fa702bd7870e86005bc220db27a6c26ca135d640ddef8a056ff68c0ae705e"
     }
   ],
-  "pendingGates": [
-    "new CShell profiles need explicitly requested default AI authorization factory; preserve existing grants and absent cloud fields, keep MCP listener disabled",
-    "final nineteen-requirement read-only audit and exact affected-package rebuild plan",
-    "Lenovo physical membership relay acceptance"
-  ]
+  "pendingGates": [],
+  "deferredVerification": {
+    "status": "user-waived-deferred",
+    "scope": "Lenovo physical membership relay acceptance",
+    "reason": "User explicitly authorized immediate release without this physical acceptance prerequisite; no claim that it passed."
+  }
 }

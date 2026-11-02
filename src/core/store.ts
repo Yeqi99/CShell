@@ -35,6 +35,7 @@ const portableExtensionsSchema=z.object({commandSuggestions:z.boolean(),dockerSo
 const schema = z.object({
   version: z.literal(1),
   capabilityPackages:portableCapabilitiesSchema.optional(),
+  accountPreferences:z.object({autoDiscoverDevices:z.boolean().optional()}).strict().optional(),
   monitorViews: z.array(monitorViewSchema).max(100).default([]),
   tools: toolsSettingsSchema.default(toolsDefaults),
   plugins: z.array(installedPluginSchema).max(100).optional(),
@@ -73,11 +74,11 @@ export class Store {
     for (const profile of snapshot.profiles) {
       if (snapshot.secrets[profile.id]) secrets[profile.id] = JSON.parse(await this.codec.decrypt(snapshot.secrets[profile.id]));
     }
-    return { ...(snapshot.capabilityPackages?{capabilityPackages:snapshot.capabilityPackages}:{}),profiles: snapshot.profiles, groups: snapshot.groups, preferences: snapshot.preferences,
+    return { ...(snapshot.accountPreferences?{accountPreferences:snapshot.accountPreferences}:{}),...(snapshot.capabilityPackages?{capabilityPackages:snapshot.capabilityPackages}:{}),profiles: snapshot.profiles, groups: snapshot.groups, preferences: snapshot.preferences,
       presets: snapshot.presets, monitorViews: snapshot.monitorViews, hosts: snapshot.hosts, secrets, extensions:{commandSuggestions:snapshot.tools.commandSuggestions,dockerSocket:snapshot.tools.dockerSocket,commands:Object.fromEntries(this.plugins().map(p=>[p.manifest.id,p.manifest.commands])),enabled:Object.fromEntries(this.plugins().filter(p=>p.source==='bundled').map(p=>[p.manifest.id,p.enabled])),...((snapshot.portablePlugins?.length||this.plugins().some(p=>p.source!=='bundled'))?{external:[...(snapshot.portablePlugins??[]).filter(p=>!this.plugins().some(local=>local.manifest.id===p.manifest.id)),...this.plugins().filter(p=>p.source!=='bundled').map(portablePlugin)]}:{})} };
   }
   cloudValidate(value: unknown) {
-    const result = schema.pick({profiles:true, groups:true, preferences:true, presets:true, monitorViews:true, hosts:true}).extend({
+    const result = schema.pick({accountPreferences:true,profiles:true, groups:true, preferences:true, presets:true, monitorViews:true, hosts:true}).extend({
       extensions:portableExtensionsSchema.optional(),
       capabilityPackages:portableCapabilitiesSchema.optional(),
       secrets: z.record(z.string().uuid(), z.object({password:z.string().max(65536).optional(), privateKey:z.string().max(262144).optional(), passphrase:z.string().max(65536).optional()}).strict()),
@@ -381,6 +382,8 @@ export class Store {
     delete this.data.secrets[id];
     await this.persist();
   }
+  accountPreferences(){return structuredClone(this.data.accountPreferences??{});}
+  async setAccountDiscovery(enabled:boolean){this.data.accountPreferences={...this.data.accountPreferences,autoDiscoverDevices:z.boolean().parse(enabled)};await this.persist();}
   async preferences(value: Preferences) {
     this.data.preferences = preferencesSchema.parse(value);
     await this.persist();

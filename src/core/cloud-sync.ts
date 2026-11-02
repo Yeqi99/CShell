@@ -1,4 +1,4 @@
-export function vaultWriteSchema(snapshot:any):number{return snapshot?.store?.extensions?.external!==undefined||snapshot?.store?.capabilityPackages!==undefined||snapshot?.identityNetwork!==undefined?3:snapshot?.store?.extensions?.enabled!==undefined?2:1;}
+export function vaultWriteSchema(snapshot:any):number{return snapshot?.store?.accountPreferences?.autoDiscoverDevices!==undefined?4:snapshot?.store?.extensions?.external!==undefined||snapshot?.store?.capabilityPackages!==undefined||snapshot?.identityNetwork!==undefined?3:snapshot?.store?.extensions?.enabled!==undefined?2:1;}
 import { CloudImportConflict } from './cloud-import';
 import { mkdir, readFile, rename, writeFile, readdir, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -156,7 +156,7 @@ export class CloudSync {
       method: body === undefined ? 'GET' : 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-CShell-Vault-Schema': '3',
+        'X-CShell-Vault-Schema': '4',
         ...(body !== undefined ? {'X-CShell-Vault-Write-Schema': writeSchema} : {}),
         ...(this.data.session ? { Authorization: 'Bearer ' + this.data.session.token } : {}),
       },

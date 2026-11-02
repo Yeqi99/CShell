@@ -57,6 +57,7 @@ test('CAgent keeps guest habits out of registration and restores isolated accoun
     remote.opencode={accounts:[{id:'default',name:'fixture',key:'opencode-test-secret'}]};
     remote.tavily={accounts:[{id:'search-account',name:'Search',key:'tavily-test-secret',enabled:false}]};
     remote.futureExtension={enabled:true,opaque:'preserve-me'};
+    remote.store.accountPreferences={autoDiscoverDevices:false};
     a.envelope=encryptVault(remote,key,a.accountId);a.revision++;
     await cloud.call('account.login',{email:'a@example.com',password:'fixture-password'});
     assert.equal((cloud as any).official.closed,false,'login must keep the OpenCode runtime available');
@@ -65,6 +66,7 @@ test('CAgent keeps guest habits out of registration and restores isolated accoun
     assert.deepEqual(updated.opencode,remote.opencode);
     assert.deepEqual(updated.tavily,remote.tavily);
     assert.deepEqual(updated.futureExtension,remote.futureExtension);
+    assert.deepEqual(updated.store.accountPreferences,{autoDiscoverDevices:false});
     await cloud.call('account.logout',{});
     await cloud.call('account.login',{email:'b@example.com',password:'fixture-password'});
     assert.equal(assistant.cloudExport().habits?.[0].text,'Account B preference');

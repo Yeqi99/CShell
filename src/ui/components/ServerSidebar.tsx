@@ -1,3 +1,4 @@
+import type {AccountDiscoveryStatus} from '../../shared/cloud-sync';
 import {ErrorNotice} from './ErrorNotice';
 import {PingButton} from './PingButton';
 import {PingAll} from './PingAll';
@@ -15,6 +16,7 @@ import {
   Pencil,
   Plus,
   Search,
+  Share2,
   Server,
   Globe,
   Star,
@@ -39,6 +41,7 @@ export function ServerSidebar({
   onOpen,
   onConnect,
   onVisual,
+  onShare,
   onSave,
   onMove,
   onDelete,
@@ -55,6 +58,7 @@ export function ServerSidebar({
   onOpen: (p?: Profile) => void;
   onConnect: (p: Profile) => void;
   onVisual?: (p: Profile) => void;
+  onShare?: (p: Profile) => void;
   onSave: (p: Profile) => Promise<void>;
   onMove?: (id: string, group: string, before?: string) => Promise<void>;
   onDelete: (p: Profile) => void;
@@ -62,6 +66,8 @@ export function ServerSidebar({
 }) {
   const { t, locale } = useI18n();
   const [query, setQuery] = useState('');
+  const [accountDevices,setAccountDevices]=useState<AccountDiscoveryStatus['devices']>([]);
+  useEffect(()=>{let alive=true;const refresh=()=>{void window.cshell.cloudDiscovery?.().then(s=>{if(alive)setAccountDevices(s.devices);}).catch(()=>{});};refresh();const timer=setInterval(refresh,15000);return()=>{alive=false;clearInterval(timer);};},[]);
   const [menu, setMenu] = useState<Menu | null>(null);
   const [appearanceExpanded, setAppearanceExpanded] = useState(false);
   const [collapsed, setCollapsed] = useState<string[]>([]);
@@ -439,10 +445,10 @@ export function ServerSidebar({
                         {profile.protocol === 'http' ? <Globe size={16} /> : <Server size={16} />}
                       </div>
                       {profile.protocol !== 'http' && (
-                        <i className={`dot ${online.includes(profile.id) ? '' : 'off'}`} />
+                        <i className={`dot ${(online.includes(profile.id)||accountDevices.some(d=>d.id===profile.id&&d.online===true)) ? '' : 'off'}`} />
                       )}
                       <div>
-                        <strong>{profile.name}</strong>
+                        <strong>{profile.name}</strong>{accountDevices.some(d=>d.id===profile.id)&&<span className="account-device-badge" title="此设备来自当前登录账号">账号设备{!online.includes(profile.id)&&(accountDevices.find(d=>d.id===profile.id)?.online===false?' · 离线':accountDevices.find(d=>d.id===profile.id)?.online===null?' · 状态未知':'')}</span>}
                         <small>{profile.protocol === 'http' ? 'HTTP' : profile.host}</small>
                       </div>
                     </button>
@@ -578,6 +584,7 @@ export function ServerSidebar({
             ) : (
               <>
                 <div className="context-caption">{menu.profile.name}</div>
+                {onShare&&<button role="menuitem" onClick={()=>{onShare(menu.profile);closeMenu();}}><Share2 size={14}/>{locale==='zh-CN'?'分享机器…':'Share machine…'}</button>}
                 {onVisual && !['http','ftp','ftps','sftp'].includes(menu.profile.protocol??'ssh') && <button role="menuitem" onClick={() => {onVisual(menu.profile);closeMenu();}}><Server size={14}/>{locale === 'zh-CN' ? '打开可视化桌面' : 'Open visual desktop'}</button>}
                 {['ssh','rdp'].includes(menu.profile.protocol??'ssh')&&<button role="menuitemcheckbox" aria-checked={connectionUsesVisual(menu.profile,preferences)} disabled={working} onClick={()=>{setWorking(true);const current=profiles.find(item=>item.id===menu.profile.id)??menu.profile;void onSave({...current,defaultConnectionView:connectionUsesVisual(current,preferences)?'original':'visual'}).then(()=>closeMenu()).catch(report).finally(()=>setWorking(false));}}><span style={{width:14,display:'flex'}}>{connectionUsesVisual(menu.profile,preferences)&&<Check size={14}/>}</span>{locale==='zh-CN'?'默认以可视化打开':'Open in visual mode by default'}</button>}
                 <button

@@ -275,6 +275,7 @@
       <section id="cagent" class="page" hidden>
         <div class="page-heading"><div><h1>CAgent</h1><p class="muted caption">此手机的远程连接</p></div><label class="cagent-toggle"><input id="cagent-enabled" type="checkbox" />启用</label></div>
         <p id="cagent-status" role="status" aria-live="polite">未启用</p>
+        <label class="cagent-toggle"><input id="cagent-account-discovery" type="checkbox" />同账号设备自动发现</label><p id="cagent-relay-status" class="muted caption">登录会员账号后，通过中继连接；屏幕共享仍需手机授权。</p>
         <form id="cagent-config" autocomplete="off"><fieldset id="cagent-fields">
           <div class="cagent-port-row"><label>监听端口<input id="cagent-port" type="number" min="1" max="65535" required value="24443" inputmode="numeric" /></label><label>对外端口<input id="cagent-public-port" type="number" min="1" max="65535" placeholder="同监听端口" inputmode="numeric" /></label></div>
           <label>对外地址<input id="cagent-host" placeholder="可访问手机的 IP 或域名" autocapitalize="none" spellcheck="false" maxlength="253" /></label>

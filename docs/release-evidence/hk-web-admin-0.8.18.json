@@ -1,0 +1,344 @@
+{
+  "status": "deployed-http-verified",
+  "at": "2026-11-02T01:25:19.981Z",
+  "count": 56,
+  "caddyUnchanged": true,
+  "files": [
+    {
+      "path": "portal/.gitattributes",
+      "bytes": 24,
+      "sha256": "c664ae1249f77573b25d6c3f1d228bd6f43da061e043017ad74c0b77c0cf89f4",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/cagent.svg",
+      "bytes": 1545,
+      "sha256": "767928f9d457ffffd8986dc0711ad15d6cad689c1b50928fcdb7c41af26b50aa",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/classroom.css",
+      "bytes": 6527,
+      "sha256": "01e30ffa0c3b29a102ad0ce9bf5c308433f5d28577de81422e3c2806e06cb19d",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/classroom.html",
+      "bytes": 465,
+      "sha256": "dad36d89368675011f6fbf67f88aa04aebb68a4f5d032c6734b0e12123668d76",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/developer-route.css",
+      "bytes": 2439,
+      "sha256": "796dd38849cf77160dcbceb53f256ae9b70482f50a2a3f6f679845a1148368ef",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/docs/ai.html",
+      "bytes": 11381,
+      "sha256": "78ec53c774179bbab15828710fc10ce16124cb37b8fabf066107e39020c15418",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/docs/android.html",
+      "bytes": 8460,
+      "sha256": "8e65847c21bd32c92e04e2db8712c0685d8772c9a5ef1fbae344333ef7deb104",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/docs/app-authoring.html",
+      "bytes": 8708,
+      "sha256": "b4c1cb5980d71ab2059cbc5f22b69041ace1d8e7decf370283b1e851eff166c1",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/docs/automation.html",
+      "bytes": 10084,
+      "sha256": "35d85a89c5be3add043596ea73450c0fa9937c2283166840f9ad6149ae113a27",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/docs/cagent.html",
+      "bytes": 7758,
+      "sha256": "08eb9c59c53eab9146605234017fe767552718d63c3137f2314c816affd035fd",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/docs/cli.html",
+      "bytes": 12469,
+      "sha256": "5da9a36b8e4d41545cb7407a74e644803dc911b5a79a6c80c75ab0178558292a",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/docs/cloud.html",
+      "bytes": 10595,
+      "sha256": "ed6eda9c42bc0240eec2e2710d83778095be8d4710a7f9661ab018a03de822bc",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/docs/connections.html",
+      "bytes": 9660,
+      "sha256": "7845afce81a47b85692e57dea76dff769a687951165e1a497e534eee417d00f2",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/docs/desktop.html",
+      "bytes": 10901,
+      "sha256": "1be85a390bc4b851d088317ae5386a984f549cd5bcb5e88746329b240eb4cf57",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/docs/developers.html",
+      "bytes": 7931,
+      "sha256": "2efc961a01457f2fc8f4db0add5cf17bd32b22618736a674a8146c3f6ed1f16a",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/docs/extensions.html",
+      "bytes": 9845,
+      "sha256": "fe4416ccfba09217ceedf1c70d3d6e1a3d25bb358afa173abef0b3a77e0a558b",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/docs/http.html",
+      "bytes": 5076,
+      "sha256": "eb03fe96265fdbb65ff9ebdabe711335d3284ccf7a9051c0b772507837ca5a58",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/docs/imports.html",
+      "bytes": 7623,
+      "sha256": "a98f7f47a9a0a916b8b6477615893701bcd0c8f84b3bd86b3a75c038b8332816",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/docs/linux.html",
+      "bytes": 7559,
+      "sha256": "24829b9791590b33c452b872866b19737cce972a1066bcde0e4d4459d131fbe2",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/docs/machine-info.html",
+      "bytes": 7719,
+      "sha256": "b3bdb3d57cd89ea4d0f52add0285e7d5959e567ef469f3a3b4598374db549b1f",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/docs/macos.html",
+      "bytes": 5010,
+      "sha256": "bf170b1904033bc6e9a7a43cc6c82a0c92753c0de4a738f1012fcb653ac30cec",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/docs/network.html",
+      "bytes": 9973,
+      "sha256": "a2230825178b031bdde3fffe4d631952edadae6260b1d3fb8e860cc37e23f118",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/docs/opencode.html",
+      "bytes": 7756,
+      "sha256": "2f3319293e4e0f6b80697a7b36d1f890675ed9b709d5b605ec7136426e45aafe",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/docs/plugin-authoring.html",
+      "bytes": 9555,
+      "sha256": "19f3a17429b04f2e56442a4307e032e986318b25a5ec79d28578482a2f49a068",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/docs/releases.html",
+      "bytes": 26925,
+      "sha256": "e367ae3d6bc7f1e0357c999607d1c053515c7a47304dc9ee209e35fbb2a13231",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/docs/settings.html",
+      "bytes": 8805,
+      "sha256": "4da58e98253c08a0c860cf86cd9140be2524100cda7c85d198e7a1ed64503d29",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/docs/start.html",
+      "bytes": 6508,
+      "sha256": "470eb2a7ebf7c471759bfcc3226977335de56faa823bbb14d3e5a6cf62aae5e4",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/docs/terminal.html",
+      "bytes": 11232,
+      "sha256": "edd80187f1cb4d9e9f5ee9fd7705a46834267384864b5c3427acdbd779cb6a11",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/docs/troubleshooting.html",
+      "bytes": 7051,
+      "sha256": "296d4a7fae3f51274e58f7f8be480125f5511eb5ea00b33614e9cab2e6bc58a0",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/docs/windows.html",
+      "bytes": 5197,
+      "sha256": "d2eaf2361f841fd06a571c2f8e03d278b3edfa0a261dc2a87450481821e767e1",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/docs/wsl-offline.html",
+      "bytes": 6847,
+      "sha256": "9795e1dfe04a5bc04acae442f0fcd67ca94463f2a473c758e4ec498ef09080b5",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/docs-index.json",
+      "bytes": 140236,
+      "sha256": "83cb3d39a0b1280d6d83a32f1c9a2fcfc0764e7556bb150b5f409a66f0599242",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/docs-reader.css",
+      "bytes": 6104,
+      "sha256": "896d04fd51f6e8536caa23ffbcb6a711fbd1a149eb9e8eb149e20781205c317e",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/docs-reader.js",
+      "bytes": 5739,
+      "sha256": "4824bde8e308c022a35c7eb44cd9fc5e129d90e2c0ac961943c45ad2e912d4d3",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/download-picker.css",
+      "bytes": 9199,
+      "sha256": "2b756f66d082e4b5ec5d8f8470337303f6a95e2cde7424adce5ca0f0eab9abe8",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/download-picker.js",
+      "bytes": 4960,
+      "sha256": "4dd9d961bc602daf6a57d43643651037da4c7eb5ec3c6b79da6e48a58bb9ff9b",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/downloads.html",
+      "bytes": 20303,
+      "sha256": "2704218969062aac3d6c960f9021823786bdf1c2fcd0c68948c28eef94e5ed5e",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/editorial.css",
+      "bytes": 13740,
+      "sha256": "400cf2dd57dfe24fdefd1b89d8f54c17a72f230e98b7fc30382c3c145df6f7a5",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/home.css",
+      "bytes": 15957,
+      "sha256": "ce0d3ccfe6903f063b4f2de533aaff67185f41991561a4e10e7f2ca1080ef294",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/icon.svg",
+      "bytes": 1771,
+      "sha256": "0286b9b08b67c6dfdbb8c29518dbdbcb4c9f0f9e806c324475defa5b27285777",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/index.html",
+      "bytes": 16843,
+      "sha256": "01037ac0e04e0977e6349a898887c359c190eabf44194b1dadb253b38215976a",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/install.sh",
+      "bytes": 9641,
+      "sha256": "a552cd2f821db5782de3f1494de2b76c3d18c7054f183febd3a87c0c220f0436",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/media/extensions.png",
+      "bytes": 166145,
+      "sha256": "ae675f58488f0aae3d8049d8d44b2fa789d65ba2d2ebfcce82491933aef0234b",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/media/linux-workspace.png",
+      "bytes": 339091,
+      "sha256": "0d57498f930af39686d42f17cfacf12db049f4d39ae2bebe1d32d1f41ab05db3",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/media/windows-workspace.png",
+      "bytes": 348930,
+      "sha256": "6c07376ef2fa3d991b8c54c9182fc719b8551de3b08f55f1c9df884bbc3bc5f5",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/README.md",
+      "bytes": 1929,
+      "sha256": "308cebc18c300480283ce2845b81f2d216ec70d1f0eae205c1bb52e75d075a14",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/showcase.js",
+      "bytes": 3972,
+      "sha256": "2847c9ac1e07e169422e04da66f4b134470cf50e6c40b54449d72845464ac1a2",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/site.js",
+      "bytes": 3482,
+      "sha256": "0b7dfd7157ae9e8a3650c8bd5e42a38e5153e27a611ba14b2b25c87bddb4d33f",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/style.css",
+      "bytes": 3920,
+      "sha256": "3bf82c052f4e77afc7721e4c8d82191026c8f5216b23018a2d50ed5f9de83e7b",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/theme.css",
+      "bytes": 14670,
+      "sha256": "f5a023d6f8a1a2ae623dc9d4d28ae3e521bad49cc3a4869b1db653ecbdf79aa9",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/usage.html",
+      "bytes": 2642,
+      "sha256": "673409347e3241906643197c775acf4adc2b19b8879d7c72141d98fd0c7573db",
+      "httpVerified": true
+    },
+    {
+      "path": "portal/workbench.css",
+      "bytes": 7038,
+      "sha256": "40b2f220bfa6b293a3dddeae305420a5a43afbad63ca4326a1c0d6359ad45a3e",
+      "httpVerified": true
+    },
+    {
+      "path": "admin/app.js",
+      "bytes": 60999,
+      "sha256": "22bd4e7840be60ebdfdfbe24908734d4812a5034a5dac4d43d24c39c2864a806",
+      "httpVerified": "authentication-required-401"
+    },
+    {
+      "path": "admin/icon.svg",
+      "bytes": 245,
+      "sha256": "e9c9adb31fbd45110b0db18c33ac6356c21f0d9e6c9c84ff1c47208782f5a629",
+      "httpVerified": "authentication-required-401"
+    },
+    {
+      "path": "admin/index.html",
+      "bytes": 616,
+      "sha256": "e4adc5c1b8b06bc0263fbf9e9b3560e9cc8d22ebd0ffb08b5a94a2284935b053",
+      "httpVerified": "authentication-required-401"
+    },
+    {
+      "path": "admin/styles.css",
+      "bytes": 21246,
+      "sha256": "71b3695d266787affbcf155c5c067ecc877b44dde642c1c686031d8b457059f8",
+      "httpVerified": "authentication-required-401"
+    }
+  ]
+}

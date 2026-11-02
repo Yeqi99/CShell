@@ -1,0 +1,15 @@
+{
+  "checkedAt": "2026-11-02T02:03:37.146Z",
+  "check": {
+    "current": "0.8.17",
+    "available": true,
+    "version": "0.8.18"
+  },
+  "phase": "ready",
+  "file": "CAgent-Setup-0.8.18-win-x64.exe",
+  "bytes": 26230795,
+  "sha256": "7f60ff4c4d297586487bac9c604e150a0aa438a786b3fc6bf11d17dc681cffe3",
+  "implementation": "src/agent/update.ts AgentUpdater default updateRequest",
+  "installed": false,
+  "downloadRouting": "Final public Worker asset route; all 28 new asset ranges independently confirmed pinned SHA256 headers"
+}

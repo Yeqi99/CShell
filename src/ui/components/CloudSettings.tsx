@@ -5,15 +5,16 @@ import {MachineLending} from './MachineLending';
 import {AccountImports} from './AccountImports';
 import { useEffect, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, Cloud, Eye, EyeOff, ShieldCheck, LogOut, Crown, Mail, LockKeyhole } from 'lucide-react';
-import type { CloudStatus } from '../../shared/cloud-sync';
+import type { CloudStatus, AccountDiscoveryStatus } from '../../shared/cloud-sync';
 import brand from '../../../assets/brand/cshell-pro.svg';
 const readable = (error: unknown) => {
   const message = String((error as Error)?.message || '').replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '');
   if (/fetch|network|timeout|net::|ECONN/i.test(message)) return '暂时无法连接，请检查网络后重试。';
   return message.replace(/^Error: /, '') || '暂时无法完成，请稍后重试。';
 };
-export function CloudSettings() {
+export function CloudSettings({shareRequest}:{shareRequest?:{id:string;name:string;nonce:number}}={}) {
   const [status, setStatus] = useState<CloudStatus>();
+  const [discovery,setDiscovery]=useState<AccountDiscoveryStatus>();
   const [registering,setRegistering]=useState(false),[verification,setVerification]=useState('');
   const [passwordMode, setPasswordMode] = useState(true), [visible, setVisible] = useState(false);
   const [email, setEmail] = useState(''), [secret, setSecret] = useState('');
@@ -22,7 +23,7 @@ export function CloudSettings() {
   const [direction, setDirection] = useState<'upload'|'download'>();
   useEffect(() => {
     let alive=true;
-    const update=()=>window.cshell.cloudStatus().then(s=>{if(alive)setStatus(s);}).catch(()=>{});
+    const update=()=>{void window.cshell.cloudDiscovery().then(s=>{if(alive)setDiscovery(s);}).catch(()=>{});return window.cshell.cloudStatus().then(s=>{if(alive)setStatus(s);}).catch(()=>{});};
     void update(); const timer=setInterval(update,2000);
     return()=>{alive=false;clearInterval(timer);};
   }, []);
@@ -41,6 +42,7 @@ export function CloudSettings() {
       <img className="auth-brand" src={brand} alt="CShell Pro"/>
       {status.workspaceRecovered&&<p className="account-recovery-note" role="status">已恢复到未登录工作区。原账号配置保留，重新登录即可继续。</p>}
       <h1>{registering?"创建 CShell 账号":"登录 CShell"}</h1><p className="auth-description">{registering?"一个账号，同步你的工作环境。":"在你的设备间，延续工作。"}</p>
+      {shareRequest&&<p role="status">登录并解锁账号后，继续分享“{shareRequest.name}”。</p>}
       <form onSubmit={e=>{e.preventDefault();void login();}}>
         <fieldset disabled={busy}>
           <label htmlFor="account-email">邮箱地址</label><div className="auth-input"><Mail size={16}/><input id="account-email" type="email" autoComplete="email" placeholder="name@example.com" required value={email} onChange={e=>setEmail(e.target.value)}/></div>
@@ -59,12 +61,13 @@ export function CloudSettings() {
       <div className={'account-sync-strip '+(offline?'offline':syncing?'syncing':'')} role="status"><span className="account-sync-icon">{offline||syncing?<Cloud size={17}/>:<Check size={17}/>}</span><div><strong>{syncLabel}</strong><p>{offline?'你的更改已保存在本机，网络恢复后自动同步。':status.lastSync?'最近同步于 '+new Date(status.lastSync).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+' · 自动同步已开启':'正在自动恢复你的连接与设置'}</p></div></div>
       <div className="account-section"><h2>账户信息</h2><div className="account-detail-row"><span>邮箱</span><strong>{status.email}</strong></div><div className="account-detail-row"><span>当前方案</span>{member?<strong>{active?'Pro 会员':'免费账号'}{active&&<Crown size={14}/>}</strong>:<span className="account-loading-line" aria-label="正在获取方案"/>}</div>{active&&<div className="account-detail-row"><span>有效期</span><strong>{new Date(member!.expiresAt!*1000).toLocaleDateString()}</strong></div>}</div>
       <div className="account-section"><h2>跨设备同步 <ShieldCheck size={14}/></h2><div className="account-detail-row"><span>连接与已保存凭据</span><span className="account-included"><Check size={14}/> 自动同步</span></div><div className="account-detail-row"><span>基座模型与个人设置</span><span className="account-included"><Check size={14}/> 自动同步</span></div></div>
+      {status.unlocked&&discovery&&<div className="account-section"><h2>同账号设备</h2><label className="account-detail-row"><span>自动发现设备</span><input type="checkbox" checked={discovery.enabled} disabled={busy} onChange={e=>{const enabled=e.target.checked;void run(async()=>setDiscovery(await window.cshell.cloudDiscovery(enabled)));}}/></label><p>随账号同步此设置，自动加入同账号设备。首次放入“同账号设备”分组，移动后保留你的分组；离线设备不会被删除。</p>{discovery.enabled&&discovery.pending>0&&<p role="status">有 {discovery.pending} 台设备正在等待加密连接信息同步。</p>}</div>}
       {!status.unlocked&&<form className="account-exception" onSubmit={e=>{e.preventDefault();void login();}}><p>输入账号密码，恢复此设备上的加密配置。</p><input aria-label="账号密码" type="password" autoComplete="current-password" required value={secret} onChange={e=>setSecret(e.target.value)}/><button className="auth-submit" disabled={busy}>继续</button></form>}
       {status.state==='conflict'&&<div className="account-exception"><p>两台设备同时修改了配置。请选择保留哪一份；另一份会先备份。</p><button onClick={()=>setDirection('download')}>保留云端更改</button><button onClick={()=>setDirection('upload')}>保留此设备更改</button>{direction&&<div><p>确认使用{direction==='download'?'云端':'此设备'}配置？</p><button disabled={busy} onClick={()=>void run(async()=>{await window.cshell.cloudSync(direction);setDirection(undefined);})}>确认</button><button onClick={()=>setDirection(undefined)}>取消</button></div>}</div>}
       {status.storage&&<div className="account-section account-storage"><h2>云空间</h2><div className="account-detail-row"><span>连接、模型、扩展偏好与浏览器记录</span><strong>{(status.storage.usedBytes/1048576).toFixed(2)} / {Math.round(status.storage.limitBytes/1048576)} MiB</strong></div><progress aria-label="云空间用量" max={status.storage.limitBytes} value={status.storage.usedBytes}/><p>仅同步配置与记录，浏览器 Cookie、缓存和登录状态保留在本机。</p></div>}
       {status.unlocked&&<AccountImports key={status.email}/>}
       <AccountMemory/>
-      {status.unlocked&&<MachineLending key={'lending-'+status.email}/>}
+      {status.unlocked&&<MachineLending key={'lending-'+status.email} request={shareRequest}/>}
       <div className="account-footer"><span><ShieldCheck size={14}/> 配置已加密保护</span><button className="account-signout" onClick={()=>setLogoutConfirm(true)}><LogOut size={14}/>退出登录</button></div>
       {logoutConfirm&&<div className="account-exception"><p>退出后重新打开未登录工作区。账号数据保留，不会混入未登录数据。</p><button disabled={busy} onClick={()=>void run(async()=>{await window.cshell.cloudLogout();setLogoutConfirm(false);})}>确认退出</button><button onClick={()=>setLogoutConfirm(false)}>取消</button></div>}
       {error&&<ErrorNotice title="操作未完成" error={error}/>}

@@ -47,7 +47,8 @@ final class AgentConnection implements AutoCloseable {
   private int earlySize;
   AgentConnection(Events events) { this.events = events; }
   void connect(String host, int port, String password, Trust trust) throws Exception {connect(host,port,password,trust,null);}
-  void connect(String host, int port, String password, Trust trust, JSONObject relay) throws Exception {
+  void connect(String host, int port, String password, Trust trust, JSONObject relay) throws Exception {connect(host,port,password,trust,relay,null);}
+  void connect(String host, int port, String password, Trust trust, JSONObject relay,String delegation) throws Exception {
     if(closed.get())throw new IOException("连接已取消");
     if (android.os.Build.VERSION.SDK_INT < 29) throw new IOException("Agent 连接需要 Android 10 或更新版本（TLS 1.3）");
     SSLContext context = SSLContext.getInstance("TLSv1.3");
@@ -84,6 +85,7 @@ final class AgentConnection implements AutoCloseable {
     if(info.getInt("protocol")!=1)throw new IOException("不支持的 Agent 协议");UUID.fromString(info.getString("deviceId"));
     JSONObject credentials=new JSONObject().put("name","CShell Android");
     if(!password.isEmpty())credentials.put("password",password);
+    if(delegation!=null)credentials.put("delegation",delegation);
     JSONObject auth=request("auth",credentials);
     if(auth.getInt("protocol")!=1||!info.getString("deviceId").equals(auth.getString("deviceId")))throw new IOException("Agent 身份不匹配");
     deviceId=info.getString("deviceId");

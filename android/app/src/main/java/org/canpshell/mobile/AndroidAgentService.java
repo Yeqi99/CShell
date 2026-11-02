@@ -19,6 +19,15 @@ public final class AndroidAgentService extends Service {
   private static volatile boolean starting;
   private final ExecutorService worker=Executors.newSingleThreadExecutor();
   private volatile AndroidAgentHost host;
+  private volatile AndroidAccountRelay accountRelay;
+  static void accountChanged(){AndroidAgentService live=current;if(live!=null){if(live.host!=null)live.host.clearAccount();AndroidAccountRelay relay=live.accountRelay;live.accountRelay=null;if(relay!=null)relay.close();}}
+  static void refreshAccount(){AndroidAgentService live=current;if(live!=null)try{live.worker.execute(()->{try{live.startAccountRelay();}catch(Exception ignored){}});}catch(RejectedExecutionException ignored){}}
+  private void startAccountRelay()throws Exception{
+    if(destroying||host==null||!host.status().optBoolean("running"))return;
+    JSONObject settings=AndroidAgentSettings.read(this);if(!settings.optBoolean("accountDiscovery",true))return;
+    if(accountRelay!=null)return;final AndroidAgentHost target=host;final int port=settings.getInt("port");
+    accountRelay=new AndroidAccountRelay(port,()->{JSONObject current=AndroidAgentSettings.read(this);if(!current.optBoolean("accountDiscovery",true)||!current.optBoolean("enabled"))return null;JSONObject descriptor=target.connectionInfo("127.0.0.1",port);descriptor.remove("host");descriptor.remove("port");try{JSONObject relay=CloudSync.shared(this).enrollHost(descriptor,target);JSONObject after=AndroidAgentSettings.read(this);if(destroying||!after.optBoolean("enabled")||!after.optBoolean("accountDiscovery",true)){target.clearAccount();return null;}changed(this);return relay;}catch(Exception error){target.clearAccount();throw error;}});accountRelay.start();
+  }
   private volatile AndroidScreenCapture capture;
   private volatile MediaProjection projection;
   private volatile AndroidAgentHost.Events viewer;
@@ -48,7 +57,7 @@ public final class AndroidAgentService extends Service {
         .put("sharing",live!=null&&live.sharing).put("accessibilityEnabled",AndroidControlService.isAvailable())
         .put("needsProjectionConsent",live!=null&&!live.sharing&&!starting).put("screenLocked",live!=null&&live.locked()).put("interactive",live!=null&&live.interactive())
         .put("ignoringBatteryOptimizations",context.getSystemService(PowerManager.class).isIgnoringBatteryOptimizations(context.getPackageName()))
-        .put("starting",starting).put("error",lastError);
+        .put("accountRelay",live!=null&&live.accountRelay!=null?live.accountRelay.status():new JSONObject().put("connected",false)).put("starting",starting).put("error",lastError);
     }catch(Exception e){return error(e);}
   }
   static JSONObject error(Exception e){try{return new JSONObject().put("error",e.getMessage()==null?"CAgent 操作失败":e.getMessage());}catch(Exception ignored){return new JSONObject();}}
@@ -58,6 +67,7 @@ public final class AndroidAgentService extends Service {
       JSONObject before=AndroidAgentSettings.read(context),after=AndroidAgentSettings.update(context,new JSONObject(json));
       boolean disconnect=!after.getBoolean("enabled")||before.getInt("port")!=after.getInt("port")||!before.getString("password").equals(after.getString("password"));
       if(disconnect){context.stopService(new Intent(context,AndroidAgentService.class));starting=false;}
+      if(before.optBoolean("accountDiscovery",true)!=after.optBoolean("accountDiscovery",true)){accountChanged();refreshAccount();}
       lastError="";changed(context);return status(context);
     }catch(Exception e){return error(e);}
   }
@@ -115,6 +125,7 @@ public final class AndroidAgentService extends Service {
     });
     if(host!=null)return;
     host=new AndroidAgentHost(this,new AndroidAgentHost.Backend(){
+      public boolean delegation(String device,String credential,String fingerprint,boolean continuation){return CloudSync.shared(AndroidAgentService.this).verifyHostDelegation(device,credential,fingerprint,continuation);}
       public boolean available(){return sharing&&!destroying&&!locked()&&interactive();}
       public String unavailableReason(){return locked()||!interactive()?"SCREEN_LOCKED: 请先在手机上亮屏并解锁；管理连接保持可用":"PROJECTION_STOPPED: 请在手机上重新授权屏幕共享；管理连接保持可用";}
       public boolean controlAvailable(){return available()&&AndroidControlService.isAvailable();}
@@ -129,7 +140,7 @@ public final class AndroidAgentService extends Service {
       public void quality(JSONObject quality)throws Exception{AndroidScreenCapture live=capture;if(live==null)throw new IllegalStateException(unavailableReason());live.quality(quality);}
     });
     host.start(settings.getInt("port"),settings.getString("password"));
-    hostReady=true;
+    hostReady=true;startAccountRelay();
   }
   private void captureEnded(AndroidScreenCapture session,String reason){
     if(destroying)return;
@@ -150,7 +161,7 @@ public final class AndroidAgentService extends Service {
     if(Build.VERSION.SDK_INT<34&&capture!=null){DisplayMetrics metrics=new DisplayMetrics();getSystemService(WindowManager.class).getDefaultDisplay().getRealMetrics(metrics);capture.resize(metrics.widthPixels,metrics.heightPixels);}
   }
   @Override public void onDestroy(){
-    destroying=true;sharing=false;hostReady=false;starting=false;viewer=null;
+    destroying=true;accountChanged();sharing=false;hostReady=false;starting=false;viewer=null;
     unregisterReceiver(screenState);
     if(current==this)current=null;
     worker.execute(()->{if(host!=null)host.close();if(capture!=null)capture.stop();if(projection!=null)projection.stop();AndroidControlService.releaseAll();});

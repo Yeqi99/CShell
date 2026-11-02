@@ -37,11 +37,11 @@ final class AndroidAgentSettings {
       password=new String(cipher.doFinal(Base64.decode(parts[1],Base64.NO_WRAP)),StandardCharsets.UTF_8);
     }
     return new JSONObject().put("enabled",p.getBoolean("enabled",false)).put("port",p.getInt("port",24443))
-      .put("advertisedHost",p.getString("advertisedHost","")).put("advertisedPort",p.getInt("advertisedPort",0)).put("password",password);
+      .put("accountDiscovery",p.getBoolean("accountDiscovery",true)).put("advertisedHost",p.getString("advertisedHost","")).put("advertisedPort",p.getInt("advertisedPort",0)).put("password",password);
   }
   static synchronized JSONObject update(Context context,JSONObject changes) throws Exception {
     JSONObject value=read(context);
-    for(String field:new String[]{"enabled","port","advertisedHost","advertisedPort","password"})
+    for(String field:new String[]{"accountDiscovery","enabled","port","advertisedHost","advertisedPort","password"})
       if(changes.has(field))value.put(field,changes.get(field));
     int port=value.getInt("port"),publicPort=value.getInt("advertisedPort");
     String host=value.getString("advertisedHost").trim(),password=value.getString("password");
@@ -51,7 +51,7 @@ final class AndroidAgentSettings {
     Cipher cipher=Cipher.getInstance("AES/GCM/NoPadding");cipher.init(Cipher.ENCRYPT_MODE,key());
     String secret=Base64.encodeToString(cipher.getIV(),Base64.NO_WRAP)+"."+Base64.encodeToString(cipher.doFinal(password.getBytes(StandardCharsets.UTF_8)),Base64.NO_WRAP);
     if(!context.getSharedPreferences("cagent-host-settings",0).edit().putBoolean("enabled",value.getBoolean("enabled"))
-      .putInt("port",port).putString("advertisedHost",host).putInt("advertisedPort",publicPort).putString("secret",secret).commit())
+      .putBoolean("accountDiscovery",value.getBoolean("accountDiscovery")).putInt("port",port).putString("advertisedHost",host).putInt("advertisedPort",publicPort).putString("secret",secret).commit())
       throw new IllegalStateException("设置保存失败");
     return read(context);
   }
