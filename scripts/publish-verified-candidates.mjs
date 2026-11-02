@@ -9,13 +9,13 @@ import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { createWriteStream } from 'node:fs';
 
-const repository = 'Yeqi99/CShell', version = '0.8.18';
-export function validatePlans(plans) {
+const repository = 'Yeqi99/CShell', version = '0.8.19';
+export function validatePlans(plans, expectedVersion = version) {
   assert.equal(plans.length, 2);
   assert.deepEqual(plans.map(p => p.edition).sort(), ['opensource', 'pro']);
   for (const p of plans) {
     assert.equal(p.status, 'candidate-not-published');
-    assert.equal(p.version, version);
+    assert.equal(p.version, expectedVersion);
     assert.match(p.sha, /^[a-f0-9]{40}$/);
     assert.equal(p.assets.length, p.edition === 'pro' ? 14 : 16);
     assert.equal(new Set(p.assets.map(a => a.name)).size, p.assets.length);
@@ -23,7 +23,7 @@ export function validatePlans(plans) {
       assert.match(a.name, /^(?:CAgent[-\w.]+\.(?:exe|tar\.gz)|CShell[-\w.]+\.(?:exe|dmg|zip|deb|AppImage|apk)|SHA256SUMS\.txt)$/);
       assert.match(a.sha256, /^[a-f0-9]{64}$/);
       assert(Number.isSafeInteger(a.size) && a.size > 0);
-      if (a.name !== 'SHA256SUMS.txt') assert(a.name.includes(version));
+      if (a.name !== 'SHA256SUMS.txt') assert(a.name.includes(expectedVersion));
       if (a.name.startsWith('CShell')) assert.equal(a.name.startsWith('CShell-Pro-'), p.edition === 'pro');
     }
     assert.equal(p.assets.filter(a => a.name === 'SHA256SUMS.txt').length, 1);
@@ -53,7 +53,7 @@ export function boundedPayload(size) {
 export async function main() {
   // No mutation, downloads or credentials unless explicitly requested by the release job.
   const requested = process.argv[2] || '--check', market = requested.startsWith('--market-');
-  const plans = market ? [JSON.parse(await readFile('services/update-edge/verified-wechat-012.json','utf8'))] : await Promise.all(['opensource', 'pro'].map(async edition => JSON.parse(await readFile(`services/update-edge/verified-${edition}-0818.json`, 'utf8'))));
+  const plans = market ? [JSON.parse(await readFile('services/update-edge/verified-wechat-012.json','utf8'))] : await Promise.all(['opensource', 'pro'].map(async edition => JSON.parse(await readFile(`services/update-edge/verified-${edition}-0819.json`, 'utf8'))));
   if (market) validateMarketPlan(plans[0]); else validatePlans(plans);
   const mode = market ? requested.replace('--market-', '--') : requested;
   assert(['--check', '--stage', '--publish'].includes(mode));
@@ -72,7 +72,7 @@ export async function main() {
   // All source refs and every complete payload are checked before creating either draft.
   for (const p of plans) {
     p.tag = market ? 'wechat-toolkit-v0.1.2' : `${p.edition === 'pro' ? 'pro-' : ''}v${version}`;
-    p.notes = await readFile(market ? 'docs/RELEASE-NOTES-WECHAT-0.1.2.md' : `docs/RELEASE-NOTES-${p.edition === 'pro' ? 'PRO' : 'CORE'}-0.8.18.md`, 'utf8');
+    p.notes = await readFile(market ? 'docs/RELEASE-NOTES-WECHAT-0.1.2.md' : `docs/RELEASE-NOTES-${p.edition === 'pro' ? 'PRO' : 'CORE'}-${version}.md`, 'utf8');
     assert(p.notes.trim().length > 100, 'Reviewed release notes required');
     assert.equal((await api(`commits/${p.sha}`))?.sha, p.sha);
     const tag = await api(`git/ref/tags/${p.tag}`);
