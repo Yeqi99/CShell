@@ -11,7 +11,7 @@ export type LinuxWorkspacePlan = {
   steps: string[];
 };
 export interface LinuxWorkspaceBridge {
-  nativeDesktopSetup(id:string,action:'inspect'|'start'|'install-start'|'stop'):Promise<{sessions?:{display:string}[];installed?:boolean;canInstall?:boolean;running?:boolean;socket:string;message?:string}>;
+  nativeDesktopSetup(id:string,action:'inspect'|'start'|'install-start'|'stop'):Promise<{desktopPresence?:'present'|'absent'|'unknown';desktopEnvironment?:string[];sessions?:{display:string}[];installed?:boolean;canInstall?:boolean;running?:boolean;socket:string;message?:string}>;
   nativeDesktopOpen(id:string,endpoint:{port:number}|{socket:string}):Promise<string>;
   nativeDesktopRead(id:string):Promise<Uint8Array|null>;
   nativeDesktopWrite(id:string,data:Uint8Array):Promise<void>;
@@ -53,3 +53,5 @@ export const linuxWorkspaceMethods = new Set([
   'packages.catalog',
   'packages.list',
 ]);
+
+export function nativeDesktopAvailable(info: {desktopPresence?:string;sessions?:{display:string}[];running?:boolean}|undefined){return info?.desktopPresence==='present'||!!info?.sessions?.length||info?.running===true;}

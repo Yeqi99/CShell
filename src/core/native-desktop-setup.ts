@@ -8,14 +8,18 @@ root=home/'.local/share/cshell/native-desktop'
 sock=root/'desktop.sock'
 pidfile=root/'process.json'
 sessions=[]
+desktop_process=False
+inspection_incomplete=False
 for p in glob.glob('/proc/[0-9]*'):
  try:
   if os.stat(p).st_uid!=os.getuid(): continue
-  if Path(p+'/comm').read_text().strip() not in ['gnome-shell','xfce4-session','plasmashell','mate-session','lxsession']: continue
+  if Path(p+'/comm').read_text().strip() not in ['gnome-shell','xfce4-session','plasmashell','mate-session','lxsession','cinnamon-session','lxqt-session']: continue
+  desktop_process=True
   env=dict(v.split('=',1) for v in Path(p+'/environ').read_bytes().decode().split('\0') if '=' in v)
   display=env.get('DISPLAY',''); auth=env.get('XAUTHORITY',str(home/'.Xauthority'))
   if env.get('XDG_SESSION_TYPE')=='wayland': continue
   if display.startswith(':') and os.access(auth,os.R_OK) and not any(s['display']==display for s in sessions): sessions.append({'display':display,'auth':auth})
+ except PermissionError: inspection_incomplete=True
  except (OSError,ValueError,UnicodeError): pass
 binary=shutil.which('x11vnc')
 private=root/'package/usr/bin/x11vnc'
@@ -27,7 +31,7 @@ try:
  managed=os.stat('/proc/'+str(pid)).st_uid==os.getuid() and str(sock).encode() in args and b'-unixsock' in args and any(a.endswith(b'/x11vnc') for a in args)
 except (OSError,ValueError,KeyError): pass
 if action=='inspect':
- print(json.dumps({'sessions':[{'display':s['display']} for s in sessions],'installed':bool(binary),'canInstall':bool(shutil.which('apt-get') and shutil.which('dpkg-deb')),'running':managed,'socket':str(sock),'message':'检测到可共享的 X11 桌面' if sessions else '未检测到当前 SSH 用户的 X11 桌面；Wayland 或其他用户的桌面需先在系统中启用兼容共享。'}));sys.exit(0)
+ print(json.dumps({'desktopPresence':presence,'desktopEnvironment':desktops,'sessions':[{'display':s['display']} for s in sessions],'installed':bool(binary),'canInstall':bool(shutil.which('apt-get') and shutil.which('dpkg-deb')),'running':managed,'socket':str(sock),'message':'检测到可共享的 X11 桌面' if sessions else ('已安装桌面，但当前用户没有可直接共享的 X11 会话；请启动桌面或连接已有 VNC 服务。' if presence=='present' else ('桌面环境检测不完整，请检查系统权限后重试。' if presence=='unknown' else '未发现已安装的桌面环境。'))}));sys.exit(0)
 if action=='stop':
  if managed:
   os.kill(pid,signal.SIGTERM)
