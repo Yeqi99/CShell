@@ -65,7 +65,7 @@ final class AgentConnection implements AutoCloseable {
     if(relay!=null){
       SSLSocket outer=(SSLSocket)context.getSocketFactory().createSocket();socket=outer;
       try{
-        outer.setEnabledProtocols(new String[]{"TLSv1.3"});outer.connect(new InetSocketAddress(relay.getString("host"),relay.getInt("port")),10000);outer.setSoTimeout(10000);outer.startHandshake();
+        outer.setTcpNoDelay(true);outer.setEnabledProtocols(new String[]{"TLSv1.3"});outer.connect(new InetSocketAddress(relay.getString("host"),relay.getInt("port")),10000);outer.setSoTimeout(10000);outer.startHandshake();
         byte[] pin=java.security.MessageDigest.getInstance("SHA-256").digest(outer.getSession().getPeerCertificates()[0].getEncoded());StringBuilder hex=new StringBuilder();for(byte b:pin)hex.append(String.format(java.util.Locale.ROOT,"%02x",b&255));
         if(!hex.toString().equalsIgnoreCase(relay.getString("fingerprint").replace(":","")))throw new IOException("中继身份校验失败");
         JSONObject hello=new JSONObject().put("protocol","cshell-relay/1").put("operation","forward").put("targetId",relay.getString("targetId")).put("credential",relay.getString("credential"));
@@ -78,7 +78,7 @@ final class AgentConnection implements AutoCloseable {
     }else s=(SSLSocket)context.getSocketFactory().createSocket();
     socket=s;
     if(closed.get()){s.close();throw new IOException("连接已取消");}
-    s.setEnabledProtocols(new String[]{"TLSv1.3"});if(relay==null)s.connect(new InetSocketAddress(host,port),10000);s.setSoTimeout(10000);s.startHandshake();
+    s.setTcpNoDelay(true);s.setEnabledProtocols(new String[]{"TLSv1.3"});if(relay==null)s.connect(new InetSocketAddress(host,port),10000);s.setSoTimeout(10000);s.startHandshake();
     byte[] certificate=s.getSession().getPeerCertificates()[0].getEncoded();
     if(!trust.verify(certificate)||closed.get())throw new IOException("Agent 身份未获信任或连接已取消");
     s.setSoTimeout(0);
@@ -211,7 +211,7 @@ final class AgentConnection implements AutoCloseable {
         listener.bind(new InetSocketAddress(java.net.InetAddress.getLoopbackAddress(),0),1);listener.setSoTimeout(10000);
         local=new java.net.Socket();local.connect(listener.getLocalSocketAddress(),10000);accepted=listener.accept();
         if(accepted.getPort()!=local.getLocalPort())throw new IOException("Unexpected relay bridge peer");
-        client=local;peer=accepted;outer.setSoTimeout(0);
+        local.setTcpNoDelay(true);accepted.setTcpNoDelay(true);client=local;peer=accepted;outer.setSoTimeout(0);
       }catch(Exception failure){if(local!=null)local.close();if(accepted!=null)accepted.close();throw failure;}
       pump(peer,outer);pump(outer,peer);
     }

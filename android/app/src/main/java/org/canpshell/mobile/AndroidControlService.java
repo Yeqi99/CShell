@@ -232,14 +232,16 @@ public final class AndroidControlService extends AccessibilityService {
     // invalidate that cache; obtain current OS focus for every edit/settle step.
     if(android.os.Build.VERSION.SDK_INT>=33)clearCache();
     // Android 10 can temporarily return no global input focus while the IME
-    // updates. Only fall back to a focused application window's actual input
+    // updates. The active application can temporarily lose window focus to the IME.
+    // Only use its actual focused editor (never the IME's editable node).
+    // Fall back to a focused or active application window's actual input
     // focus, never an arbitrary editable field or a remembered node.
     {
       AccessibilityNodeInfo node=findFocus(AccessibilityNodeInfo.FOCUS_INPUT);
       if(node!=null){if(node.isFocused()&&node.isEditable())return node;node.recycle();}
       java.util.List<android.view.accessibility.AccessibilityWindowInfo> windows=getWindows();
       try{for(android.view.accessibility.AccessibilityWindowInfo window:windows){
-          if(window.getType()!=android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION||!window.isFocused())continue;
+          if(window.getType()!=android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION||(!window.isFocused()&&!window.isActive()))continue;
           AccessibilityNodeInfo root=window.getRoot();if(root==null)continue;
           try{node=root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);if(node!=null){if(node.isFocused()&&node.isEditable())return node;node.recycle();}node=focusedDescendant(root);if(node!=null)return node;}finally{root.recycle();}
       }}finally{for(android.view.accessibility.AccessibilityWindowInfo window:windows)window.recycle();}
