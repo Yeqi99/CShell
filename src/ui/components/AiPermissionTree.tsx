@@ -102,71 +102,28 @@ export function AiPermissionTree({
             <button type="button" onClick={() => edit({...p, application: [...aiPolicySchema.shape.application.element.options]})}>全选应用权限</button>
             <button type="button" onClick={() => edit({...p, application: []})}>清空应用权限</button>
           </div>
-          <label data-permission-node="application/connections.read">
-            <input
-              type="checkbox"
-              checked={p.application.includes('connections.read')}
-              onChange={(e) =>
-                edit({
-                  ...p,
-                  application: toggle(p.application, 'connections.read', e.target.checked),
-                })
-              }
-            />
-            查询连接目标、分组与会话
-          </label>
-          <small>可查询尚未连接的目标；不会读取凭据或连接机器。</small>
-          <label data-permission-node="application/http.use">
-            <input
-              type="checkbox"
-              checked={p.application.includes('http.use')}
-              onChange={(e) =>
-                edit({ ...p, application: toggle(p.application, 'http.use', e.target.checked) })
-              }
-            />
-            使用 HTTP 扩展工具
-          </label>
-          <small>需同时勾选允许的 HTTP 工作区；远端发送还需授权发送方机器的 HTTP 能力。</small>
-          <label data-permission-node="application/connections.open">
-            <input
-              type="checkbox"
-              checked={p.application.includes('connections.open')}
-              onChange={(e) =>
-                edit({
-                  ...p,
-                  application: toggle(p.application, 'connections.open', e.target.checked),
-                })
-              }
-            />
-            为授权机器新建连接
-          </label>
-          <small>使用已保存的凭据打开终端，后续操作仍受机器权限限制。</small>
-          {(
-            [
-              ['agents.manage', '分配与管理子任务'],
-              ['goals.manage', '管理定期目标'],
-              ['events.manage', '管理事件订阅与触发任务'],
-              ['web.search', '网络搜索（Tavily）'],
-              ['ai.providers.manage', '查询、添加与测试 AI 基座'],
-              ['wechat.read', '读取本机微信状态、联系人与授权消息'],
-              ['wechat.send', '向授权联系人发送微信文本'],
-              ['wechat.payments.receive', '领取本机微信转账或红包（另需对应领取开关）'],
-              ['wechat.contacts.manage', '修改授权微信联系人的备注'],
-            ] as const
-          ).map(([id, label]) => (
-            <label key={id} data-permission-node={`application/${id}`}>
-              <input
-                type="checkbox"
-                checked={p.application.includes(id)}
-                onChange={(e) =>
-                  edit({ ...p, application: toggle(p.application, id, e.target.checked) })
-                }
-              />
-              {label}
-            </label>
-          ))}
-          <small>默认关闭。子任务和定期目标不会增加机器或操作权限。</small>
-          <small>基座保存需确认地址、模型与密钥来源；密钥由后端保管，不返回对话。</small>
+          <div className="permission-application-list">
+            {([
+              ['connections.read', '查询连接目标、分组与会话', '可查询尚未连接的目标；不会读取凭据或连接机器。'],
+              ['http.use', '使用 HTTP 扩展工具', '还需选择允许的 HTTP 工作区；远端请求使用发送方机器的授权。'],
+              ['connections.open', '为授权机器新建连接', '使用已保存的凭据连接；后续操作仍受目标机器权限限制。'],
+              ['agents.manage', '分配与管理子任务', '子任务和定期目标不会扩大机器范围或操作权限。'],
+              ['goals.manage', '管理定期目标', ''],
+              ['events.manage', '管理事件订阅与触发任务', ''],
+              ['web.search', '网络搜索（Tavily）', ''],
+              ['ai.providers.manage', '查询、添加与测试 AI 基座', '基座地址、模型与密钥来源需确认；密钥不会返回对话。'],
+              ['wechat.read', '读取本机微信状态、联系人与授权消息', ''],
+              ['wechat.send', '向授权联系人发送微信文本', ''],
+              ['wechat.payments.receive', '领取本机微信转账或红包', '另需开启对应领取功能。'],
+              ['wechat.contacts.manage', '修改授权微信联系人的备注', ''],
+            ] as const).map(([id, label, description]) => (
+              <label className="permission-application-option" key={id} data-permission-node={`application/${id}`}>
+                <input type="checkbox" checked={p.application.includes(id)}
+                  onChange={(e) => edit({ ...p, application: toggle(p.application, id, e.target.checked) })} />
+                <span><span className="permission-option-title">{label}</span>{description && <small>{description}</small>}</span>
+              </label>
+            ))}
+          </div>
         </section>
         <section className="permission-global-section">
           <h4>
