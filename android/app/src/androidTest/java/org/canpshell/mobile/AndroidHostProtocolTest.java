@@ -50,7 +50,7 @@ final class AndroidHostProtocolTest {
     }finally{host.close();capture.close();config.delete();stop.delete();}
   }
   static String run(Context context)throws Exception {
-    AndroidFrameQueueTest.run();
+    AndroidFrameQueueTest.run(); AndroidManagedFilesTest.run(context);
     Capture capture=new Capture();AndroidAgentHost host=new AndroidAgentHost(context,capture);int port;
     try(ServerSocket reserve=new ServerSocket(0)){port=reserve.getLocalPort();}
     String password="fixture-"+UUID.randomUUID(),replacement="changed-"+UUID.randomUUID();
@@ -71,6 +71,13 @@ final class AndroidHostProtocolTest {
           ref[0].connect("127.0.0.1",port,attempt==0?password:"",cert->certificateMatches(cert,invitation.optString("certificate")));
           check(shells.get()!=null&&shells.get().length()==0,"Host advertised an unsupported terminal");
           JSONObject status=(JSONObject)ref[0].manage("desktop.status",new JSONObject());check(status.getBoolean("viewAllowed")&&status.getBoolean("controlAllowed"),"Real availability not reflected");
+          if(attempt==0){
+            JSONObject roots=(JSONObject)ref[0].manage("files.roots",new JSONObject());String fileRoot=roots.getJSONArray("roots").getJSONObject(0).getString("root"),filePath="/tls-fixture-"+UUID.randomUUID()+".txt";
+            JSONObject upload=(JSONObject)ref[0].manage("files.uploadStart",new JSONObject().put("root",fileRoot).put("path",filePath).put("size",3));String uploadId=upload.getString("id");
+            ref[0].manage("files.uploadChunk",new JSONObject().put("id",uploadId).put("offset",0).put("data","YWJj"));ref[0].manage("files.uploadFinish",new JSONObject().put("id",uploadId));
+            JSONObject read=(JSONObject)ref[0].manage("files.read",new JSONObject().put("root",fileRoot).put("path",filePath).put("offset",0));check("YWJj".equals(read.getString("data")),"TLS file transfer failed");
+            ref[0].manage("files.action",new JSONObject().put("root",fileRoot).put("path",filePath).put("action","delete"));check(ref[0].manage("applications.list",new JSONObject()) instanceof JSONArray,"Application list contract");
+          }
           ref[0].desktop(QUALITY,true);check(frames.await(15,TimeUnit.SECONDS),"Encrypted frame timeout");if(error.get()!=null)throw new Exception(error.get());Thread.sleep(150);
         }finally{ref[0].close();}
         long until=System.nanoTime()+TimeUnit.SECONDS.toNanos(3);while(capture.delivery!=null&&System.nanoTime()<until)Thread.sleep(20);
