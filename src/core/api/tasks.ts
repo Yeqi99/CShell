@@ -206,6 +206,19 @@ export class ApiTasks {
       error: structuredClone(t.error),
     };
   }
+  /** Reattach by ID/cursor after client reconnection; never enumerates another owner. */
+  list(owner: string, options: {target?:string;limit?:number} = {}) {
+    const limit = options.limit ?? 100;
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100)
+      throw new ApiError('INVALID_ARGUMENT', 'Invalid task list limit.', 'Use a limit from 1 to 100.');
+    this.prune();
+    const visible = [...this.records.values()].filter(t => t.owner === owner && !t.released && (!options.target || t.target === options.target))
+      .sort((a,b) => b.updatedAt-a.updatedAt || a.id.localeCompare(b.id));
+    return {tasks: visible.slice(0,limit).map(t => {
+      const {result: _result,error: _error,...status} = this.describe(t);
+      return {...status, latestCursor:t.sequence, earliestCursor:t.events[0]?.sequence ?? t.sequence+1};
+    }), hasMore:visible.length>limit, persistence:'process-lifetime' as const};
+  }
   read(owner: string, id: string, after = 0, limit = 50) {
     if (
       !Number.isSafeInteger(after) ||
