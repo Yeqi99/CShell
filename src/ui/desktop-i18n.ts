@@ -2,6 +2,10 @@ import { useI18n } from './i18n';
 
 // Product chrome only: never pass user machine, group or application names here.
 export const desktopEnglish: Record<string, string> = {
+  '新建和修改连接配置':'Create and edit connection profiles','不会自动连接或扩大机器授权。':'Does not connect automatically or expand machine access.',
+  '保存和更换连接凭据':'Save and replace connection credentials','仅写入加密存储，不读取或返回密码、私钥。':'Write-only encrypted storage. Passwords and private keys are not returned.',
+  '接受 SSH 主机身份':'Accept SSH host identity','先探测真实指纹，再显式确认；已改变的主机密钥不会自动接受。':'Probe the real fingerprint, then explicitly accept it. Changed host keys are never accepted automatically.',
+
   '连接与视图':'Connections & views','命令台':'Command console','能力浏览器':'Capabilities','扩展':'Extensions','偏好设置':'Preferences','无法连接 · 点击重试':'Unable to connect · retry','正在连接…':'Connecting…',
   '停用':'Off','读取机器浏览器页面与截图':'Read browser pages and screenshots','操作机器浏览器（包括已登录网站）':'Control the browser, including signed-in websites','查看远程桌面与截图':'View remote desktop and screenshots','远程桌面键鼠输入':'Control remote keyboard and mouse','从此机器发送 HTTP 请求':'Send HTTP requests from this machine','管理 CAgent 与系统环境':'Manage CAgent and system environment','管理 CAgent HTTP 服务':'Manage CAgent HTTP services','管理 CAgent 中继':'Manage CAgent relay','资源监控':'Monitor resources','读取文件':'Read files','创建文件（不覆盖）':'Create files without overwriting','执行命令 / 修改文件':'Run commands / modify files',
   '权限节点':'Permission settings','智能体权限':'Assistant permissions','所有会话共用。审核模式只决定操作是否需要确认。':'Shared across conversations. Review mode only determines whether actions need confirmation.',
