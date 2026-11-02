@@ -1,13 +1,15 @@
 name: Core Android candidate
 on:
   push:
-    branches: ['codex/android-core-candidate-0.8.18']
+    branches: ['codex/candidate-core-0.8.19']
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   android:
     runs-on: ubuntu-latest
+    env:
+      CSHELL_EDITION: opensource
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -27,7 +29,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec tsc --noEmit -p android/web/tsconfig.json
       - run: node scripts/build-android.mjs
-      - name: Restore persistent Android signing key
+      - name: Restore persistent signing key
         env:
           KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
@@ -39,68 +41,15 @@ jobs:
           ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-      - name: Stage Android preview
+      - run: node scripts/verify-android.mjs
+      - name: Stage candidate only
         run: |
-          node scripts/verify-android.mjs
-          mkdir -p android-artifacts
+          mkdir -p candidate-artifacts
           VERSION=$(node -p 'require("./package.json").version')
-          cp android/app/build/outputs/apk/release/app-release.apk "android-artifacts/CShell-${VERSION}-android-test.apk"
+          cp android/app/build/outputs/apk/release/app-release.apk "candidate-artifacts/CShell-${VERSION}-android.apk"
+          sha256sum candidate-artifacts/*.apk > candidate-artifacts/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: desktop-android-preview
+          name: core-android-candidate
           if-no-files-found: error
-          path: android-artifacts/*.apk
-  android-native:
-    needs: android
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        api: [29, 35]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.25.0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24.19.0
-          cache: pnpm
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.13'
-      - run: pnpm install --frozen-lockfile
-      - run: node scripts/prepare-pty.mjs
-      - run: node scripts/build-android.mjs
-      - run: gradle -p android assembleDebug assembleDebugAndroidTest
-      - uses: actions/download-artifact@v4
-        with:
-          name: desktop-android-preview
-          path: signed-android
-      - name: Enable emulator acceleration
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-      - uses: reactivecircus/android-emulator-runner@v2
-        env:
-          CSHELL_ANDROID_RELEASE_DIR: signed-android
-        with:
-          api-level: ${{ matrix.api }}
-          target: google_apis
-          arch: x86_64
-          # Keep the isolated host-alias network used by the fixture, rather than
-          # the shared Wi-Fi stack introduced in Emulator 36.5.
-          # https://developer.android.com/studio/run/emulator-networking-interconnect
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -feature -WiFiPacketStream
-          disable-animations: true
-          script: pnpm exec tsx scripts/android-agent-instrumentation.ts
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: verification-android-api-${{ matrix.api }}
-          path: test-results/android-*.txt
+          path: candidate-artifacts/*
