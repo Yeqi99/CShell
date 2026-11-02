@@ -159,4 +159,7 @@ test('vault schema advances only when new portable fields are present',async()=>
  assert.equal(vaultWriteSchema({}),1);assert.equal(vaultWriteSchema({store:{extensions:{enabled:{}}}}),2);
  assert.equal(vaultWriteSchema({store:{extensions:{enabled:{},external:[]}}}),3);
  assert.equal(vaultWriteSchema({identityNetwork:[]}),3);
+ assert.equal(vaultWriteSchema({store:{accountPreferences:{}}}),1);
+ assert.equal(vaultWriteSchema({store:{accountPreferences:{autoDiscoverDevices:false}}}),4);
+ assert.equal(vaultWriteSchema({store:{accountPreferences:{autoDiscoverDevices:true}}}),4);
 });

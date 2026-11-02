@@ -1,4 +1,4 @@
-import {readFile,writeFile,rename} from 'node:fs/promises';
+import {readFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {createHash} from 'node:crypto';
 import type {Store} from './store';
@@ -15,13 +15,19 @@ export class AccountDiscovery {
     private credentials:()=>Device[],private list:()=>Promise<Listed[]>,private publish:()=>void){}
   private path(id:string){return join(this.directory,'account-discovery-'+createHash('sha256').update(id).digest('hex')+'.json');}
   private exclusive<T>(fn:()=>Promise<T>):Promise<T>{const result=this.serial.then(fn);this.serial=result.catch(()=>{});return result;}
-  private async load(){const id=this.accountId();if(id===this.account)return;this.account=id;this.value={enabled:false,devices:[],pending:0};if(!id)return;
-    try{const data=JSON.parse(await readFile(this.path(id),'utf8'));if(this.accountId()!==id)return;this.value.enabled=data.enabled===true;}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e;}}
+  private async load(){const id=this.accountId();
+    if(id===this.account){if(id)this.value.enabled=this.store.accountPreferences().autoDiscoverDevices??false;return;}
+    this.account=id;this.value={enabled:false,devices:[],pending:0};if(!id)return;
+    const saved=this.store.accountPreferences().autoDiscoverDevices;
+    if(saved!==undefined){this.value.enabled=saved;return;}
+    // One-time migration only when this account has no cloud preference; explicit cloud false/true wins.
+    try{const data=JSON.parse(await readFile(this.path(id),'utf8'));if(this.accountId()!==id)return;
+      if(typeof data.enabled==='boolean'){await this.store.setAccountDiscovery(data.enabled);this.value.enabled=data.enabled;}
+    }catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e;}}
   status():AccountDiscoveryStatus{return this.accountId()===this.account?structuredClone(this.value):{enabled:false,devices:[],pending:0};}
   get(){return this.exclusive(async()=>{await this.load();return this.status();});}
   set(enabled:boolean){return this.exclusive(async()=>{await this.load();const id=this.account;if(!id)throw Error('请先登录账号');
-    const file=this.path(id);await writeFile(file+'.tmp',JSON.stringify({enabled}),{mode:0o600});
-    if(this.accountId()!==id)throw Error('账号已切换，请重试');await rename(file+'.tmp',file);this.value.enabled=enabled;
+    if(this.accountId()!==id)throw Error('账号已切换，请重试');await this.store.setAccountDiscovery(enabled);this.value.enabled=enabled;
     if(enabled)await this.refreshCurrent();return this.status();});}
   refresh(){return this.exclusive(async()=>{await this.load();await this.refreshCurrent();});}
   private async refreshCurrent(){const id=this.account;if(!id||!this.value.enabled)return;

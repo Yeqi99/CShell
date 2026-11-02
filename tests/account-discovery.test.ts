@@ -30,3 +30,15 @@ test('discovery does not apply late account responses or register unauthenticate
   const locked=new AccountDiscovery(dir,store,()=>account,()=>[{...device,accountPassword:undefined}],async()=>[{...device,online:true}],()=>{});await locked.set(true);assert.equal(locked.status().pending,1);assert.equal(store.snapshot().profiles.length,0);
  }finally{await rm(dir,{recursive:true,force:true});}
 });
+
+test('discovery preference travels in account vault, never appearance presets, preserving explicit false',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'account-discovery-cloud-'));try{
+  const a=new Store(join(dir,'a'),codec),b=new Store(join(dir,'b'),codec);await a.load();await b.load();
+  assert.equal((await a.cloudExport()).accountPreferences,undefined);
+  await a.setAccountDiscovery(true);await b.cloudImport(await a.cloudExport());assert.equal(b.accountPreferences().autoDiscoverDevices,true);
+  await b.preferences({...b.snapshot().preferences,theme:'dark'});assert.equal(b.accountPreferences().autoDiscoverDevices,true);
+  assert.equal('accountPreferences' in b.snapshot().preferences,false);
+  await b.setAccountDiscovery(false);await a.cloudImport(await b.cloudExport());assert.equal(a.accountPreferences().autoDiscoverDevices,false);
+  const reload=new Store(join(dir,'a'),codec);await reload.load();assert.equal(reload.accountPreferences().autoDiscoverDevices,false);
+ }finally{await rm(dir,{recursive:true,force:true});}
+});
