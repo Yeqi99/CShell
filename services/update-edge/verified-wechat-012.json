@@ -1,9 +1,9 @@
 {
   "edition": "toolkit",
   "version": "0.1.2",
-  "status": "blocked-pending-Lenovo-login-and-local-install-confirmation",
+  "status": "candidate-not-published",
   "sha": "670b89d3bc588de1d83abab5f713f7aff9cf79d7",
-  "verification": "Fixed public source 670b89d; six binary distribution assets verified by 54b6715 with private implementation excluded. Unified release awaits required Lenovo physical relay verification and local Windows system installation confirmation.",
+  "verification": "Final thirty-file inventory fdf3454 and Hong Kong full verification 74d96a2 complete. Desktop defaults and Android physical input evidence retained. Lenovo physical relay deferred by explicit user authorization; not claimed verified.",
   "assets": [
     {
       "name": "Weixin-4.1.15.56-0.1.2.cagent-package.json",
@@ -36,9 +36,10 @@
       "sha256": "d29fa702bd7870e86005bc220db27a6c26ca135d640ddef8a056ff68c0ae705e"
     }
   ],
-  "pendingGates": [
-    "updated Hong Kong thirty-file inventory verification",
-    "Lenovo physical membership relay acceptance"
-  ],
-  "blockedReason": "Coordinated release remains gated with the product release; private source is not included."
+  "pendingGates": [],
+  "deferredVerification": {
+    "status": "user-waived-deferred",
+    "scope": "Lenovo physical membership relay acceptance",
+    "reason": "User explicitly authorized immediate release without this physical acceptance prerequisite; no claim that it passed."
+  }
 }

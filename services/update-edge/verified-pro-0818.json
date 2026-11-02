@@ -1,9 +1,9 @@
 {
   "edition": "pro",
   "sha": "670b89d3bc588de1d83abab5f713f7aff9cf79d7",
-  "status": "blocked-pending-Lenovo-login-and-local-install-confirmation",
+  "status": "candidate-not-published",
   "version": "0.8.18",
-  "verification": "Final inventory fdf3454 and Hong Kong complete 30-file size/SHA/root-permission receipt 74d96a2 verified; exact fixed source tree and desktop/CAgent/Android provenance recorded. Required Lenovo remains signed-out. Actual local Windows install returned 1223; previous 0.8.17 reopened and configuration preserved (2902f8e). Not published.",
+  "verification": "Final thirty-file inventory fdf3454 and Hong Kong full verification 74d96a2 complete. Desktop defaults and Android physical input evidence retained. Lenovo physical relay deferred by explicit user authorization; not claimed verified.",
   "assets": [
     {
       "name": "CAgent-0.8.18-linux-arm64.tar.gz",
@@ -76,9 +76,10 @@
       "sha256": "b6da45caebb892b447141f28e1a8931aa2e5e1a2704a0ec0f99fc722fdded9e0"
     }
   ],
-  "pendingGates": [
-    "updated Hong Kong thirty-file inventory verification",
-    "Lenovo physical membership relay acceptance"
-  ],
-  "blockedReason": "New desktop artifacts require final Hong Kong full-inventory verification; Lenovo remains signed out pending physical account relay acceptance."
+  "pendingGates": [],
+  "deferredVerification": {
+    "status": "user-waived-deferred",
+    "scope": "Lenovo physical membership relay acceptance",
+    "reason": "User explicitly authorized immediate release without this physical acceptance prerequisite; no claim that it passed."
+  }
 }
