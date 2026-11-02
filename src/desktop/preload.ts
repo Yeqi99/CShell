@@ -22,6 +22,7 @@ const bridge: Bridge = {
   accountSourcePreview:source=>ipcRenderer.invoke('account:source-preview',source),
   accountSourceImport:(token,settings,choices)=>ipcRenderer.invoke('account:source-import',token,settings,choices),
   cloudStatus:()=>ipcRenderer.invoke('cloud:status'),
+  cloudDiscovery:enabled=>ipcRenderer.invoke('cloud:discovery',enabled),
   cloudNetwork:input=>ipcRenderer.invoke('cloud:network',input),
   cloudLending:input=>ipcRenderer.invoke('cloud:lending',input),
   onCloudChanged:listener=>{const fn=()=>listener();ipcRenderer.on('cloud:changed',fn);return()=>ipcRenderer.removeListener('cloud:changed',fn);},

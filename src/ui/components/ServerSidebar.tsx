@@ -1,3 +1,4 @@
+import type {AccountDiscoveryStatus} from '../../shared/cloud-sync';
 import {ErrorNotice} from './ErrorNotice';
 import {PingButton} from './PingButton';
 import {PingAll} from './PingAll';
@@ -62,6 +63,8 @@ export function ServerSidebar({
 }) {
   const { t, locale } = useI18n();
   const [query, setQuery] = useState('');
+  const [accountDevices,setAccountDevices]=useState<AccountDiscoveryStatus['devices']>([]);
+  useEffect(()=>{let alive=true;const refresh=()=>{void window.cshell.cloudDiscovery?.().then(s=>{if(alive)setAccountDevices(s.devices);}).catch(()=>{});};refresh();const timer=setInterval(refresh,15000);return()=>{alive=false;clearInterval(timer);};},[]);
   const [menu, setMenu] = useState<Menu | null>(null);
   const [appearanceExpanded, setAppearanceExpanded] = useState(false);
   const [collapsed, setCollapsed] = useState<string[]>([]);
@@ -439,10 +442,10 @@ export function ServerSidebar({
                         {profile.protocol === 'http' ? <Globe size={16} /> : <Server size={16} />}
                       </div>
                       {profile.protocol !== 'http' && (
-                        <i className={`dot ${online.includes(profile.id) ? '' : 'off'}`} />
+                        <i className={`dot ${(online.includes(profile.id)||accountDevices.some(d=>d.id===profile.id&&d.online===true)) ? '' : 'off'}`} />
                       )}
                       <div>
-                        <strong>{profile.name}</strong>
+                        <strong>{profile.name}</strong>{accountDevices.some(d=>d.id===profile.id)&&<span className="account-device-badge" title="此设备来自当前登录账号">账号设备{!online.includes(profile.id)&&(accountDevices.find(d=>d.id===profile.id)?.online===false?' · 离线':accountDevices.find(d=>d.id===profile.id)?.online===null?' · 状态未知':'')}</span>}
                         <small>{profile.protocol === 'http' ? 'HTTP' : profile.host}</small>
                       </div>
                     </button>

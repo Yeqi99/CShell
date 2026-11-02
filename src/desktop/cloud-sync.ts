@@ -1,4 +1,5 @@
 import {identityRulesSchema} from '../shared/identity-network';
+import {AccountDiscovery} from '../core/account-discovery';
 import { syncClientProfiles } from '../core/client/profiles';
 import { importCloudStages, type CloudImportStage } from '../core/cloud-import';
 import { app, net } from 'electron';
@@ -253,8 +254,13 @@ export async function registerCloudHandlers(
     cloud.sync(z.enum(['upload', 'download']).optional().parse(direction)),
   );
   handle('cloud:logout', () => {assertAccountIdle();return cloud.logout();});
+  const discovery=new AccountDiscovery(directory,store,()=>cloud.activationDeferred()?undefined:cloud.accountId(),()=>client.cloudExport(),async()=>{
+    const result=await cloud.accountRequest('/v1/devices');
+    return z.array(z.object({deviceId:z.string().uuid(),certificate:z.string().min(100).max(8192),online:z.boolean(),borrowed:z.boolean().optional()})).max(200).parse(result.devices);
+  },publish);
+  handle('cloud:discovery',async enabled=>{if(enabled===undefined)return discovery.get();return discovery.set(z.boolean().parse(enabled));});
   let refreshing=false,modelsChecked=0;
-  const tick=async()=>{if(refreshing||cloud.activationDeferred())return;refreshing=true;try{await cloud.autoSync();if(!cloud.activationDeferred()&&cloud.status().email&&Date.now()-modelsChecked>60000){const catalog=await cloud.accountRequest('/v1/models');if(await ai.ensureOfficialModels(catalog.models.map((m:{id:string})=>m.id)))publish();modelsChecked=Date.now();}}catch{}finally{refreshing=false;}};
+  const tick=async()=>{if(refreshing||cloud.activationDeferred())return;refreshing=true;try{await cloud.autoSync();await discovery.refresh();if(!cloud.activationDeferred()&&cloud.status().email&&Date.now()-modelsChecked>60000){const catalog=await cloud.accountRequest('/v1/models');if(await ai.ensureOfficialModels(catalog.models.map((m:{id:string})=>m.id)))publish();modelsChecked=Date.now();}}catch{}finally{refreshing=false;}};
   void tick();
   const timer = setInterval(() => { void tick(); }, 15000);
   timer.unref();
