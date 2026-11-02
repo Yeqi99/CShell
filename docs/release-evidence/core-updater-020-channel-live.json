@@ -1,0 +1,14 @@
+{
+  "checkedAt": "2026-11-02T09:28:01.966Z",
+  "check": {
+    "current": "0.8.18",
+    "available": true,
+    "version": "0.8.19"
+  },
+  "phase": "ready",
+  "file": "CAgent-Setup-0.8.19-win-x64.exe",
+  "bytes": 26190135,
+  "sha256": "664f11291ac2fbdf18708a8192e2dda47b84315e452170515b5e644e6289eee0",
+  "implementation": "Unreleased Core 0.8.20 source 94bca2d AgentUpdater default updateRequest; downloads published Core 0.8.19 without installation",
+  "installed": false
+}
