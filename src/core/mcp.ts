@@ -29,6 +29,8 @@ import { fileChunkOutput } from './api/sftp-read';
 import { ServerPages, serverPageInput } from './api/server-pages';
 import { baseResultSchemas, baseResultJson } from './api/result-contracts';
 import { ApiTasks } from './api/tasks';
+import { preflightSsh, uncheckedStages } from './api/connection-preflight';
+import { ConnectionManagement, connectionManagementSchema, sshEndpoint } from './api/connection-management';
 import { createSshManager } from './connections/ssh-provider';
 import { profileProvider } from '../shared/file-connections';
 import type { ConnectionManager } from './connections/manager';
@@ -91,6 +93,7 @@ export class McpService {
   private ownerSignals = new Map<string, AbortController>();
   private transitions: Promise<unknown> = Promise.resolve();
   private tasks = new ApiTasks();
+  private connectionManagement: ConnectionManagement;
   private serverPages = new ServerPages();
   private error?: string;
   private requests = 0;
@@ -120,6 +123,7 @@ export class McpService {
     private confirm: (name: string, command: string, signal?: AbortSignal) => Promise<boolean>,
     private host?: McpHost,
   ) {
+    this.connectionManagement = new ConnectionManagement(store, () => `${this.directory}:${this.generation}`);
     this.ssh = new SshService(
       (event) => {
         if (!this.event(event) && event.type === 'data')
@@ -1158,6 +1162,223 @@ export class McpService {
           }, `local.files.${args.operation.action}`);
         }));
     }
+    register(
+      'permission_diagnostics',
+      {
+        description:
+          'Read this authenticated caller’s effective grants and review mode, optionally for an authorized target. Does not change permissions or reveal credentials.',
+        inputSchema: { profileId: z.string().uuid().optional() },
+        annotations: { readOnlyHint: true },
+        permission: 'Authenticated caller only',
+        target: 'application',
+      },
+      async ({ profileId }) =>
+        run('permission_diagnostics', () => {
+          if (profileId) this.allowed(profileId, owner);
+          const p = this.principal(owner, profileId),
+            policy = this.callerPolicy(owner);
+          return {
+            application: [...policy.application],
+            allowedProfiles: [...p.allowedProfiles],
+            capabilities: profileId
+              ? [...(policy.override(profileId) ?? policy.capabilities)]
+              : [...policy.capabilities],
+            review: p.review,
+            allowedLocalShells: p.allowedLocalShells ?? [],
+            mcpEnabled: true,
+          };
+        }),
+    );
+    register(
+      'connection_preflight',
+      {
+        description:
+          'Inspect an authorized saved target. probe=true performs one bounded SSH/SFTP network, pinned-host and saved-credential authentication check without shell/commands or trust changes. Untrusted/changed identity never receives credentials. Jump transports are explicitly unsupported, never bypassed.',
+        inputSchema: { profileId: z.string().uuid(), probe:z.boolean().default(false) },
+        annotations: { readOnlyHint: true },
+        permission: 'Authorized saved target',
+        target: 'saved-profile',
+      },
+      async ({ profileId, probe }) =>
+        run('connection_preflight', async () => {
+          const p = this.allowed(profileId, owner);
+          const revision=this.store.connectionRevision(profileId),pin=this.store.host(sshEndpoint(p));
+          const guard=()=>{
+            this.allowed(profileId,owner);
+            if(generation!==this.generation||revision!==this.store.connectionRevision(profileId)||pin!==this.store.host(sshEndpoint(p)))throw new ApiError('FORBIDDEN','Connection or authorization changed during preflight.','Inspect current settings before retrying.');
+          };
+          const result=probe?await preflightSsh(p,pin,await this.store.secret(profileId),guard,signal):{stages:uncheckedStages(),reason:'configuration_only'};
+          guard();
+          return {
+            profileId,
+            providerId: profileProvider(p),
+            credentialConfigured: this.store.credentialConfigured(profileId),
+            hostIdentityTrusted: ['ssh', 'sftp'].includes(p.protocol ?? 'ssh')
+              ? Boolean(this.store.host(sshEndpoint(p)))
+              : null,
+            networkTested: result.stages.network.checked,
+            ...result,
+          };
+        }),
+    );
+    register(
+      'session_list',
+      {
+        description:
+          'List only this caller’s live authorized API sessions. Reuse sessionId without replaying commands; interactive UI sessions and other callers are excluded.',
+        inputSchema: {},
+        annotations: { readOnlyHint: true },
+        permission: 'Owned authorized sessions',
+        target: 'application',
+      },
+      async () =>
+        run('session_list', () => ({
+          sessions: [...this.connections].flatMap(([sessionId, profileId]) => {
+            if (this.sessionOwners.get(sessionId) !== owner) return [];
+            try {
+              const target = this.owned(sessionId, owner);
+              return [
+                {
+                  sessionId,
+                  profileId,
+                  target,
+                  nextInputSequence: this.terminalSequences.get(sessionId) ?? 0,
+                },
+              ];
+            } catch {
+              return [];
+            }
+          }),
+          persistence: 'process-lifetime',
+        })),
+    );
+    register(
+      'task_list',
+      {
+        description:
+          'Find this caller’s retained authorized tasks after transport reconnect. Results/events are retrieved with task_read; never re-execute unknown tasks. Not durable across application restart.',
+        inputSchema: {
+          limit: z.number().int().min(1).max(100).default(100),
+          after: z.string().uuid().optional(),
+        },
+        annotations: { readOnlyHint: true },
+        permission: 'Owned task and current target grant',
+        target: 'application',
+      },
+      async ({ limit, after }) =>
+        run('task_list', () => {
+          return this.tasks.list(owner, { limit, after }, (t) => {
+            try {
+              if (t.permission.startsWith('local.files.'))
+                return Boolean(
+                  this.principal(owner)
+                    .localFileRoots?.find((r) => r.id === t.target)
+                    ?.mutations?.some((a) => t.permission === 'local.files.' + a),
+                );
+              if (t.permission === 'http.use') {
+                if (
+                  !this.host?.http?.enabled() ||
+                  !this.principal(owner).allowedProfiles.includes(t.target) ||
+                  this.store.profile(t.target).protocol !== 'http'
+                )
+                  return false;
+              } else this.allowed(t.target, owner);
+              return this.capabilityAllowed(t.permission, owner, t.target);
+            } catch {
+              return false;
+            }
+          });
+        }),
+    );
+    for (const option of connectionManagementSchema.options) {
+      const action = option.shape.action.value;
+      const grant =
+        action === 'credentials'
+          ? 'credentials.manage'
+          : action === 'probe' || action === 'accept'
+            ? 'identity.trust'
+            : action === 'list'
+              ? 'connections.read'
+              : 'connections.manage';
+      if (!allowsApplication(this.callerPolicy(owner), grant)) continue;
+      const name = 'connection_' + action;
+      register(
+        name,
+        {
+          description:
+            'Saved connection ' +
+            action +
+            '. Independent application grant required. Credentials stay backend-only; save never grants access. SSH trust acceptance requires the exact short-lived owner/account-bound observed fingerprint; changed pins are refused.',
+          inputSchema: Object.fromEntries(
+            Object.entries(option.shape).filter(([key]) => key !== 'action'),
+          ) as z.ZodRawShape,
+          annotations: { readOnlyHint: action === 'list' || action === 'probe' },
+          permission: grant,
+          target: 'application',
+        },
+        async (args) =>
+          run(name, async () => {
+            const raw = { ...args, action };
+            const authorize = (_action: string, p?: Profile) => {
+              if (
+                generation !== this.generation ||
+                !allowsApplication(this.callerPolicy(owner), grant)
+              )
+                throw new ApiError(
+                  'FORBIDDEN',
+                  'Connection management grant is unavailable.',
+                  'Review the independent application permission.',
+                );
+              if (p && action !== 'create' && !this.principal(owner).allowedProfiles.includes(p.id))
+                throw new ApiError(
+                  'FORBIDDEN',
+                  'Saved target is not authorized.',
+                  'Review this caller target scope.',
+                );
+              if (
+                action === 'create' &&
+                'secret' in args &&
+                args.secret &&
+                !allowsApplication(this.callerPolicy(owner), 'credentials.manage')
+              )
+                throw new ApiError(
+                  'FORBIDDEN',
+                  'Credential grant required.',
+                  'Enable credentials.manage explicitly.',
+                );
+            };
+            authorize(action);
+            if (
+              !['list', 'probe'].includes(action) &&
+              requiresReview(this.principal(owner).review, true)
+            ) {
+              if (
+                !(await this.confirm(
+                  'Saved connection',
+                  JSON.stringify({
+                    tool: name,
+                    action,
+                    profileId: 'id' in args ? args.id : undefined,
+                    credentialsIncluded: 'secret' in args,
+                  }),
+                  signal,
+                ))
+              )
+                throw new ApiError(
+                  'FORBIDDEN',
+                  'Connection change declined.',
+                  'Do not retry automatically.',
+                );
+            }
+            return this.connectionManagement.call(raw, {
+              owner,
+              accountKey: this.directory + ':' + generation,
+              authorize,
+              signal,
+            });
+          }),
+      );
+    }
     const visibleServers = () => {
       const allowedProfiles = new Set(this.principal(owner).allowedProfiles);
       return this.store.snapshot().profiles.filter(
@@ -1705,10 +1926,11 @@ export class McpService {
               signal,
               output,
             );
-            return {
-              output: commandOutput,
-              ...(this.owned(sessionId, owner).providerId === 'cshell.ssh' ? { exitCode: 0 } : {}),
-            };
+            if (this.owned(sessionId, owner).providerId === 'cshell.ssh') {
+              const result = JSON.parse(commandOutput);
+              return { output: result.stdout, ...result };
+            }
+            return { output: commandOutput };
           }),
       );
     register(

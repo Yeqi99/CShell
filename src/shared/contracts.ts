@@ -137,6 +137,7 @@ export const apiLocalFileRootSchema = z.object({
   mutations: z.array(z.enum(['create', 'write', 'rename', 'delete', 'mkdir', 'rmdir', 'renameDirectory'])).max(7).optional(),
 }).strict();
 const apiLocalFileRoots = z.array(apiLocalFileRootSchema).max(32).refine((roots) => new Set(roots.map((root) => root.id)).size === roots.length).optional();
+export const apiApplicationCapabilities = ['plugins.read', 'plugins.manage', 'connections.read', 'connections.manage', 'credentials.manage', 'identity.trust', 'http.use'] as const;
 export const apiClientSchema = z
   .object({
     id: z.string().uuid(),
@@ -147,8 +148,8 @@ export const apiClientSchema = z
     allowedLocalShells: z.array(localShellSchema).max(100).optional(),
     localFileRoots: apiLocalFileRoots,
     applicationCapabilities: z
-      .array(z.enum(['plugins.read', 'plugins.manage', 'connections.read', 'http.use']))
-      .max(4)
+      .array(z.enum(apiApplicationCapabilities))
+      .max(apiApplicationCapabilities.length)
       .optional(),
     targetPolicies: apiTargetPoliciesSchema,
     capabilities: z.array(apiCapabilitySchema).max(32),
@@ -172,8 +173,8 @@ export const mcpSettingsSchema = z
     allowedLocalShells: z.array(localShellSchema).max(100).optional(),
     localFileRoots: apiLocalFileRoots,
     applicationCapabilities: z
-      .array(z.enum(['plugins.read', 'plugins.manage', 'connections.read', 'http.use']))
-      .max(4)
+      .array(z.enum(apiApplicationCapabilities))
+      .max(apiApplicationCapabilities.length)
       .optional(),
     targetPolicies: apiTargetPoliciesSchema,
     clients: z

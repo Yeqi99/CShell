@@ -243,13 +243,14 @@ export class SshConnectionProvider implements ManagedProvider {
       {
         name: 'execute_command',
         capability: 'commands.execute',
-        description: 'Execute a command on the bound resource. No persistent shell state.',
+        description: 'Execute a command on the bound resource. Returns stdout, stderr, exitCode and truncation flags including nonzero exits. No persistent shell state.',
+        jsonOutput: z.object({stdout:z.string(),stderr:z.string(),exitCode:z.number().int(),stdoutTruncated:z.boolean(),stderrTruncated:z.boolean()}).strict(),
         input: commandInput,
-        examples: [{ input: { command: 'pwd', timeoutMs: 5000 }, explanation: 'Run on the explicitly bound SSH target. Returned text is bounded process output, not a persistent interactive shell or an exit-status object.' }],
+        examples: [{ input: { command: 'pwd', timeoutMs: 5000 }, explanation: 'Run on the bound SSH target. Inspect exitCode, both output streams and truncation flags.' }],
         needsReview: (a) => commandNeedsReview(commandInput.parse(a).command),
-        invoke: (a, signal, output) => {
+        invoke: async (a, signal, output) => {
           const input = commandInput.parse(a);
-          return this.jobs.exec(id, input.command, undefined, input.timeoutMs, output, signal);
+          return JSON.stringify(await this.jobs.execResult(id, input.command, undefined, input.timeoutMs, output, signal));
         },
       },
       {

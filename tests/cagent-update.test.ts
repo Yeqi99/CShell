@@ -1,3 +1,4 @@
+import {downloadRoot} from '../src/shared/download-source';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp,readFile,writeFile,rm} from 'node:fs/promises';
@@ -6,7 +7,7 @@ import {join} from 'node:path';
 import {createHash} from 'node:crypto';
 import {AgentUpdater,selectUpdate} from '../src/agent/update';
 const data=Buffer.from('installer fixture'),digest='sha256:'+createHash('sha256').update(data).digest('hex');
-const release={assets:[{name:'CAgent-Setup-0.6.20-win-x64.exe',browser_download_url:'https://shell.canp.ai/downloads/opensource/v0.6.20/CAgent-Setup-0.6.20-win-x64.exe',digest,size:data.length}]};
+const release={assets:[{name:'CAgent-Setup-0.6.20-win-x64.exe',browser_download_url:(downloadRoot+"/v0.6.20/CAgent-Setup-0.6.20-win-x64.exe"),digest,size:data.length}]};
 test('update selection rejects wrong origin, platform, digest and downgrades',()=>{
  assert.equal(selectUpdate([release],'0.6.19','x64')?.version,'0.6.20');assert.equal(selectUpdate([release],'0.6.20','x64'),undefined);assert.equal(selectUpdate([release],'0.6.19','arm64'),undefined);
  for(const patch of [{digest:undefined},{browser_download_url:'https://evil.example/a.exe'}])assert.equal(selectUpdate([{assets:[{...release.assets[0],...patch}]}],'0.6.19','x64'),undefined);
@@ -52,7 +53,7 @@ test('closing updater cancels streaming download without exposing installer',{sk
 
 test('Unix CAgent update channels select only the exact operating system and architecture',()=>{
  const name='CAgent-0.8.7-linux-arm64.tar.gz';
- const unix={assets:[{name,browser_download_url:'https://shell.canp.ai/downloads/pro/v0.8.7/'+name,digest,size:data.length}]};
+ const unix={assets:[{name,browser_download_url:(downloadRoot+"/v0.8.7/")+name,digest,size:data.length}]};
  assert.equal(selectUpdate([unix],'0.8.6','arm64','linux')?.version,'0.8.7');
  assert.equal(selectUpdate([unix],'0.8.6','x64','linux'),undefined);
  assert.equal(selectUpdate([unix],'0.8.6','arm64','darwin'),undefined);
@@ -69,9 +70,15 @@ test('automatic updates cool down a rolled-back version while explicit retry and
   await writeFile(join(directory,'update-result.json'),JSON.stringify({version:'0.6.20',state:'rollback-pending',at:Date.now()}));
   updater=new AgentUpdater(directory,'0.6.19',request);await updater.initialize();await waitFor(updater,'deferred');assert.equal(downloads,0);assert.ok(updater.status().retryAt>Date.now());
   await updater.check();updater.start();await waitFor(updater,'ready');assert.equal(downloads,1);updater.close();
-  currentRelease={assets:[{...release.assets[0],name:'CAgent-Setup-0.6.21-win-x64.exe',browser_download_url:'https://shell.canp.ai/downloads/opensource/v0.6.21/CAgent-Setup-0.6.21-win-x64.exe'}]};
+  currentRelease={assets:[{...release.assets[0],name:'CAgent-Setup-0.6.21-win-x64.exe',browser_download_url:(downloadRoot+"/v0.6.21/CAgent-Setup-0.6.21-win-x64.exe")}]};
   updater=new AgentUpdater(directory,'0.6.19',request);await updater.initialize();await waitFor(updater,'ready');assert.equal(updater.status().version,'0.6.21');assert.equal(downloads,2);updater.close();
   currentRelease=release;await writeFile(join(directory,'update-result.json'),JSON.stringify({version:'0.6.20',state:'rolled-back',at:Date.now()-7*60*60*1000}));
   updater=new AgentUpdater(directory,'0.6.19',request);await updater.initialize();await waitFor(updater,'ready');assert.equal(downloads,3);
  }finally{updater?.close();await rm(directory,{recursive:true,force:true});}
 });
+
+test('update selection cannot cross editions or substitute a different version path',()=>{
+ const a=release.assets[0];const other=downloadRoot.endsWith('/pro')?'opensource':'pro';
+ for(const url of ['https://shell.canp.ai/downloads/'+other+'/v0.6.20/'+a.name,downloadRoot+'/v9.9.9/'+a.name,downloadRoot+'/v0.6.20/'+a.name+'?mirror=1']) assert.equal(selectUpdate([{assets:[{...a,browser_download_url:url}]}],'0.6.19','x64'),undefined);
+});
+

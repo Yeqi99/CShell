@@ -53,6 +53,9 @@ export const aiPolicySchema = z
     application: z.array(
       z.enum([
         'connections.read',
+        'connections.manage',
+        'credentials.manage',
+        'identity.trust',
         'connections.open',
         'agents.manage',
         'goals.manage',
