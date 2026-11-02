@@ -1,13 +1,21 @@
 # Verified update download edge
 
-The deployed Worker pins published 0.8.17 catalogs and preserves all 0.8.16 assets. Deployment `d36adb3fc6a244ed9a586967b0bc4aaa` has six exact routes: two edition catalogs and the two edition-specific asset subtrees for each version. Other site routes and origin DNS are unchanged.
+The deployed Worker pins public 0.8.18 catalogs and preserves all verified 0.8.16/0.8.17 assets. It has eight exact routes: two edition catalogs and both edition-specific asset subtrees for each of the three versions. Other routes and origin DNS are unchanged. Code SHA256: `6fadcbdd3a265384908d9e59110ad10a29ab439b8d7b188301bf93ee7c03fbe9`.
 
-`node generate.mjs --released` checks public release state, exact asset sets, fixed source SHAs and the adjacent verified edition manifests before generating the deployment bundle. It preserves previous-manifest.json assets; absent digests, wrong channels and changed files fail closed. No token is needed. Regeneration does not deploy.
+## Current acceptance
 
-For a later release, use an explicit version and the currently deployed manifest as the previous input, for example `node generate.mjs --released --version 0.8.18 --previous manifest.json`. Prepare `verified-opensource-0818.json` and `verified-pro-0818.json` from final verified source and packages first. This command is only valid after both releases are public; it rejects non-increasing versions, missing previous-channel assets, wrong source commits and incomplete checksum bodies. Existing verified asset routes remain pinned. The command does not publish releases or deploy the generated edge bundle.
+`deployed-acceptance.json` verifies both exact public catalogs, complete checksum bodies for all three versions/channels, and installer byte ranges without redirects. `all-0818-public-ranges.json` verifies all 28 new binary assets: HTTP 206, 1024-byte body, exact total size and pinned Worker SHA256 header. Ranges alone do not prove full binary digests.
 
-Run `node --test worker.test.mjs generate.test.mjs` for allowlist, authentication-header stripping, redirects, range checks, channel preservation and rejection tests. `node verify-deployed.mjs` validates actual public catalogs, complete checksum files and installer byte ranges without client redirects. Production results are in production-acceptance.json; all-0817-public-ranges.json covers all 28 new binary assets with 206 / 1024-byte range / total length / pinned SHA headers. Range acceptance is not a complete binary digest check.
+`agent-updater-0818-acceptance.json` separately records the real AgentUpdater checking 0.8.17 → 0.8.18 and downloading/verifying all 26,230,795 bytes of the Windows CAgent installer through the final public route. No installer was launched. Full Hong Kong and GitHub artifact digests were verified before release publication. HEAD metadata alone is not download acceptance.
 
-agent-updater-0817-acceptance.json separately records the real AgentUpdater checking 0.8.16 → 0.8.17 and downloading/verifying the entire 25,587,138-byte CAgent Windows installer, without installing from that test. Full Hong Kong files and GitHub digests were verified before publication. HEAD metadata alone is not upstream availability evidence.
+## Next release checklist
 
-Rollback removes only these six bindings or restores the previously verified deployment; do not broaden routing to all downloads or alter unrelated services. Future releases must explicitly refresh the pinned catalogs and verified release manifests.
+1. Finish builds and source verification for both editions. Keep existing tags immutable; prepare exact `verified-opensource-VERSION.json` and `verified-pro-VERSION.json` manifests (VERSION without dots).
+2. Stage, fully hash, and publish both GitHub releases and the Hong Kong artifacts. Do not generate against draft or incomplete releases.
+3. Back up the currently deployed `manifest.json`, then run `node generate.mjs --released --version 0.8.19 --previous manifest.json` from this directory. This example does not authorize publication before development is complete. The command verifies public state, asset sets, source SHAs, digests and complete checksum lists; it generates but does not deploy.
+4. Use `deployment.json.code` exactly as `worker.mjs` in the existing `cshell-update-emergency` Worker. Preserve existing routes and add only the two new version-specific edition routes listed in the generated bundle. Do not create a replacement site or change DNS.
+5. Atomically update the Hong Kong edition catalogs from `manifest.json.catalogs`, after backing up existing files. Origin/query-string success does not verify the exact bare catalog URL used by clients.
+6. Run `node --test worker.test.mjs generate.test.mjs` and `node verify-deployed.mjs`. Verify every new binary range, total size, SHA header and absence of client redirects. Download a complete installer with the actual AgentUpdater and verify its digest without installing. Record routing, timestamps, limits, and results.
+7. Commit bundle, manifest and receipts to the release control branch; update the website/docs only to reflect actually published and verified packages.
+
+Rollback restores the previously verified Worker code/catalogs and removes only the newly added bindings if necessary. Never broaden routing to unrelated paths. Regeneration without deployment leaves clients pinned to the previous release.
