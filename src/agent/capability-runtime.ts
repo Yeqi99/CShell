@@ -104,7 +104,14 @@ export class CapabilityRuntime {
     for(const item of desired){
       const entry=this.entries.find(entry=>entry.id===item.id&&entry.version===item.version&&entry.manifestSha256===item.manifestSha256);
       if(!entry){pending.push({...item,retryAvailable:false,reason:'此机器尚无匹配且已核验的能力包来源'});continue;}
-      try{await this.install({id:item.id,confirm:true});if(item.configuration){const manifest=this.manifestFor(item.id),config=manifest?this.adapters.get(manifest.adapterId)?.portableConfiguration:undefined;if(!config)throw Error('此扩展没有声明可同步的配置');await config.import(config.validate(item.configuration));}}catch{pending.push({...item,retryAvailable:true,reason:'能力包恢复未完成，可在应用市场重试'});}
+      try{
+        // Validate portable data before installation/registration can touch the host.
+        const manifest=this.manifestFor(item.id),config=manifest?this.adapters.get(manifest.adapterId)?.portableConfiguration:undefined;
+        let validated:unknown;
+        if(item.configuration!==undefined){if(!config)throw Error('此扩展没有声明可同步的配置');validated=config.validate(item.configuration);}
+        await this.install({id:item.id,confirm:true});
+        if(item.configuration!==undefined)await config!.import(validated);
+      }catch{pending.push({...item,retryAvailable:true,reason:'能力包恢复未完成，可在应用市场重试'});}
     }
     return pending;
   }

@@ -109,10 +109,21 @@ test('portable adapter configuration uses host allowlist and never imports unkno
  const directory=await mkdtemp(join(tmpdir(),'capability-config-cloud-'));const vault=new ClientVault(directory,{encrypt:async s=>s,decrypt:async s=>s});
  const original=capabilityCatalog()[0],base=parseCapabilityManifest(JSON.parse(original.bundle!).manifest,original.manifestSha256);
  const entry=createBundledCapabilityEntry({...base,id:'cagent.configfixture',adapterId:'cagent.configfixture',name:'Config',permissions:[],tools:[]},{'NOTICE.txt':Buffer.from('fixture')});
- let settings={compact:false};const validate=(input:unknown)=>{const value=input as any;if(!value||typeof value.compact!=='boolean'||Object.keys(value).some(k=>k!=='compact'))throw Error('Unsupported portable setting');return {compact:value.compact};};
- const adapter={inspect:async()=>({installed:true,configured:true}),invoke:async()=>({}),portableConfiguration:{export:()=>settings,validate,import:async(input:unknown)=>{settings=validate(input);}}};
+ let inspected=0,registered=0;let settings={compact:false};const validate=(input:unknown)=>{const value=input as any;if(!value||typeof value.compact!=='boolean'||Object.keys(value).some(k=>k!=='compact'))throw Error('Unsupported portable setting');return {compact:value.compact};};
+ const adapter={inspect:async()=>{inspected++;return {installed:true,configured:true};},register:async()=>{registered++;},invoke:async()=>({}),portableConfiguration:{export:()=>settings,validate,import:async(input:unknown)=>{settings=validate(input);}}};
  const runtime=new CapabilityRuntime({directory,vault,applications:{} as AgentApplicationService,agentVersion:'0.8.18',extraPackages:[{entry,adapter}]});await runtime.load();
- try{const selection={id:entry.id,version:entry.version,manifestSha256:entry.manifestSha256,configuration:{compact:true}};assert.deepEqual(await runtime.cloudImport([selection]),[]);assert.equal(settings.compact,true);assert.deepEqual(runtime.cloudExport()[0].configuration,{compact:true});
+ try{const selection={id:entry.id,version:entry.version,manifestSha256:entry.manifestSha256,configuration:{compact:true}};
+ const invalid=await runtime.cloudImport([{...selection,configuration:{compact:true,allowExecute:true}}]);assert.equal(invalid.length,1);assert.deepEqual(runtime.list(),[]);assert.equal(inspected,0);assert.equal(registered,0);assert.equal(settings.compact,false);
+ assert.deepEqual(await runtime.cloudImport([selection]),[]);assert.equal(settings.compact,true);assert.deepEqual(runtime.cloudExport()[0].configuration,{compact:true});
  const pending=await runtime.cloudImport([{...selection,configuration:{compact:false,allowExecute:true}}]);assert.equal(pending.length,1);assert.equal(settings.compact,true);assert.deepEqual(runtime.list()[0].grants,[]);
  }finally{await runtime.dispose();await rm(directory,{recursive:true,force:true});}
 });
+
+ test('production capability rejects portable permissions before package installation',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'capability-unportable-'));const vault=new ClientVault(directory,{encrypt:async s=>s,decrypt:async s=>s});
+ const runtime=new CapabilityRuntime({directory,vault,applications:{} as AgentApplicationService,agentVersion:'0.8.18'});await runtime.load();
+ try{const entry=capabilityCatalog()[0];const selection={id:entry.id,version:entry.version,manifestSha256:entry.manifestSha256};
+ const rejected=await runtime.cloudImport([{...selection,configuration:{enabled:true}}]);assert.equal(rejected.length,1);assert.deepEqual(runtime.list(),[]);assert.deepEqual(runtime.cloudExport(),[]);
+ assert.deepEqual(await runtime.cloudImport([selection]),[]);assert.deepEqual(runtime.cloudExport(),[selection]);assert.deepEqual(runtime.list()[0].grants,[]);
+ }finally{await runtime.dispose();await rm(directory,{recursive:true,force:true});}
+ });
