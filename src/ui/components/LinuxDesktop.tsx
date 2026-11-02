@@ -1,3 +1,4 @@
+import {aspectWindowBounds} from '../remote-window-layout';
 import { useDesktopText } from '../desktop-i18n';
 import {ErrorNotice} from './ErrorNotice';
 import {MachineInformation} from './MachineInformation';
@@ -118,7 +119,7 @@ export function LinuxDesktop({
   machine: any;
   target: string;
   call: (method: AgentCall['method'], params?: unknown) => Promise<unknown>;
-  extraPanels?: { id: string; label: string; content: ReactNode | ((active: boolean, options: boolean, closeOptions: () => void, windowClosed: boolean) => ReactNode); icon?: typeof Monitor; color?: string; onOpen?: () => void }[];
+  extraPanels?: { aspectRatio?:number; id: string; label: string; content: ReactNode | ((active: boolean, options: boolean, closeOptions: () => void, windowClosed: boolean) => ReactNode); icon?: typeof Monitor; color?: string; onOpen?: () => void }[];
   active: boolean;
   closed?: boolean;
   onTerminal?: () => void;
@@ -136,8 +137,8 @@ export function LinuxDesktop({
   },[call,machine.sshOnly,machine.desktopOnly,closed,workbench]);
   useEffect(()=>{void refreshInstalled();},[refreshInstalled]);
   const catalog = [
-    ...apps.map(app => ({...app,label:tr(app.label)})).filter(app => workbench ? false : machine.desktopOnly ? false : machine.sshOnly ? ['terminal','files'].includes(app.id) : ['codex','claude','ide'].includes(app.id)?installed.includes(app.id):machine.terminalOnly ? app.id === 'terminal' : machine.platform === 'android' ? app.id === 'settings' : app.id === 'browser' ? ['linux','win32','darwin'].includes(machine.platform) : app.id !== 'native' || machine.platform === 'linux'),
-    ...extraPanels.map((p) => ({ id: p.id, label: ['remote','assistant','permissions','install-cagent','native-desktop',...(workbench?['connections','command','capabilities','extensions','agent','preferences']:[])].includes(p.id) ? tr(p.label) : p.label, icon: p.icon ?? Settings, color: p.color ?? 'slate' })),
+    ...apps.map(app => ({...app,label:tr(app.label)})).filter(app => workbench ? false : machine.desktopOnly ? false : machine.sshOnly ? ['terminal','files'].includes(app.id) : ['codex','claude','ide'].includes(app.id)?installed.includes(app.id):machine.terminalOnly ? app.id === 'terminal' : machine.platform === 'android' ? ['settings','files'].includes(app.id) : app.id === 'browser' ? ['linux','win32','darwin'].includes(machine.platform) : app.id !== 'native' || machine.platform === 'linux'),
+    ...extraPanels.map((p) => ({ id: p.id, label: ['remote','android-apps','assistant','permissions','install-cagent','native-desktop',...(workbench?['connections','command','capabilities','extensions','agent','preferences']:[])].includes(p.id) ? tr(p.label) : p.label, icon: p.icon ?? Settings, color: p.color ?? 'slate' })),
     ...(workbench ? [{ id: 'settings', label: tr("桌面外观"), icon: Settings, color: 'slate' }] : []),
   ];
   const [context, setContext] = useState<{id:string;x:number;y:number}>();
@@ -237,6 +238,19 @@ export function LinuxDesktop({
     if (canvas.current) observer.observe(canvas.current);
     return () => observer.disconnect();
   }, []);
+  const aspectSignature=JSON.stringify(extraPanels.filter(p=>p.aspectRatio).map(p=>[p.id,Math.round(p.aspectRatio!*100)/100]));
+  const previousAspects=useRef(new Map<string,number>());
+  useEffect(()=>{
+    const ratios=new Map<string,number>(JSON.parse(aspectSignature));
+    const changed=[...ratios].filter(([id,ratio])=>previousAspects.current.get(id)!==ratio);
+    previousAspects.current=ratios;
+    if(!changed.length)return;
+    setWindows(items=>items.map(w=>{
+      const entry=changed.find(([id])=>id===w.id);if(!entry||w.maximized)return w;
+      const next=aspectWindowBounds(entry[1],size,w);
+      return {...w,...next};
+    }));
+  },[aspectSignature]);
   const focus = (id: string) =>
     setWindows((v) =>
       v.map((w) =>
@@ -259,7 +273,7 @@ export function LinuxDesktop({
               minimized: false,
               closed: false,
               maximized: false,
-              ...initialWindowBounds(id, size),
+              ...(extraPanels.find(p=>p.id===id)?.aspectRatio ? aspectWindowBounds(extraPanels.find(p=>p.id===id)!.aspectRatio!,size) : initialWindowBounds(id, size)),
               z: ++sequence.current,
             },
           ],
