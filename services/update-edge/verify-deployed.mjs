@@ -5,7 +5,8 @@ for(const edition of ['opensource','pro']){
  const p=`/downloads/${edition}/releases.json`,r=await get(p),catalog=await r.json();
  if(JSON.stringify(catalog)!==JSON.stringify(m.catalogs[p]))throw Error('Deployed catalog differs from verified release: '+edition);
  results.push({path:p,status:200,catalogVerified:true});
- for(const v of ['0.8.16','0.8.17']){
+ const versions=[...new Set(Object.keys(m.files).map(p=>p.match(/^\/downloads\/(?:opensource|pro)\/v([^/]+)\//)?.[1]).filter(Boolean))];
+ for(const v of versions){
   const paths=Object.keys(m.files).filter(p=>p.startsWith(`/downloads/${edition}/v${v}/`));
   for(const path of [paths.find(p=>p.endsWith('/SHA256SUMS.txt')),paths.find(p=>p.endsWith('-win-x64.exe'))]){
    if(!path)throw Error('Missing pinned probe asset');const full=path.endsWith('.txt'),response=await get(path,!full),bytes=Buffer.from(await response.arrayBuffer());
