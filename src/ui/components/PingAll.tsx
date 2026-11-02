@@ -1,3 +1,4 @@
+import { useDesktopText } from '../desktop-i18n';
 import {ErrorNotice} from './ErrorNotice';
 import { createPortal } from 'react-dom';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -5,6 +6,7 @@ import { Activity } from 'lucide-react';
 import type { Profile } from '../../shared/contracts';
 
 export function PingAll({profiles, interval = 0, onInterval}:{profiles:Profile[]; interval?:number; onInterval?:(value:number)=>Promise<void>}) {
+  const tr = useDesktopText();
   const [busy,setBusy]=useState(false),[menu,setMenu]=useState(false);
   const [error,setError]=useState('');
   const trigger=useRef<HTMLButtonElement>(null),popup=useRef<HTMLDivElement>(null);
@@ -21,12 +23,12 @@ export function PingAll({profiles, interval = 0, onInterval}:{profiles:Profile[]
     const worker=async()=>{while(alive.current&&index<queue.length){const profile=queue[index++];try{
       const result=await window.cshell.networkPing({profileId:profile.id});
       if(alive.current)window.dispatchEvent(new CustomEvent('cshell:ping-result',{detail:{profileId:profile.id,result}}));
-    }catch(cause){if(alive.current)window.dispatchEvent(new CustomEvent('cshell:ping-result',{detail:{profileId:profile.id,error:cause instanceof Error?cause.message:'检测未完成'}}));}}};
+    }catch(cause){if(alive.current)window.dispatchEvent(new CustomEvent('cshell:ping-result',{detail:{profileId:profile.id,error:cause instanceof Error?cause.message:tr("检测未完成")}}));}}};
     try{await Promise.all([worker(),worker()]);}finally{running.current=false;if(alive.current)setBusy(false);}
   };
   useEffect(()=>{if(!interval)return;const timer=window.setInterval(()=>void ping(),interval*1000);return()=>window.clearInterval(timer);},[interval]);
   return <span className="ping-all-control">
-    <button ref={trigger} type="button" aria-haspopup="dialog" aria-expanded={menu} aria-busy={busy} disabled={busy} aria-label="本机 Ping 全部服务器" title={menu?undefined:busy?'正在检测服务器':'Ping 全部 · 右键设置自动检测'} onClick={()=>void ping()} onContextMenu={e=>{e.preventDefault();setMenu(v=>!v)}} onKeyDown={e=>{if(e.key==='Escape')setMenu(false);if(e.key==='ContextMenu'||e.shiftKey&&e.key==='F10'){e.preventDefault();setMenu(v=>!v)}}}><Activity size={15} aria-hidden="true"/></button>
-    {menu&&createPortal(<div ref={popup} role="dialog" aria-label="自动 Ping 设置" className="ping-all-menu" style={position}><label>自动检测<select aria-label="自动 Ping 间隔" value={interval} disabled={!onInterval} onChange={e=>{setError('');void onInterval?.(Number(e.target.value)).catch(cause=>setError(cause instanceof Error?cause.message:'保存失败'));}}><option value={0}>关闭</option><option value={30}>每 30 秒</option><option value={60}>每分钟</option><option value={300}>每 5 分钟</option></select></label>{error&&<ErrorNotice title="检测设置未保存" error={error}/>}<button type="button" onClick={()=>setMenu(false)}>完成</button></div>,document.body)}
+    <button ref={trigger} type="button" aria-haspopup="dialog" aria-expanded={menu} aria-busy={busy} disabled={busy} aria-label={tr("本机 Ping 全部服务器")} title={menu?undefined:busy?tr("正在检测服务器"):tr("Ping 全部 · 右键设置自动检测")} onClick={()=>void ping()} onContextMenu={e=>{e.preventDefault();setMenu(v=>!v)}} onKeyDown={e=>{if(e.key==='Escape')setMenu(false);if(e.key==='ContextMenu'||e.shiftKey&&e.key==='F10'){e.preventDefault();setMenu(v=>!v)}}}><Activity size={15} aria-hidden="true"/></button>
+    {menu&&createPortal(<div ref={popup} role="dialog" aria-label={tr("自动 Ping 设置")} className="ping-all-menu" style={position}><label> {tr("自动检测")} <select aria-label={tr("自动 Ping 间隔")} value={interval} disabled={!onInterval} onChange={e=>{setError('');void onInterval?.(Number(e.target.value)).catch(cause=>setError(cause instanceof Error?cause.message:tr('保存失败')));}}><option value={0}> {tr("停用")} </option><option value={30}> {tr("每 30 秒")} </option><option value={60}> {tr("每分钟")} </option><option value={300}> {tr("每 5 分钟")} </option></select></label>{error&&<ErrorNotice title={tr("检测设置未保存")} error={error}/>}<button type="button" onClick={()=>setMenu(false)}> {tr("完成")} </button></div>,document.body)}
   </span>;
 }
