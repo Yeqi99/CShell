@@ -13,3 +13,5 @@ Validation:
 - Native C# compilation and `--fixture <image> market`: passed actual WPF rendering at 340/540/900 px, no tile overflow, draft/permission assertions retained. No runtime/real software installation used in this fixture.
 - Screenshots: `test-results/market-020/web-{320,380,600,1000}.png`, `native.png-{340,540,900}.png`.
 - Existing broader `cagent-app-smoke.ts` currently stops before reaching the market while waiting for the legacy command-approval heading. This is not counted as passed; only its market selectors were updated for the new accessible names.
+
+Header refinement: search and accessible refresh icon share one toolbar on native/web; native blank feedback space is removed only on the market page. Refresh rereads the actual catalog/policy and preserves the native search query. Browser smoke also verifies refresh requests the catalog.

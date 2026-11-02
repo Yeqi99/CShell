@@ -420,8 +420,11 @@ public class CagentWindow : Window {
     var button=Button("",name+" · "+state);button.Height=84;button.Margin=new Thickness(0,0,10,10);button.HorizontalContentAlignment=HorizontalAlignment.Stretch;button.Background=Brushes.White;button.Content=body;button.Click+=async(sender,e)=>await Guard(action);grid.Children.Add(button);
   }
   void FitMarketTiles(WrapPanel cards){double width=cards.ActualWidth;if(width<=0)return;int columns=Math.Max(1,(int)Math.Floor((width+10)/210));double tile=Math.Max(1,width/columns);foreach(FrameworkElement child in cards.Children){if(child is Button)child.Width=Math.Max(1,tile-10);}}
-  void RenderMarket(Dictionary<string,object> catalog,Dictionary<string,object> policy,IEnumerable packages){
-    var p=Panel("应用市场");var search=Field(p,"搜索应用","");
+  void RenderMarket(Dictionary<string,object> catalog,Dictionary<string,object> policy,IEnumerable packages,string queryText=""){
+    var p=Panel("应用市场");panelStatus.Visibility=Visibility.Collapsed;
+    var toolbar=new Grid{Margin=new Thickness(0,2,0,14)};toolbar.ColumnDefinitions.Add(new ColumnDefinition());toolbar.ColumnDefinitions.Add(new ColumnDefinition{Width=GridLength.Auto});p.Children.Add(toolbar);
+    var search=new TextBox{Text=queryText,Padding=new Thickness(10,7,10,7),MinHeight=36,ToolTip="搜索应用与能力工具"};AutomationProperties.SetName(search,"搜索应用与能力工具");toolbar.Children.Add(search);var hint=new TextBlock{Text="搜索应用与能力工具",Foreground=Brush("#78878C"),Margin=new Thickness(11,0,0,0),VerticalAlignment=VerticalAlignment.Center,IsHitTestVisible=false,Visibility=search.Text.Length==0?Visibility.Visible:Visibility.Collapsed};toolbar.Children.Add(hint);search.TextChanged+=(sender,e)=>hint.Visibility=search.Text.Length==0?Visibility.Visible:Visibility.Collapsed;
+    var refresh=Button("↻","刷新应用市场");refresh.Width=36;refresh.Height=36;refresh.FontSize=20;refresh.Margin=new Thickness(8,0,0,0);Grid.SetColumn(refresh,1);toolbar.Children.Add(refresh);refresh.Click+=async(sender,e)=>await Guard(async()=>{refresh.IsEnabled=false;try{var latest=D(await Api("applications.list"));var latestPolicy=D(await Api("applications.policy"));var latestPackages=A(await Api("packages.catalog"));RenderMarket(latest,latestPolicy,latestPackages,search.Text);}finally{refresh.IsEnabled=true;}});
     var packageTitle=Text("能力工具",12);packageTitle.FontWeight=FontWeights.SemiBold;p.Children.Add(packageTitle);
     var cards=new WrapPanel{Margin=new Thickness(0,6,-10,12)};p.Children.Add(cards);cards.SizeChanged+=(sender,e)=>FitMarketTiles(cards);
     var appTitle=Text("系统应用",12);appTitle.FontWeight=FontWeights.SemiBold;p.Children.Add(appTitle);
