@@ -110,6 +110,10 @@ test(
         (await call('connection_preflight', { profileId: id })).result.hostIdentityTrusted,
         true,
       );
+      const checked = await call('connection_preflight', { profileId: id, probe: true });
+      assert.equal(checked.result.stages.authentication.outcome, 'ok');
+      assert.equal(f.shellRequests(), 0);
+      assert.equal(f.execRequests(), 0);
       const connected = await call('connect', { profileId: id });
       assert.equal(connected.status, 200, JSON.stringify(connected));
       const sessionId = connected.result.sessionId;
