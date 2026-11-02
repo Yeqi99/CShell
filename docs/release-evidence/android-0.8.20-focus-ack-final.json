@@ -1,0 +1,64 @@
+{
+  "version": "0.8.20",
+  "date": "2026-11-02",
+  "scope": "Android native release blockers",
+  "localCommits": {
+    "pro": [
+      "7684557",
+      "5137621"
+    ],
+    "core": [
+      "9be814a",
+      "5b5b181"
+    ]
+  },
+  "fixes": [
+    "Disable Nagle on Android mutual-TLS clients and local relay bridges so real-time ACK and input records are not delayed.",
+    "Resolve actual focused editors in active application windows while IME temporarily owns window focus.",
+    "Hold ordered text input for up to 1000 ms after a completed gesture while WebView publishes real input focus; preserve window/gesture identity, never replay ACTION_SET_TEXT, reject unavailable focus."
+  ],
+  "validation": [
+    {
+      "api29": "success",
+      "edition": "Pro",
+      "api35": "success",
+      "run": 41446997407,
+      "api35Job": 125282487953,
+      "build": "success",
+      "api29Job": 125282487997
+    },
+    {
+      "api29": "success",
+      "edition": "Core",
+      "api35": "success",
+      "run": 41447001660,
+      "api35Job": 125282501550,
+      "build": "success",
+      "api29Job": 125282502237
+    }
+  ],
+  "assertions": "Existing instrumentation assertions unchanged, including immediate WebView input, backspace, rejection without focus and delayed-ACK delta frames.",
+  "deterministicQueue": {
+    "rtt150": {
+      "deltas": 0,
+      "frames": 19
+    },
+    "maximumQueuedAgeMs": 120,
+    "rtt20": {
+      "deltas": 90,
+      "frames": 91
+    },
+    "rtt60": {
+      "deltas": 34,
+      "frames": 46
+    }
+  },
+  "limitations": [
+    "API 29/35 emulator validation, not a new physical-phone performance measurement.",
+    "The 120 ms queue expiry intentionally recovers with keyframes on high RTT; no 30 FPS claim at 150 ms RTT."
+  ],
+  "signedRuns": {
+    "pro": 41447086436,
+    "core": 41447094105
+  }
+}
