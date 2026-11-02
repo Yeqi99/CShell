@@ -6083,3 +6083,10 @@ input[type='radio']:focus-visible {
 @keyframes sidebar-ping-spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.ping-button.is-pinging svg{animation:none}}
 .ping-all-control>button{width:26px;height:26px;justify-content:center;border-radius:6px;padding:4px}.ping-all-control>button[aria-busy="true"]{opacity:.55}
+
+.server-open>div:last-child{overflow:hidden}
+.server-metadata{width:100%;overflow:hidden}
+.server-metadata small{display:block;max-width:100%;width:100%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.account-device-badge{max-width:100%;overflow:hidden;white-space:nowrap}
+.account-device-badge>span{overflow:hidden;text-overflow:ellipsis}
+.server-row>.ping-button{flex-shrink:0}
