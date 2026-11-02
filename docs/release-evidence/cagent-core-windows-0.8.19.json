@@ -1,0 +1,18 @@
+{
+  "version": "0.8.19",
+  "edition": "opensource",
+  "source": "438a26b730ae88a8c06d1c2b4bab03e62e8fe1f5",
+  "status": "verified-candidate-not-published",
+  "path": "C:/Users/35097/.codex/worktrees/core-unified-followup/CShell/.local/CAgent-Setup-0.8.19-win-x64-portable-final.exe",
+  "bytes": 26190135,
+  "sha256": "664f11291ac2fbdf18708a8192e2dda47b84315e452170515b5e644e6289eee0",
+  "authenticode": "NotSigned",
+  "payloadFiles": 48,
+  "validation": [
+    "exact EXE /S /PREPARE isolated install; all48 payload SHA verified; no discovery registry or shortcut mutation",
+    "actual packaged CMD PTY / TLS / restricted authorization / stop",
+    "native read reconnect / mutation no replay / concurrent single replacement / shared runtime preserved / unauthorized no retry",
+    "exact packaged identity ciphertext unchanged after clean runtime restart"
+  ],
+  "verifiedAt": "2026-11-02T06:36:15.8223307Z"
+}
