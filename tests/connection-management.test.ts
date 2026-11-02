@@ -228,3 +228,65 @@ test('changed known host pin is never silently accepted and probe rejects cancel
       /JUMP_PROBE/,
     );
   }));
+test('review resolves actual target, never includes secrets, and rechecks revocation before probe/write', async () =>
+  fixture(async (s, m, c) => {
+    const id: any = await m.call({ action: 'create', profile }, c);
+    let observed: unknown;
+    let allowed = true;
+    let probes = 0;
+    const manager = new ConnectionManagement(
+      s,
+      () => 'account',
+      async () => {
+        probes++;
+        return 'SHA256:' + 'a'.repeat(43);
+      },
+    );
+    const denied = {
+      ...c,
+      authorize: () => {
+        if (!allowed) throw new Error('REVOKED');
+      },
+      review: async (_action: string, p: any, detail: unknown) => {
+        assert.equal(p.id, id.profile.id);
+        observed = detail;
+        allowed = false;
+      },
+    };
+    await assert.rejects(manager.call({ action: 'probe', id: id.profile.id }, denied), /REVOKED/);
+    assert.equal(probes, 0);
+    allowed = true;
+    await assert.rejects(
+      manager.call(
+        {
+          action: 'credentials',
+          id: id.profile.id,
+          revision: id.revision,
+          secret: { password: 'sensitive-fixture' },
+        },
+        denied,
+      ),
+      /REVOKED/,
+    );
+    assert(!JSON.stringify(observed).includes('sensitive-fixture'));
+    assert.equal(await s.secret(id.profile.id), undefined);
+  }));
+test('account epoch changes during review abort creation even when account returns to same name', async () =>
+  fixture(async (s, _m, c) => {
+    let epoch = 'a:1';
+    const manager = new ConnectionManagement(s, () => epoch);
+    await assert.rejects(
+      manager.call(
+        { action: 'create', profile, secret: { password: 'x' } },
+        {
+          ...c,
+          accountKey: 'a:1',
+          review: async () => {
+            epoch = 'a:3';
+          },
+        },
+      ),
+      /ACCOUNT_CHANGED/,
+    );
+    assert.equal(s.snapshot().profiles.length, 0);
+  }));
