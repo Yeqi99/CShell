@@ -32,13 +32,13 @@ try{const page=await browser.newPage({viewport:{width:1200,height:900}});const e
  await page.getByRole('heading',{name:'允许执行这条本机命令？'}).waitFor();assert.equal(commands,0);
  await page.getByRole('button',{name:'允许这一次'}).click();await page.getByText('隔离测试已完成。',{exact:true}).waitFor();assert.equal(commands,1);
  await page.getByLabel('任务',{exact:true}).fill('保留草稿');await page.getByRole('button',{name:'会话、应用与设置',exact:true}).click();await page.getByRole('button',{name:'应用市场',exact:true}).click();
- await page.getByRole('button',{name:'查看配置',exact:true}).click();await page.getByText('未安装',{exact:true}).waitFor();assert.equal(packageMutations,0);
+ await page.locator('#packages .market-tile').first().click();await page.getByText('未安装',{exact:true}).waitFor();assert.equal(packageMutations,0);
  await page.getByRole('button',{name:'安装并核验能力包',exact:true}).click();await page.getByText('待授权',{exact:true}).waitFor();assert.deepEqual(packageGrants,[]);
  await page.getByLabel('读取系统应用目录',{exact:true}).check();assert.deepEqual(packageGrants,[]);await page.getByRole('button',{name:'保存工具权限',exact:true}).click();await page.getByText('工具已注册',{exact:true}).waitFor();assert.deepEqual(packageGrants,['applications.read']);
  await page.getByRole('button',{name:'停用工具',exact:true}).click();await page.getByText('工具未注册',{exact:true}).waitFor();assert.deepEqual(packageGrants,[]);
  await page.getByRole('button',{name:'卸载能力包',exact:true}).click();assert.equal(packageInstalled,true);await page.getByRole('button',{name:'保留能力包',exact:true}).click();assert.equal(packageInstalled,true);
  await page.getByRole('button',{name:'卸载能力包',exact:true}).click();await page.getByRole('button',{name:'确认卸载',exact:true}).click();await page.locator('#market-list').waitFor();assert.equal(packageInstalled,false);
- await page.getByText('系统应用',{exact:true}).click();await page.getByRole('button',{name:'git · Git.Git',exact:true}).click();await page.getByText('隔离测试计划，不安装真实软件').waitFor();
+ await page.getByText('系统应用',{exact:true}).click();await page.getByRole('button',{name:'git · 查看安装计划',exact:true}).click();await page.getByText('隔离测试计划，不安装真实软件').waitFor();
  await page.getByRole('button',{name:'会话、应用与设置',exact:true}).click();await page.getByRole('button',{name:'智能体',exact:true}).click();assert.equal(await page.getByLabel('任务',{exact:true}).inputValue(),'保留草稿');
  await page.screenshot({path:'test-results/cagent-app.png'});assert.deepEqual(errors,[]);console.log('PASS cagent standalone UI, command review, draft preservation, application plan, CSP');
 }finally{await browser.close();await app.close();await engine.close();}
