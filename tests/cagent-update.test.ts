@@ -1,4 +1,4 @@
-import {downloadRoot,downloadManifest} from '../src/shared/download-source';
+import {downloadRoot} from '../src/shared/download-source';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp,readFile,writeFile,rm} from 'node:fs/promises';
@@ -81,3 +81,4 @@ test('update selection cannot cross editions or substitute a different version p
  const a=release.assets[0];const other=downloadRoot.endsWith('/pro')?'opensource':'pro';
  for(const url of ['https://shell.canp.ai/downloads/'+other+'/v0.6.20/'+a.name,downloadRoot+'/v9.9.9/'+a.name,downloadRoot+'/v0.6.20/'+a.name+'?mirror=1']) assert.equal(selectUpdate([{assets:[{...a,browser_download_url:url}]}],'0.6.19','x64'),undefined);
 });
+
