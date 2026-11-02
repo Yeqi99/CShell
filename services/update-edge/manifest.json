@@ -1,6 +1,6 @@
 {
-  "version": "0.8.18",
-  "generatedAt": "2026-11-02T01:21:28.700Z",
+  "version": "0.8.19",
+  "generatedAt": "2026-11-02T08:19:07.527Z",
   "files": {
     "/downloads/opensource/v0.8.16/CAgent-0.8.16-linux-arm64.tar.gz": {
       "url": "https://github.com/Yeqi99/CShell/releases/download/v0.8.16/CAgent-0.8.16-linux-arm64.tar.gz",
@@ -541,209 +541,389 @@
       "size": 1283,
       "digest": "sha256:b6da45caebb892b447141f28e1a8931aa2e5e1a2704a0ec0f99fc722fdded9e0",
       "name": "SHA256SUMS.txt"
+    },
+    "/downloads/opensource/v0.8.19/CAgent-0.8.19-linux-arm64.tar.gz": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/v0.8.19/CAgent-0.8.19-linux-arm64.tar.gz",
+      "size": 44507599,
+      "digest": "sha256:32d692f5be2e2c538ff83b4ea59422c133768927ae0dda4f92ea655a0e78281e",
+      "name": "CAgent-0.8.19-linux-arm64.tar.gz"
+    },
+    "/downloads/opensource/v0.8.19/CAgent-0.8.19-linux-x64.tar.gz": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/v0.8.19/CAgent-0.8.19-linux-x64.tar.gz",
+      "size": 44818601,
+      "digest": "sha256:9e5ad3e7950358bb1a989b2b2c0f4a40f03314faaaff19e4107d643800b5e9da",
+      "name": "CAgent-0.8.19-linux-x64.tar.gz"
+    },
+    "/downloads/opensource/v0.8.19/CAgent-0.8.19-mac-arm64.tar.gz": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/v0.8.19/CAgent-0.8.19-mac-arm64.tar.gz",
+      "size": 39500376,
+      "digest": "sha256:77b5afdb4cea097de46f39036eb8e33e185f329dece114c29e8bf5d2abb101ca",
+      "name": "CAgent-0.8.19-mac-arm64.tar.gz"
+    },
+    "/downloads/opensource/v0.8.19/CAgent-0.8.19-mac-x64.tar.gz": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/v0.8.19/CAgent-0.8.19-mac-x64.tar.gz",
+      "size": 40730802,
+      "digest": "sha256:1305ead9656f6be36e80d469355d55b9c5b6e29d24b5267b08fb158ae430c121",
+      "name": "CAgent-0.8.19-mac-x64.tar.gz"
+    },
+    "/downloads/opensource/v0.8.19/CAgent-Setup-0.8.19-win-x64.exe": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/v0.8.19/CAgent-Setup-0.8.19-win-x64.exe",
+      "size": 26190135,
+      "digest": "sha256:664f11291ac2fbdf18708a8192e2dda47b84315e452170515b5e644e6289eee0",
+      "name": "CAgent-Setup-0.8.19-win-x64.exe"
+    },
+    "/downloads/opensource/v0.8.19/CShell-0.8.19-android.apk": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/v0.8.19/CShell-0.8.19-android.apk",
+      "size": 4903802,
+      "digest": "sha256:ee7676c3a22debd3a79742d93bde9cff6a9ecfc626bb93a1623e2d8cd952b3d2",
+      "name": "CShell-0.8.19-android.apk"
+    },
+    "/downloads/opensource/v0.8.19/CShell-0.8.19-linux-amd64.deb": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/v0.8.19/CShell-0.8.19-linux-amd64.deb",
+      "size": 108876832,
+      "digest": "sha256:d2c43fc1639cac90f99e341f5e783b4109e61af9e2edcc80fc641a70e0e3ed1f",
+      "name": "CShell-0.8.19-linux-amd64.deb"
+    },
+    "/downloads/opensource/v0.8.19/CShell-0.8.19-linux-arm64.AppImage": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/v0.8.19/CShell-0.8.19-linux-arm64.AppImage",
+      "size": 140723594,
+      "digest": "sha256:7b2a04b1c50ea336e468a31c29776f7cf91be43810f6b4584480eed9f18b023c",
+      "name": "CShell-0.8.19-linux-arm64.AppImage"
+    },
+    "/downloads/opensource/v0.8.19/CShell-0.8.19-linux-arm64.deb": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/v0.8.19/CShell-0.8.19-linux-arm64.deb",
+      "size": 103040780,
+      "digest": "sha256:f88a1aa9e999fb6e31fe9fdc80f92a6148a645239dfc97e7fc3a85083024629b",
+      "name": "CShell-0.8.19-linux-arm64.deb"
+    },
+    "/downloads/opensource/v0.8.19/CShell-0.8.19-linux-x86_64.AppImage": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/v0.8.19/CShell-0.8.19-linux-x86_64.AppImage",
+      "size": 139468379,
+      "digest": "sha256:04e2f85cfe6ed3be8cdd144eef85e6f5e5ea9f4b4ba3300cd99797d770dc8803",
+      "name": "CShell-0.8.19-linux-x86_64.AppImage"
+    },
+    "/downloads/opensource/v0.8.19/CShell-0.8.19-mac-arm64.dmg": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/v0.8.19/CShell-0.8.19-mac-arm64.dmg",
+      "size": 142334477,
+      "digest": "sha256:cbabc2a30acd48f43dba3d0ecd716bac7860d6720f72f462926a51e30651e0ba",
+      "name": "CShell-0.8.19-mac-arm64.dmg"
+    },
+    "/downloads/opensource/v0.8.19/CShell-0.8.19-mac-arm64.zip": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/v0.8.19/CShell-0.8.19-mac-arm64.zip",
+      "size": 142176936,
+      "digest": "sha256:e4cf8bb8f023e10d00f8c0d3016d1d1b04f76034a260b631205349e996fa96fe",
+      "name": "CShell-0.8.19-mac-arm64.zip"
+    },
+    "/downloads/opensource/v0.8.19/CShell-0.8.19-mac-x64.dmg": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/v0.8.19/CShell-0.8.19-mac-x64.dmg",
+      "size": 146129895,
+      "digest": "sha256:7cd51c09ee9824b792b9b1ceae3aedded03d9cdc24d374248a50de28a2303895",
+      "name": "CShell-0.8.19-mac-x64.dmg"
+    },
+    "/downloads/opensource/v0.8.19/CShell-0.8.19-mac-x64.zip": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/v0.8.19/CShell-0.8.19-mac-x64.zip",
+      "size": 146018387,
+      "digest": "sha256:2a8251b471506b4712bd461ff00f098f0f5e4b4d26c8fab6065802fb8105a8b3",
+      "name": "CShell-0.8.19-mac-x64.zip"
+    },
+    "/downloads/opensource/v0.8.19/CShell-0.8.19-win-x64.exe": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/v0.8.19/CShell-0.8.19-win-x64.exe",
+      "size": 123782978,
+      "digest": "sha256:a2f538178029b41e0fee3e25b0d3616814ba43824aa58ef45cc81ec79b648708",
+      "name": "CShell-0.8.19-win-x64.exe"
+    },
+    "/downloads/opensource/v0.8.19/SHA256SUMS.txt": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/v0.8.19/SHA256SUMS.txt",
+      "size": 1437,
+      "digest": "sha256:06ddef5c67ba0f21793839597a59f310139c82a727f0f1ccc38b710f9537ef15",
+      "name": "SHA256SUMS.txt"
+    },
+    "/downloads/pro/v0.8.19/CAgent-0.8.19-linux-arm64.tar.gz": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/pro-v0.8.19/CAgent-0.8.19-linux-arm64.tar.gz",
+      "size": 44560429,
+      "digest": "sha256:3c6f0f449ed597423cdda2bae66f0be96c3f25a624f0e2c3c0da963e65725aab",
+      "name": "CAgent-0.8.19-linux-arm64.tar.gz"
+    },
+    "/downloads/pro/v0.8.19/CAgent-0.8.19-linux-x64.tar.gz": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/pro-v0.8.19/CAgent-0.8.19-linux-x64.tar.gz",
+      "size": 44875785,
+      "digest": "sha256:e86729e2bed2740bcd3a784298be26670bcc81fddaa23c41f2fbf9352f179e78",
+      "name": "CAgent-0.8.19-linux-x64.tar.gz"
+    },
+    "/downloads/pro/v0.8.19/CAgent-0.8.19-mac-arm64.tar.gz": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/pro-v0.8.19/CAgent-0.8.19-mac-arm64.tar.gz",
+      "size": 39550203,
+      "digest": "sha256:4baac168e4faa1f34de184fdf480221d15fe96dc8ba4a0feafe64add29da793e",
+      "name": "CAgent-0.8.19-mac-arm64.tar.gz"
+    },
+    "/downloads/pro/v0.8.19/CAgent-0.8.19-mac-x64.tar.gz": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/pro-v0.8.19/CAgent-0.8.19-mac-x64.tar.gz",
+      "size": 40782819,
+      "digest": "sha256:5d6ac79c8ad780295ed4c1bf2eb780d6ae3b750ce9fe4ba4df14f23b06624e1d",
+      "name": "CAgent-0.8.19-mac-x64.tar.gz"
+    },
+    "/downloads/pro/v0.8.19/CAgent-Setup-0.8.19-win-x64.exe": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/pro-v0.8.19/CAgent-Setup-0.8.19-win-x64.exe",
+      "size": 26235182,
+      "digest": "sha256:0f14a93ceb49aba2e29ff1a093bef4389507ac46355727886fbc87eec89798cc",
+      "name": "CAgent-Setup-0.8.19-win-x64.exe"
+    },
+    "/downloads/pro/v0.8.19/CShell-Pro-0.8.19-android.apk": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/pro-v0.8.19/CShell-Pro-0.8.19-android.apk",
+      "size": 4930902,
+      "digest": "sha256:12d63467f43ac8039f1edf8a361bca48ad5174130751eb4b5f7a0baa9a10a4ae",
+      "name": "CShell-Pro-0.8.19-android.apk"
+    },
+    "/downloads/pro/v0.8.19/CShell-Pro-0.8.19-linux-amd64.deb": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/pro-v0.8.19/CShell-Pro-0.8.19-linux-amd64.deb",
+      "size": 107790468,
+      "digest": "sha256:0c128e677dac5fe099f810dc410633ac2582b27c5cc8b2dcbd902eb6e27098c7",
+      "name": "CShell-Pro-0.8.19-linux-amd64.deb"
+    },
+    "/downloads/pro/v0.8.19/CShell-Pro-0.8.19-linux-arm64.AppImage": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/pro-v0.8.19/CShell-Pro-0.8.19-linux-arm64.AppImage",
+      "size": 140965124,
+      "digest": "sha256:cdc83f49932d81a0dfad5ac6b38454eb7645d9946128ccc436e851d64ebd6be4",
+      "name": "CShell-Pro-0.8.19-linux-arm64.AppImage"
+    },
+    "/downloads/pro/v0.8.19/CShell-Pro-0.8.19-linux-arm64.deb": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/pro-v0.8.19/CShell-Pro-0.8.19-linux-arm64.deb",
+      "size": 103288616,
+      "digest": "sha256:9d466217112d591ede8112680f6f361dc0efb9c9a67ea02c37a2e65603473c19",
+      "name": "CShell-Pro-0.8.19-linux-arm64.deb"
+    },
+    "/downloads/pro/v0.8.19/CShell-Pro-0.8.19-linux-x86_64.AppImage": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/pro-v0.8.19/CShell-Pro-0.8.19-linux-x86_64.AppImage",
+      "size": 139705819,
+      "digest": "sha256:3ed3df3c84dbf002db90f261ec077bd59fd5c0a06e237918f53e91f09b1789c8",
+      "name": "CShell-Pro-0.8.19-linux-x86_64.AppImage"
+    },
+    "/downloads/pro/v0.8.19/CShell-Pro-0.8.19-mac-arm64.dmg": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/pro-v0.8.19/CShell-Pro-0.8.19-mac-arm64.dmg",
+      "size": 142635002,
+      "digest": "sha256:7cddf7e1129d4f2658b98603a9e9432602364381db0abfac7a62159665ed432a",
+      "name": "CShell-Pro-0.8.19-mac-arm64.dmg"
+    },
+    "/downloads/pro/v0.8.19/CShell-Pro-0.8.19-mac-x64.dmg": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/pro-v0.8.19/CShell-Pro-0.8.19-mac-x64.dmg",
+      "size": 146449161,
+      "digest": "sha256:d1252a407b7b47c317b03ccd0cf9a08f5a082db506d76659440dda64c102e715",
+      "name": "CShell-Pro-0.8.19-mac-x64.dmg"
+    },
+    "/downloads/pro/v0.8.19/CShell-Pro-0.8.19-win-x64.exe": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/pro-v0.8.19/CShell-Pro-0.8.19-win-x64.exe",
+      "size": 123912958,
+      "digest": "sha256:54e14956c8e14d898d49ce9f30a6907d8a688b5295b8fd3aaf579fb7039c4a25",
+      "name": "CShell-Pro-0.8.19-win-x64.exe"
+    },
+    "/downloads/pro/v0.8.19/SHA256SUMS.txt": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/pro-v0.8.19/SHA256SUMS.txt",
+      "size": 1283,
+      "digest": "sha256:aee5ae5eecc33fb89879b70ed724acc10f62e359d63f73094d34bccc94c18713",
+      "name": "SHA256SUMS.txt"
     }
   },
   "catalogs": {
     "/downloads/opensource/releases.json": [
       {
-        "tag_name": "v0.8.18",
-        "name": "CShell 0.8.18",
+        "tag_name": "v0.8.19",
+        "name": "CShell 0.8.19",
         "draft": false,
         "prerelease": false,
-        "published_at": "2026-11-02T01:19:34Z",
+        "published_at": "2026-11-02T08:16:34Z",
         "html_url": "https://shell.canp.ai/downloads.html",
         "assets": [
           {
-            "name": "CAgent-0.8.18-linux-arm64.tar.gz",
-            "size": 44504621,
-            "digest": "sha256:2ca667d2f497d791c99087d6cc91b71eaed87a4a05b3e0e46c6ab9477af964a7",
-            "browser_download_url": "https://shell.canp.ai/downloads/opensource/v0.8.18/CAgent-0.8.18-linux-arm64.tar.gz"
+            "name": "CAgent-0.8.19-linux-arm64.tar.gz",
+            "size": 44507599,
+            "digest": "sha256:32d692f5be2e2c538ff83b4ea59422c133768927ae0dda4f92ea655a0e78281e",
+            "browser_download_url": "https://shell.canp.ai/downloads/opensource/v0.8.19/CAgent-0.8.19-linux-arm64.tar.gz"
           },
           {
-            "name": "CAgent-0.8.18-linux-x64.tar.gz",
-            "size": 44818935,
-            "digest": "sha256:3ca8f4e639ffe708138c2a55eff6d269f630e05e48f73733b150fb3319e6e4e6",
-            "browser_download_url": "https://shell.canp.ai/downloads/opensource/v0.8.18/CAgent-0.8.18-linux-x64.tar.gz"
+            "name": "CAgent-0.8.19-linux-x64.tar.gz",
+            "size": 44818601,
+            "digest": "sha256:9e5ad3e7950358bb1a989b2b2c0f4a40f03314faaaff19e4107d643800b5e9da",
+            "browser_download_url": "https://shell.canp.ai/downloads/opensource/v0.8.19/CAgent-0.8.19-linux-x64.tar.gz"
           },
           {
-            "name": "CAgent-0.8.18-mac-arm64.tar.gz",
-            "size": 39500398,
-            "digest": "sha256:c41bc10b4888950c1be7b0c529b61d2cc7d7b5ae49ccf86bd4a1925590773e3b",
-            "browser_download_url": "https://shell.canp.ai/downloads/opensource/v0.8.18/CAgent-0.8.18-mac-arm64.tar.gz"
+            "name": "CAgent-0.8.19-mac-arm64.tar.gz",
+            "size": 39500376,
+            "digest": "sha256:77b5afdb4cea097de46f39036eb8e33e185f329dece114c29e8bf5d2abb101ca",
+            "browser_download_url": "https://shell.canp.ai/downloads/opensource/v0.8.19/CAgent-0.8.19-mac-arm64.tar.gz"
           },
           {
-            "name": "CAgent-0.8.18-mac-x64.tar.gz",
-            "size": 40730782,
-            "digest": "sha256:4928a33c8e76fe66e90da1b3abbfbac61e434e08d464fa72207365fa8c2721db",
-            "browser_download_url": "https://shell.canp.ai/downloads/opensource/v0.8.18/CAgent-0.8.18-mac-x64.tar.gz"
+            "name": "CAgent-0.8.19-mac-x64.tar.gz",
+            "size": 40730802,
+            "digest": "sha256:1305ead9656f6be36e80d469355d55b9c5b6e29d24b5267b08fb158ae430c121",
+            "browser_download_url": "https://shell.canp.ai/downloads/opensource/v0.8.19/CAgent-0.8.19-mac-x64.tar.gz"
           },
           {
-            "name": "CAgent-Setup-0.8.18-win-x64.exe",
-            "size": 26187452,
-            "digest": "sha256:59dc9978ae2193cbfca6a705e07c90b9af0815e6cf364ec9df6b3de982249572",
-            "browser_download_url": "https://shell.canp.ai/downloads/opensource/v0.8.18/CAgent-Setup-0.8.18-win-x64.exe"
+            "name": "CAgent-Setup-0.8.19-win-x64.exe",
+            "size": 26190135,
+            "digest": "sha256:664f11291ac2fbdf18708a8192e2dda47b84315e452170515b5e644e6289eee0",
+            "browser_download_url": "https://shell.canp.ai/downloads/opensource/v0.8.19/CAgent-Setup-0.8.19-win-x64.exe"
           },
           {
-            "name": "CShell-0.8.18-android.apk",
-            "size": 4897942,
-            "digest": "sha256:b958ccd6b618ced4b1bb564d4274d95ec66cd647978aa316e740ffea7d037495",
-            "browser_download_url": "https://shell.canp.ai/downloads/opensource/v0.8.18/CShell-0.8.18-android.apk"
+            "name": "CShell-0.8.19-android.apk",
+            "size": 4903802,
+            "digest": "sha256:ee7676c3a22debd3a79742d93bde9cff6a9ecfc626bb93a1623e2d8cd952b3d2",
+            "browser_download_url": "https://shell.canp.ai/downloads/opensource/v0.8.19/CShell-0.8.19-android.apk"
           },
           {
-            "name": "CShell-0.8.18-linux-amd64.deb",
-            "size": 107543400,
-            "digest": "sha256:f3de08f12adc004e66cfcc5fdfeecc1ecca4949dfb4ee622d61dceb330168590",
-            "browser_download_url": "https://shell.canp.ai/downloads/opensource/v0.8.18/CShell-0.8.18-linux-amd64.deb"
+            "name": "CShell-0.8.19-linux-amd64.deb",
+            "size": 108876832,
+            "digest": "sha256:d2c43fc1639cac90f99e341f5e783b4109e61af9e2edcc80fc641a70e0e3ed1f",
+            "browser_download_url": "https://shell.canp.ai/downloads/opensource/v0.8.19/CShell-0.8.19-linux-amd64.deb"
           },
           {
-            "name": "CShell-0.8.18-linux-arm64.AppImage",
-            "size": 140723392,
-            "digest": "sha256:8d68d280cd2d383ed45b434f66606514b73696bbff547726a27b46126388c2ea",
-            "browser_download_url": "https://shell.canp.ai/downloads/opensource/v0.8.18/CShell-0.8.18-linux-arm64.AppImage"
+            "name": "CShell-0.8.19-linux-arm64.AppImage",
+            "size": 140723594,
+            "digest": "sha256:7b2a04b1c50ea336e468a31c29776f7cf91be43810f6b4584480eed9f18b023c",
+            "browser_download_url": "https://shell.canp.ai/downloads/opensource/v0.8.19/CShell-0.8.19-linux-arm64.AppImage"
           },
           {
-            "name": "CShell-0.8.18-linux-arm64.deb",
-            "size": 103040424,
-            "digest": "sha256:9457570bd6bdf68fb3a78584f71060ef2e6d0348ad671260cb199853e01b8cee",
-            "browser_download_url": "https://shell.canp.ai/downloads/opensource/v0.8.18/CShell-0.8.18-linux-arm64.deb"
+            "name": "CShell-0.8.19-linux-arm64.deb",
+            "size": 103040780,
+            "digest": "sha256:f88a1aa9e999fb6e31fe9fdc80f92a6148a645239dfc97e7fc3a85083024629b",
+            "browser_download_url": "https://shell.canp.ai/downloads/opensource/v0.8.19/CShell-0.8.19-linux-arm64.deb"
           },
           {
-            "name": "CShell-0.8.18-linux-x86_64.AppImage",
-            "size": 139468198,
-            "digest": "sha256:5c565da9284912ff464a76123e3871e378f89a79f87fb8a03f43b671cfa2ca10",
-            "browser_download_url": "https://shell.canp.ai/downloads/opensource/v0.8.18/CShell-0.8.18-linux-x86_64.AppImage"
+            "name": "CShell-0.8.19-linux-x86_64.AppImage",
+            "size": 139468379,
+            "digest": "sha256:04e2f85cfe6ed3be8cdd144eef85e6f5e5ea9f4b4ba3300cd99797d770dc8803",
+            "browser_download_url": "https://shell.canp.ai/downloads/opensource/v0.8.19/CShell-0.8.19-linux-x86_64.AppImage"
           },
           {
-            "name": "CShell-0.8.18-mac-arm64.dmg",
-            "size": 142333581,
-            "digest": "sha256:07bed2e371a3566eb544f378842b868b8a70b999ebe6dd2f8ac67c80c2f7772b",
-            "browser_download_url": "https://shell.canp.ai/downloads/opensource/v0.8.18/CShell-0.8.18-mac-arm64.dmg"
+            "name": "CShell-0.8.19-mac-arm64.dmg",
+            "size": 142334477,
+            "digest": "sha256:cbabc2a30acd48f43dba3d0ecd716bac7860d6720f72f462926a51e30651e0ba",
+            "browser_download_url": "https://shell.canp.ai/downloads/opensource/v0.8.19/CShell-0.8.19-mac-arm64.dmg"
           },
           {
-            "name": "CShell-0.8.18-mac-arm64.zip",
-            "size": 142176270,
-            "digest": "sha256:5c13b5a394d51f6cabc1161dc365bfeaf9e7640709b774d5c3860b161e4dc1bf",
-            "browser_download_url": "https://shell.canp.ai/downloads/opensource/v0.8.18/CShell-0.8.18-mac-arm64.zip"
+            "name": "CShell-0.8.19-mac-arm64.zip",
+            "size": 142176936,
+            "digest": "sha256:e4cf8bb8f023e10d00f8c0d3016d1d1b04f76034a260b631205349e996fa96fe",
+            "browser_download_url": "https://shell.canp.ai/downloads/opensource/v0.8.19/CShell-0.8.19-mac-arm64.zip"
           },
           {
-            "name": "CShell-0.8.18-mac-x64.dmg",
-            "size": 146128653,
-            "digest": "sha256:fe631973313c25601e032a809a1d0fd916bceac360bb43c361bb522e0c368ad5",
-            "browser_download_url": "https://shell.canp.ai/downloads/opensource/v0.8.18/CShell-0.8.18-mac-x64.dmg"
+            "name": "CShell-0.8.19-mac-x64.dmg",
+            "size": 146129895,
+            "digest": "sha256:7cd51c09ee9824b792b9b1ceae3aedded03d9cdc24d374248a50de28a2303895",
+            "browser_download_url": "https://shell.canp.ai/downloads/opensource/v0.8.19/CShell-0.8.19-mac-x64.dmg"
           },
           {
-            "name": "CShell-0.8.18-mac-x64.zip",
-            "size": 146017721,
-            "digest": "sha256:985fb4b8aeff851a3cefa116926c78d93f9197c1e8052c6bb3f66ca215ab5c6c",
-            "browser_download_url": "https://shell.canp.ai/downloads/opensource/v0.8.18/CShell-0.8.18-mac-x64.zip"
+            "name": "CShell-0.8.19-mac-x64.zip",
+            "size": 146018387,
+            "digest": "sha256:2a8251b471506b4712bd461ff00f098f0f5e4b4d26c8fab6065802fb8105a8b3",
+            "browser_download_url": "https://shell.canp.ai/downloads/opensource/v0.8.19/CShell-0.8.19-mac-x64.zip"
           },
           {
-            "name": "CShell-0.8.18-win-x64.exe",
-            "size": 123699494,
-            "digest": "sha256:c401acdbb335b0c43412ae1c5148268142f2df35e1990681b680df84fe8d8a14",
-            "browser_download_url": "https://shell.canp.ai/downloads/opensource/v0.8.18/CShell-0.8.18-win-x64.exe"
+            "name": "CShell-0.8.19-win-x64.exe",
+            "size": 123782978,
+            "digest": "sha256:a2f538178029b41e0fee3e25b0d3616814ba43824aa58ef45cc81ec79b648708",
+            "browser_download_url": "https://shell.canp.ai/downloads/opensource/v0.8.19/CShell-0.8.19-win-x64.exe"
           },
           {
             "name": "SHA256SUMS.txt",
             "size": 1437,
-            "digest": "sha256:911007348921ada7b8fc0e15425143ee94be0c283cf2afddcafc9f57b66995bb",
-            "browser_download_url": "https://shell.canp.ai/downloads/opensource/v0.8.18/SHA256SUMS.txt"
+            "digest": "sha256:06ddef5c67ba0f21793839597a59f310139c82a727f0f1ccc38b710f9537ef15",
+            "browser_download_url": "https://shell.canp.ai/downloads/opensource/v0.8.19/SHA256SUMS.txt"
           }
         ]
       }
     ],
     "/downloads/pro/releases.json": [
       {
-        "tag_name": "v0.8.18",
-        "name": "CShell Pro 0.8.18",
+        "tag_name": "v0.8.19",
+        "name": "CShell Pro 0.8.19",
         "draft": false,
         "prerelease": false,
-        "published_at": "2026-11-02T01:19:34Z",
+        "published_at": "2026-11-02T08:16:35Z",
         "html_url": "https://shell.canp.ai/downloads.html",
         "assets": [
           {
-            "name": "CAgent-0.8.18-linux-arm64.tar.gz",
-            "size": 44560384,
-            "digest": "sha256:ef2f5877681716f302470cae617d20b6a51054e16233b0a9676f1d03dc7afd94",
-            "browser_download_url": "https://shell.canp.ai/downloads/pro/v0.8.18/CAgent-0.8.18-linux-arm64.tar.gz"
+            "name": "CAgent-0.8.19-linux-arm64.tar.gz",
+            "size": 44560429,
+            "digest": "sha256:3c6f0f449ed597423cdda2bae66f0be96c3f25a624f0e2c3c0da963e65725aab",
+            "browser_download_url": "https://shell.canp.ai/downloads/pro/v0.8.19/CAgent-0.8.19-linux-arm64.tar.gz"
           },
           {
-            "name": "CAgent-0.8.18-linux-x64.tar.gz",
-            "size": 44874504,
-            "digest": "sha256:a3367334b43ba769b27ee60c11cb0664287eea21b5f0294c00d11d4edadff1c7",
-            "browser_download_url": "https://shell.canp.ai/downloads/pro/v0.8.18/CAgent-0.8.18-linux-x64.tar.gz"
+            "name": "CAgent-0.8.19-linux-x64.tar.gz",
+            "size": 44875785,
+            "digest": "sha256:e86729e2bed2740bcd3a784298be26670bcc81fddaa23c41f2fbf9352f179e78",
+            "browser_download_url": "https://shell.canp.ai/downloads/pro/v0.8.19/CAgent-0.8.19-linux-x64.tar.gz"
           },
           {
-            "name": "CAgent-0.8.18-mac-arm64.tar.gz",
-            "size": 39550110,
-            "digest": "sha256:61f9e2bdc0246cdb82b39df141f8220f5a79f0d5e441d188a25d5b25afb49e46",
-            "browser_download_url": "https://shell.canp.ai/downloads/pro/v0.8.18/CAgent-0.8.18-mac-arm64.tar.gz"
+            "name": "CAgent-0.8.19-mac-arm64.tar.gz",
+            "size": 39550203,
+            "digest": "sha256:4baac168e4faa1f34de184fdf480221d15fe96dc8ba4a0feafe64add29da793e",
+            "browser_download_url": "https://shell.canp.ai/downloads/pro/v0.8.19/CAgent-0.8.19-mac-arm64.tar.gz"
           },
           {
-            "name": "CAgent-0.8.18-mac-x64.tar.gz",
-            "size": 40782689,
-            "digest": "sha256:b7bcbc3c9c0ebae2230fefa8e551ba495fe8e8ce3ee59517536573b1c462dac3",
-            "browser_download_url": "https://shell.canp.ai/downloads/pro/v0.8.18/CAgent-0.8.18-mac-x64.tar.gz"
+            "name": "CAgent-0.8.19-mac-x64.tar.gz",
+            "size": 40782819,
+            "digest": "sha256:5d6ac79c8ad780295ed4c1bf2eb780d6ae3b750ce9fe4ba4df14f23b06624e1d",
+            "browser_download_url": "https://shell.canp.ai/downloads/pro/v0.8.19/CAgent-0.8.19-mac-x64.tar.gz"
           },
           {
-            "name": "CAgent-Setup-0.8.18-win-x64.exe",
-            "size": 26230795,
-            "digest": "sha256:7f60ff4c4d297586487bac9c604e150a0aa438a786b3fc6bf11d17dc681cffe3",
-            "browser_download_url": "https://shell.canp.ai/downloads/pro/v0.8.18/CAgent-Setup-0.8.18-win-x64.exe"
+            "name": "CAgent-Setup-0.8.19-win-x64.exe",
+            "size": 26235182,
+            "digest": "sha256:0f14a93ceb49aba2e29ff1a093bef4389507ac46355727886fbc87eec89798cc",
+            "browser_download_url": "https://shell.canp.ai/downloads/pro/v0.8.19/CAgent-Setup-0.8.19-win-x64.exe"
           },
           {
-            "name": "CShell-Pro-0.8.18-android.apk",
-            "size": 4923366,
-            "digest": "sha256:7f9f866c1767f991370e4171619e29c53b29cf41487a08413c39ed7205adbd78",
-            "browser_download_url": "https://shell.canp.ai/downloads/pro/v0.8.18/CShell-Pro-0.8.18-android.apk"
+            "name": "CShell-Pro-0.8.19-android.apk",
+            "size": 4930902,
+            "digest": "sha256:12d63467f43ac8039f1edf8a361bca48ad5174130751eb4b5f7a0baa9a10a4ae",
+            "browser_download_url": "https://shell.canp.ai/downloads/pro/v0.8.19/CShell-Pro-0.8.19-android.apk"
           },
           {
-            "name": "CShell-Pro-0.8.18-linux-amd64.deb",
-            "size": 107786032,
-            "digest": "sha256:1bfcb75c7325f7583d5f9abb8a6574340670aff4016d0db4b2da96c0c45f7650",
-            "browser_download_url": "https://shell.canp.ai/downloads/pro/v0.8.18/CShell-Pro-0.8.18-linux-amd64.deb"
+            "name": "CShell-Pro-0.8.19-linux-amd64.deb",
+            "size": 107790468,
+            "digest": "sha256:0c128e677dac5fe099f810dc410633ac2582b27c5cc8b2dcbd902eb6e27098c7",
+            "browser_download_url": "https://shell.canp.ai/downloads/pro/v0.8.19/CShell-Pro-0.8.19-linux-amd64.deb"
           },
           {
-            "name": "CShell-Pro-0.8.18-linux-arm64.AppImage",
-            "size": 140957024,
-            "digest": "sha256:d4c49a85333ee8c7e8d16aaf6ace4f1b8ca1bdd47304f2cfd929cac8a7a5fc58",
-            "browser_download_url": "https://shell.canp.ai/downloads/pro/v0.8.18/CShell-Pro-0.8.18-linux-arm64.AppImage"
+            "name": "CShell-Pro-0.8.19-linux-arm64.AppImage",
+            "size": 140965124,
+            "digest": "sha256:cdc83f49932d81a0dfad5ac6b38454eb7645d9946128ccc436e851d64ebd6be4",
+            "browser_download_url": "https://shell.canp.ai/downloads/pro/v0.8.19/CShell-Pro-0.8.19-linux-arm64.AppImage"
           },
           {
-            "name": "CShell-Pro-0.8.18-linux-arm64.deb",
-            "size": 103284072,
-            "digest": "sha256:bfd7181c7ee28a2000fffc9dc3cdd499dc64c20c81c9191ca7217a8e8b8a72d6",
-            "browser_download_url": "https://shell.canp.ai/downloads/pro/v0.8.18/CShell-Pro-0.8.18-linux-arm64.deb"
+            "name": "CShell-Pro-0.8.19-linux-arm64.deb",
+            "size": 103288616,
+            "digest": "sha256:9d466217112d591ede8112680f6f361dc0efb9c9a67ea02c37a2e65603473c19",
+            "browser_download_url": "https://shell.canp.ai/downloads/pro/v0.8.19/CShell-Pro-0.8.19-linux-arm64.deb"
           },
           {
-            "name": "CShell-Pro-0.8.18-linux-x86_64.AppImage",
-            "size": 139701812,
-            "digest": "sha256:9540f5615d14da4fc6a168226b7a2808623d3d32df54abeacf6feffb1cbb75d1",
-            "browser_download_url": "https://shell.canp.ai/downloads/pro/v0.8.18/CShell-Pro-0.8.18-linux-x86_64.AppImage"
+            "name": "CShell-Pro-0.8.19-linux-x86_64.AppImage",
+            "size": 139705819,
+            "digest": "sha256:3ed3df3c84dbf002db90f261ec077bd59fd5c0a06e237918f53e91f09b1789c8",
+            "browser_download_url": "https://shell.canp.ai/downloads/pro/v0.8.19/CShell-Pro-0.8.19-linux-x86_64.AppImage"
           },
           {
-            "name": "CShell-Pro-0.8.18-mac-arm64.dmg",
-            "size": 142614693,
-            "digest": "sha256:9a621cba49849ed0535fadfb0c346bf6bb09ad332f6c1c90325bf4ad01d19c1f",
-            "browser_download_url": "https://shell.canp.ai/downloads/pro/v0.8.18/CShell-Pro-0.8.18-mac-arm64.dmg"
+            "name": "CShell-Pro-0.8.19-mac-arm64.dmg",
+            "size": 142635002,
+            "digest": "sha256:7cddf7e1129d4f2658b98603a9e9432602364381db0abfac7a62159665ed432a",
+            "browser_download_url": "https://shell.canp.ai/downloads/pro/v0.8.19/CShell-Pro-0.8.19-mac-arm64.dmg"
           },
           {
-            "name": "CShell-Pro-0.8.18-mac-x64.dmg",
-            "size": 146425126,
-            "digest": "sha256:b6aafea0cde1bd20ba2f643fef29cd606e37229c8546b3730138b29eeb341d8d",
-            "browser_download_url": "https://shell.canp.ai/downloads/pro/v0.8.18/CShell-Pro-0.8.18-mac-x64.dmg"
+            "name": "CShell-Pro-0.8.19-mac-x64.dmg",
+            "size": 146449161,
+            "digest": "sha256:d1252a407b7b47c317b03ccd0cf9a08f5a082db506d76659440dda64c102e715",
+            "browser_download_url": "https://shell.canp.ai/downloads/pro/v0.8.19/CShell-Pro-0.8.19-mac-x64.dmg"
           },
           {
-            "name": "CShell-Pro-0.8.18-win-x64.exe",
-            "size": 123909057,
-            "digest": "sha256:976b7cf19a3ceb41c385a995e49d3998cb65bb37124f3d0a033d6840f06ee3d3",
-            "browser_download_url": "https://shell.canp.ai/downloads/pro/v0.8.18/CShell-Pro-0.8.18-win-x64.exe"
+            "name": "CShell-Pro-0.8.19-win-x64.exe",
+            "size": 123912958,
+            "digest": "sha256:54e14956c8e14d898d49ce9f30a6907d8a688b5295b8fd3aaf579fb7039c4a25",
+            "browser_download_url": "https://shell.canp.ai/downloads/pro/v0.8.19/CShell-Pro-0.8.19-win-x64.exe"
           },
           {
             "name": "SHA256SUMS.txt",
             "size": 1283,
-            "digest": "sha256:b6da45caebb892b447141f28e1a8931aa2e5e1a2704a0ec0f99fc722fdded9e0",
-            "browser_download_url": "https://shell.canp.ai/downloads/pro/v0.8.18/SHA256SUMS.txt"
+            "digest": "sha256:aee5ae5eecc33fb89879b70ed724acc10f62e359d63f73094d34bccc94c18713",
+            "browser_download_url": "https://shell.canp.ai/downloads/pro/v0.8.19/SHA256SUMS.txt"
           }
         ]
       }
