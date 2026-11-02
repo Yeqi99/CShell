@@ -3,7 +3,17 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { Readable, Writable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { validatePlans, verifyRelease, boundedPayload, validateMarketPlan, publishStaged } from './publish-verified-candidates.mjs';
+import { validatePlans, verifyRelease, boundedPayload, validateMarketPlan, publishStaged, verifyConcurrently } from './publish-verified-candidates.mjs';
+test('payload verification never exceeds two workers and verifies every item', async () => {
+  let active=0, peak=0;const checked=[];
+  await verifyConcurrently([1,2,3,4,5],async item=>{active++;peak=Math.max(peak,active);await new Promise(resolve=>setImmediate(resolve));checked.push(item);active--;});
+  assert.equal(peak,2);assert.deepEqual(checked.sort(),[1,2,3,4,5]);
+});
+test('failed payload stops new work and waits for outstanding verification before rejecting', async () => {
+  const started=[];let secondFinished=false;
+  await assert.rejects(verifyConcurrently([1,2,3,4],async item=>{started.push(item);if(item===1)throw new Error('SHA mismatch');await new Promise(resolve=>setImmediate(resolve));secondFinished=true;}),/SHA mismatch/);
+  assert.deepEqual(started,[1,2]);assert.equal(secondFinished,true);
+});
 const fixture = () => ['opensource','pro'].map(edition => ({ edition, status:'candidate-not-published', version:'0.8.20', sha:'a'.repeat(40), assets:[...Array.from({length:edition==='pro'?13:15},(_,i)=>({name:`CAgent-0.8.20-test-${i}.exe`,size:100,sha256:'b'.repeat(64)})),{name:'SHA256SUMS.txt',size:10,sha256:'c'.repeat(64)}] }));
 test('complete distinct channels allowed without publication',()=>validatePlans(fixture()));
 test('0.8.20 publisher refuses an older inventory by default',()=>{

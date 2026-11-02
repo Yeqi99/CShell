@@ -10,6 +10,18 @@ import { pipeline } from 'node:stream/promises';
 import { createWriteStream } from 'node:fs';
 
 const repository = 'Yeqi99/CShell', version = '0.8.20';
+export async function verifyConcurrently(items, operation, concurrency = 2) {
+  assert(Number.isInteger(concurrency) && concurrency >= 1 && concurrency <= 2);
+  let next = 0, failure, failed = false;
+  async function worker() {
+    while (!failed && next < items.length) {
+      const item = items[next++];
+      try { await operation(item); } catch (error) { if (!failed) failure = error; failed = true; }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
+  if (failed) throw failure;
+}
 export function validatePlans(plans, expectedVersion = version) {
   assert.equal(plans.length, 2);
   assert.deepEqual(plans.map(p => p.edition).sort(), ['opensource', 'pro']);
@@ -112,7 +124,7 @@ export async function main() {
       if (!matches[0].draft) verifyRelease(matches[0], p, await api(`releases/${matches[0].id}/assets?per_page=100`));
     }
     p.release = matches[0];
-    for (const a of p.assets) {
+    await verifyConcurrently(p.assets, async a => {
       const started = Date.now();
       console.log(`Verifying ${p.edition}/${a.name} (${a.size} bytes)`);
       const url = `https://shell.canp.ai/downloads/${p.edition}/v${p.version}/${a.name}`;
@@ -124,7 +136,7 @@ export async function main() {
       await pipeline(Readable.fromWeb(response.body), boundedPayload(a.size), createWriteStream(a.path, { flags: 'wx' }));
       assert.equal((await stat(a.path)).size, a.size); assert.equal(await hash(a.path), a.sha256);
       console.log(`Verified ${p.edition}/${a.name} in ${Date.now() - started} ms`);
-    }
+    });
     if (!market) {
       const sums = await readFile(p.assets.find(a => a.name === 'SHA256SUMS.txt').path, 'utf8');
       const expected = p.assets.filter(a => a.name !== 'SHA256SUMS.txt').map(a => `${a.sha256}  ${a.name}`).sort();
