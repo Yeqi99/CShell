@@ -1,22 +1,24 @@
 {
-  "edition": "opensource",
+  "path": "C:\\Users\\35097\\.codex\\worktrees\\core-020-model-market\\CShell\\.local\\CAgent-Setup-0.8.20-win-x64-channel.exe",
   "version": "0.8.20",
-  "sha256": "bd378f5e5ec3e325ae925c95282ee4972ea4b40eb9252d0ede693089a70a89a8",
-  "deployment": "C:\\Users\\35097\\.codex\\worktrees\\core-020-model-market\\CShell\\.local\\cagent-020-final-3ac63f5-deployment",
-  "stage": "C:\\Users\\35097\\.codex\\worktrees\\core-020-model-market\\CShell\\.local\\cagent-020-final-3ac63f5",
-  "path": "C:\\Users\\35097\\.codex\\worktrees\\core-020-model-market\\CShell\\.local\\CAgent-Setup-0.8.20-win-x64.exe",
-  "bytes": 26189476,
-  "source": "3ac63f5f94ac2c6815a1b033e6d13552c592c5cf",
+  "bytes": 26182280,
+  "sha256": "9e3458600599df441760ef1d4f08535f436e2fd4140a0cf23004070764a0e92e",
+  "deployment": "C:\\Users\\35097\\.codex\\worktrees\\core-020-model-market\\CShell\\.local\\cagent-020-channel-3bfb3ed-deployment",
+  "stage": "C:\\Users\\35097\\.codex\\worktrees\\core-020-model-market\\CShell\\.local\\cagent-020-channel-3bfb3ed",
+  "source": "3bfb3ed36b85b48a3986d02defadfd0c5e6f7017",
+  "edition": "opensource",
   "status": "verified-candidate-not-published",
-  "preparedPath": "C:\\Users\\35097\\AppData\\Local\\Temp\\cagent-020-prepare-opensource-771b0b4ad8354667a208b5c7bbb2321a\\versions\\0.8.20-affaa7ecbbb6c615",
+  "preparedPath": "C:\\Users\\35097\\AppData\\Local\\Temp\\cagent-020-prepare-opensource-3961c89376b1456d8f4b5615d4fb6718\\versions\\0.8.20-67db1d4e767eef0b",
   "payloadCount": 48,
+  "sourceFilesSha256": "feec668c9294fadbb7c828e97c8cc7a6848c9cf4e4ebdb12e17e4cf3300bba4f",
+  "verifiedAt": "2026-11-02T09:45:19.129877+00:00",
   "authenticode": "NotSigned",
-  "verifiedAt": "2026-11-02T08:52:04.1997005Z",
+  "expectedCatalog": "https://shell.canp.ai/downloads/opensource/releases.json",
   "validation": [
-    "Exact EXE /S /PREPARE isolated version directory; all 48 payload sizes and SHA256 match",
-    "Actual packaged CMD PTY, TLS, restricted authorization rejection, clean stop",
-    "Native host read reconnect; mutation not replayed; concurrent single replacement; shared runtime preserved; 401/403 not retried",
-    "Actual packaged WPF market fixture at 340/540/900; draft retained; install does not grant; no overflow",
-    "Exact packaged identity ciphertext unchanged across two clean starts"
+    "Isolated exact EXE /S /PREPARE; all 48 installed payload sizes and SHA256 match deployment manifest",
+    "Actual packaged CMD PTY and TLS, restricted authorization rejection, clean shutdown",
+    "17 updater tests passed: edition-specific catalog/path, exact identity and checksum, interrupted body recovery, cancel, 522 fallback, runtime update admission",
+    "Compiled agent.cjs uses edition catalog variable; contains no MCP/preflight modules",
+    "Native market and host reconnect source unchanged from previously validated 0.8.20 Windows candidate; not re-tested for this updater-only rebuild"
   ]
 }

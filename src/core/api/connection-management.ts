@@ -52,6 +52,7 @@ export type ConnectionManagementContext = {
   accountKey: string;
   authorize: (action: string, profile?: Profile) => void;
   signal?: AbortSignal;
+  review?: (action: string, profile: Profile, detail: Record<string, unknown>) => Promise<void>;
 };
 export function sshEndpoint(profile: Profile) {
   return `${profile.host.toLowerCase()}:${profile.port}`;
@@ -176,7 +177,19 @@ export class ConnectionManagement {
       // Do not silently replace an existing, different trust pin.
       if (entry.previous && entry.previous !== entry.fingerprint)
         throw new Error('HOST_KEY_CHANGED');
-      await this.store.saveConnection(profile, entry.revision, () => guard(profile), undefined, {
+      await context.review?.(input.action, profile, {
+        profileId: profile.id,
+        name: profile.name,
+        host: profile.host,
+        port: profile.port,
+        fingerprint: entry.fingerprint,
+      });
+      const acceptGuard = () => {
+        guard(profile);
+        if (entry.expires < Date.now()) throw new Error('HOST_CHALLENGE_INVALID');
+      };
+      acceptGuard();
+      await this.store.saveConnection(profile, entry.revision, acceptGuard, undefined, {
         endpoint: sshEndpoint(profile),
         fingerprint: entry.fingerprint,
         previous: entry.previous,
@@ -193,6 +206,15 @@ export class ConnectionManagement {
     if (input.action === 'probe') {
       const revision = this.store.connectionRevision(profile.id),
         previous = this.store.host(sshEndpoint(profile));
+      await context.review?.(input.action, profile, {
+        profileId: profile.id,
+        name: profile.name,
+        host: profile.host,
+        port: profile.port,
+      });
+      guard(profile);
+      if (this.store.connectionRevision(profile.id) !== revision)
+        throw new Error('CONNECTION_CHANGED');
       const fingerprint = await this.probe(profile, { signal: context.signal });
       guard(profile);
       if (this.store.connectionRevision(profile.id) !== revision)
@@ -234,6 +256,20 @@ export class ConnectionManagement {
         (next.auth === 'key' && secret.password !== undefined))
     )
       throw new Error('CREDENTIAL_AUTH_MISMATCH');
+    await context.review?.(input.action, profile, {
+      profileId: next.id,
+      name: next.name,
+      host: next.host,
+      port: next.port,
+      username: next.username,
+      protocol: next.protocol ?? 'ssh',
+      group: next.group,
+      auth: next.auth,
+      credentialsIncluded: secret !== undefined,
+      credentialsCleared: secret === null,
+    });
+    guard(profile);
+    guard(next);
     await this.store.saveConnection(
       next,
       input.action === 'create' ? this.store.connectionRevision(profile.id) : input.revision,
@@ -246,4 +282,3 @@ export class ConnectionManagement {
     return this.result(next);
   }
 }
-
