@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,rm} from 'node:fs/promises';
+import {mkdtemp,rm,writeFile} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {Store} from '../src/core/store';
@@ -40,5 +41,21 @@ test('discovery preference travels in account vault, never appearance presets, p
   assert.equal('accountPreferences' in b.snapshot().preferences,false);
   await b.setAccountDiscovery(false);await a.cloudImport(await b.cloudExport());assert.equal(a.accountPreferences().autoDiscoverDevices,false);
   const reload=new Store(join(dir,'a'),codec);await reload.load();assert.equal(reload.accountPreferences().autoDiscoverDevices,false);
+ }finally{await rm(dir,{recursive:true,force:true});}
+});
+
+test('existing cloud discovery preference wins over obsolete local setting',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'account-discovery-migrate-'));try{
+  const store=new Store(dir,codec);await store.load();await store.setAccountDiscovery(false);
+  await writeFile(join(dir,'account-discovery-'+createHash('sha256').update('a').digest('hex')+'.json'),JSON.stringify({enabled:true}));
+  const d=new AccountDiscovery(dir,store,()=> 'a',()=>[],async()=>[],()=>{});assert.equal((await d.get()).enabled,false);assert.equal(store.accountPreferences().autoDiscoverDevices,false);
+ }finally{await rm(dir,{recursive:true,force:true});}
+});
+
+test('same identifier with another protocol is not labelled or overwritten as an account device',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'account-discovery-conflict-'));try{
+  const store=new Store(dir,codec);await store.load();await store.saveProfile({id:device.deviceId,name:'SSH',host:'example.invalid',port:22,username:'test',protocol:'ssh',auth:'password',group:'Private',favorite:true});
+  const d=new AccountDiscovery(dir,store,()=> 'a',()=>[device],async()=>[{...device,online:true}],()=>{});await d.set(true);
+  assert.equal(d.status().pending,1);assert.deepEqual(d.status().devices,[]);assert.equal(store.profile(device.deviceId).protocol,'ssh');assert.equal(store.profile(device.deviceId).group,'Private');
  }finally{await rm(dir,{recursive:true,force:true});}
 });
