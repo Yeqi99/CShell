@@ -1,0 +1,61 @@
+{
+  "version": "0.8.20",
+  "status": "validated-not-published",
+  "artifacts": [
+    {
+      "edition": "pro",
+      "source": "b324a2d27328f2ce145f5a4d538df0e263a91698",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-020-model-market\\CShell\\release\\pro-0.8.20\\CShell-Pro-0.8.20-win-x64.exe",
+      "size": 124019214,
+      "sha256": "736e08260e45c2fdd5cc7c8b1c2a533e2d74e02de5de789d3c5ceda8a89047e3",
+      "asarSha256": "f14612368fae1b8156633bff2c6b4730abb196eaab2206aa75e65660fcd074f1",
+      "authenticode": "NotSigned",
+      "checks": [
+        "NSIS app.asar equals tested win-unpacked",
+        "packaged MCP management/preflight/structured SSH and owner task/session list",
+        "packaged English/Ping/native desktop entry",
+        "desktop SSH/SFTP/layout/fonts/groups/MCP/restart",
+        "platform package",
+        "first-install defaults and saved deny preservation"
+      ]
+    },
+    {
+      "edition": "opensource",
+      "source": "9b9b1ad74764423ad05110f25f31b34e2b096a49",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\core-020-model-market\\CShell\\release\\0.8.20\\CShell-0.8.20-win-x64.exe",
+      "size": 123802075,
+      "sha256": "307539919460d58755d0bb8af91f7e5518710172755fa9d2da851fe0e5da487f",
+      "asarSha256": "551b129ff7c06a32bdfbc19749f67947e5f358389febbe7448339ec979d08fbe",
+      "authenticode": "NotSigned",
+      "checks": [
+        "NSIS app.asar equals tested win-unpacked",
+        "packaged MCP management/preflight/structured SSH and owner task/session list",
+        "packaged English/Ping/native desktop entry",
+        "desktop SSH/SFTP/layout/fonts/groups/MCP/restart",
+        "platform package",
+        "first-install defaults and saved deny preservation"
+      ]
+    }
+  ],
+  "phoneUi": {
+    "test": "scripts/phone-remote-layout-smoke.ts",
+    "result": "both editions passed real Electron components with controlled stream/RPC fixture",
+    "checks": [
+      "portrait/landscape contain",
+      "drag persists on same-size frames",
+      "390px resize bounded",
+      "normalized pointer mapping",
+      "apps search/launch/error",
+      "files empty-roots authorization"
+    ],
+    "physicalDevice": "separate Android acceptance; not claimed by this fixture"
+  },
+  "clipboard": "Connection parser smoke uses private test-process copy/read and raw fill. OS Ctrl+V is not covered by that test.",
+  "localInstallation": {
+    "status": "pending-minimized-window-activation-failed",
+    "criticalBackupFiles": 5,
+    "profiles": 9,
+    "groups": 7,
+    "noForcedTermination": true
+  }
+}
