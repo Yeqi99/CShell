@@ -27,7 +27,32 @@ final class CloudAccountTest {
    check(cached.getJSONObject("bundle").getJSONObject("tavily").toString().equals(bundle.getJSONObject("tavily").toString()),"unconsumed Tavily credentials retained");
    set(guest,"state",new JSONObject().put("session",new JSONObject().put("accountId","b").put("email","b@example.com")).put("key","b-key"));call(guest,"save",new Class<?>[]{});CloudSync b=new CloudSync(context);check(b.owner().equals("b"),"account B restart");b.fillCredentials(request);check(!request.has("password"),"B cannot read A credentials");
    cached.put("session",new JSONObject().put("accountId","a").put("email","a@example.com")).put("key","fixture-key");set(b,"state",cached);b.fillCredentials(request);check(request.getString("password").equals("fixture-secret"),"same-account credential restore");
-   return "OK: native encrypted account archive, pending writes, guest/B isolation, same-account credentials and unknown fields\n";
+   return "OK: native encrypted account archive, pending writes, guest/B isolation, same-account credentials and unknown fields\n"+enrollment(context);
   }finally{original.deleteSharedPreferences(prefix+"-cloud-sync");}
  }
+ static String enrollment(Context context)throws Exception{
+   final CloudSync[] ref=new CloudSync[1];final JSONObject[] remote=new JSONObject[1];final long[] revision={7};final int[] writes={0},registered={0};final boolean[] active={true};
+   CloudSync cloud=new CloudSync(context,(path,body,schema)->{
+     if(path.equals("account"))return new JSONObject().put("membership",new JSONObject().put("active",active[0]));
+     if(path.equals("devices/register")){registered[0]++;check(!body.has("accountPassword")&&!body.has("password"),"registration leaked password");JSONObject endpoint=new JSONObject().put("host","relay.invalid").put("port",22444);return new JSONObject().put("endpoint",endpoint).put("relay",new JSONObject(endpoint.toString()).put("credential","fixture"));}
+     if(path.equals("vault")){if(body==null)return new JSONObject().put("revision",revision[0]).put("envelope",remote[0]);check(body.getLong("baseRevision")==revision[0],"incorrect optimistic revision");remote[0]=body.getJSONObject("envelope");writes[0]++;return new JSONObject().put("revision",++revision[0]);}
+     throw new AssertionError("unexpected request");
+   });ref[0]=cloud;
+   JSONObject bundle=new JSONObject().put("format",1).put("store",new JSONObject().put("profiles",new JSONArray()).put("groups",new JSONArray()).put("preferences",new JSONObject()).put("secrets",new JSONObject()).put("accountPreferences",new JSONObject().put("autoDiscoverDevices",false))).put("ai",new JSONObject().put("providers",new JSONArray())).put("devices",new JSONArray()).put("unknown",new JSONObject().put("preserve",true));
+   String key=android.util.Base64.encodeToString(new byte[32],android.util.Base64.URL_SAFE|android.util.Base64.NO_WRAP|android.util.Base64.NO_PADDING);
+   JSONObject state=new JSONObject().put("session",new JSONObject().put("accountId",UUID.randomUUID().toString()).put("email","fixture@example.invalid")).put("key",key).put("bundle",bundle).put("revision",7);
+   set(cloud,"state",state);remote[0]=(JSONObject)call(cloud,"encrypt",new Class<?>[]{JSONObject.class},bundle);
+   AndroidHostProtocolTest.Capture capture=new AndroidHostProtocolTest.Capture();AndroidAgentHost host=new AndroidAgentHost(context,capture);int port;try(java.net.ServerSocket reserve=new java.net.ServerSocket(0)){port=reserve.getLocalPort();}
+   try{
+     host.start(port,"fixture-lan-password");JSONObject descriptor=host.connectionInfo("127.0.0.1",port);descriptor.remove("host");descriptor.remove("port");
+     cloud.enrollHost(descriptor,host);check(writes[0]==1,"enrollment not persisted");check(CloudSync.writeSchema(state.getJSONObject("bundle"))==4,"account preference schema not retained");
+     JSONObject device=state.getJSONObject("bundle").getJSONArray("devices").getJSONObject(0);check(!device.getString("accountPassword").equals("fixture-lan-password"),"LAN password uploaded");String saved=device.getString("accountPassword");
+     cloud.enrollHost(descriptor,host);check(writes[0]==1,"unchanged enrollment rewrote vault");
+     JSONObject latest=state.getJSONObject("bundle");latest.getJSONObject("store").getJSONArray("profiles").getJSONObject(0).put("name","user-name").put("group","user-group");remote[0]=(JSONObject)call(cloud,"encrypt",new Class<?>[]{JSONObject.class},latest);revision[0]++;
+     cloud.enrollHost(descriptor,host);JSONObject kept=state.getJSONObject("bundle");check(kept.getJSONObject("store").getJSONArray("profiles").getJSONObject(0).getString("group").equals("user-group"),"user group overwritten");check(kept.getJSONObject("unknown").getBoolean("preserve"),"unknown fields lost");check(kept.getJSONArray("devices").getJSONObject(0).getString("accountPassword").equals(saved),"account password not stable");
+     state.put("pending",new JSONObject());int before=registered[0];boolean denied=false;try{cloud.enrollHost(descriptor,host);}catch(Exception expected){denied=true;}check(denied&&registered[0]==before,"pending edits bypassed");state.remove("pending");active[0]=false;check(cloud.enrollHost(descriptor,host)==null&&registered[0]==before,"nonmember registered relay");
+     return "OK: encrypted host enrollment preserves latest cloud fields/groups, stable separate secret, optimistic revision, pending and membership gates\n";
+   }finally{host.close();capture.close();}
+ }
+
 }

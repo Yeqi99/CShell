@@ -91,7 +91,8 @@ try {
   for (const [mode, expected] of [
     ['filesMode', 'OK (Agent file roots'],
     ['browserMode', 'OK (browser SOCKS'],
-    ['hostMode', 'OK (Android host'],
+    ['cloudMode', 'OK: encrypted host enrollment'],
+    ['hostMode', 'OK (Android account reverse TLS'],
     ['captureMode', 'PASS real Android system screen-sharing'],
   ]) {
     const hostReport = await adb([

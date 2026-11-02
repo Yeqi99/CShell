@@ -14,14 +14,17 @@ import javax.crypto.spec.*;
 
 /** Native-only credentials and crypto. The WebView receives public descriptors only. */
 final class CloudSync {
+  interface Transport { JSONObject request(String path,JSONObject body,int schema)throws Exception; }
   private final Context context;
+  private final Transport transport;
   private JSONObject state;
   private JSONObject membership;
   private JSONObject accounts = new JSONObject();
   private long profileChecked;
   private static CloudSync shared;
   static synchronized CloudSync shared(Context context){if(shared==null)shared=new CloudSync(context.getApplicationContext());return shared;}
-  CloudSync(Context context) { this.context=context; }
+  CloudSync(Context context) { this(context,null); }
+  CloudSync(Context context,Transport transport) { this.context=context;this.transport=transport; }
   private SecretKey localKey()throws Exception{
     KeyStore store=KeyStore.getInstance("AndroidKeyStore");store.load(null);String alias="cshell-cloud-sync";
     if(!store.containsAlias(alias)){KeyGenerator g=KeyGenerator.getInstance("AES","AndroidKeyStore");g.init(new KeyGenParameterSpec.Builder(alias,KeyProperties.PURPOSE_ENCRYPT|KeyProperties.PURPOSE_DECRYPT).setBlockModes(KeyProperties.BLOCK_MODE_GCM).setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE).build());g.generateKey();}
@@ -54,6 +57,7 @@ final class CloudSync {
   static int writeSchema(JSONObject bundle){JSONObject store=bundle==null?null:bundle.optJSONObject("store");JSONObject extensions=store==null?null:store.optJSONObject("extensions");return store!=null&&store.optJSONObject("accountPreferences")!=null&&store.optJSONObject("accountPreferences").has("autoDiscoverDevices")?4:(store!=null&&store.has("capabilityPackages"))||(extensions!=null&&extensions.has("external"))||(bundle!=null&&bundle.has("identityNetwork"))?3:supportsSchema2(bundle)?2:1;}
   private JSONObject api(String path,JSONObject body)throws Exception{return api(path,body,1);}
   private JSONObject api(String path,JSONObject body,int writeSchema)throws Exception{
+    if(transport!=null)return transport.request(path,body,writeSchema);
     HttpURLConnection connection=(HttpURLConnection)new URL("https://shell.canp.ai/api/v1/"+path).openConnection();
     connection.setConnectTimeout(15000);connection.setReadTimeout(25000);connection.setInstanceFollowRedirects(false);
     connection.setRequestProperty("Content-Type","application/json");
