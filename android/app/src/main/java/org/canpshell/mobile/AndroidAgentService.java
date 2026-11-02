@@ -26,7 +26,7 @@ public final class AndroidAgentService extends Service {
     if(destroying||host==null||!host.status().optBoolean("running"))return;
     JSONObject settings=AndroidAgentSettings.read(this);if(!settings.optBoolean("accountDiscovery",true))return;
     if(accountRelay!=null)return;final AndroidAgentHost target=host;final int port=settings.getInt("port");
-    accountRelay=new AndroidAccountRelay(port,()->{JSONObject current=AndroidAgentSettings.read(this);if(!current.optBoolean("accountDiscovery",true)||!current.optBoolean("enabled"))return null;JSONObject descriptor=target.connectionInfo("127.0.0.1",port);descriptor.remove("host");descriptor.remove("port");return CloudSync.shared(this).enrollHost(descriptor,target);});accountRelay.start();
+    accountRelay=new AndroidAccountRelay(port,()->{JSONObject current=AndroidAgentSettings.read(this);if(!current.optBoolean("accountDiscovery",true)||!current.optBoolean("enabled"))return null;JSONObject descriptor=target.connectionInfo("127.0.0.1",port);descriptor.remove("host");descriptor.remove("port");try{JSONObject relay=CloudSync.shared(this).enrollHost(descriptor,target);JSONObject after=AndroidAgentSettings.read(this);if(destroying||!after.optBoolean("enabled")||!after.optBoolean("accountDiscovery",true)){target.clearAccount();return null;}changed(this);return relay;}catch(Exception error){target.clearAccount();throw error;}});accountRelay.start();
   }
   private volatile AndroidScreenCapture capture;
   private volatile MediaProjection projection;
