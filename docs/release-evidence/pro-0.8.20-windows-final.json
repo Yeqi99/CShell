@@ -1,0 +1,20 @@
+{
+  "sha256": "75f0d0e643e9b7c7c1de46b5205c12eeba48392764a95b72d75102f34d8665ff",
+  "signature": "NotSigned",
+  "installerAsarEqualsTestedUnpacked": true,
+  "runtimeFix": "97bf6ac",
+  "file": "CShell-Pro-0.8.20-win-x64.exe",
+  "asarSha256": "65bd767c2bb5b7c5daafec6c19cf2451862cf33bb8c9446725846018161adf60",
+  "installedUserApplication": false,
+  "bytes": 123918098,
+  "checks": [
+    "020-package-ui-smoke",
+    "release-desktop-smoke",
+    "platform-package-smoke",
+    "ai-first-install-package-smoke"
+  ],
+  "logs": "test-results/020-pro-final-*.log",
+  "version": "0.8.20",
+  "edition": "pro",
+  "sourceBuild": "b06ca5dff0941c925fc51b2b47ce3a1b809db388"
+}
