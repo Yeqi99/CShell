@@ -13,7 +13,10 @@ export function Tooltips() {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const clear = () => {
       clearTimeout(timer);
-      if (current && originalTitle !== null) current.setAttribute('title', originalTitle);
+      // Opening a menu can remove title during the same focus transition.
+      // Do not resurrect that stale native tooltip over the expanded menu.
+      if (current && originalTitle !== null && current.getAttribute('aria-expanded') !== 'true')
+        current.setAttribute('title', originalTitle);
       current?.removeAttribute('aria-describedby');
       if (addedLabel) current?.removeAttribute('aria-label');
       addedLabel = false;
@@ -28,7 +31,7 @@ export function Tooltips() {
           : null;
       if (target === current) return;
       clear();
-      if (!target || target.closest('[role="menu"]')) return;
+      if (!target || target.getAttribute('aria-expanded') === 'true' || target.closest('[role="menu"]')) return;
       const text = target.dataset.tooltip || target.title || target.getAttribute('aria-label');
       if (!text) return;
       current = target;
