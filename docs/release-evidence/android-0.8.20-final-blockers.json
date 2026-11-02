@@ -1,0 +1,24 @@
+{
+  "version": "0.8.20",
+  "status": "resolved-see-android-0.8.20-final-rebuild",
+  "checkedAt": "2026-11-02T12:30:05.9577294Z",
+  "runs": [
+    {
+      "run": 41441089594,
+      "edition": "pro",
+      "api29": "failure: captureMode WebView input mismatch expected CAgent42 actual empty, service=text:no-input-focus",
+      "api35": "failure: hostMode delayed ACK deltas=2"
+    },
+    {
+      "run": 41441104501,
+      "edition": "opensource",
+      "api29": "success job 125273320642",
+      "api35": "success after SDK system-image infrastructure retry; job 125273318688"
+    }
+  ],
+  "desktopRuns": [
+    41438307799,
+    41438312471
+  ],
+  "publicationAllowed": false
+}

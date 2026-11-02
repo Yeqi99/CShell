@@ -1,90 +1,89 @@
 {
-  "version": "0.8.20",
-  "status": "blocked-awaiting-android-remote-ui-fix",
-  "edition": "opensource",
-  "sha": "49639202f679072ae8cfb754160ee58f443f84d5",
-  "tag": "v0.8.20",
   "assets": [
     {
       "name": "CAgent-0.8.20-linux-arm64.tar.gz",
-      "size": 44505697,
-      "sha256": "605feeb49dd18968d4495dd0e97de3b75194310071055cb25e684e5ef1ebddae"
+      "sha256": "605feeb49dd18968d4495dd0e97de3b75194310071055cb25e684e5ef1ebddae",
+      "size": 44505697
     },
     {
       "name": "CAgent-0.8.20-linux-x64.tar.gz",
-      "size": 44823799,
-      "sha256": "5d988168a9be6ad02bdc45187bfb5100760b2dfc1aac1f70e26aaa9588c77283"
+      "sha256": "5d988168a9be6ad02bdc45187bfb5100760b2dfc1aac1f70e26aaa9588c77283",
+      "size": 44823799
     },
     {
       "name": "CAgent-0.8.20-mac-arm64.tar.gz",
-      "size": 39501213,
-      "sha256": "ad7cb7660bcaf238a056a010873408132511a15e1012c812089dfbc8c3128bc1"
+      "sha256": "ad7cb7660bcaf238a056a010873408132511a15e1012c812089dfbc8c3128bc1",
+      "size": 39501213
     },
     {
       "name": "CAgent-0.8.20-mac-x64.tar.gz",
-      "size": 40730816,
-      "sha256": "fff707ae0e4061a86621c65c56f9667c26c6047a40eb2b13c113b83d1ff9c534"
+      "sha256": "fff707ae0e4061a86621c65c56f9667c26c6047a40eb2b13c113b83d1ff9c534",
+      "size": 40730816
     },
     {
       "name": "CAgent-Setup-0.8.20-win-x64.exe",
-      "size": 26182280,
-      "sha256": "9e3458600599df441760ef1d4f08535f436e2fd4140a0cf23004070764a0e92e"
+      "sha256": "9e3458600599df441760ef1d4f08535f436e2fd4140a0cf23004070764a0e92e",
+      "size": 26182280
     },
     {
       "name": "CShell-0.8.20-android.apk",
-      "size": 4903818,
-      "sha256": "3e68764e17708e1ab9cff2e2f4ee0695f56686333bb9a20f22ebc047bd5bf009"
+      "sha256": "9ed6ad36da7f57ecccfc8c67b80c11020bc2b1e29bfb6e8f0dd9b64fd341cfa2",
+      "size": 4913982
     },
     {
       "name": "CShell-0.8.20-linux-amd64.deb",
-      "size": 108862388,
-      "sha256": "d6be790b9ca765c247657413bdbc9ed4cd154c0fa0f7e7bd3f94720b69e40d43"
+      "sha256": "129f52ac76bcb8d329ccb544d21d92f1a21719e2e7143e9cb5440957543f4416",
+      "size": 108861688
     },
     {
       "name": "CShell-0.8.20-linux-arm64.AppImage",
-      "size": 140747965,
-      "sha256": "125d23805b3e0c4ac5bbdb4756eb1744b764d176b3bcd13376161b3e6781bca2"
+      "sha256": "3bc3de360be636611510acbcfb624eec7c3531425999f25782e622d6bac06d3a",
+      "size": 140752123
     },
     {
       "name": "CShell-0.8.20-linux-arm64.deb",
-      "size": 103062100,
-      "sha256": "7814b3743be4931c389ee4a537fd8357569676ca071cc00653afced1e8f14780"
+      "sha256": "d84e824824ea79c9e7d61701a05399aa8d04b31bc86b4a16f80d18a5c96a11f0",
+      "size": 103063924
     },
     {
       "name": "CShell-0.8.20-linux-x86_64.AppImage",
-      "size": 139492755,
-      "sha256": "c1389c3cb04d9fce1742e0d97840694c7e9805b75792ca51696114ba9fc824ea"
+      "sha256": "e267a2f0a555c2b44aeee097341cdda536c15b66c2c06e48d13ab4522de51013",
+      "size": 139496897
     },
     {
       "name": "CShell-0.8.20-mac-arm64.dmg",
-      "size": 142338468,
-      "sha256": "235631f5dfae89a13f749217eae1c3dd4a5edc213f7a61c521f89dbbb585e153"
+      "sha256": "30d2b6993b8c36245d70dce6bd10bb2e8b0c4ef2d7e3d83d6f6ad279a8f5e997",
+      "size": 142356914
     },
     {
       "name": "CShell-0.8.20-mac-arm64.zip",
-      "size": 142202944,
-      "sha256": "578d84b545be45b41d930b8524c16d2f95771bd57bbd63e11188d33ac1449b5f"
+      "sha256": "bb7503a3fe559e6d29acb98d1c115c9e6075ccff0a00de1a2f0e13c1c36b2e7e",
+      "size": 142205935
     },
     {
       "name": "CShell-0.8.20-mac-x64.dmg",
-      "size": 146178171,
-      "sha256": "a56205baa4071f0143ac9f533c659ae7d2d29730347b8b6c0175cfff565a8bf4"
+      "sha256": "984b487da51cb313ddd010a1a4b2285c4bcfcf4a50997b0ee03158e73c674efe",
+      "size": 146178312
     },
     {
       "name": "CShell-0.8.20-mac-x64.zip",
-      "size": 146044395,
-      "sha256": "5e6f68c61701ba542bf0cd43595dc1b2db6ce31067087608667cdc08b8c29301"
+      "sha256": "090735a3af8fb1480eeb8e265244ee08808ba49b995c2a2690f89117d08019ed",
+      "size": 146047386
     },
     {
       "name": "CShell-0.8.20-win-x64.exe",
-      "size": 123717105,
-      "sha256": "e80c6e7701086df897b5a2be207f8f048fd1aa910832d67ab716950b0552c8d7"
+      "sha256": "307539919460d58755d0bb8af91f7e5518710172755fa9d2da851fe0e5da487f",
+      "size": 123802075
     },
     {
       "name": "SHA256SUMS.txt",
-      "size": 1437,
-      "sha256": "d06b7461f637ad2f99bcab5303c726e4345fc2a00caa00bd8c2be82f8c650859"
+      "sha256": "d49f0caadbed02b02e25804811477bffb749a51c4316133eb8955af5224896ab",
+      "size": 1437
     }
   ],
-  "holdReason": "User requested Android remote-control scale and latency fixes before this release; retain verified artifacts, replace affected packages after scoped validation."
+  "status": "candidate-not-published",
+  "version": "0.8.20",
+  "sha": "78d37f9913dfef274fe64f97e3306b93ca0863fd",
+  "edition": "opensource",
+  "tag": "v0.8.20"
 }

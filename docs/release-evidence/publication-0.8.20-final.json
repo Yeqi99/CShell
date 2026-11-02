@@ -1,0 +1,52 @@
+{
+  "version": "0.8.20",
+  "status": "github-and-hong-kong-published-edge-deployment-pending",
+  "publishedAt": "2026-11-02T13:19:21Z",
+  "releases": {
+    "opensource": {
+      "id": 431483591,
+      "tag": "v0.8.20",
+      "sha": "78d37f9913dfef274fe64f97e3306b93ca0863fd",
+      "assets": 16
+    },
+    "pro": {
+      "id": 431484905,
+      "tag": "pro-v0.8.20",
+      "sha": "017d7e36f2a6652a145d8b324a1068e06dc0d567",
+      "assets": 14
+    }
+  },
+  "verification": {
+    "stageRun": 41449949825,
+    "publishRun": 41451886636,
+    "fullHongKongDownloadsSha256": 30,
+    "githubAssetDigestsVerified": 30,
+    "publicGithubChecksumsDownloadedViaHongKong": true,
+    "coreWindowsRerun": 41447094233,
+    "coreWindowsResult": "success",
+    "workerTests": 10,
+    "publicationTests": 12,
+    "android": "Both editions passed API29/API35 emulator real TLS/AEAD tests; no final physical-device retest"
+  },
+  "hongKong": {
+    "catalogs": "0.8.20",
+    "retainedRecent": [
+      "0.8.19",
+      "0.8.20"
+    ],
+    "removedMirror": "0.8.18",
+    "free": "11 GB",
+    "usage": "92%",
+    "legacy": "0.8.2/0.8.8 preserved where original GitHub release could not be verified"
+  },
+  "edge": {
+    "worker": ".local/020-final-refined/worker-0.8.20.mjs",
+    "sha256": "61cfe50c2e9eb9eab07ca3b3e2701dd8b861ccf2b6478bb4d85557e41d8c1ea8",
+    "status": "awaiting root/user Cloudflare deployment"
+  },
+  "limitations": [
+    "Windows packages unsigned",
+    "macOS packages unsigned/not notarized",
+    "No new physical Android, Lenovo relay or carrier SMS/call verification"
+  ]
+}

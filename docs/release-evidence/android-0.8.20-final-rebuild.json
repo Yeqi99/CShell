@@ -1,0 +1,27 @@
+{
+  "version": "0.8.20",
+  "status": "native-api29-api35-and-signed-artifacts-verified",
+  "publicationAllowed": false,
+  "pro": {
+    "local": "5137621",
+    "nativeCommit": "ea396ed02f428d8a971ac9600875ed9306df0f6a",
+    "nativeRun": 41446997407,
+    "signedCommit": "017d7e36f2a6652a145d8b324a1068e06dc0d567",
+    "tree": "fc5db71afdf4aafa6d53990b9e45d0abcf3a84a6",
+    "signedRun": 41447086436,
+    "nativeResult": "API29/API35/build success",
+    "apkSha256": "9d788bb6df7a94e1d2c373a709398108b14828f8c3d1afe6e12d0f60dbb63d2a"
+  },
+  "opensource": {
+    "local": "5b5b181",
+    "nativeCommit": "a3184fbea54c4f45cecf06abad75330e0bd12ad8",
+    "nativeRun": 41447001660,
+    "signedCommit": "78d37f9913dfef274fe64f97e3306b93ca0863fd",
+    "tree": "21d34b4f91eb40ace0881fe7cac5ef1c03f1c314",
+    "signedRun": 41447094105,
+    "nativeResult": "API29/API35/build success",
+    "apkSha256": "9ed6ad36da7f57ecccfc8c67b80c11020bc2b1e29bfb6e8f0dd9b64fd341cfa2"
+  },
+  "physicalDevice": "No physical device test in this final CI pass; emulator validation only",
+  "signerCertificate": "34cc1c9a0eacafc512a0837c3d286081879822f047e5637a65cdbc5b525914c5"
+}
