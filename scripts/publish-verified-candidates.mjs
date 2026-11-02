@@ -37,6 +37,29 @@ export function verifyRelease(release, plan, assets) {
   assert.equal(new Set(assets.map(a => a.name)).size, assets.length);
   for (const a of plan.assets) { const x = assets.find(x => x.name === a.name); assert(x); assert.equal(x.size, a.size); assert.equal(x.digest, `sha256:${a.sha256}`); }
 }
+export async function publishStaged(plans, api, releases) {
+  const checked = [];
+  for (const p of plans) {
+    assert.equal((await api(`commits/${p.sha}`))?.sha, p.sha);
+    const tag = await api(`git/ref/tags/${p.tag}`);
+    if (tag) { assert.equal(tag.object.type, 'commit'); assert.equal(tag.object.sha, p.sha); }
+    const matches = releases.filter(r => r.tag_name === p.tag);
+    assert.equal(matches.length, 1, 'Exactly one complete staged release required');
+    const release = await api(`releases/${matches[0].id}`);
+    verifyRelease(release, p, await api(`releases/${release.id}/assets?per_page=100`));
+    checked.push({ plan: p, release });
+  }
+  // Verify every channel before any mutation. Publication never repairs incomplete drafts.
+  for (const { plan, release } of checked) {
+    if (!release.draft) { console.log(`Already verified public: ${plan.tag}; unchanged`); continue; }
+    const result = await api(`releases/${release.id}`, 'PATCH', { draft: false });
+    assert.equal(result.draft, false);
+    assert.equal(result.tag_name, plan.tag);
+    assert.equal(result.target_commitish, plan.sha);
+    console.log(`Published ${plan.tag} at verified source ${plan.sha}`);
+  }
+  return checked.map(({ plan, release }) => ({ edition: plan.edition, tag: plan.tag, sha: plan.sha, releaseId: release.id }));
+}
 export function validateMarketPlan(p) {
   assert.equal(p.edition, 'toolkit'); assert.equal(p.version, '0.1.2');
   assert.equal(p.status, 'candidate-not-published'); assert.match(p.sha, /^[a-f0-9]{40}$/);
@@ -68,6 +91,11 @@ export async function main() {
     return r.status === 204 ? null : r.json();
   }
   const releases = await api('releases?per_page=100');
+  if (mode === '--publish' && !market) {
+    for (const p of plans) p.tag = `${p.edition === 'pro' ? 'pro-' : ''}v${version}`;
+    console.log(JSON.stringify(await publishStaged(plans, api, releases)));
+    return;
+  }
   const work = await mkdtemp(join(tmpdir(), 'cshell-verified-publication-'));
   // All source refs and every complete payload are checked before creating either draft.
   for (const p of plans) {
@@ -85,6 +113,8 @@ export async function main() {
     }
     p.release = matches[0];
     for (const a of p.assets) {
+      const started = Date.now();
+      console.log(`Verifying ${p.edition}/${a.name} (${a.size} bytes)`);
       const url = `https://shell.canp.ai/downloads/${p.edition}/v${p.version}/${a.name}`;
       const response = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(600000) });
       assert.equal(response.status, 200, `${p.edition}/${a.name}: origin not ready`);
@@ -93,6 +123,7 @@ export async function main() {
       a.path = join(work, `${p.edition}-${a.name}`);
       await pipeline(Readable.fromWeb(response.body), boundedPayload(a.size), createWriteStream(a.path, { flags: 'wx' }));
       assert.equal((await stat(a.path)).size, a.size); assert.equal(await hash(a.path), a.sha256);
+      console.log(`Verified ${p.edition}/${a.name} in ${Date.now() - started} ms`);
     }
     if (!market) {
       const sums = await readFile(p.assets.find(a => a.name === 'SHA256SUMS.txt').path, 'utf8');
