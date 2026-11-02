@@ -94,3 +94,16 @@ help <browser_open 对应的能力ID>
 声明式扩展与独立进程扩展的接口见 [自定义扩展](CUSTOM-EXTENSIONS.md)。所有入口共用执行边界，不能靠 CLI 或 MCP 绕过目标范围、审核、输入输出校验或能力授权。
 
 另见 [API 契约与错误语义](API.md)、[MCP 接入](MCP.md)。
+
+## 连接配置与凭据管理（0.8.20）
+
+API / MCP 设置的应用权限将“查看连接”、“新建和修改连接”、“保存和更换凭据”、“接受 SSH 主机身份”分开。旧的授权不会因升级自动扩大；明确点击全选并保存才会加入新增权限。创建连接不会自动加入调用方的机器范围，也不会自动连接。CAgent 仍走设备身份核对与配对流程。
+
+在命令台先执行 `tools connection`，再用 `help <返回的能力 ID>` 查看实际契约。应用级入口为 `connection_list`、`connection_create`、`connection_update`、`connection_credentials`、`connection_probe`、`connection_accept`，同一组入口也通过 MCP 提供。
+
+- 更新与更换凭据使用最近结果的 `id` 和 `revision`；冲突时重新读取，不自动覆盖。
+- 改名、分组、收藏保留加密凭据；修改主机、端口、用户名或认证方式清除旧凭据，不改变已运行会话。
+- `connection_probe` 只进行 SSH 握手，返回真实指纹及短期确认凭据，不发送密码、不执行命令、不接受主机身份。首次信任使用返回的 `challenge` 和 `fingerprint` 显式调用 `connection_accept`。旧主机密钥变化会被拒绝；跳板探测尚须通过明确的跳板流程，不能偷偷直连。
+- 凭据写入只返回是否已配置，不返回密码、私钥或口令。“已配置”不等于远端认证已通过。
+
+外部 CLI 可使用 `--stdin` 输入包含凭据的 JSON，避免将密码放入命令行历史和进程参数。例如 `CShell.exe --cli --token-file <私有令牌文件> --stdin api connection_credentials`，由调用程序通过标准输入提供 `id`、`revision` 和 `secret`。不要把密钥写入共享脚本或公开日志；CLI 和 MCP 都不会自动重试结果未知的修改。
