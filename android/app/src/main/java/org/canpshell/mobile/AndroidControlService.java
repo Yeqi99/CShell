@@ -65,7 +65,7 @@ public final class AndroidControlService extends AccessibilityService {
   private boolean pending;
   private volatile boolean gestureBusy;
   private volatile String gestureState="idle";
-  private long gestureSequence;
+  private long gestureSequence, lastGestureCompleted, focusWaitSequence;
   private volatile boolean editBusy;
   private boolean shiftLeft,shiftRight,control,alt,caps;
   private static volatile String lastEditState="none";
@@ -111,7 +111,7 @@ public final class AndroidControlService extends AccessibilityService {
   }
   static void releaseAll(){AndroidControlService s=instance;if(s!=null){synchronized(s){s.queue.clear();}s.inputHandler.post(s::reset);}}
   private void resetPointer(){drag=null;points=0;downAt=0;}
-  private void reset(){resetPointer();shiftLeft=false;shiftRight=false;control=false;alt=false;}
+  private void reset(){focusWaitSequence++;resetPointer();shiftLeft=false;shiftRight=false;control=false;alt=false;}
   private float px(float value,boolean horizontal){
     android.util.DisplayMetrics dm=new android.util.DisplayMetrics();
     ((android.view.WindowManager)getSystemService(WINDOW_SERVICE)).getDefaultDisplay().getRealMetrics(dm);
@@ -218,7 +218,7 @@ public final class AndroidControlService extends AccessibilityService {
   }
   private void finishGesture(long sequence,String outcome){
     if(sequence!=gestureSequence||!gestureBusy)return;
-    gestureState=outcome;gestureBusy=false;
+    gestureState=outcome;gestureBusy=false;if(outcome.equals("completed"))lastGestureCompleted=android.os.SystemClock.uptimeMillis();
     // A failed focus-changing gesture invalidates the dependent input sequence.
     // In particular, do not type queued text into the previously focused field.
     if(!outcome.equals("completed")){
@@ -267,7 +267,41 @@ public final class AndroidControlService extends AccessibilityService {
     }
   }
   private void insert(String text){
-    if(text.length()>4096)return;AccessibilityNodeInfo node=focused();if(node==null){lastEditState="text:no-input-focus";return;}
+    if(text.length()>4096)return;AccessibilityNodeInfo node=focused();
+    if(node==null){
+      if(lastGestureCompleted>0&&android.os.SystemClock.uptimeMillis()-lastGestureCompleted<1500)awaitInputFocus(text);
+      else lastEditState="text:no-input-focus";
+      return;
+    }
+    insertFocused(text,node);
+  }
+  // Motion completion precedes WebView's asynchronous virtual focus publication.
+  // Hold ordered input briefly; no edit is sent until OS input focus exists, and
+  // never retry an edit after ACTION_SET_TEXT has been attempted.
+  private void awaitInputFocus(String text){
+    final long wait=++focusWaitSequence,gesture=gestureSequence,deadline=android.os.SystemClock.uptimeMillis()+1000;
+    final int window=activeApplicationWindow();editBusy=true;lastEditState="text:focus-pending";
+    inputHandler.postDelayed(new Runnable(){public void run(){
+      if(instance!=AndroidControlService.this||wait!=focusWaitSequence||gesture!=gestureSequence){editBusy=false;return;}
+      int current=activeApplicationWindow();
+      if(window>=0&&current>=0&&current!=window){editBusy=false;lastEditState="text:window-changed";synchronized(AndroidControlService.this){queue.clear();}return;}
+      AccessibilityNodeInfo node=focused();
+      if(node!=null){
+        if(window>=0&&node.getWindowId()!=window){node.recycle();editBusy=false;lastEditState="text:window-changed";synchronized(AndroidControlService.this){queue.clear();}return;}
+        editBusy=false;try{insertFocused(text,node);}catch(RuntimeException error){lastEditState="input-error:"+error.getClass().getSimpleName();reset();}return;
+      }
+      if(android.os.SystemClock.uptimeMillis()<deadline){inputHandler.postDelayed(this,32);return;}
+      editBusy=false;lastEditState="text:no-input-focus";synchronized(AndroidControlService.this){queue.clear();}
+    }},32);
+  }
+  private int activeApplicationWindow(){
+    java.util.List<android.view.accessibility.AccessibilityWindowInfo> windows=getWindows();
+    try{for(android.view.accessibility.AccessibilityWindowInfo window:windows)
+      if(window.getType()==android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION&&window.isActive())return window.getId();
+    }finally{for(android.view.accessibility.AccessibilityWindowInfo window:windows)window.recycle();}
+    return -1;
+  }
+  private void insertFocused(String text,AccessibilityNodeInfo node){
     try{if(!node.isEditable()||node.isPassword()){lastEditState="text:target-unavailable:editable="+node.isEditable()+",password="+node.isPassword()+",class="+node.getClassName();return;}String old=node.isShowingHintText()||node.getText()==null?"":node.getText().toString();if(old.length()>1_000_000)return;
       int start=node.getTextSelectionStart(),end=node.getTextSelectionEnd();if(start<0||end<0){start=old.length();end=start;}int lo=Math.min(start,end),hi=Math.max(start,end);if(hi>old.length()){lastEditState="text:invalid-selection";return;}
       Bundle args=new Bundle();args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,old.substring(0,lo)+text+old.substring(hi));
