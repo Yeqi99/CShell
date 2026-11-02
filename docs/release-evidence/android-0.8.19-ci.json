@@ -1,0 +1,17 @@
+{
+  "version": "0.8.19",
+  "status": "running-not-release",
+  "localSource": "700a21348e57258270ba3bc6195a75db0dec4fef",
+  "sourceTree": "59b2b1bd530a5feb7901806a81599b2b2aa7f8d2",
+  "remoteEquivalent": "f5d8ea02991395610c141b4a97495678ed903d16",
+  "ciCommit": "41e8ba4373217a9e58c3c7e63f36fc6b35c295da",
+  "branch": "codex/android-validation-0.8.19",
+  "workflow": "android.yml",
+  "runId": 41399099170,
+  "nativeApis": [
+    29,
+    35
+  ],
+  "trigger": "push; isolated workflow-only condition enables native jobs, equivalent to native=true",
+  "note": "No tags or releases. CI commit differs from exact source tree only in isolated branch predicate."
+}

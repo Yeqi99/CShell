@@ -38,14 +38,15 @@ export class AccountDiscovery {
     const devices:AccountDiscoveryStatus['devices']=[];
     for(const row of own){const device=known.find(d=>d.deviceId===row.deviceId&&d.certificate===row.certificate);
       if(!device){pending++;continue;}
-      devices.push({id:device.deviceId,online:row.online===true});
       const existing=this.store.snapshot().profiles.find(p=>p.id===device.deviceId);
+      if(existing&&existing.protocol!=='client'){pending++;continue;}
+      devices.push({id:device.deviceId,online:row.online===true});
       // Never rewrite a user's name, group, ordering or protocol with discovery data.
       if(!existing&&this.accountId()===id)await this.store.saveProfile({id:device.deviceId,protocol:'client',name:device.name,host:device.host,port:device.port,username:'Client',group:'同账号设备',favorite:false,auth:'password',clientShell:'powershell'});
     }
     if(id!==this.accountId())return;
     // Missing/offline registry rows do not delete the user's connection or grouping.
-    for(const device of known)if(!devices.some(d=>d.id===device.deviceId)&&this.store.snapshot().profiles.some(p=>p.id===device.deviceId))devices.push({id:device.deviceId,online:false});
+    for(const device of known)if(!devices.some(d=>d.id===device.deviceId)&&this.store.snapshot().profiles.some(p=>p.id===device.deviceId&&p.protocol==='client'))devices.push({id:device.deviceId,online:false});
     this.value={enabled:true,devices,pending};this.publish();
   }
 }
