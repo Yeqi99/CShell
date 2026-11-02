@@ -43,6 +43,7 @@ import { remoteExecutable, pluginEnabled } from '../shared/plugins';
 import { requiresReview, apiCallerPolicy, allowsApplication, allowsCapability, advertisesCapability } from './connections/authorization';
 
 export interface McpHost {
+  accountContext?: () => { key: string; transitioning: boolean };
   connectEnvironment?: (parent: string, conda: string, prefix: string, signal: AbortSignal, ready: (id: string) => void) => Promise<string>;
   manager: ConnectionManager;
   http?: HttpWorkspaces;
@@ -123,7 +124,7 @@ export class McpService {
     private confirm: (name: string, command: string, signal?: AbortSignal) => Promise<boolean>,
     private host?: McpHost,
   ) {
-    this.connectionManagement = new ConnectionManagement(store, () => `${this.directory}:${this.generation}`);
+    this.connectionManagement = new ConnectionManagement(store, () => this.accountKey());
     this.ssh = new SshService(
       (event) => {
         if (!this.event(event) && event.type === 'data')
@@ -135,6 +136,15 @@ export class McpService {
     );
     this.manager =
       host?.manager ?? createSshManager(this.ssh, () => this.store.snapshot().profiles);
+  }
+  private accountKey() { return this.host?.accountContext?.().key ?? this.directory; }
+  invalidateAccountContext() {
+    this.generation++;
+    this.lifecycle.abort(new ApiError('FORBIDDEN', 'Account context changed.', 'Reconnect after account switching completes.'));
+    this.lifecycle = new AbortController();
+    this.tasks.revoke();
+    this.catalogs.clear();
+    this.catalogSources.clear();
   }
   /** Consume only API-owned sessions; never take over a user's interactive terminal. */
   event(event: SessionEvent) {
@@ -821,6 +831,11 @@ export class McpService {
     const resultSchemas: Record<string, z.ZodType> = { ...baseResultSchemas, ...terminalResultSchemas };
     const resultJson = { ...baseResultJson, ...terminalResultJson };
     const generation = this.generation;
+    const accountKey = this.accountKey();
+    const accountGuard = () => {
+      if (this.host?.accountContext?.().transitioning || accountKey !== this.accountKey() || generation !== this.generation)
+        throw new ApiError('FORBIDDEN', 'Account context changed.', 'Reconnect after account switching completes.');
+    };
     if (!this.ownerSignals.has(owner)) this.ownerSignals.set(owner, new AbortController());
     const ownerSignal = AbortSignal.any([
       this.lifecycle.signal,
@@ -853,6 +868,7 @@ export class McpService {
         resultJson[name] = z.toJSONSchema(config.resultSchema);
       }
       const execute = async (value: unknown) => {
+        accountGuard();
         const parsed = schema.safeParse(value ?? {});
         if (!parsed.success)
           throw new ApiError(
@@ -1063,7 +1079,9 @@ export class McpService {
           );
         });
         signal.throwIfAborted();
+        accountGuard();
         const result = await fn();
+        accountGuard();
         if (resultSchemas[tool] && !resultSchemas[tool].safeParse(result).success)
           throw new ApiError(
             'OUTCOME_UNKNOWN',
@@ -1204,9 +1222,16 @@ export class McpService {
           const p = this.allowed(profileId, owner);
           const revision=this.store.connectionRevision(profileId),pin=this.store.host(sshEndpoint(p));
           const guard=()=>{
+            accountGuard();
             this.allowed(profileId,owner);
             if(generation!==this.generation||revision!==this.store.connectionRevision(profileId)||pin!==this.store.host(sshEndpoint(p)))throw new ApiError('FORBIDDEN','Connection or authorization changed during preflight.','Inspect current settings before retrying.');
           };
+          if (probe && requiresReview(this.principal(owner, profileId).review, true)) {
+            const accepted = await this.confirm(p.name, JSON.stringify({tool:'connection_preflight',profileId,host:p.host,port:p.port,username:p.username,authentication:'saved credentials; no commands'}), signal);
+            guard();
+            if (!accepted) throw new ApiError('FORBIDDEN','Connection preflight declined.','Do not retry automatically.');
+          }
+          guard();
           const result=probe?await preflightSsh(p,pin,await this.store.secret(profileId),guard,signal):{stages:uncheckedStages(),reason:'configuration_only'};
           guard();
           return {
@@ -1320,6 +1345,7 @@ export class McpService {
           run(name, async () => {
             const raw = { ...args, action };
             const authorize = (_action: string, p?: Profile) => {
+              accountGuard();
               if (
                 generation !== this.generation ||
                 !allowsApplication(this.callerPolicy(owner), grant)
@@ -1348,32 +1374,18 @@ export class McpService {
                 );
             };
             authorize(action);
-            if (
-              !['list', 'probe'].includes(action) &&
-              requiresReview(this.principal(owner).review, true)
-            ) {
-              if (
-                !(await this.confirm(
-                  'Saved connection',
-                  JSON.stringify({
-                    tool: name,
-                    action,
-                    profileId: 'id' in args ? args.id : undefined,
-                    credentialsIncluded: 'secret' in args,
-                  }),
-                  signal,
-                ))
-              )
-                throw new ApiError(
-                  'FORBIDDEN',
-                  'Connection change declined.',
-                  'Do not retry automatically.',
-                );
-            }
             return this.connectionManagement.call(raw, {
               owner,
-              accountKey: this.directory + ':' + generation,
+              accountKey,
               authorize,
+              review: async (_action, profile, detail) => {
+                authorize(_action, profile);
+                if (requiresReview(this.principal(owner, profile.id).review, true)) {
+                  const accepted = await this.confirm(profile.name, JSON.stringify({tool:name,...detail}), signal);
+                  authorize(_action, profile);
+                  if (!accepted) throw new ApiError('FORBIDDEN','Connection operation declined.','Do not retry automatically.');
+                }
+              },
               signal,
             });
           }),

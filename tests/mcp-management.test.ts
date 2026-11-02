@@ -20,7 +20,11 @@ test(
       decrypt: async (v) => Buffer.from(v, 'base64').toString(),
     });
     await store.load();
-    const svc = new McpService(store, dir, async () => true);
+    let reviewAccepted = true;
+    let onReview: (() => void) | undefined;
+    const reviews: string[] = [];
+    let account = {key:'account-a:0',transitioning:false};
+    const svc = new McpService(store, dir, async (_name, detail) => {reviews.push(detail);onReview?.();return reviewAccepted;}, {accountContext:()=>account} as any);
     const socket = createServer();
     await new Promise<void>((r) => socket.listen(0, '127.0.0.1', r));
     const port = (socket.address() as { port: number }).port;
@@ -114,6 +118,35 @@ test(
       assert.equal(checked.result.stages.authentication.outcome, 'ok');
       assert.equal(f.shellRequests(), 0);
       assert.equal(f.execRequests(), 0);
+      a.targetPolicies = {[id]:{review:'always',allowCommands:true,capabilities:[]}};
+      await svc.configure({...store.mcpSettings(), clients:[a,b]});
+      reviewAccepted=false;
+      const authBefore=f.authenticationRequests();
+      for(const [name,args] of [
+        ['connection_preflight',{profileId:id,probe:true}],
+        ['connection_probe',{id}],
+        ['connection_update',{id,revision:store.connectionRevision(id),patch:{name:'declined'}}],
+        ['connection_credentials',{id,revision:store.connectionRevision(id),secret:{password:'never-log-this'}}],
+      ] as const) assert.notEqual((await call(name,args)).status,200,name);
+      assert.equal(f.authenticationRequests(),authBefore);
+      assert.equal(store.profile(id).name,'managed');
+      assert.equal(reviews.length,4);
+      assert.ok(!reviews.join('').includes('never-log-this'));
+      assert.ok(reviews[2].includes('declined'));
+      reviewAccepted=true;
+      const reviewedProbe=await call('connection_probe',{id});
+      reviewAccepted=false;
+      assert.notEqual((await call('connection_accept',{challenge:reviewedProbe.result.challenge,fingerprint:reviewedProbe.result.fingerprint})).status,200);
+      assert.equal(reviews.length,6);
+      reviewAccepted=true;
+      onReview=()=>{account={key:'account-a:1',transitioning:true};svc.invalidateAccountContext();};
+      assert.notEqual((await call('connection_credentials',{id,revision:store.connectionRevision(id),secret:{password:'must-not-save'}})).status,200);
+      assert.equal((await store.secret(id))?.password,f.password);
+      assert.notEqual((await call('connection_list')).status,200);
+      account={key:'account-a:2',transitioning:false};onReview=undefined;
+      (svc as any).host=undefined;
+      a.targetPolicies={};
+      await svc.configure({...store.mcpSettings(),clients:[a,b]});
       const connected = await call('connect', { profileId: id });
       assert.equal(connected.status, 200, JSON.stringify(connected));
       const sessionId = connected.result.sessionId;
