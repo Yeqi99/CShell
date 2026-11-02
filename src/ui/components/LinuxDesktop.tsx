@@ -1,3 +1,4 @@
+import { useDesktopText } from '../desktop-i18n';
 import {ErrorNotice} from './ErrorNotice';
 import {MachineInformation} from './MachineInformation';
 import {IdeApp} from './IdeApp';
@@ -123,6 +124,7 @@ export function LinuxDesktop({
   onTerminal?: () => void;
   terminal?: (active: boolean, theme: 'light' | 'dark') => ReactNode;
 }) {
+  const tr = useDesktopText();
   const [installed,setInstalled]=useState<string[]>([]);
   const refreshInstalled=useCallback(async()=>{
     if(workbench || machine.sshOnly || machine.desktopOnly || closed)return;
@@ -134,9 +136,9 @@ export function LinuxDesktop({
   },[call,machine.sshOnly,machine.desktopOnly,closed,workbench]);
   useEffect(()=>{void refreshInstalled();},[refreshInstalled]);
   const catalog = [
-    ...apps.filter(app => workbench ? false : machine.desktopOnly ? false : machine.sshOnly ? ['terminal','files'].includes(app.id) : ['codex','claude','ide'].includes(app.id)?installed.includes(app.id):machine.terminalOnly ? app.id === 'terminal' : machine.platform === 'android' ? app.id === 'settings' : app.id === 'browser' ? ['linux','win32','darwin'].includes(machine.platform) : app.id !== 'native' || machine.platform === 'linux'),
-    ...extraPanels.map((p) => ({ id: p.id, label: p.label, icon: p.icon ?? Settings, color: p.color ?? 'slate' })),
-    ...(workbench ? [{ id: 'settings', label: '桌面外观', icon: Settings, color: 'slate' }] : []),
+    ...apps.map(app => ({...app,label:tr(app.label)})).filter(app => workbench ? false : machine.desktopOnly ? false : machine.sshOnly ? ['terminal','files'].includes(app.id) : ['codex','claude','ide'].includes(app.id)?installed.includes(app.id):machine.terminalOnly ? app.id === 'terminal' : machine.platform === 'android' ? app.id === 'settings' : app.id === 'browser' ? ['linux','win32','darwin'].includes(machine.platform) : app.id !== 'native' || machine.platform === 'linux'),
+    ...extraPanels.map((p) => ({ id: p.id, label: ['remote','assistant','permissions','install-cagent','native-desktop',...(workbench?['connections','command','capabilities','extensions','agent','preferences']:[])].includes(p.id) ? tr(p.label) : p.label, icon: p.icon ?? Settings, color: p.color ?? 'slate' })),
+    ...(workbench ? [{ id: 'settings', label: tr("桌面外观"), icon: Settings, color: 'slate' }] : []),
   ];
   const [context, setContext] = useState<{id:string;x:number;y:number}>();
   const [options, setOptions] = useState('');
@@ -163,9 +165,9 @@ export function LinuxDesktop({
   const [lookLoadAttempt,setLookLoadAttempt]=useState(0);
   lookValue.current=look;
   const setLook=(value:Look|((previous:Look)=>Look))=>{
-    if(window.cshell.desktopLookSave&&!lookReady.current){setError('正在读取桌面外观，请稍候');return;}
+    if(window.cshell.desktopLookSave&&!lookReady.current){setError(tr("正在读取桌面外观，请稍候"));return;}
     const next=validLook(typeof value==='function'?value(lookValue.current):value);lookEdit.current++;lookValue.current=next;setLookState(next);
-    try{localStorage.setItem(key,JSON.stringify(next));}catch{setError('外观未能保存');}
+    try{localStorage.setItem(key,JSON.stringify(next));}catch{setError(tr("外观未能保存"));}
     if(window.cshell.desktopLookSave){const id=machine.deviceId;lookWrite.current=lookWrite.current.catch(()=>{}).then(()=>window.cshell.desktopLookSave!(id,JSON.stringify(next)===JSON.stringify(initialLook)?null:next)).catch(e=>{setError(String(e));});}
   };
   useEffect(()=>{
@@ -181,7 +183,7 @@ export function LinuxDesktop({
           catch(e){if(legacy===undefined)throw e;value=await window.cshell.desktopLookGet(machine.deviceId);}
           if(!alive||generation!==lookEdit.current)return;
           const next=value??initialLook;lookValue.current=next;setLookState(next);
-          try{localStorage.setItem(key,JSON.stringify(next));}catch{setError('桌面外观已保存；本机显示缓存暂不可写');}
+          try{localStorage.setItem(key,JSON.stringify(next));}catch{setError(tr("桌面外观已保存；本机显示缓存暂不可写"));}
         }
         if(alive)lookReady.current=true;
       }catch(e){if(alive)setError(String(e));}
@@ -213,7 +215,7 @@ export function LinuxDesktop({
     // Keep pointer movement on the render path; persist the final position only.
     if (gesture.current) return;
     try { localStorage.setItem(key + ':windows', JSON.stringify(windows)); }
-    catch { setError('窗口状态未能保存，请检查本机存储空间'); }
+    catch { setError(tr("窗口状态未能保存，请检查本机存储空间")); }
   }, [key, windows]);
   useEffect(() => () => {
     if (gestureFrame.current !== undefined) cancelAnimationFrame(gestureFrame.current);
@@ -312,11 +314,11 @@ export function LinuxDesktop({
   const upload = async (file?: File, scheme = false) => {
     if (!file) return;
     try {
-      if (file.size > 3_000_000) throw Error('请选择小于 3 MB 的文件');
+      if (file.size > 3_000_000) throw Error(tr("请选择小于 3 MB 的文件"));
       if (scheme) setLook(validLook(JSON.parse(await file.text())));
       else {
         if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type))
-          throw Error('背景支持 PNG、JPEG 和 WebP');
+          throw Error(tr("背景支持 PNG、JPEG 和 WebP"));
         const data = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(String(reader.result));
@@ -336,7 +338,7 @@ export function LinuxDesktop({
       data-theme={look.theme}
       onPointerDownCapture={e=>{if(context&&!(e.target as HTMLElement).closest('.desktop-context-menu'))setContext(undefined);}}
       onContextMenu={e=>{if(!(e.target as HTMLElement).closest('.desktop-window,button'))showContext(e,'desktop');}}
-      aria-label={workbench ? "工作台桌面" : "机器桌面"}
+      aria-label={workbench ? tr("工作台桌面") : tr("机器桌面")}
       style={{ backgroundImage: look.image ? `url("${look.image}")` : wallpapers[look.wallpaper] }}
     >
       <div
@@ -411,7 +413,7 @@ export function LinuxDesktop({
         onPointerCancel={finishGesture}
         onLostPointerCapture={finishGesture}
       >
-        <div className="desktop-icons" aria-label="桌面应用" style={{ gridTemplateRows: `repeat(${Math.max(1, Math.floor((size.h - 32) / 96))}, 84px)` }}>
+        <div className="desktop-icons" aria-label={tr("桌面应用")} style={{ gridTemplateRows: `repeat(${Math.max(1, Math.floor((size.h - 32) / 96))}, 84px)` }}>
           {catalog.map((a) => (
             <button
               key={a.id}
@@ -436,7 +438,7 @@ export function LinuxDesktop({
                   open(a.id);
                 }
               }}
-              title={'双击打开' + a.label}
+              title={tr("双击打开") + a.label}
             >
               <span className={'desktop-app-icon ' + a.color}>
                 <a.icon size={27} />
@@ -453,7 +455,7 @@ export function LinuxDesktop({
         )}
         <div className="desktop-watermark">
           <span>{name}</span>
-          <small>{workbench ? '工作台' : <>{machine.platform === 'win32' ? 'Windows' : machine.platform === 'linux' ? 'Linux' : machine.platform === 'android' ? 'Android' : '设备'} · {machine.protocolLabel || (machine.sshOnly ? 'SSH' : 'CAgent')}</>}</small>
+          <small>{workbench ? tr("工作台") : <>{machine.platform === 'win32' ? 'Windows' : machine.platform === 'linux' ? 'Linux' : machine.platform === 'android' ? 'Android' : tr("设备")} · {machine.protocolLabel || (machine.sshOnly ? 'SSH' : 'CAgent')}</>}</small>
         </div>
         {windows.map((w) => {
           const app = catalog.find((a) => a.id === w.id);
@@ -463,7 +465,7 @@ export function LinuxDesktop({
             <section
               key={w.id}
               role="region"
-              aria-label={app.label + '窗口'}
+              aria-label={app.label + tr("窗口")}
               className={
                 'desktop-window ' +
                 (w.maximized ? 'maximized ' : '') +
@@ -497,24 +499,24 @@ export function LinuxDesktop({
                 <span>{app.label}</span>
                 <div className="desktop-window-controls">
                   <button
-                    title="最小化"
-                    aria-label={'最小化' + app.label}
+                    title={tr("最小化")}
+                    aria-label={tr("最小化") + ' ' + app.label}
                     onDoubleClick={(e) => e.stopPropagation()}
                     onClick={() => patch(w.id, { minimized: true })}
                   >
                     <Minus size={15} />
                   </button>
                   <button
-                    title={w.maximized ? '还原' : '最大化'}
-                    aria-label={(w.maximized ? '还原' : '最大化') + app.label}
+                    title={w.maximized ? tr("还原") : tr("最大化")}
+                    aria-label={(w.maximized ? tr("还原") : tr("最大化")) + ' ' + app.label}
                     onDoubleClick={(e) => e.stopPropagation()}
                     onClick={() => patch(w.id, { maximized: !w.maximized })}
                   >
                     {w.maximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
                   </button>
                   <button
-                    title="收起窗口，保留会话"
-                    aria-label={'关闭' + app.label + '窗口'}
+                    title={tr("收起窗口，保留会话")}
+                    aria-label={tr("关闭") + ' ' + app.label + tr("窗口")}
                     onDoubleClick={(e) => e.stopPropagation()}
                     onClick={() => patch(w.id, { closed: true })}
                   >
@@ -558,16 +560,16 @@ export function LinuxDesktop({
                   (terminal ? (
                     terminal(active && visible && front === w.id, look.theme)
                   ) : (
-                    <button onClick={onTerminal}>打开 SSH 终端</button>
+                    <button onClick={onTerminal}> {tr("打开 SSH 终端")} </button>
                   ))}
                 {extraPanels.filter(p => p.id === w.id).map(p => <div className={'desktop-extra-panel desktop-extra-' + p.id} key={p.id}>{typeof p.content === 'function' ? p.content(active && visible && front === w.id && !menu && !context && !closed, options === w.id, () => setOptions(''), w.closed) : p.content}</div>)}
                 {w.id === 'settings' && (
                   <div className="desktop-settings">
-                    <nav aria-label="桌面设置分类">
+                    <nav aria-label={tr("桌面设置分类")}>
                       {[
-                        ['appearance', '个性化'],
-                        ['display', '显示与操作'],
-                        ...(!workbench ? [['system', '系统信息']] : []),
+                        ['appearance', tr("个性化")],
+                        ['display', tr("显示与操作")],
+                        ...(!workbench ? [['system', tr("系统信息")]] : []),
                       ].map(([id, label]) => (
                         <button
                           key={id}
@@ -581,15 +583,15 @@ export function LinuxDesktop({
                     <div className="desktop-settings-content">
                       {settingsTab === 'appearance' && (
                         <>
-                          <h2>个性化</h2>
-                          <p>让这台机器的桌面成为你的工作空间。</p>
-                          <h3>桌面背景</h3>
+                          <h2> {tr("个性化")} </h2>
+                          <p> {tr("让这台机器的桌面成为你的工作空间。")} </p>
+                          <h3> {tr("桌面背景")} </h3>
                           <div className="desktop-wallpapers">
                             {Object.entries(wallpapers).map(([id, background]) => (
                               <button
                                 key={id}
                                 style={{ backgroundImage: background }}
-                                aria-label={'背景 ' + id}
+                                aria-label={tr("背景 ") + id}
                                 aria-pressed={!look.image && look.wallpaper === id}
                                 onClick={() =>
                                   setLook((v) => ({
@@ -604,36 +606,30 @@ export function LinuxDesktop({
                             ))}
                           </div>
                           <label className="desktop-upload">
-                            <Upload size={15} />
-                            选择背景图片
-                            <input
+                            <Upload size={15} /> {tr("选择背景图片")} <input
                               type="file"
                               accept="image/png,image/jpeg,image/webp"
                               onChange={(e) => void upload(e.target.files?.[0])}
                             />
                           </label>
-                          <h3>窗口主题</h3>
+                          <h3> {tr("窗口主题")} </h3>
                           <div className="desktop-theme-options">
                             <button
                               aria-pressed={look.theme === 'light'}
                               onClick={() => setLook((v) => ({ ...v, theme: 'light' }))}
                             >
-                              <Sun size={18} />
-                              浅色
-                            </button>
+                              <Sun size={18} /> {tr("浅色")} </button>
                             <button
                               aria-pressed={look.theme === 'dark'}
                               onClick={() => setLook((v) => ({ ...v, theme: 'dark' }))}
                             >
-                              <Moon size={18} />
-                              深色
-                            </button>
+                              <Moon size={18} /> {tr("深色")} </button>
                           </div>
-                          <h3>外观方案</h3>
+                          <h3> {tr("外观方案")} </h3>
                           <label className="desktop-look-name">
-                            <span>方案名称</span>
+                            <span> {tr("方案名称")} </span>
                             <input
-                              aria-label="方案名称"
+                              aria-label={tr("方案名称")}
                               maxLength={50}
                               value={look.name}
                               onChange={(e) => setLook((v) => ({ ...v, name: e.target.value }))}
@@ -649,17 +645,13 @@ export function LinuxDesktop({
                                 );
                                 const a = document.createElement('a');
                                 a.href = url;
-                                a.download = (look.name || '桌面') + '.json';
+                                a.download = (look.name || tr("桌面")) + '.json';
                                 a.click();
                                 setTimeout(() => URL.revokeObjectURL(url), 1000);
                               }}
                             >
-                              <Download size={15} />
-                              导出方案
-                            </button>
-                            <label className="desktop-upload">
-                              导入方案
-                              <input
+                              <Download size={15} /> {tr("导出方案")} </button>
+                            <label className="desktop-upload"> {tr("导入方案")} <input
                                 type="file"
                                 accept="application/json,.json"
                                 onChange={(e) => void upload(e.target.files?.[0], true)}
@@ -667,38 +659,38 @@ export function LinuxDesktop({
                             </label>
                           </div>
                           <div className="desktop-look-footer">
-                            <button className="desktop-look-reset" onClick={()=>setLook(initialLook)}>恢复默认外观</button>
-                            <small>外观自动保存；Pro 登录后随账号同步。窗口位置只保留在本机。</small>
+                            <button className="desktop-look-reset" onClick={()=>setLook(initialLook)}> {tr("恢复默认外观")} </button>
+                            <small> {tr("外观自动保存；Pro 登录后随账号同步。窗口位置只保留在本机。")} </small>
                           </div>
                         </>
                       )}
                       {settingsTab === 'display' && (
                         <>
-                          <h2>显示与操作</h2>
+                          <h2> {tr("显示与操作")} </h2>
                           <dl>
-                            <dt>桌面应用</dt>
-                            <dd>单击选择，双击或 Enter 打开；在空白处拖动框选</dd>
-                            <dt>排列</dt>
-                            <dd>随桌面高度自动换列，空间不足时滚动浏览</dd>
-                            <dt>窗口</dt>
-                            <dd>拖动标题栏移动，右下角调整大小，双击标题栏最大化</dd>
-                            <dt>会话</dt>
-                            <dd>最小化和收起窗口保留运行状态</dd>
+                            <dt> {tr("桌面应用")} </dt>
+                            <dd> {tr("单击选择，双击或 Enter 打开；在空白处拖动框选")} </dd>
+                            <dt> {tr("排列")} </dt>
+                            <dd> {tr("随桌面高度自动换列，空间不足时滚动浏览")} </dd>
+                            <dt> {tr("窗口")} </dt>
+                            <dd> {tr("拖动标题栏移动，右下角调整大小，双击标题栏最大化")} </dd>
+                            <dt> {tr("会话")} </dt>
+                            <dd> {tr("最小化和收起窗口保留运行状态")} </dd>
                           </dl>
                         </>
                       )}
                       {settingsTab === 'system' && (
                         <>
-                          <h2>系统信息</h2>
+                          <h2> {tr("系统信息")} </h2>
                           <dl>
-                            <dt>机器</dt>
+                            <dt> {tr("机器")} </dt>
                             <dd>{name}</dd>
-                            <dt>操作系统</dt>
+                            <dt> {tr("操作系统")} </dt>
                             <dd>{device.platform}</dd>
-                            <dt>设备身份</dt>
+                            <dt> {tr("设备身份")} </dt>
                             <dd>{device.deviceId}</dd>
-                            <dt>连接</dt>
-                            <dd>{closed ? '已断开' : '已连接'}</dd>
+                            <dt> {tr("连接")} </dt>
+                            <dd>{closed ? tr("已断开") : tr("已连接")}</dd>
                           </dl>
                           <button
                             disabled={closed}
@@ -708,13 +700,11 @@ export function LinuxDesktop({
                                 .catch((e) => setError(String(e)))
                             }
                           >
-                            <RefreshCw size={15} />
-                            刷新状态
-                          </button>
-                          {onTerminal && <button onClick={onTerminal}>进入 SSH 终端</button>}
+                            <RefreshCw size={15} /> {tr("刷新状态")} </button>
+                          {onTerminal && <button onClick={onTerminal}> {tr("进入 SSH 终端")} </button>}
                         </>
                       )}
-                      {error && <div><ErrorNotice title="桌面设置未完成" error={error}/>{!lookReady.current&&<button onClick={()=>{setError('');setLookLoadAttempt(v=>v+1);}}>重新读取外观</button>}</div>}
+                      {error && <div><ErrorNotice title={tr("桌面设置未完成")} error={error}/>{!lookReady.current&&<button onClick={()=>{setError('');setLookLoadAttempt(v=>v+1);}}> {tr("重新读取外观")} </button>}</div>}
                     </div>
                   </div>
                 )}
@@ -722,8 +712,8 @@ export function LinuxDesktop({
               {!w.maximized && (
                 <button
                   className="desktop-resize"
-                  title="调整窗口大小（方向键微调）"
-                  aria-label={'调整' + app.label + '窗口大小'}
+                  title={tr("调整窗口大小（方向键微调）")}
+                  aria-label={tr("调整") + app.label + tr("窗口大小")}
                   onKeyDown={(e) => {
                     if (e.key.startsWith('Arrow')) {
                       e.preventDefault();
@@ -780,23 +770,21 @@ export function LinuxDesktop({
           </div>
           {onTerminal && (
             <button onClick={onTerminal}>
-              <Terminal size={16} />
-              SSH 终端
-            </button>
+              <Terminal size={16} /> {tr("SSH 终端")} </button>
           )}
         </div>
       )}
       <footer className="desktop-taskbar">
         <button
-          title="应用"
-          aria-label="打开应用菜单"
+          title={tr("应用")}
+          aria-label={tr("打开应用菜单")}
           aria-expanded={menu}
           onClick={() => setMenu(!menu)}
         >
           <Grid2X2 size={21} />
         </button>
         <span className="desktop-taskbar-divider" />
-        <nav aria-label="运行中的应用">
+        <nav aria-label={tr("运行中的应用")}>
           {windows
             .filter((w) => !w.closed)
             .map((w) => {
@@ -807,7 +795,7 @@ export function LinuxDesktop({
                   key={w.id}
                   title={a.label}
                   onContextMenu={e=>showContext(e,w.id)}
-                  aria-label={'切换到' + a.label}
+                  aria-label={tr("切换到") + a.label}
                   aria-pressed={front === w.id && !w.minimized}
                   onClick={() =>
                     front === w.id && !w.minimized ? patch(w.id, { minimized: true }) : focus(w.id)
@@ -821,13 +809,13 @@ export function LinuxDesktop({
             })}
         </nav>
         <span className="desktop-taskbar-spacer" />
-        {!workbench && <button className="desktop-machine-name" title={connectionLabel || (closed ? '无法连接，点击重试' : '网络连接正常')} onClick={onRetry} aria-label={closed ? '连接已断开，重试' : '网络连接正常'}>
+        {!workbench && <button className="desktop-machine-name" title={connectionLabel ? tr(connectionLabel) : (closed ? tr("无法连接，点击重试") : tr("网络连接正常"))} onClick={onRetry} aria-label={closed ? tr("连接已断开，重试") : tr("网络连接正常")}>
           <i className={closed ? 'offline' : ''} />
-          {connectionLabel || (closed ? '无法连接' : name)}
+          {connectionLabel ? tr(connectionLabel) : (closed ? tr("无法连接") : name)}
         </button>}
         <button
-          title="切换桌面明暗主题"
-          aria-label="切换桌面明暗主题"
+          title={tr("切换桌面明暗主题")}
+          aria-label={tr("切换桌面明暗主题")}
           onClick={() => setLook((v) => ({ ...v, theme: v.theme === 'light' ? 'dark' : 'light' }))}
         >
           {look.theme === 'light' ? <Sun size={17} /> : <Moon size={17} />}
@@ -838,31 +826,31 @@ export function LinuxDesktop({
         </time>
         <button
           className="desktop-show"
-          title="显示桌面"
-          aria-label="显示桌面"
+          title={tr("显示桌面")}
+          aria-label={tr("显示桌面")}
           onClick={() => {
             setMenu(false);
             setWindows((v) => v.map((w) => ({ ...w, minimized: true })));
           }}
         >
           <Monitor size={18} />
-          <span>桌面</span>
+          <span> {tr("桌面")} </span>
         </button>
       </footer>
-      {context&&<div ref={contextMenu} className="desktop-context-menu" role="menu" aria-label="桌面右键菜单" style={{left:context.x,top:context.y}} onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();dismissContext();}if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();const buttons=Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>('button'));const index=buttons.indexOf(document.activeElement as HTMLButtonElement);buttons[(index+(e.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length]?.focus();}}}>
-        <span>{context.id==='desktop'?'桌面':catalog.find(a=>a.id===context.id)?.label}</span>
+      {context&&<div ref={contextMenu} className="desktop-context-menu" role="menu" aria-label={tr("桌面右键菜单")} style={{left:context.x,top:context.y}} onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();dismissContext();}if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();const buttons=Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>('button'));const index=buttons.indexOf(document.activeElement as HTMLButtonElement);buttons[(index+(e.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length]?.focus();}}}>
+        <span>{context.id==='desktop'?tr("桌面"):catalog.find(a=>a.id===context.id)?.label}</span>
         {context.id==='desktop'?<>
-          <button role="menuitem" onClick={()=>{open('settings');setSettingsTab('appearance');dismissContext();}}>个性化</button>
-          <button role="menuitem" onClick={()=>{open('settings');setSettingsTab('display');dismissContext();}}>显示设置</button>
-          <button role="menuitem" onClick={()=>{setWindows(v=>v.map(w=>({...w,minimized:true})));dismissContext();}}>显示桌面</button>
+          <button role="menuitem" onClick={()=>{open('settings');setSettingsTab('appearance');dismissContext();}}> {tr("个性化")} </button>
+          <button role="menuitem" onClick={()=>{open('settings');setSettingsTab('display');dismissContext();}}> {tr("显示设置")} </button>
+          <button role="menuitem" onClick={()=>{setWindows(v=>v.map(w=>({...w,minimized:true})));dismissContext();}}> {tr("显示桌面")} </button>
         </>:<>
-          <button role="menuitem" onClick={()=>{open(context.id);dismissContext();}}>打开 / 恢复</button>
-          {['ide','codex','claude'].includes(context.id)&&<button role="menuitem" onClick={()=>{open('applications');dismissContext();}}>管理应用</button>}
-          {['remote','native'].includes(context.id)&&<button role="menuitem" onClick={()=>{open(context.id);setOptions(context.id);dismissContext();}}>应用设置与操作</button>}
+          <button role="menuitem" onClick={()=>{open(context.id);dismissContext();}}> {tr("打开 / 恢复")} </button>
+          {['ide','codex','claude'].includes(context.id)&&<button role="menuitem" onClick={()=>{open('applications');dismissContext();}}> {tr("管理应用")} </button>}
+          {['remote','native'].includes(context.id)&&<button role="menuitem" onClick={()=>{open(context.id);setOptions(context.id);dismissContext();}}> {tr("应用设置与操作")} </button>}
           {windows.some(w=>w.id===context.id&&!w.closed)&&<>
-            <button role="menuitem" onClick={()=>{patch(context.id,{minimized:true});dismissContext();}}>最小化</button>
-            <button role="menuitem" onClick={()=>{patch(context.id,{maximized:!windows.find(w=>w.id===context.id)?.maximized,minimized:false});dismissContext();}}>最大化 / 还原</button>
-            <button role="menuitem" onClick={()=>{patch(context.id,{closed:true});dismissContext();}}>收起应用</button>
+            <button role="menuitem" onClick={()=>{patch(context.id,{minimized:true});dismissContext();}}> {tr("最小化")} </button>
+            <button role="menuitem" onClick={()=>{patch(context.id,{maximized:!windows.find(w=>w.id===context.id)?.maximized,minimized:false});dismissContext();}}> {tr("最大化 / 还原")} </button>
+            <button role="menuitem" onClick={()=>{patch(context.id,{closed:true});dismissContext();}}> {tr("收起应用")} </button>
           </>}
         </>}
       </div>}
@@ -879,6 +867,7 @@ export function LinuxDesktopTerminal({
   preferences: Preferences;
   active: boolean;
 }) {
+  const tr = useDesktopText();
   const [id, setId] = useState(''),
     [error, setError] = useState(''),
     [closed, setClosed] = useState(false);
@@ -907,7 +896,7 @@ export function LinuxDesktopTerminal({
   return (
     <div className="desktop-terminal">
       {error ? (
-        <ErrorNotice title="终端连接未完成" error={error}/>
+        <ErrorNotice title={tr("终端连接未完成")} error={error}/>
       ) : id ? (
         <TerminalPane
           id={id}
@@ -921,7 +910,7 @@ export function LinuxDesktopTerminal({
           onError={(e) => setError(String(e))}
         />
       ) : (
-        <p role="status">正在连接终端…</p>
+        <p role="status"> {tr("正在连接终端…")} </p>
       )}
     </div>
   );
