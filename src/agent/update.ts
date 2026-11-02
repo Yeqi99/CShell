@@ -5,7 +5,7 @@ import {updateRequest} from './update-request';
 import {mkdir,writeFile,rename,rm,readFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {createHash} from 'node:crypto';
-import {trustedDownload} from '../shared/download-source';
+import {trustedDownload,downloadRoot,downloadManifest} from '../shared/download-source';
 import {formatUpdateProgress} from '../shared/update-progress';
 export function newer(a:string,b:string){const x=a.split('.').map(Number),y=b.split('.').map(Number);for(let i=0;i<3;i++){if(x[i]!==y[i])return x[i]>y[i];}return false;}
 export function selectUpdate(releases:any[],current:string,arch:string,platform:NodeJS.Platform='win32'){
@@ -15,6 +15,7 @@ export function selectUpdate(releases:any[],current:string,arch:string,platform:
   if(!m||m[2]!==arch||!newer(m[1],current))return [];
   if(!trustedDownload(a.browser_download_url)||!Number.isSafeInteger(a.size)||a.size<=0||a.size>256*1024*1024)return [];
   const url=new URL(a.browser_download_url);
+  if(url.href!==`${downloadRoot}/v${m[1]}/${a.name}`)return [];
   if(!/^sha256:[a-f0-9]{64}$/i.test(a.digest??''))return [];
   return [{version:m[1],name:a.name,url:url.href,digest:a.digest.slice(7).toLowerCase(),size:a.size}];
  })).sort((a,b)=>newer(a.version,b.version)?-1:1)[0];
@@ -52,7 +53,7 @@ export class AgentUpdater{
  }
  private async tick(){if(this.lifetime.signal.aborted||!this.automatic||this.checking||['ready','downloading'].includes(this.state.phase))return;this.checking=true;try{const result=await this.check();if(result.available&&this.automatic){if(this.failedVersion&&this.failedVersion.version===result.version&&Date.now()<this.failedVersion.retryAt)this.state={phase:'deferred',version:result.version,retryAt:this.failedVersion.retryAt,error:'此版本上次启动未通过核验，已保留原后台，稍后再自动检查'};else this.start();}}catch(e){if(!this.lifetime.signal.aborted)this.state={phase:'failed',error:e instanceof Error?e.message:String(e)};}finally{this.checking=false;}}
  private fetchUpdate(url:string,timeout:number,officialOnly=false){return requestUpdateWithFallback(url,candidate=>{this.assertOpen();if(officialOnly&&candidate===url)return Promise.resolve(new Response(null,{status:503}));return this.request(candidate,{headers:{Accept:'application/json','User-Agent':'CAgent/'+this.version},signal:AbortSignal.any([this.lifetime.signal,AbortSignal.timeout(timeout)])});});}
- async check(){this.assertOpen();if(!['win32','linux','darwin'].includes(process.platform))throw new Error('当前平台没有更新安装包');const r=await this.fetchUpdate('https://shell.canp.ai/downloads/pro/releases.json',15000);if(!r.ok)throw new Error('检查更新失败：香港更新服务 HTTP '+r.status);const releases=await r.json();this.assertOpen();if(!Array.isArray(releases))throw new Error('更新目录格式不正确');this.candidate=selectUpdate(releases,this.version,process.arch,process.platform);return {current:this.version,available:!!this.candidate,version:this.candidate?.version};}
+ async check(){this.assertOpen();if(!['win32','linux','darwin'].includes(process.platform))throw new Error('当前平台没有更新安装包');const r=await this.fetchUpdate(downloadManifest,15000);if(!r.ok)throw new Error('检查更新失败：香港更新服务 HTTP '+r.status);const releases=await r.json();this.assertOpen();if(!Array.isArray(releases))throw new Error('更新目录格式不正确');this.candidate=selectUpdate(releases,this.version,process.arch,process.platform);return {current:this.version,available:!!this.candidate,version:this.candidate?.version};}
  async prepareInstall(identity?:string){
   await this.verify();
   if(!identity)throw Error('缺少更新目标身份');
