@@ -2,8 +2,11 @@ import type {AccountDiscoveryStatus} from '../../shared/cloud-sync';
 import {ErrorNotice} from './ErrorNotice';
 import {PingButton} from './PingButton';
 import {PingAll} from './PingAll';
+import {useSidebarGroups} from './useSidebarGroups';
+import {ACCOUNT_DEVICE_GROUP,orderSidebarGroups} from './sidebar-groups';
+import {useDesktopText} from '../desktop-i18n';
 import type { LocalConnectionTarget } from '../../shared/local-terminal';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   ArrowLeft,
@@ -65,12 +68,15 @@ export function ServerSidebar({
   onManageGroup: (action: GroupAction) => Promise<void>;
 }) {
   const { t, locale } = useI18n();
+  const tr=useDesktopText();
+  const [groupScope,setGroupScope]=useState('signed-out');
+  useEffect(()=>{let alive=true;const refresh=()=>void window.cshell.cloudStatus?.().then(s=>{if(alive)setGroupScope(s.email||'signed-out');}).catch(()=>{});refresh();const off=window.cshell.onCloudChanged?.(refresh);return()=>{alive=false;off?.();};},[]);
   const [query, setQuery] = useState('');
   const [accountDevices,setAccountDevices]=useState<AccountDiscoveryStatus['devices']>([]);
   useEffect(()=>{let alive=true;const refresh=()=>{void window.cshell.cloudDiscovery?.().then(s=>{if(alive)setAccountDevices(s.devices);}).catch(()=>{});};refresh();const timer=setInterval(refresh,15000);return()=>{alive=false;clearInterval(timer);};},[]);
   const [menu, setMenu] = useState<Menu | null>(null);
   const [appearanceExpanded, setAppearanceExpanded] = useState(false);
-  const [collapsed, setCollapsed] = useState<string[]>([]);
+  const {isCollapsed,toggle:toggleGroup,setCollapsed:setGroupCollapsed}=useSidebarGroups(groupScope,ACCOUNT_DEVICE_GROUP);
   const [editor, setEditor] = useState<{ original?: string; move?: Profile } | null>(null);
   const [name, setName] = useState('');
   const [error, setError] = useState('');
@@ -182,7 +188,7 @@ export function ServerSidebar({
         );
       }
       setEditor(null);
-      setCollapsed((items) => items.filter((item) => item !== `group:${next}`));
+      setGroupCollapsed(`group:${next}`,false);
     } catch (e) {
       report(e);
     } finally {
@@ -192,7 +198,7 @@ export function ServerSidebar({
   async function move(profile: Profile, group: string) {
     try {
       await onSave({ ...profile, group });
-      setCollapsed((items) => items.filter((item) => item !== `group:${group}`));
+      setGroupCollapsed(`group:${group}`,false);
       closeMenu(true);
       setError('');
     } catch (e) {
@@ -203,9 +209,7 @@ export function ServerSidebar({
   const filtered = profiles.filter((p) =>
     `${p.name} ${p.host} ${p.group}`.toLowerCase().includes(query.toLowerCase()),
   );
-  const groupNames = [
-    ...new Set([...groups, ...profiles.map((p) => p.group).filter(Boolean)]),
-  ].sort((a, b) => a.localeCompare(b, locale));
+  const groupNames = orderSidebarGroups([...groups,...profiles.map(p=>p.group).filter(Boolean)],locale,ACCOUNT_DEVICE_GROUP);
   const sections = [
     {
       id: '__favorites',
@@ -213,13 +217,43 @@ export function ServerSidebar({
       items: filtered.filter((p) => p.favorite),
       favorite: true,
     },
-    ...['', ...groupNames].map((group) => ({
+    ...[...groupNames.filter(g=>g===ACCOUNT_DEVICE_GROUP),'',...groupNames.filter(g=>g!==ACCOUNT_DEVICE_GROUP)].map((group) => ({
       id: group,
       name: group || t('ungrouped'),
       items: filtered.filter((p) => p.group === group),
       favorite: false,
     })),
-  ].filter((section) => section.items.length || (!query && !section.favorite && section.id));
+  ].filter((section) => section.items.length || (!query && !section.favorite && section.id)).sort((a,b)=>a.id===ACCOUNT_DEVICE_GROUP?-1:b.id===ACCOUNT_DEVICE_GROUP?1:0);
+  const localSection = (!!targets.length && (
+          <section className="server-group">
+            <div className="group-heading">
+              <span className="group-name">本机环境</span>
+              <small>{targets.length}</small>
+            </div>
+            {targets
+              .filter((t) => t.name.toLowerCase().includes(query.toLowerCase()))
+              .map((target) => (
+                <button
+                  className="local-target-row"
+                  key={target.id}
+                  onDoubleClick={() => onTarget?.(target)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      onTarget?.(target);
+                    }
+                  }}
+                  title="双击打开终端"
+                >
+                  <Server size={20} />
+                  <span>
+                    <strong>{target.name}</strong>
+                    <small>{target.detail}</small>
+                  </span>
+                </button>
+              ))}
+          </section>
+        ));
   return (
     <aside className="sidebar" aria-busy={working} tabIndex={0} onContextMenu={e => {
       if (!onPreferences || e.defaultPrevented || (e.target as HTMLElement).closest('button,input,a,[data-profile-id]')) return;
@@ -306,37 +340,10 @@ export function ServerSidebar({
       )}
       <div className="server-list">
         {dragging && <div className="sidebar-drag-hint" role="status">{profiles.find(p => p.id === dragging)?.name} → {drop ? `${drop.group || t('ungrouped')}${drop.before ? ' · 插入此机器之前' : ' · 移到分组末尾'}` : '拖到机器之间或分组标题'}</div>}
-        {!!targets.length && (
-          <section className="server-group">
-            <div className="group-heading">
-              <span className="group-name">本机环境</span>
-              <small>{targets.length}</small>
-            </div>
-            {targets
-              .filter((t) => t.name.toLowerCase().includes(query.toLowerCase()))
-              .map((target) => (
-                <button
-                  className="local-target-row"
-                  key={target.id}
-                  onDoubleClick={() => onTarget?.(target)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      onTarget?.(target);
-                    }
-                  }}
-                  title="双击打开终端"
-                >
-                  <Server size={20} />
-                  <span>
-                    <strong>{target.name}</strong>
-                    <small>{target.detail}</small>
-                  </span>
-                </button>
-              ))}
-          </section>
-        )}
-        {sections.map((section) => (
+        {!sections.length && localSection}
+        {sections.map((section,index) => (
+          <Fragment key={`${section.favorite ? 'favorite' : 'group'}:${section.id}`}>
+          {index===0 && section.id!==ACCOUNT_DEVICE_GROUP && localSection}
           <section
             key={`${section.favorite ? 'favorite' : 'group'}:${section.id}`}
             className={`server-group ${dragging && drop?.group === section.id && !drop.before ? 'group-drop-target' : ''}`}
@@ -346,25 +353,17 @@ export function ServerSidebar({
               <button
                 className="group-title"
                 aria-expanded={
-                  !collapsed.includes(`${section.favorite ? 'favorite' : 'group'}:${section.id}`)
+                  !isCollapsed(`${section.favorite ? 'favorite' : 'group'}:${section.id}`)
                 }
-                onClick={() =>
-                  setCollapsed((current) =>
-                    current.includes(`${section.favorite ? 'favorite' : 'group'}:${section.id}`)
-                      ? current.filter(
-                          (x) => x !== `${section.favorite ? 'favorite' : 'group'}:${section.id}`,
-                        )
-                      : [...current, `${section.favorite ? 'favorite' : 'group'}:${section.id}`],
-                  )
-                }
+                onClick={()=>toggleGroup(`${section.favorite ? 'favorite' : 'group'}:${section.id}`)}
               >
-                {collapsed.includes(`${section.favorite ? 'favorite' : 'group'}:${section.id}`) ? (
+                {isCollapsed(`${section.favorite ? 'favorite' : 'group'}:${section.id}`) ? (
                   <ChevronRight size={12} />
                 ) : (
                   <ChevronDown size={12} />
                 )}
                 {section.favorite && <Star size={11} />}
-                <span className="group-name">{section.name}</span>
+                <span className="group-name">{section.id===ACCOUNT_DEVICE_GROUP?tr(ACCOUNT_DEVICE_GROUP):section.name}</span>
                 <small>{section.items.length}</small>
               </button>
               {!section.favorite && section.id && (
@@ -378,7 +377,7 @@ export function ServerSidebar({
                 </button>
               )}
             </div>
-            {!collapsed.includes(`${section.favorite ? 'favorite' : 'group'}:${section.id}`) &&
+            {!isCollapsed(`${section.favorite ? 'favorite' : 'group'}:${section.id}`) &&
               section.items.map((profile) => (
                 <div
                   key={profile.id}
@@ -448,8 +447,8 @@ export function ServerSidebar({
                         <i className={`dot ${(online.includes(profile.id)||accountDevices.some(d=>d.id===profile.id&&d.online===true)) ? '' : 'off'}`} />
                       )}
                       <div>
-                        <strong>{profile.name}</strong>{accountDevices.some(d=>d.id===profile.id)&&<span className="account-device-badge" title="此设备来自当前登录账号">账号设备{!online.includes(profile.id)&&(accountDevices.find(d=>d.id===profile.id)?.online===false?' · 离线':accountDevices.find(d=>d.id===profile.id)?.online===null?' · 状态未知':'')}</span>}
-                        <small>{profile.protocol === 'http' ? 'HTTP' : profile.host}</small>
+                        <strong>{profile.name}</strong>
+                        <div className="server-metadata"><small title={profile.host}>{profile.protocol === 'http' ? 'HTTP' : profile.host}</small>{accountDevices.some(d=>d.id===profile.id)&&<span className="account-device-badge" title={tr('此设备来自当前登录账号')} aria-label={tr('账号设备')}><Share2 size={11} aria-hidden="true" />{!online.includes(profile.id)&&accountDevices.find(d=>d.id===profile.id)?.online!==true&&<span>{tr(accountDevices.find(d=>d.id===profile.id)?.online===false?'离线':'状态未知')}</span>}</span>}</div>
                       </div>
                     </button>
                     {profile.protocol!=='http'&&<PingButton key={profile.host} profileId={profile.id}/>}
@@ -478,10 +477,12 @@ export function ServerSidebar({
                 </div>
               ))}
             {!section.items.length &&
-              !collapsed.includes(`${section.favorite ? 'favorite' : 'group'}:${section.id}`) && (
+              !isCollapsed(`${section.favorite ? 'favorite' : 'group'}:${section.id}`) && (
                 <p className="empty-group">{t('emptyGroup')}</p>
               )}
           </section>
+          {index===0 && section.id===ACCOUNT_DEVICE_GROUP && localSection}
+          </Fragment>
         ))}
         {!profiles.length && !groups.length && (
           <div className="sidebar-empty-state">
