@@ -1,0 +1,19 @@
+.android-applications{padding:24px;min-width:0;height:100%;overflow:auto;color:var(--text);box-sizing:border-box}
+.android-applications header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px}
+.android-applications h2{margin:0;font-size:20px;line-height:1.4}
+.android-applications header p{margin:6px 0 0;opacity:.7;font-size:13px}
+.android-app-refresh{display:grid;place-items:center;width:34px;height:34px;flex:none}
+.android-app-search{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:10px;margin-bottom:20px}
+.android-app-search input{width:100%;min-width:0;border:0;background:transparent;outline:0;color:inherit;padding:0}
+.android-app-search:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+.android-app-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:8px;align-content:start}
+.android-app-item{display:flex;align-items:center;gap:12px;padding:12px;text-align:left;min-width:0;border:1px solid transparent;border-radius:12px;background:transparent;color:inherit;cursor:pointer}
+.android-app-item:hover{background:var(--panel);border-color:var(--border)}
+.android-app-item:focus-visible,.android-app-refresh:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.android-app-symbol{display:grid;place-items:center;width:42px;height:42px;border-radius:12px;background:color-mix(in srgb,var(--accent) 10%,transparent);color:var(--accent);flex:none}
+.android-app-copy{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1}
+.android-app-copy strong,.android-app-copy small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.android-app-copy strong{font-size:14px;font-weight:600}.android-app-copy small{font-size:11px;opacity:.65}
+.android-app-notice{font-size:13px;line-height:1.6;margin:0 0 16px;color:var(--muted)}
+.android-app-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:36px 12px;opacity:.65;text-align:center}
+@media(max-width:480px){.android-applications{padding:16px}.android-app-grid{grid-template-columns:1fr}}
