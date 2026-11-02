@@ -3,21 +3,34 @@
   "status": "candidate-not-published",
   "sources": {
     "opensource": {
-      "sha": "f23fa4194f218f5812abe46c4f8ff3d602201d8f",
-      "local": "961d3807d9f56ecd3fd8a4cee816ac53ae996d26",
-      "tree": "b4ffc74dd84074447fdbbe57299464c9b1f0ee18"
+      "sha": "68bdaf5433c73b3aa951fe0bac08ee607e1023b1",
+      "local": "fd5d03f81809bf81ea7fc0b0971332f7ef1e03f0",
+      "tree": "f70cda1cee5e6a434e9274d5c12ddc68ae810f22"
     },
     "pro": {
-      "sha": "7d906ee2a858e7bbb0701d2277c3c95501dac46e",
-      "local": "bdfdc81037fecaf568194c7c666e2cffaba1b9fa",
-      "tree": "bbdc5bd4cd7d0b8a282071ec77a005ae5f169b32"
+      "sha": "670b89d3bc588de1d83abab5f713f7aff9cf79d7",
+      "local": "efaccbee54dda3c0379a9a558b2ff9f678471d0d",
+      "tree": "be4bcd233902ce86d98b6a6968441d6132bcfadf"
     }
   },
   "productionProvenance": {
-    "unchangedDesktopAndPosix": {
+    "desktop": {
+      "opensource": "96e04df",
+      "pro": "6b0375d",
+      "posixSource": {
+        "opensource": "d73ed54",
+        "pro": "910243d"
+      },
+      "count": 16,
+      "receipts": [
+        "windows-ai-default-final.json",
+        "desktop-defaults-artifacts.json"
+      ]
+    },
+    "retainedPosixCAgent": {
       "opensource": "3202d564c86a9e8969deff4e9324e15f8508787f",
       "pro": "c53e8f14fb9c09d4974a75518f831850c43c3191",
-      "count": 24
+      "count": 8
     },
     "windowsCAgent": {
       "opensource": "8d23feb",
@@ -30,5 +43,5 @@
       "count": 2
     }
   },
-  "note": "Remote complete Git Data trees exactly match stated committed local trees. Since prior runtime build only native CAgent C# and Android source/test changes affect binaries; their four replaced artifacts are separately verified. Final control metadata is committed after these source targets to avoid self-reference. No tags/releases/activation."
+  "note": "Complete remote Git Data trees exactly equal the committed local trees. After desktop builds, subsequent changes are documentation, release evidence and a smoke test only; no runtime changes. Agent entry-point bundle byte equivalence and unchanged Android sources justify retention. This control metadata is committed after source snapshots to avoid self-reference. No tags, releases or update catalog changes."
 }

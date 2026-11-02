@@ -1,0 +1,29 @@
+{
+  "version": "0.8.18",
+  "status": "blocked-on-user-actions",
+  "checkedAt": "2026-11-01T14:38:45.1456435Z",
+  "verified": {
+    "coreFiles": 16,
+    "sources": "935ef71",
+    "proFiles": 14,
+    "inventory": "fdf3454",
+    "hongKongFullInventory": "74d96a2",
+    "localInstallAttempt": "2902f8e",
+    "toolkitFiles": 6
+  },
+  "remaining": [
+    {
+      "required": "Login to the same account on Lenovo, then force authenticated relay and verify without LAN fallback",
+      "id": "lenovo-physical-relay",
+      "state": "signed-out"
+    },
+    {
+      "installedVersion": "0.8.17",
+      "required": "User confirms Windows administrator prompt on requested retry; preserve and verify the existing account and configuration",
+      "id": "local-pro-install",
+      "state": "installer-exit-1223"
+    }
+  ],
+  "published": false,
+  "publicDownloadOrUpdateChannelsChanged": false
+}

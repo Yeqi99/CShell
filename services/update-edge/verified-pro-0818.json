@@ -1,9 +1,9 @@
 {
   "edition": "pro",
-  "sha": "7d906ee2a858e7bbb0701d2277c3c95501dac46e",
-  "status": "blocked-pending-fresh-ai-defaults-and-final-audit",
+  "sha": "670b89d3bc588de1d83abab5f713f7aff9cf79d7",
+  "status": "candidate-not-published",
   "version": "0.8.18",
-  "verification": "Exact final 30-file inventory f566ea0, full Hong Kong verification 7630135, Android physical evidence e49397a. Fixed complete source tree; only Lenovo account login and physical relay acceptance remain. Not published.",
+  "verification": "Final thirty-file inventory fdf3454 and Hong Kong full verification 74d96a2 complete. Desktop defaults and Android physical input evidence retained. Lenovo physical relay deferred by explicit user authorization; not claimed verified.",
   "assets": [
     {
       "name": "CAgent-0.8.18-linux-arm64.tar.gz",
@@ -37,49 +37,49 @@
     },
     {
       "name": "CShell-Pro-0.8.18-linux-amd64.deb",
-      "size": 107782788,
-      "sha256": "60ee644374a3a4138b59c635fa59491258aa41719e014d376a717ff249913011"
+      "size": 107786032,
+      "sha256": "1bfcb75c7325f7583d5f9abb8a6574340670aff4016d0db4b2da96c0c45f7650"
     },
     {
       "name": "CShell-Pro-0.8.18-linux-arm64.AppImage",
-      "size": 140957008,
-      "sha256": "a04c96f7c244e7e09eee247382f4473b591238f9bace53f5b98d6442861dfc09"
+      "size": 140957024,
+      "sha256": "d4c49a85333ee8c7e8d16aaf6ace4f1b8ca1bdd47304f2cfd929cac8a7a5fc58"
     },
     {
       "name": "CShell-Pro-0.8.18-linux-arm64.deb",
-      "size": 103283032,
-      "sha256": "4e00f767a22ecdf846a50c1f2a75bdd79a4f2411bbdae988c84fa89163381ae1"
+      "size": 103284072,
+      "sha256": "bfd7181c7ee28a2000fffc9dc3cdd499dc64c20c81c9191ca7217a8e8b8a72d6"
     },
     {
       "name": "CShell-Pro-0.8.18-linux-x86_64.AppImage",
-      "size": 139701759,
-      "sha256": "251036bd4b39184ff0fd2e1474ca6b0084ddbc8eba3cd23b6e0852479c888d7d"
+      "size": 139701812,
+      "sha256": "9540f5615d14da4fc6a168226b7a2808623d3d32df54abeacf6feffb1cbb75d1"
     },
     {
       "name": "CShell-Pro-0.8.18-mac-arm64.dmg",
-      "size": 142614496,
-      "sha256": "99416cb712779672d3cd4a4d7892470a2e121b8c396afd314089b675656b5679"
+      "size": 142614693,
+      "sha256": "9a621cba49849ed0535fadfb0c346bf6bb09ad332f6c1c90325bf4ad01d19c1f"
     },
     {
       "name": "CShell-Pro-0.8.18-mac-x64.dmg",
-      "size": 146425630,
-      "sha256": "30eb20ab03beb3364d4a677d4e639b304b791ab1c89bd3d2cb1aea92c3bedf65"
+      "size": 146425126,
+      "sha256": "b6aafea0cde1bd20ba2f643fef29cd606e37229c8546b3730138b29eeb341d8d"
     },
     {
       "name": "CShell-Pro-0.8.18-win-x64.exe",
-      "size": 123908045,
-      "sha256": "cd7d209967775649be63ebd91275965ab4ccc4b12294c7e841a738b144541a18"
+      "size": 123909057,
+      "sha256": "976b7cf19a3ceb41c385a995e49d3998cb65bb37124f3d0a033d6840f06ee3d3"
     },
     {
       "name": "SHA256SUMS.txt",
       "size": 1283,
-      "sha256": "e3a4260e2ff26a85f065912b4c31e19ef6a0fa5da34dd9787a80289a1f02fcf6"
+      "sha256": "b6da45caebb892b447141f28e1a8931aa2e5e1a2704a0ec0f99fc722fdded9e0"
     }
   ],
-  "blockReason": "Pending Windows native CAgent stale-host credential recovery and Android fresh editable-node/continuous-delete fixes. Replace only two Windows CAgent installers, two Android APKs, and two SHA256SUMS. Verified 22 POSIX binaries and two Windows CShell installers remain valid; no unrelated matrix rebuild.",
-  "pendingGates": [
-    "new CShell profiles need explicitly requested default AI authorization factory; preserve existing grants and absent cloud fields, keep MCP listener disabled",
-    "final nineteen-requirement read-only audit and exact affected-package rebuild plan",
-    "Lenovo physical membership relay acceptance"
-  ]
+  "pendingGates": [],
+  "deferredVerification": {
+    "status": "user-waived-deferred",
+    "scope": "Lenovo physical membership relay acceptance",
+    "reason": "User explicitly authorized immediate release without this physical acceptance prerequisite; no claim that it passed."
+  }
 }
