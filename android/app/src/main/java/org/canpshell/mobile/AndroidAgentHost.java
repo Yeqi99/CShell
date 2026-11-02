@@ -175,7 +175,7 @@ final class AndroidAgentHost implements AutoCloseable {
     final SSLSocket socket;final InputStream input;final DataOutputStream output;final String owner;final long hostEpoch;
     JSONObject ticket;byte[] session,txKey,rxKey,mediaKey;long tx,rx,mediaSequence,frameId,inputSequence,lastInputNotice;volatile long awaiting=-1,writeStarted,lastAck=System.nanoTime();volatile boolean ready,hasVideo;final AtomicBoolean closed=new AtomicBoolean();
     final ExecutorService writer=new ThreadPoolExecutor(1,1,0,TimeUnit.MILLISECONDS,new ArrayBlockingQueue<>(2));
-    final AtomicBoolean frameQueued=new AtomicBoolean();volatile boolean needKey=true;
+    final AtomicBoolean frameQueued=new AtomicBoolean();final AndroidFrameQueue frameQueue=new AndroidFrameQueue();
     ScheduledFuture<?> watchdog;
     Desktop(SSLSocket s,InputStream in,OutputStream out,String owner,long hostEpoch){socket=s;input=in;output=new DataOutputStream(out);this.owner=owner;this.hostEpoch=hostEpoch;}
     void run()throws Exception {
@@ -197,11 +197,11 @@ final class AndroidAgentHost implements AutoCloseable {
       switch(op){
         case "ping":send(new JSONObject().put("op","pong").put("sent",m.opt("sent")));break;
         case "pong":break;
-        case "ack":if(String.valueOf(awaiting).equals(m.getString("id"))){awaiting=-1;lastAck=System.nanoTime();}break;
-        case "keyframe":needKey=true;backend.requestKeyFrame();break;
+        case "ack":if(String.valueOf(awaiting).equals(m.getString("id"))){awaiting=-1;lastAck=System.nanoTime();pumpFrame();}break;
+        case "keyframe":frameQueue.reset();backend.requestKeyFrame();break;
         case "release-input":backend.releaseInput();break;
         case "input":{JSONObject value=m.getJSONObject("value");if(!ticket.optBoolean("control")||!hasVideo)break;if(!backend.controlAvailable()){backend.releaseInput();ticket.put("control",false);send(new JSONObject().put("op","notice").put("value","INPUT_DISABLED: 手机辅助控制已关闭"));break;}if(value.getLong("generation")!=1||value.getLong("sequence")<=inputSequence)throw new IOException("Input ordering invalid");inputSequence=value.getLong("sequence");boolean unsupported=false;synchronized(AndroidAgentHost.this){if(closed.get()||desktop!=this||hostEpoch!=epoch.get())return;try{backend.input(value);}catch(Exception e){backend.releaseInput();unsupported=true;}}if(unsupported&&System.nanoTime()-lastInputNotice>TimeUnit.SECONDS.toNanos(2)){lastInputNotice=System.nanoTime();send(new JSONObject().put("op","notice").put("value","Android 当前界面不支持此输入操作；屏幕共享仍在继续。"));}break;}
-        case "quality":{JSONObject q=m.getJSONObject("value");validateQuality(q);synchronized(AndroidAgentHost.this){if(closed.get()||desktop!=this||hostEpoch!=epoch.get())return;backend.quality(q);needKey=true;backend.requestKeyFrame();}break;}
+        case "quality":{JSONObject q=m.getJSONObject("value");validateQuality(q);synchronized(AndroidAgentHost.this){if(closed.get()||desktop!=this||hostEpoch!=epoch.get())return;backend.quality(q);frameQueue.reset();backend.requestKeyFrame();}break;}
         case "feedback":break; // Transport receipts bound the queue; device quality remains explicit.
         case "close":close();break;
         default:throw new IOException("Invalid desktop operation");
@@ -211,9 +211,14 @@ final class AndroidAgentHost implements AutoCloseable {
     public void video(JSONObject info){try{JSONObject snapshot=new JSONObject(info.toString());writer.execute(()->{try{send(new JSONObject().put("op","video").put("value",snapshot));hasVideo=true;}catch(Exception e){failure="DESKTOP_WRITE_"+e.getClass().getSimpleName();close();}});}catch(Exception e){close();}}
     public void frame(byte[] data,long time,boolean key){
       if(closed.get()||!ready||!hasVideo)return;if(data.length==0||data.length>32*1024*1024){error("CAPTURE_FRAME_BUDGET");return;}
-      if(awaiting>=0||!frameQueued.compareAndSet(false,true)){needKey=true;return;}
-      if(needKey&&!key){frameQueued.set(false);backend.requestKeyFrame();return;}
-      needKey=false;byte[] copy=data.clone();try{writer.execute(()->{try{sendFrame(copy,time,key);}catch(Exception e){failure="DESKTOP_FRAME_"+e.getClass().getSimpleName();close();}finally{frameQueued.set(false);}});}catch(RejectedExecutionException e){frameQueued.set(false);close();}
+      if(!frameQueue.offer(data,time,key,System.nanoTime()))backend.requestKeyFrame();
+      pumpFrame();
+    }
+    private void pumpFrame(){
+      if(closed.get()||awaiting>=0||!frameQueued.compareAndSet(false,true))return;
+      AndroidFrameQueue.Frame next=frameQueue.poll(System.nanoTime());
+      if(next==null){frameQueued.set(false);if(frameQueue.needsKey())backend.requestKeyFrame();return;}
+      try{writer.execute(()->{try{sendFrame(next.data,next.timestamp,next.key);}catch(Exception e){failure="DESKTOP_FRAME_"+e.getClass().getSimpleName();close();}finally{frameQueued.set(false);if(awaiting<0)pumpFrame();}});}catch(RejectedExecutionException e){frameQueued.set(false);close();}
     }
     private void sendFrame(byte[] data,long timestamp,boolean key)throws Exception {
       long id=frameId++;if(id>0xffffffffL)throw new IOException("Frame identity exhausted");int payload=16384-48,count=(data.length+payload-1)/payload;awaiting=id;lastAck=System.nanoTime();
@@ -224,7 +229,7 @@ final class AndroidAgentHost implements AutoCloseable {
       }
     }
     public void error(String reason){failure=reason==null?"Screen capture stopped":reason;String message=failure.startsWith("SCREEN_LOCKED")?"手机已锁屏或息屏，请在手机上解锁后重新连接；管理连接仍可使用":"手机屏幕共享已结束，请在手机上重新授权共享后连接；管理连接仍可使用";try{send(new JSONObject().put("op","close").put("reason",message).put("code",failure.startsWith("SCREEN_LOCKED")?"SCREEN_LOCKED":"PROJECTION_STOPPED").put("recoverable",true));}catch(Exception ignored){}close();}
-    public void close(){if(!closed.compareAndSet(false,true))return;try{socket.close();}catch(Exception ignored){}if(watchdog!=null)watchdog.cancel(false);writer.shutdownNow();synchronized(AndroidAgentHost.this){if(desktop==this){desktop=null;backend.releaseInput();backend.stop();}}}
+    public void close(){if(!closed.compareAndSet(false,true))return;try{socket.close();}catch(Exception ignored){}if(watchdog!=null)watchdog.cancel(false);frameQueue.reset();writer.shutdownNow();synchronized(AndroidAgentHost.this){if(desktop==this){desktop=null;backend.releaseInput();backend.stop();}}}
   }
   static byte[] hmac(byte[] key,String value)throws Exception{Mac mac=Mac.getInstance("HmacSHA256");mac.init(new SecretKeySpec(key,"HmacSHA256"));return mac.doFinal(value.getBytes(StandardCharsets.UTF_8));}
   static byte[] crypt(boolean encrypt,byte[] key,byte[] sequence,byte[] aad,byte[] body)throws Exception{byte[] nonce=new byte[12];System.arraycopy(sequence,0,nonce,4,8);Cipher c=Cipher.getInstance("AES/GCM/NoPadding");c.init(encrypt?Cipher.ENCRYPT_MODE:Cipher.DECRYPT_MODE,new SecretKeySpec(key,"AES"),new GCMParameterSpec(128,nonce));c.updateAAD(aad);return c.doFinal(body);}
