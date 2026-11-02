@@ -1,0 +1,254 @@
+{
+  "version": "0.8.19",
+  "status": "verified-candidates-not-published",
+  "channels": {
+    "opensource": {
+      "source": "438a26b730ae88a8c06d1c2b4bab03e62e8fe1f5",
+      "remote": "f98650e308dd2e4772cadd14857e7059189ca3d8",
+      "tree": "e7264a9c0adb3297ec01e8c0f62a6e04e5c52baa",
+      "runId": 41400606703,
+      "artifacts": [
+        {
+          "id": 13121910015,
+          "name": "desktop-mac-arm64",
+          "size_in_bytes": 322979710,
+          "url": "https://api.github.com/repos/Yeqi99/CShell/actions/artifacts/13121910015",
+          "archive_download_url": "https://api.github.com/repos/Yeqi99/CShell/actions/artifacts/13121910015/zip",
+          "expired": false,
+          "created_at": "2026-11-02T06:37:27Z",
+          "expires_at": "2027-01-31T06:33:00Z",
+          "updated_at": "2026-11-02T06:37:27Z",
+          "digest": "sha256:e071d146232e00aea92a97dcd3c3f5e17f3aa5fd8aefd422a4e7a3b96d963fe8",
+          "workflow_run": {
+            "id": 41400606703,
+            "repository_id": 1414250753,
+            "head_repository_id": 1414250753,
+            "head_branch": "codex/runtime-core-0.8.19",
+            "head_sha": "f98650e308dd2e4772cadd14857e7059189ca3d8"
+          }
+        },
+        {
+          "id": 13121690287,
+          "name": "desktop-linux-arm64",
+          "size_in_bytes": 287443891,
+          "url": "https://api.github.com/repos/Yeqi99/CShell/actions/artifacts/13121690287",
+          "archive_download_url": "https://api.github.com/repos/Yeqi99/CShell/actions/artifacts/13121690287/zip",
+          "expired": false,
+          "created_at": "2026-11-02T06:37:27Z",
+          "expires_at": "2027-01-31T06:33:00Z",
+          "updated_at": "2026-11-02T06:37:27Z",
+          "digest": "sha256:89065b6b9ba1bbf61e46545f3c1b0a0f679c1abbbb65f5b431b2bf6c22afe484",
+          "workflow_run": {
+            "id": 41400606703,
+            "repository_id": 1414250753,
+            "head_repository_id": 1414250753,
+            "head_branch": "codex/runtime-core-0.8.19",
+            "head_sha": "f98650e308dd2e4772cadd14857e7059189ca3d8"
+          }
+        },
+        {
+          "id": 13121610656,
+          "name": "desktop-linux-x64",
+          "size_in_bytes": 292380280,
+          "url": "https://api.github.com/repos/Yeqi99/CShell/actions/artifacts/13121610656",
+          "archive_download_url": "https://api.github.com/repos/Yeqi99/CShell/actions/artifacts/13121610656/zip",
+          "expired": false,
+          "created_at": "2026-11-02T06:36:37Z",
+          "expires_at": "2027-01-31T06:33:00Z",
+          "updated_at": "2026-11-02T06:36:37Z",
+          "digest": "sha256:97dbea2acc6483a5ac08bdc66ab566303680219003375abf675606c76b591172",
+          "workflow_run": {
+            "id": 41400606703,
+            "repository_id": 1414250753,
+            "head_repository_id": 1414250753,
+            "head_branch": "codex/runtime-core-0.8.19",
+            "head_sha": "f98650e308dd2e4772cadd14857e7059189ca3d8"
+          }
+        },
+        {
+          "id": 13121224113,
+          "name": "desktop-mac-x64",
+          "size_in_bytes": 331860589,
+          "url": "https://api.github.com/repos/Yeqi99/CShell/actions/artifacts/13121224113",
+          "archive_download_url": "https://api.github.com/repos/Yeqi99/CShell/actions/artifacts/13121224113/zip",
+          "expired": false,
+          "created_at": "2026-11-02T06:44:05Z",
+          "expires_at": "2027-01-31T06:33:00Z",
+          "updated_at": "2026-11-02T06:44:05Z",
+          "digest": "sha256:0e64a06867da4ac2368dc7d7d8ea7ea3e543aa900eebe2e1bb5f9790b18fa75e",
+          "workflow_run": {
+            "id": 41400606703,
+            "repository_id": 1414250753,
+            "head_repository_id": 1414250753,
+            "head_branch": "codex/runtime-core-0.8.19",
+            "head_sha": "f98650e308dd2e4772cadd14857e7059189ca3d8"
+          }
+        }
+      ]
+    },
+    "pro": {
+      "source": "e2fc37ed7cdde1a7d3b1d793c0a64062c7d00472",
+      "remote": "560c0c57dd55b4e765212cf2f3852a6a8920bed8",
+      "tree": "841b959498b5e39a0d85a21602fa890fd536d653",
+      "runId": 41399914894,
+      "artifacts": [
+        {
+          "id": 13121310479,
+          "name": "pro-cagent-mac-arm64",
+          "size_in_bytes": 39115921,
+          "url": "https://api.github.com/repos/Yeqi99/CShell/actions/artifacts/13121310479",
+          "archive_download_url": "https://api.github.com/repos/Yeqi99/CShell/actions/artifacts/13121310479/zip",
+          "expired": false,
+          "created_at": "2026-11-02T06:27:22Z",
+          "expires_at": "2027-01-31T06:26:30Z",
+          "updated_at": "2026-11-02T06:27:22Z",
+          "digest": "sha256:4282328c762fa9ac106c75bfa28ad16dd71fce854fdd53b4e10bdbdec1f851e1",
+          "workflow_run": {
+            "id": 41399914894,
+            "repository_id": 1414250753,
+            "head_repository_id": 1414250753,
+            "head_branch": "codex/runtime-pro-0.8.19",
+            "head_sha": "560c0c57dd55b4e765212cf2f3852a6a8920bed8"
+          }
+        },
+        {
+          "id": 13121251029,
+          "name": "pro-cagent-linux-arm64",
+          "size_in_bytes": 44262794,
+          "url": "https://api.github.com/repos/Yeqi99/CShell/actions/artifacts/13121251029",
+          "archive_download_url": "https://api.github.com/repos/Yeqi99/CShell/actions/artifacts/13121251029/zip",
+          "expired": false,
+          "created_at": "2026-11-02T06:27:17Z",
+          "expires_at": "2027-01-31T06:26:30Z",
+          "updated_at": "2026-11-02T06:27:17Z",
+          "digest": "sha256:9cfc2a9f9f4f6781f3936b61cb363a477b3b0375860be5eb9bd379bf7bce4199",
+          "workflow_run": {
+            "id": 41399914894,
+            "repository_id": 1414250753,
+            "head_repository_id": 1414250753,
+            "head_branch": "codex/runtime-pro-0.8.19",
+            "head_sha": "560c0c57dd55b4e765212cf2f3852a6a8920bed8"
+          }
+        },
+        {
+          "id": 13121077559,
+          "name": "pro-mac-x64",
+          "size_in_bytes": 146217305,
+          "url": "https://api.github.com/repos/Yeqi99/CShell/actions/artifacts/13121077559",
+          "archive_download_url": "https://api.github.com/repos/Yeqi99/CShell/actions/artifacts/13121077559/zip",
+          "expired": false,
+          "created_at": "2026-11-02T06:31:26Z",
+          "expires_at": "2027-01-31T06:26:30Z",
+          "updated_at": "2026-11-02T06:31:26Z",
+          "digest": "sha256:4f5e6d15656b915a2324c5299e11c363fb99222b4dde17c93687989804474316",
+          "workflow_run": {
+            "id": 41399914894,
+            "repository_id": 1414250753,
+            "head_repository_id": 1414250753,
+            "head_branch": "codex/runtime-pro-0.8.19",
+            "head_sha": "560c0c57dd55b4e765212cf2f3852a6a8920bed8"
+          }
+        },
+        {
+          "id": 13120639239,
+          "name": "pro-linux-x64",
+          "size_in_bytes": 246998386,
+          "url": "https://api.github.com/repos/Yeqi99/CShell/actions/artifacts/13120639239",
+          "archive_download_url": "https://api.github.com/repos/Yeqi99/CShell/actions/artifacts/13120639239/zip",
+          "expired": false,
+          "created_at": "2026-11-02T06:28:31Z",
+          "expires_at": "2027-01-31T06:26:30Z",
+          "updated_at": "2026-11-02T06:28:31Z",
+          "digest": "sha256:938d680a9fa4da18f591dd7bd699314eaf857b669c29c4922190acb56c3886b1",
+          "workflow_run": {
+            "id": 41399914894,
+            "repository_id": 1414250753,
+            "head_repository_id": 1414250753,
+            "head_branch": "codex/runtime-pro-0.8.19",
+            "head_sha": "560c0c57dd55b4e765212cf2f3852a6a8920bed8"
+          }
+        },
+        {
+          "id": 13120579424,
+          "name": "pro-mac-arm64",
+          "size_in_bytes": 142396072,
+          "url": "https://api.github.com/repos/Yeqi99/CShell/actions/artifacts/13120579424",
+          "archive_download_url": "https://api.github.com/repos/Yeqi99/CShell/actions/artifacts/13120579424/zip",
+          "expired": false,
+          "created_at": "2026-11-02T06:29:31Z",
+          "expires_at": "2027-01-31T06:26:30Z",
+          "updated_at": "2026-11-02T06:29:31Z",
+          "digest": "sha256:8f1489792d621d87748f25eeb3adef98bb782b1be0261c57afc6b080f2439fd9",
+          "workflow_run": {
+            "id": 41399914894,
+            "repository_id": 1414250753,
+            "head_repository_id": 1414250753,
+            "head_branch": "codex/runtime-pro-0.8.19",
+            "head_sha": "560c0c57dd55b4e765212cf2f3852a6a8920bed8"
+          }
+        },
+        {
+          "id": 13120499442,
+          "name": "pro-cagent-mac-x64",
+          "size_in_bytes": 40320555,
+          "url": "https://api.github.com/repos/Yeqi99/CShell/actions/artifacts/13120499442",
+          "archive_download_url": "https://api.github.com/repos/Yeqi99/CShell/actions/artifacts/13120499442/zip",
+          "expired": false,
+          "created_at": "2026-11-02T06:28:26Z",
+          "expires_at": "2027-01-31T06:26:30Z",
+          "updated_at": "2026-11-02T06:28:26Z",
+          "digest": "sha256:273860d78a9590c5da7a194594324072629e49f8343ebf3e6bc730ce28ebdc1d",
+          "workflow_run": {
+            "id": 41399914894,
+            "repository_id": 1414250753,
+            "head_repository_id": 1414250753,
+            "head_branch": "codex/runtime-pro-0.8.19",
+            "head_sha": "560c0c57dd55b4e765212cf2f3852a6a8920bed8"
+          }
+        },
+        {
+          "id": 13120258506,
+          "name": "pro-cagent-linux-x64",
+          "size_in_bytes": 44591510,
+          "url": "https://api.github.com/repos/Yeqi99/CShell/actions/artifacts/13120258506",
+          "archive_download_url": "https://api.github.com/repos/Yeqi99/CShell/actions/artifacts/13120258506/zip",
+          "expired": false,
+          "created_at": "2026-11-02T06:27:23Z",
+          "expires_at": "2027-01-31T06:26:30Z",
+          "updated_at": "2026-11-02T06:27:23Z",
+          "digest": "sha256:4f1a9de48998f424a9b6fd1b5027f5a175695c72a27052ca49d646e445bddbb6",
+          "workflow_run": {
+            "id": 41399914894,
+            "repository_id": 1414250753,
+            "head_repository_id": 1414250753,
+            "head_branch": "codex/runtime-pro-0.8.19",
+            "head_sha": "560c0c57dd55b4e765212cf2f3852a6a8920bed8"
+          }
+        },
+        {
+          "id": 13120094282,
+          "name": "pro-linux-arm64",
+          "size_in_bytes": 243721466,
+          "url": "https://api.github.com/repos/Yeqi99/CShell/actions/artifacts/13120094282",
+          "archive_download_url": "https://api.github.com/repos/Yeqi99/CShell/actions/artifacts/13120094282/zip",
+          "expired": false,
+          "created_at": "2026-11-02T06:29:31Z",
+          "expires_at": "2027-01-31T06:26:30Z",
+          "updated_at": "2026-11-02T06:29:31Z",
+          "digest": "sha256:26dea247320dcd425938960694e8d9074159889136fdf06f6c9c89b783118d2f",
+          "workflow_run": {
+            "id": 41399914894,
+            "repository_id": 1414250753,
+            "head_repository_id": 1414250753,
+            "head_branch": "codex/runtime-pro-0.8.19",
+            "head_sha": "560c0c57dd55b4e765212cf2f3852a6a8920bed8"
+          }
+        }
+      ]
+    }
+  },
+  "limits": [
+    "macOS not notarized; no physical Mac/Linux installation claimed",
+    "CI native package smoke is recorded per workflow; Windows user applications not installed"
+  ]
+}

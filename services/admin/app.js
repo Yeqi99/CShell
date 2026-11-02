@@ -174,7 +174,7 @@ analytics=function(){const total=modelUsage.usage.reduce((n,r)=>n+r.requests,0),
 void loadProduction();
 
 const accountOverview=accounts;
-accounts=function(){return accountOverview()+`<section class="card production-loans"><div class="card-head"><div><h2>机器借用授权</h2><p class="muted">查看授权期限与范围，撤销会终止借用连接。</p></div>${btn('刷新','refresh-lending',false,'refresh')}</div>${lendingError?`<p role="status" class="card-body">${esc(lendingError)}</p>`:table(['拥有者','借用范围','接收方式','期限','状态','操作'],productionLending.loans.map(loan=>{
+accounts=function(){return accountOverview()+`<section class="card production-loans"><div class="card-head"><div><h2>机器借用授权</h2><p class="muted">查看授权期限与范围，撤销会终止借用连接。用户在 CShell 连接右键“分享机器…”创建邀请；同账号自动发现开关位于客户端“账号与云同步”，不由管理台代开设备服务。</p></div>${btn('刷新','refresh-lending',false,'refresh')}</div>${lendingError?`<p role="status" class="card-body">${esc(lendingError)}</p>`:table(['拥有者','借用范围','接收方式','期限','状态','操作'],productionLending.loans.map(loan=>{
   const active=!loan.revoked&&loan.expiresAt*1000>Date.now();
   return `<tr><td>${esc(production.accounts.find(a=>a.id===loan.owner)?.email||loan.owner)}</td><td>${loan.deviceIds.length} 台机器</td><td>${esc(loan.email||`分享码 · 最多 ${loan.maxUses} 人`)}</td><td>${esc(new Date(loan.expiresAt*1000).toLocaleString())}</td><td>${badge(loan.revoked?'已撤销':active?'有效':'已到期',active?'green':'')}</td><td>${active?`<button class="textbtn" data-revoke-loan="${esc(loan.id)}">撤销授权</button>`:'—'}</td></tr>`;
 }),'<p>暂无机器借用授权</p>')}<div id="loan-revoke-editor" class="card-body" hidden></div></section>`;};

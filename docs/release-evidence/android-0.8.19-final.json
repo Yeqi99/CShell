@@ -1,0 +1,48 @@
+{
+  "version": "0.8.19",
+  "status": "verified-candidates-not-published",
+  "nativeValidation": {
+    "runId": 41400196059,
+    "apis": [
+      29,
+      35
+    ],
+    "source": "11b133c2f5f40be04048d79cb7b11c9498a9d181",
+    "ciCommit": "75062c781d283241035810100d9cd1b9a4853018",
+    "result": "success",
+    "previousRun": 41399099170,
+    "fix": "Android29 nested TLS uses a bounded byte bridge; strict verification retained"
+  },
+  "sources": {
+    "opensource": {
+      "head": "4761ea696df5c14c76a4af736755366522a0439e",
+      "tree": "17ffcf9a59a9df15730a129ab090f5d5fabd7a01",
+      "remote": "936c799ab94308dbb1faab0f8ec1bfe2046faab1",
+      "runId": 41402886068
+    },
+    "pro": {
+      "head": "3669b97638dd69b2bd750139dbf8788cfd65305d",
+      "tree": "8fda3827e54275981c5d92858f658fd27b91b97d",
+      "remote": "8d2bba8345db4f53862ef198d657acc2dd9e829d",
+      "runId": 41402913090
+    }
+  },
+  "identity": {
+    "opensource": {
+      "apk": "/home/runner/work/CShell/CShell/android/app/build/outputs/apk/release/app-release.apk",
+      "package": "org.canpshell.mobile",
+      "version": "0.8.19",
+      "versionCode": 8019,
+      "certificate": "34cc1c9a0eacafc512a0837c3d286081879822f047e5637a65cdbc5b525914c5",
+      "sha256": "ee7676c3a22debd3a79742d93bde9cff6a9ecfc626bb93a1623e2d8cd952b3d2"
+    },
+    "pro": {
+      "apk": "/home/runner/work/CShell/CShell/android/app/build/outputs/apk/release/app-release.apk",
+      "package": "org.canpshell.mobile.pro",
+      "version": "0.8.19",
+      "versionCode": 8019,
+      "certificate": "34cc1c9a0eacafc512a0837c3d286081879822f047e5637a65cdbc5b525914c5",
+      "sha256": "12d63467f43ac8039f1edf8a361bca48ad5174130751eb4b5f7a0baa9a10a4ae"
+    }
+  }
+}
