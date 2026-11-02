@@ -225,6 +225,9 @@ async function rawManage(
 test('Agent native management, hosting and relay grants are independent on provider and TLS server', async () => {
   const f = await fixture();
   try {
+    // This matrix isolates transport grants from assistant automation. The new
+    // workspace default is open; this fixture explicitly opts out instead.
+    await f.runtime.dispatch('assistant.configure',{endpoint:'https://example.invalid/v1/chat/completions',model:'fixture',commands:false,review:true,delegates:[],automation:false});
     for (const [grant, allowed, denied, toolName] of [
       ['allowManage', 'client.status', ['hosting.list', 'relay.status'], 'agent_manage'],
       ['allowHosting', 'hosting.list', ['client.status', 'relay.status'], 'agent_hosting'],
@@ -299,6 +302,20 @@ test('Agent native management, hosting and relay grants are independent on provi
   } finally {
     await f.close();
   }
+});
+
+test('fresh assistant automation is exposed through authenticated management and explicit denial is enforced',async()=>{
+  const f=await fixture();
+  try{
+    const {device,session}=await f.pair({allowManage:true});
+    const registry=new ConnectionRegistry(()=>({id:device.deviceId,profileId:device.deviceId,group:'fixture'}));
+    registry.register(f.provider);registry.bind(session,f.provider.id);
+    assert(registry.tools(session).some(tool=>tool.name==='agent_automation_list'));
+    const identity=await f.vault.identity();
+    assert.ok(await rawManage(f.port,identity,'automation.list'));
+    await f.runtime.dispatch('assistant.configure',{endpoint:'https://example.invalid/v1/chat/completions',model:'fixture',commands:false,review:true,delegates:[],automation:false});
+    await assert.rejects(rawManage(f.port,identity,'automation.list'),/denied|未授权|not allowed|CAgent/i);
+  }finally{await f.close();}
 });
 
 test('Agent legacy peers retain identity but gain no new management or hosting grants on load', async () => {
@@ -538,3 +555,4 @@ test('remote automation uses real authenticated TLS owner and exposes reviewed c
   await assert.rejects(tools[0].invoke({},signal));
  }finally{await f.close();}
 });
+
