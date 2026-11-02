@@ -1,0 +1,20 @@
+{
+  "version": "0.8.19",
+  "edition": "opensource",
+  "status": "candidate-verified-not-published",
+  "runtimeSource": "adb8187",
+  "artifact": "CShell-0.8.19-win-x64.exe",
+  "size": 123699797,
+  "sha256": "85601f23def342fb65b191bc61e175860c9ab00466592f7b8a44b7eec2280fab",
+  "checks": [
+    "pnpm build",
+    "release-desktop-smoke: actual unpacked executable, isolated data, SSH/SFTP/settings/MCP/restart",
+    "ai-first-install-package-smoke: fresh defaults, explicit denial persists, MCP off",
+    "ping-all-ui-smoke: 320/390/700px, 125 percent, left and right bottom corners"
+  ],
+  "limits": [
+    "Windows executable unsigned",
+    "No installation over user application",
+    "This is not a publication receipt"
+  ]
+}
