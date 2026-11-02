@@ -1,0 +1,19 @@
+{
+  "version": "0.8.19",
+  "edition": "pro",
+  "source": "dc03f3b6ef12367edd306bc9b5b26aefbfef1d8a",
+  "status": "verified-candidate-not-published",
+  "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\CAgent-Setup-0.8.19-win-x64.exe",
+  "bytes": 26235182,
+  "sha256": "0f14a93ceb49aba2e29ff1a093bef4389507ac46355727886fbc87eec89798cc",
+  "authenticode": "NotSigned",
+  "payloadFiles": 48,
+  "validation": [
+    "exact EXE /S /PREPARE isolated install; 48 payload SHA verified; no user discovery/shortcut mutation",
+    "actual packaged CMD PTY / TLS / authorization denial / stop",
+    "native read reconnect / mutation no replay / concurrent single replacement / shared runtime retained / unauthorized no retry",
+    "Pro account guest appearance restart, no listener grant",
+    "actual native models / automation / appearance and identity ciphertext unchanged restart; invalid test invocation blocked before backend"
+  ],
+  "verifiedAt": "2026-11-02T06:32:11.5763984Z"
+}

@@ -1,0 +1,25 @@
+{
+  "version": "0.8.19",
+  "edition": "opensource",
+  "status": "candidate-verified-not-published",
+  "runtimeSource": "438a26b730ae88a8c06d1c2b4bab03e62e8fe1f5",
+  "artifact": "CShell-0.8.19-win-x64.exe",
+  "size": 123782978,
+  "sha256": "a2f538178029b41e0fee3e25b0d3616814ba43824aa58ef45cc81ec79b648708",
+  "checks": [
+    "pnpm build",
+    "release-desktop-smoke: actual unpacked executable, isolated data, SSH/SFTP/settings/MCP/restart",
+    "ai-first-install-package-smoke: fresh defaults, explicit denial persists, MCP off",
+    "ping-all-ui-smoke: 320/390/700px, 125 percent, left and right bottom corners",
+    "final rebuilt package release-desktop-smoke passed after portable capability fix",
+    "final Core and Pro simultaneous edition-isolation-smoke passed"
+  ],
+  "limits": [
+    "Windows executable unsigned",
+    "No installation over user application",
+    "This is not a publication receipt"
+  ],
+  "installerAsarEqualsTestedPackage": true,
+  "asarSha256": "3af7b994ec90e81a18e44b5df08c05b2257ce520997ca7c6a3f5d064542d2fad",
+  "electronDistribution": "installed pinned Electron 44.7.0; GitHub redownload timed out, rebuilt with electronDist"
+}
