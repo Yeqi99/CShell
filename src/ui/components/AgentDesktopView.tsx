@@ -21,6 +21,7 @@ export function AgentDesktopView({
   visible = true,
   embedded = false,
   optionsOpen = false,
+  onVideoSize,
 }: {
   target: string;
   canView: boolean;
@@ -30,6 +31,7 @@ export function AgentDesktopView({
   visible?: boolean;
   embedded?: boolean;
   optionsOpen?: boolean;
+  onVideoSize?: (size: {width:number;height:number}) => void;
 }) {
   const [active, setActive] = useState(false),
     [busy, setBusy] = useState(false),
@@ -37,6 +39,8 @@ export function AgentDesktopView({
     [control, setControl] = useState(true),
     [error, setError] = useState(''),
     [info, setInfo] = useState<DesktopVideoInfo>();
+  const videoSizeCallback=useRef(onVideoSize);videoSizeCallback.current=onVideoSize;
+  useEffect(()=>{if(info?.width&&info?.height)videoSizeCallback.current?.({width:info.width,height:info.height});},[info?.width,info?.height]);
   const visibleRef = useRef(visible);
   visibleRef.current = visible;
   const requestedControl=useRef(true);
@@ -55,7 +59,7 @@ export function AgentDesktopView({
   },[]);
   const [expanded,setExpanded]=useState(false),[fullscreen,setFullscreen]=useState(false);
   const [frameSize,setFrameSize]=useState<{width:number;height:number}>();
-  const [fit,setFit]=useState<'fill'|'contain'|'native'>('fill');
+  const [fit,setFit]=useState<'fill'|'contain'|'native'>('contain');
   const [zoom,setZoom]=useState(100),[pan,setPan]=useState(false);
   const drag=useRef<{x:number;y:number;left:number;top:number}|undefined>(undefined);
   useEffect(()=>{
@@ -575,7 +579,7 @@ export function AgentDesktopView({
             onKeyUp={(e) => {if(!pan)key(e, false);}}
             onContextMenu={(e) => e.preventDefault()}
             onPointerDown={(e) => {
-              e.currentTarget.focus();
+              e.currentTarget.focus({preventScroll:true});
               if(pan&&screen.current){e.preventDefault();e.currentTarget.setPointerCapture(e.pointerId);drag.current={x:e.clientX,y:e.clientY,left:screen.current.scrollLeft,top:screen.current.scrollTop};return;}
               if (controlling.current) {
                 e.preventDefault();
