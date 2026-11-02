@@ -48,12 +48,12 @@ try {
   await openFiles();
   await page.getByLabel('file draft').fill('preserve file draft');
   const first = await polls();await tick();assert.equal(await polls(),first+1);
-  await fileWindow.getByRole('button',{name:'最小化文件',exact:true}).click();
+  await fileWindow.getByRole('button',{name:/^最小化\s*文件$/}).click();
   await page.locator('[data-file-active="false"]').waitFor({state:'attached'});
   await assertPaused();
   await openFiles();
   assert.equal(await page.getByLabel('file draft').inputValue(),'preserve file draft');
-  await fileWindow.getByRole('button',{name:'关闭文件窗口',exact:true}).click();
+  await fileWindow.getByRole('button',{name:/^关闭\s*文件窗口$/}).click();
   await assertPaused();
   await openFiles();
 
