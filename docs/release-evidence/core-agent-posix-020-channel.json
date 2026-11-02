@@ -1,0 +1,54 @@
+{
+  "version": "0.8.20",
+  "status": "private-verified",
+  "files": [
+    {
+      "name": "CAgent-0.8.20-mac-x64.tar.gz",
+      "path": "/opt/cshell-release-staging/0.8.20-final/opensource/CAgent-0.8.20-mac-x64.tar.gz",
+      "bytes": 40730816,
+      "sha256": "fff707ae0e4061a86621c65c56f9667c26c6047a40eb2b13c113b83d1ff9c534",
+      "archiveSha256": "c05aa0ca5459d559818b4d8103fbeda1290e7441a26351c1754bb1e5cbe44ca9",
+      "archiveBytes": 331922792,
+      "artifactId": 13132045225,
+      "source": "23b9bf2a0a2e4ed29986bdd671cd8dcb1487efbd",
+      "status": "private-archive-digest-verified-not-published",
+      "edition": "opensource"
+    },
+    {
+      "name": "CAgent-0.8.20-linux-x64.tar.gz",
+      "path": "/opt/cshell-release-staging/0.8.20-final/opensource/CAgent-0.8.20-linux-x64.tar.gz",
+      "bytes": 44823799,
+      "sha256": "5d988168a9be6ad02bdc45187bfb5100760b2dfc1aac1f70e26aaa9588c77283",
+      "archiveSha256": "df1247a2299507ac4450b1435f257321ec6cee19f51ae93853eae187151496cc",
+      "archiveBytes": 292394045,
+      "artifactId": 13130657601,
+      "source": "23b9bf2a0a2e4ed29986bdd671cd8dcb1487efbd",
+      "status": "private-archive-digest-verified-not-published",
+      "edition": "opensource"
+    },
+    {
+      "name": "CAgent-0.8.20-mac-arm64.tar.gz",
+      "path": "/opt/cshell-release-staging/0.8.20-final/opensource/CAgent-0.8.20-mac-arm64.tar.gz",
+      "bytes": 39501213,
+      "sha256": "ad7cb7660bcaf238a056a010873408132511a15e1012c812089dfbc8c3128bc1",
+      "archiveSha256": "67343359d381c2ec117ad943ccefbf5bb585ce0b8f4dd40fb4db4f50dbed37fe",
+      "archiveBytes": 323014677,
+      "artifactId": 13131565717,
+      "source": "23b9bf2a0a2e4ed29986bdd671cd8dcb1487efbd",
+      "status": "private-archive-digest-verified-not-published",
+      "edition": "opensource"
+    },
+    {
+      "name": "CAgent-0.8.20-linux-arm64.tar.gz",
+      "path": "/opt/cshell-release-staging/0.8.20-final/opensource/CAgent-0.8.20-linux-arm64.tar.gz",
+      "bytes": 44505697,
+      "sha256": "605feeb49dd18968d4495dd0e97de3b75194310071055cb25e684e5ef1ebddae",
+      "archiveSha256": "6ec45831edc8d14fb422eb194dd8612aa259d710bec6ebd1a2807b394680bd03",
+      "archiveBytes": 287484293,
+      "artifactId": 13130223911,
+      "source": "23b9bf2a0a2e4ed29986bdd671cd8dcb1487efbd",
+      "status": "private-archive-digest-verified-not-published",
+      "edition": "opensource"
+    }
+  ]
+}
