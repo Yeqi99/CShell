@@ -3,7 +3,7 @@ import { NativeDesktop } from './NativeDesktop';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Monitor, Terminal, ChevronRight, RefreshCw } from 'lucide-react';
 import type { AgentCall } from '../../shared/agent';
-import type { LinuxWorkspacePlan } from '../../shared/linux-workspace';
+import { nativeDesktopAvailable, type LinuxWorkspacePlan } from '../../shared/linux-workspace';
 import type { RemoteJob } from '../../shared/plugins';
 import { LinuxDesktop, LinuxDesktopTerminal } from './LinuxDesktop';
 import type { Preferences } from '../../shared/contracts';
@@ -209,7 +209,7 @@ export function LinuxWorkspace({
   return <div className="linux-desktop-host" hidden={!active}>
     <LinuxDesktop initialApp={nativeDesktopRequest ? 'native-desktop' : undefined} initialAppRevision={nativeDesktopRequest} name={name} machine={ready ? {...machine, deviceId: profileId} : {deviceId:profileId, platform:plan?.platform || 'unknown', sshOnly:true}} target={target} call={call} active={active} closed={closed} onRetry={onRetry} onTerminal={onTerminal}
       files={files} terminal={terminal || ((visible,theme)=><LinuxDesktopTerminal profileId={profileId} preferences={{...preferences,theme}} active={visible}/>)}
-      extraPanels={[...(ready ? [] : [{id:'install-cagent',label:'安装 CAgent',content:setup}]),{id:'native-desktop',label:'原生桌面',icon:Monitor,content:(visible, _options, _closeOptions, windowClosed)=><NativeDesktop session={session} closed={closed || windowClosed} active={visible} initialInfo={nativeInfo}/>} ]}/>
+      extraPanels={[...(ready ? [] : [{id:'install-cagent',label:'安装 CAgent',content:setup}]),...(nativeDesktopAvailable(nativeInfo)||nativeDesktopRequest ? [{id:'native-desktop',label:nativeDesktopAvailable(nativeInfo)?'原生桌面':'桌面检测',icon:Monitor,content:(visible:boolean, _options:boolean, _closeOptions:()=>void, windowClosed:boolean)=><NativeDesktop session={session} closed={closed || windowClosed} active={visible} initialInfo={nativeInfo}/>} ] : []) ]}/>
   </div>;
 
 }
