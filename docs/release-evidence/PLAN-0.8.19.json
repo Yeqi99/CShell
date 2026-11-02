@@ -1,0 +1,50 @@
+{
+  "version": "0.8.19",
+  "status": "planned-not-built-not-published",
+  "channels": [
+    {
+      "edition": "opensource",
+      "tag": "v0.8.19",
+      "source": null,
+      "assets": [
+        "CAgent-0.8.19-linux-arm64.tar.gz",
+        "CAgent-0.8.19-linux-x64.tar.gz",
+        "CAgent-0.8.19-mac-arm64.tar.gz",
+        "CAgent-0.8.19-mac-x64.tar.gz",
+        "CAgent-Setup-0.8.19-win-x64.exe",
+        "CShell-0.8.19-android.apk",
+        "CShell-0.8.19-linux-amd64.deb",
+        "CShell-0.8.19-linux-arm64.AppImage",
+        "CShell-0.8.19-linux-arm64.deb",
+        "CShell-0.8.19-linux-x86_64.AppImage",
+        "CShell-0.8.19-mac-arm64.dmg",
+        "CShell-0.8.19-mac-arm64.zip",
+        "CShell-0.8.19-mac-x64.dmg",
+        "CShell-0.8.19-mac-x64.zip",
+        "CShell-0.8.19-win-x64.exe",
+        "SHA256SUMS.txt"
+      ]
+    },
+    {
+      "edition": "pro",
+      "tag": "pro-v0.8.19",
+      "source": null,
+      "assets": [
+        "CAgent-0.8.19-linux-arm64.tar.gz",
+        "CAgent-0.8.19-linux-x64.tar.gz",
+        "CAgent-0.8.19-mac-arm64.tar.gz",
+        "CAgent-0.8.19-mac-x64.tar.gz",
+        "CAgent-Setup-0.8.19-win-x64.exe",
+        "CShell-Pro-0.8.19-android.apk",
+        "CShell-Pro-0.8.19-linux-amd64.deb",
+        "CShell-Pro-0.8.19-linux-arm64.AppImage",
+        "CShell-Pro-0.8.19-linux-arm64.deb",
+        "CShell-Pro-0.8.19-linux-x86_64.AppImage",
+        "CShell-Pro-0.8.19-mac-arm64.dmg",
+        "CShell-Pro-0.8.19-mac-x64.dmg",
+        "CShell-Pro-0.8.19-win-x64.exe",
+        "SHA256SUMS.txt"
+      ]
+    }
+  ]
+}
