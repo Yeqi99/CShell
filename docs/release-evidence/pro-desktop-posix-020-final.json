@@ -1,0 +1,102 @@
+{
+  "version": "0.8.20",
+  "status": "verified-private-candidate",
+  "files": [
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.20-linux-arm64.deb",
+      "path": "/opt/cshell-release-staging/0.8.20-final/pro/CShell-Pro-0.8.20-linux-arm64.deb",
+      "bytes": 103309828,
+      "sha256": "f8f07011df0f77dd4c107c34cde9ee7657bd714c05e5b4e244d9b3e62ac6c373",
+      "archiveSha256": "11beab2fd95c61cc5282113dee36ea16e313b4d688fe8776ba66154946f9dd8b",
+      "archiveBytes": 243767308,
+      "artifactId": 13132286260,
+      "source": {
+        "head": "5b784c6faa0ebee3c3b830fdf9630a7c59aa3f60",
+        "tree": "6a17b0e841b9def5552f97a1a8f6e350270ae2e6",
+        "remote": "9a50c3b63887052783b75472943b74c68800f4ba"
+      },
+      "status": "private-archive-digest-verified-not-published"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.20-mac-x64.dmg",
+      "path": "/opt/cshell-release-staging/0.8.20-final/pro/CShell-Pro-0.8.20-mac-x64.dmg",
+      "bytes": 146484071,
+      "sha256": "00ff389b80d4a88ee19dfa66d91a41a8624ea93e499dfd5c1c380946b00ccc30",
+      "archiveSha256": "4dda8523f347008625c41e2be510c5a77a33073119748565b8f77d164da81a3f",
+      "archiveBytes": 146251499,
+      "artifactId": 13132081740,
+      "source": {
+        "head": "5b784c6faa0ebee3c3b830fdf9630a7c59aa3f60",
+        "tree": "6a17b0e841b9def5552f97a1a8f6e350270ae2e6",
+        "remote": "9a50c3b63887052783b75472943b74c68800f4ba"
+      },
+      "status": "private-archive-digest-verified-not-published"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.20-linux-x86_64.AppImage",
+      "path": "/opt/cshell-release-staging/0.8.20-final/pro/CShell-Pro-0.8.20-linux-x86_64.AppImage",
+      "bytes": 139730499,
+      "sha256": "92a36a6f1fa752c1ae67ab0a3520b04fef10e38acdabae49d26b73be87725dd7",
+      "archiveSha256": "8d277e476f2be05d56df1bfde2379325b396dbf9a3baba3c0068f3fa00ce3d20",
+      "archiveBytes": 247044785,
+      "artifactId": 13131637294,
+      "source": {
+        "head": "5b784c6faa0ebee3c3b830fdf9630a7c59aa3f60",
+        "tree": "6a17b0e841b9def5552f97a1a8f6e350270ae2e6",
+        "remote": "9a50c3b63887052783b75472943b74c68800f4ba"
+      },
+      "status": "private-archive-digest-verified-not-published"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.20-linux-arm64.AppImage",
+      "path": "/opt/cshell-release-staging/0.8.20-final/pro/CShell-Pro-0.8.20-linux-arm64.AppImage",
+      "bytes": 140989794,
+      "sha256": "00c7b47c1c1aee92409340c013200aab2cb99dc2ef257e39151b0b9776f2e34b",
+      "archiveSha256": "11beab2fd95c61cc5282113dee36ea16e313b4d688fe8776ba66154946f9dd8b",
+      "archiveBytes": 243767308,
+      "artifactId": 13132286260,
+      "source": {
+        "head": "5b784c6faa0ebee3c3b830fdf9630a7c59aa3f60",
+        "tree": "6a17b0e841b9def5552f97a1a8f6e350270ae2e6",
+        "remote": "9a50c3b63887052783b75472943b74c68800f4ba"
+      },
+      "status": "private-archive-digest-verified-not-published"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.20-mac-arm64.dmg",
+      "path": "/opt/cshell-release-staging/0.8.20-final/pro/CShell-Pro-0.8.20-mac-arm64.dmg",
+      "bytes": 142650892,
+      "sha256": "60c3126935e49401bf86c7c0dc2c5c9e35ff9cead2816b1bd1b476c3721283d6",
+      "archiveSha256": "d5fb1a1c57bcda91d1fe970be28d9c5f5d2893a6ac523ac13c1e17f17d7e0428",
+      "archiveBytes": 142413182,
+      "artifactId": 13131583144,
+      "source": {
+        "head": "5b784c6faa0ebee3c3b830fdf9630a7c59aa3f60",
+        "tree": "6a17b0e841b9def5552f97a1a8f6e350270ae2e6",
+        "remote": "9a50c3b63887052783b75472943b74c68800f4ba"
+      },
+      "status": "private-archive-digest-verified-not-published"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.20-linux-amd64.deb",
+      "path": "/opt/cshell-release-staging/0.8.20-final/pro/CShell-Pro-0.8.20-linux-amd64.deb",
+      "bytes": 107811960,
+      "sha256": "fd5fc31ddd59557877c259601f375ccb8842dea626c4d23ac02b4b7028f8ca73",
+      "archiveSha256": "8d277e476f2be05d56df1bfde2379325b396dbf9a3baba3c0068f3fa00ce3d20",
+      "archiveBytes": 247044785,
+      "artifactId": 13131637294,
+      "source": {
+        "head": "5b784c6faa0ebee3c3b830fdf9630a7c59aa3f60",
+        "tree": "6a17b0e841b9def5552f97a1a8f6e350270ae2e6",
+        "remote": "9a50c3b63887052783b75472943b74c68800f4ba"
+      },
+      "status": "private-archive-digest-verified-not-published"
+    }
+  ]
+}
