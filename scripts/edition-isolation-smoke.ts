@@ -1,7 +1,7 @@
 import { _electron as electron } from 'playwright';
 import {mkdtemp,rm} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join,resolve} from 'node:path';import {createServer} from 'node:net';import {spawn} from 'node:child_process';import assert from 'node:assert/strict';
 const root=await mkdtemp(join(tmpdir(),'cshell-editions-'));
-const exes=[resolve('../..','core-unified-followup/CShell/.local/package-acceptance/win-unpacked/CShell.exe'),resolve('.local/pro-acceptance-dir/win-unpacked/CShell Pro.exe')];
+const exes=[process.env.CSHELL_CORE_EXECUTABLE||resolve('../..','core-unified-followup/CShell/.local/package-acceptance/win-unpacked/CShell.exe'),process.env.CSHELL_PRO_EXECUTABLE||resolve('.local/pro-acceptance-dir/win-unpacked/CShell Pro.exe')];
 const apps:any[]=[];const states:any[]=[];
 async function port(){const s=createServer();await new Promise<void>(r=>s.listen(0,'127.0.0.1',r));const p=(s.address() as any).port;await new Promise<void>(r=>s.close(()=>r()));return p;}
 async function launch(i:number){const env={...process.env,CSHELL_TEST_DATA:join(root,String(i)),CSHELL_TEST_START_GATE:'1'};delete env.ELECTRON_RUN_AS_NODE;const a=await electron.launch({executablePath:exes[i],args:[],env,timeout:30000});await a.evaluate(()=>{(globalThis as any).__cshellPackagedTestAttached=true});const p=await a.firstWindow();await p.waitForFunction(()=>!!window.cshell);return {a,p,env};}
