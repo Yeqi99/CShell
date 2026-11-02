@@ -11,3 +11,6 @@
 ## 开源同步验证
 
 本开源分支只同步共有的自动化默认值与权限布局，不引入 Pro 专属账号工作区切换实现。开源 CAgent 18 项测试通过，完整构建通过，隔离 Electron 的 360/500/700 宽度布局与草稿保存检查通过。上述 24 项账号测试属于 Pro 验证。
+
+
+最终尺寸复核：`getBoundingClientRect().width` 实测分别为 360/500/700 CSS px；当前 Windows `devicePixelRatio=1.25`，对应 PNG 位图宽度为 450/625/875 px。450 px 截图不是面板被最小宽度钳制。脚本现在同时断言实际 CSS 宽度与 PNG/DPI 比例，并保存 `test-results/permission-layout-020/geometry.json`。此次隔离 Electron 复验通过；未调整产品布局来迎合截图尺寸。
