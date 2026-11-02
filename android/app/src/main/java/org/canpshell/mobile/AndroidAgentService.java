@@ -125,6 +125,7 @@ public final class AndroidAgentService extends Service {
     });
     if(host!=null)return;
     host=new AndroidAgentHost(this,new AndroidAgentHost.Backend(){
+      public boolean delegation(String device,String credential,String fingerprint,boolean continuation){return CloudSync.shared(AndroidAgentService.this).verifyHostDelegation(device,credential,fingerprint,continuation);}
       public boolean available(){return sharing&&!destroying&&!locked()&&interactive();}
       public String unavailableReason(){return locked()||!interactive()?"SCREEN_LOCKED: 请先在手机上亮屏并解锁；管理连接保持可用":"PROJECTION_STOPPED: 请在手机上重新授权屏幕共享；管理连接保持可用";}
       public boolean controlAvailable(){return available()&&AndroidControlService.isAvailable();}

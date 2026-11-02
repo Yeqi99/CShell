@@ -51,13 +51,13 @@ final class CloudSync {
     accounts.put(owner(),copy);
   }
   static boolean supportsSchema2(JSONObject bundle){JSONObject store=bundle==null?null:bundle.optJSONObject("store");JSONObject extensions=store==null?null:store.optJSONObject("extensions");return extensions!=null&&extensions.optJSONObject("enabled")!=null;}
-  static int writeSchema(JSONObject bundle){JSONObject store=bundle==null?null:bundle.optJSONObject("store");JSONObject extensions=store==null?null:store.optJSONObject("extensions");return (store!=null&&store.has("capabilityPackages"))||(extensions!=null&&extensions.has("external"))||(bundle!=null&&bundle.has("identityNetwork"))?3:supportsSchema2(bundle)?2:1;}
+  static int writeSchema(JSONObject bundle){JSONObject store=bundle==null?null:bundle.optJSONObject("store");JSONObject extensions=store==null?null:store.optJSONObject("extensions");return store!=null&&store.optJSONObject("accountPreferences")!=null&&store.optJSONObject("accountPreferences").has("autoDiscoverDevices")?4:(store!=null&&store.has("capabilityPackages"))||(extensions!=null&&extensions.has("external"))||(bundle!=null&&bundle.has("identityNetwork"))?3:supportsSchema2(bundle)?2:1;}
   private JSONObject api(String path,JSONObject body)throws Exception{return api(path,body,1);}
   private JSONObject api(String path,JSONObject body,int writeSchema)throws Exception{
     HttpURLConnection connection=(HttpURLConnection)new URL("https://shell.canp.ai/api/v1/"+path).openConnection();
     connection.setConnectTimeout(15000);connection.setReadTimeout(25000);connection.setInstanceFollowRedirects(false);
     connection.setRequestProperty("Content-Type","application/json");
-    connection.setRequestProperty("X-CShell-Vault-Schema","3");if(body!=null)connection.setRequestProperty("X-CShell-Vault-Write-Schema",Integer.toString(writeSchema));
+    connection.setRequestProperty("X-CShell-Vault-Schema","4");if(body!=null)connection.setRequestProperty("X-CShell-Vault-Write-Schema",Integer.toString(writeSchema));
     if(state.has("session"))connection.setRequestProperty("Authorization","Bearer "+state.getJSONObject("session").getString("token"));
     try{
       if(body!=null){connection.setRequestMethod("POST");connection.setDoOutput(true);byte[] payload=bytes(body.toString());connection.setFixedLengthStreamingMode(payload.length);try(OutputStream out=connection.getOutputStream()){out.write(payload);}}
@@ -213,6 +213,11 @@ final class CloudSync {
     if(changed){validate(data);JSONObject saved=api("vault",new JSONObject().put("baseRevision",revision).put("mutationId",UUID.randomUUID().toString()).put("envelope",encrypt(data)),writeSchema(data));revision=saved.getLong("revision");}
     state.put("bundle",data).put("revision",revision).put("lastSync",System.currentTimeMillis());save();
     host.accountPassword(owner(),password);return answer.optJSONObject("relay");
+  }
+  synchronized boolean verifyHostDelegation(String device,String credential,String fingerprint,boolean continuation){
+    try{load();if(!state.has("session")||!credential.matches("[a-f0-9]{64}"))return false;
+      return api("devices/delegation/verify",new JSONObject().put("deviceId",device).put("credential",credential).put("fingerprint",fingerprint).put("continuation",continuation)).optBoolean("allowed");
+    }catch(Exception ignored){return false;}
   }
   synchronized JSONObject cloudAgent(String profileId)throws Exception{
     load();if(!state.has("session")||!state.has("key")||!state.has("bundle"))return null;

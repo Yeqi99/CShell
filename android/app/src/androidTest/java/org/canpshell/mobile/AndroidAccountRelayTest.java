@@ -33,6 +33,15 @@ final class AndroidAccountRelayTest {
         check(relay.channels>0,"Direct fallback used instead of reverse channel");
         host.clearAccount();boolean rejected=false;try{client.manage("client.status",new JSONObject());}catch(Exception expected){rejected=true;}check(rejected,"Account revoke retained access");
       }finally{client.close();}
+      backend.delegationCredential=UUID.randomUUID().toString().replace("-","")+UUID.randomUUID().toString().replace("-","");backend.delegationAllowed=true;
+      AgentConnection borrowed=new AgentConnection((t,v)->{});
+      try{
+        borrowed.connect("192.0.2.1",port,"",c->true,endpoint,backend.delegationCredential);
+        check(((JSONObject)borrowed.manage("client.status",new JSONObject())).getBoolean("running"),"Borrowed management failed");
+        boolean blocked=false;try{borrowed.manage("account.status",new JSONObject());}catch(Exception expected){blocked=true;}check(blocked,"Borrowed account settings exposed");
+        backend.delegationAllowed=false;Thread.sleep(2600);blocked=false;try{borrowed.manage("client.status",new JSONObject());}catch(Exception expected){blocked=true;}check(blocked,"Revoked borrowed session retained");
+      }finally{borrowed.close();}
+      AgentConnection retry=new AgentConnection((t,v)->{});try{boolean blocked=false;try{retry.connect("192.0.2.1",port,"",c->true,endpoint);}catch(Exception expected){blocked=true;}check(blocked,"Borrowed certificate persisted as local peer");}finally{retry.close();}
       reverse.close();reverse=null;
       JSONObject wrong=new JSONObject(endpoint.toString()).put("fingerprint",String.join("",Collections.nCopies(64,"0")));
       int before=relay.registrations;reverse=new AndroidAccountRelay(port,()->wrong);reverse.start();Thread.sleep(1200);
