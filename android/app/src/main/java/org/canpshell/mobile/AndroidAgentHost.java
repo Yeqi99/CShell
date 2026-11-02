@@ -30,6 +30,7 @@ final class AndroidAgentHost implements AutoCloseable {
     void requestKeyFrame(); void quality(JSONObject quality)throws Exception;
   }
   private final Backend backend;
+  private final AndroidManagedFiles files;private final AndroidApplications applications;
   private final AndroidPhoneCapabilities phone;
   private final AndroidHostIdentity identity;
   private final SharedPreferences prefs;
@@ -57,7 +58,7 @@ final class AndroidAgentHost implements AutoCloseable {
     if(desktopReplayRejections<Long.MAX_VALUE)desktopReplayRejections++;
     desktopReplayReason="sequence-mismatch";
   }
-  AndroidAgentHost(Context context,Backend backend)throws Exception {this.backend=backend;phone=new AndroidPhoneCapabilities(context);identity=new AndroidHostIdentity(context);prefs=context.getSharedPreferences("cagent-host-peers",0);}
+  AndroidAgentHost(Context context,Backend backend)throws Exception {this.backend=backend;files=new AndroidManagedFiles(context);applications=new AndroidApplications(context);phone=new AndroidPhoneCapabilities(context);identity=new AndroidHostIdentity(context);prefs=context.getSharedPreferences("cagent-host-peers",0);}
   synchronized void start(int port,String password)throws Exception {
     if(android.os.Build.VERSION.SDK_INT<29)throw new IOException("CAgent host requires Android 10 or newer");
     if(port<1024||port>65535||password==null||password.length()<1||password.length()>128)throw new IOException("Invalid CAgent port or password");
@@ -81,7 +82,7 @@ final class AndroidAgentHost implements AutoCloseable {
   JSONObject status()throws JSONException{return new JSONObject().put("running",listener!=null&&!listener.isClosed()).put("deviceId",identity.id).put("port",listener==null?0:listener.getLocalPort()).put("bind","0.0.0.0").put("sharing",backend.available()).put("accessibilityEnabled",backend.controlAvailable()).put("connections",sockets.size()).put("error",failure);}
   JSONObject connectionInfo(String host,int port)throws Exception {if(host==null||!host.matches("[a-zA-Z0-9.:-]{1,253}")||port<1||port>65535)throw new IOException("Invalid public endpoint");return new JSONObject().put("protocol",1).put("deviceId",identity.id).put("name",name()).put("certificate",identity.pem()).put("host",host).put("port",port);}
   private String name(){return (android.os.Build.MANUFACTURER+" "+android.os.Build.MODEL).trim();}
-  synchronized void stop(){epoch.incrementAndGet();SSLServerSocket old=listener;listener=null;try{if(old!=null)old.close();}catch(IOException ignored){}Desktop d=desktop;if(d!=null)d.close();for(SSLSocket s:sockets)try{s.close();}catch(IOException ignored){}sockets.clear();pending.clear();if(clients!=null)clients.shutdownNow();if(timer!=null)timer.shutdownNow();passwordDigest=null;clearAccount();backend.releaseInput();}
+  synchronized void stop(){epoch.incrementAndGet();SSLServerSocket old=listener;listener=null;try{if(old!=null)old.close();}catch(IOException ignored){}Desktop d=desktop;if(d!=null)d.close();for(SSLSocket s:sockets)try{s.close();}catch(IOException ignored){}sockets.clear();pending.clear();files.close();if(clients!=null)clients.shutdownNow();if(timer!=null)timer.shutdownNow();passwordDigest=null;clearAccount();backend.releaseInput();}
   public void close(){stop();}
   private void serve(SSLSocket socket,long generation){
     boolean desktopProtocolOwned=false;ScheduledFuture<?> delegatedWatch=null;
@@ -124,12 +125,19 @@ final class AndroidAgentHost implements AutoCloseable {
     String password=payload.optString("password","");if(password.length()>0&&password.length()<=128&&cloudPasswordDigest!=null&&MessageDigest.isEqual(cloudPasswordDigest,passwordHash(password))){if(cloudPeers.size()>=24)throw new IOException("Account controller limit reached");cloudPeers.add(owner);return;}if(password.length()<1||password.length()>128||passwordDigest==null||!MessageDigest.isEqual(passwordDigest,passwordHash(password)))throw new IOException("CAgent authentication failed");
     if(prefs.getAll().size()>32)throw new IOException("Controller limit reached");if(!prefs.edit().putBoolean("peer."+owner,true).commit())throw new IOException("Could not save controller");
   }
-  private synchronized Object manage(String owner,String method,JSONObject params)throws Exception {
+  private Object manage(String owner,String method,JSONObject params)throws Exception {
     if(params==null)params=new JSONObject();
+    // File I/O must not hold the desktop/input state monitor while an SAF provider blocks.
+    if(method.startsWith("files."))return files.call(method,params,owner);
+    if(method.equals("packages.invoke")&&"cagent.android".equals(params.optString("packageId"))&&params.optString("toolId").startsWith("android_files_"))return files.call("files."+params.getString("toolId").substring("android_files_".length()),params.optJSONObject("args")==null?new JSONObject():params.getJSONObject("args"),owner);
+    return manageState(owner,method,params);
+  }
+  private synchronized Object manageState(String owner,String method,JSONObject params)throws Exception {
     switch(method){
-      case "agent.shells":case "agent.environments":case "applications.list":case "agent.logs":return new JSONArray();
+      case "agent.shells":case "agent.environments":case "agent.logs":return new JSONArray();
+      case "applications.list":return applications.list();
       case "packages.tools":{
-        JSONArray tools=phone.tools();
+        JSONArray tools=phone.tools();JSONArray fileTools=files.tools();for(int i=0;i<fileTools.length();i++)tools.put(fileTools.get(i));JSONArray appTools=applications.tools();for(int i=0;i<appTools.length();i++)tools.put(appTools.get(i));
         if(backend.controlAvailable())tools.put(new JSONObject().put("packageId","cagent.android").put("id","android_ui_read").put("toolId","android_ui_read")
           .put("description","Read the current Android accessibility UI; password text is omitted.").put("sideEffect",false)
           .put("inputSchema",new JSONObject().put("type","object").put("properties",new JSONObject()).put("additionalProperties",false))
@@ -139,6 +147,9 @@ final class AndroidAgentHost implements AutoCloseable {
       }
       case "packages.invoke":{
         if(!"cagent.android".equals(params.optString("packageId")))throw new IOException("Unknown Android capability");
+        if(params.optString("toolId").startsWith("android_files_"))return files.call("files."+params.getString("toolId").substring("android_files_".length()),params.optJSONObject("args")==null?new JSONObject():params.getJSONObject("args"),owner);
+        if("android_apps_list".equals(params.optString("toolId")))return applications.list();
+        if("android_app_launch".equals(params.optString("toolId")))return applications.launch(params.getJSONObject("args"));
         if(!"android_ui_read".equals(params.optString("toolId")))return phone.invoke(owner,params.optString("toolId"),params.optJSONObject("args")==null?new JSONObject():params.getJSONObject("args"));
         if(!backend.controlAvailable())throw new IOException("请先在手机系统设置中启用 CAgent 辅助控制");
         return AndroidControlService.snapshot();
