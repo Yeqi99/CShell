@@ -1,0 +1,433 @@
+{
+  "version": "0.8.19",
+  "status": "published-verified",
+  "files": [
+    {
+      "edition": "opensource",
+      "name": "CAgent-0.8.19-linux-arm64.tar.gz",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\019-final\\opensource\\CAgent-0.8.19-linux-arm64.tar.gz",
+      "bytes": 44507599,
+      "sha256": "32d692f5be2e2c538ff83b4ea59422c133768927ae0dda4f92ea655a0e78281e",
+      "source": {
+        "kind": "native-posix",
+        "local": "438a26b730ae88a8c06d1c2b4bab03e62e8fe1f5",
+        "remote": "f98650e308dd2e4772cadd14857e7059189ca3d8",
+        "runId": 41400606703
+      }
+    },
+    {
+      "edition": "opensource",
+      "name": "CAgent-0.8.19-linux-x64.tar.gz",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\019-final\\opensource\\CAgent-0.8.19-linux-x64.tar.gz",
+      "bytes": 44818601,
+      "sha256": "9e5ad3e7950358bb1a989b2b2c0f4a40f03314faaaff19e4107d643800b5e9da",
+      "source": {
+        "kind": "native-posix",
+        "local": "438a26b730ae88a8c06d1c2b4bab03e62e8fe1f5",
+        "remote": "f98650e308dd2e4772cadd14857e7059189ca3d8",
+        "runId": 41400606703
+      }
+    },
+    {
+      "edition": "opensource",
+      "name": "CAgent-0.8.19-mac-arm64.tar.gz",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\019-final\\opensource\\CAgent-0.8.19-mac-arm64.tar.gz",
+      "bytes": 39500376,
+      "sha256": "77b5afdb4cea097de46f39036eb8e33e185f329dece114c29e8bf5d2abb101ca",
+      "source": {
+        "kind": "native-posix",
+        "local": "438a26b730ae88a8c06d1c2b4bab03e62e8fe1f5",
+        "remote": "f98650e308dd2e4772cadd14857e7059189ca3d8",
+        "runId": 41400606703
+      }
+    },
+    {
+      "edition": "opensource",
+      "name": "CAgent-0.8.19-mac-x64.tar.gz",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\019-final\\opensource\\CAgent-0.8.19-mac-x64.tar.gz",
+      "bytes": 40730802,
+      "sha256": "1305ead9656f6be36e80d469355d55b9c5b6e29d24b5267b08fb158ae430c121",
+      "source": {
+        "kind": "native-posix",
+        "local": "438a26b730ae88a8c06d1c2b4bab03e62e8fe1f5",
+        "remote": "f98650e308dd2e4772cadd14857e7059189ca3d8",
+        "runId": 41400606703
+      }
+    },
+    {
+      "edition": "opensource",
+      "name": "CAgent-Setup-0.8.19-win-x64.exe",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\019-final\\opensource\\CAgent-Setup-0.8.19-win-x64.exe",
+      "bytes": 26190135,
+      "sha256": "664f11291ac2fbdf18708a8192e2dda47b84315e452170515b5e644e6289eee0",
+      "source": {
+        "kind": "windows-package",
+        "local": "438a26b730ae88a8c06d1c2b4bab03e62e8fe1f5",
+        "receipt": "cagent-core-windows-0.8.19.json"
+      }
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.19-android.apk",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\019-final\\opensource\\CShell-0.8.19-android.apk",
+      "bytes": 4903802,
+      "sha256": "ee7676c3a22debd3a79742d93bde9cff6a9ecfc626bb93a1623e2d8cd952b3d2",
+      "source": {
+        "kind": "signed-android",
+        "local": "4761ea696df5c14c76a4af736755366522a0439e",
+        "remote": "936c799ab94308dbb1faab0f8ec1bfe2046faab1",
+        "runId": 41402886068,
+        "identity": {
+          "apk": "/home/runner/work/CShell/CShell/android/app/build/outputs/apk/release/app-release.apk",
+          "package": "org.canpshell.mobile",
+          "version": "0.8.19",
+          "versionCode": 8019,
+          "certificate": "34cc1c9a0eacafc512a0837c3d286081879822f047e5637a65cdbc5b525914c5",
+          "sha256": "ee7676c3a22debd3a79742d93bde9cff6a9ecfc626bb93a1623e2d8cd952b3d2"
+        }
+      }
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.19-linux-amd64.deb",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\019-final\\opensource\\CShell-0.8.19-linux-amd64.deb",
+      "bytes": 108876832,
+      "sha256": "d2c43fc1639cac90f99e341f5e783b4109e61af9e2edcc80fc641a70e0e3ed1f",
+      "source": {
+        "kind": "native-posix",
+        "local": "438a26b730ae88a8c06d1c2b4bab03e62e8fe1f5",
+        "remote": "f98650e308dd2e4772cadd14857e7059189ca3d8",
+        "runId": 41400606703
+      }
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.19-linux-arm64.AppImage",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\019-final\\opensource\\CShell-0.8.19-linux-arm64.AppImage",
+      "bytes": 140723594,
+      "sha256": "7b2a04b1c50ea336e468a31c29776f7cf91be43810f6b4584480eed9f18b023c",
+      "source": {
+        "kind": "native-posix",
+        "local": "438a26b730ae88a8c06d1c2b4bab03e62e8fe1f5",
+        "remote": "f98650e308dd2e4772cadd14857e7059189ca3d8",
+        "runId": 41400606703
+      }
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.19-linux-arm64.deb",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\019-final\\opensource\\CShell-0.8.19-linux-arm64.deb",
+      "bytes": 103040780,
+      "sha256": "f88a1aa9e999fb6e31fe9fdc80f92a6148a645239dfc97e7fc3a85083024629b",
+      "source": {
+        "kind": "native-posix",
+        "local": "438a26b730ae88a8c06d1c2b4bab03e62e8fe1f5",
+        "remote": "f98650e308dd2e4772cadd14857e7059189ca3d8",
+        "runId": 41400606703
+      }
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.19-linux-x86_64.AppImage",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\019-final\\opensource\\CShell-0.8.19-linux-x86_64.AppImage",
+      "bytes": 139468379,
+      "sha256": "04e2f85cfe6ed3be8cdd144eef85e6f5e5ea9f4b4ba3300cd99797d770dc8803",
+      "source": {
+        "kind": "native-posix",
+        "local": "438a26b730ae88a8c06d1c2b4bab03e62e8fe1f5",
+        "remote": "f98650e308dd2e4772cadd14857e7059189ca3d8",
+        "runId": 41400606703
+      }
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.19-mac-arm64.dmg",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\019-final\\opensource\\CShell-0.8.19-mac-arm64.dmg",
+      "bytes": 142334477,
+      "sha256": "cbabc2a30acd48f43dba3d0ecd716bac7860d6720f72f462926a51e30651e0ba",
+      "source": {
+        "kind": "native-posix",
+        "local": "438a26b730ae88a8c06d1c2b4bab03e62e8fe1f5",
+        "remote": "f98650e308dd2e4772cadd14857e7059189ca3d8",
+        "runId": 41400606703
+      }
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.19-mac-arm64.zip",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\019-final\\opensource\\CShell-0.8.19-mac-arm64.zip",
+      "bytes": 142176936,
+      "sha256": "e4cf8bb8f023e10d00f8c0d3016d1d1b04f76034a260b631205349e996fa96fe",
+      "source": {
+        "kind": "native-posix",
+        "local": "438a26b730ae88a8c06d1c2b4bab03e62e8fe1f5",
+        "remote": "f98650e308dd2e4772cadd14857e7059189ca3d8",
+        "runId": 41400606703
+      }
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.19-mac-x64.dmg",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\019-final\\opensource\\CShell-0.8.19-mac-x64.dmg",
+      "bytes": 146129895,
+      "sha256": "7cd51c09ee9824b792b9b1ceae3aedded03d9cdc24d374248a50de28a2303895",
+      "source": {
+        "kind": "native-posix",
+        "local": "438a26b730ae88a8c06d1c2b4bab03e62e8fe1f5",
+        "remote": "f98650e308dd2e4772cadd14857e7059189ca3d8",
+        "runId": 41400606703
+      }
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.19-mac-x64.zip",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\019-final\\opensource\\CShell-0.8.19-mac-x64.zip",
+      "bytes": 146018387,
+      "sha256": "2a8251b471506b4712bd461ff00f098f0f5e4b4d26c8fab6065802fb8105a8b3",
+      "source": {
+        "kind": "native-posix",
+        "local": "438a26b730ae88a8c06d1c2b4bab03e62e8fe1f5",
+        "remote": "f98650e308dd2e4772cadd14857e7059189ca3d8",
+        "runId": 41400606703
+      }
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.19-win-x64.exe",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\019-final\\opensource\\CShell-0.8.19-win-x64.exe",
+      "bytes": 123782978,
+      "sha256": "a2f538178029b41e0fee3e25b0d3616814ba43824aa58ef45cc81ec79b648708",
+      "source": {
+        "kind": "windows-package",
+        "local": "438a26b730ae88a8c06d1c2b4bab03e62e8fe1f5",
+        "receipt": "core-windows-0.8.19.json"
+      }
+    },
+    {
+      "edition": "opensource",
+      "name": "SHA256SUMS.txt",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\019-final\\opensource\\SHA256SUMS.txt",
+      "bytes": 1437,
+      "sha256": "06ddef5c67ba0f21793839597a59f310139c82a727f0f1ccc38b710f9537ef15",
+      "source": {
+        "kind": "exact-inventory"
+      }
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-0.8.19-linux-arm64.tar.gz",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\019-final\\pro\\CAgent-0.8.19-linux-arm64.tar.gz",
+      "bytes": 44560429,
+      "sha256": "3c6f0f449ed597423cdda2bae66f0be96c3f25a624f0e2c3c0da963e65725aab",
+      "source": {
+        "kind": "native-posix",
+        "local": "e2fc37ed7cdde1a7d3b1d793c0a64062c7d00472",
+        "remote": "560c0c57dd55b4e765212cf2f3852a6a8920bed8",
+        "runId": 41399914894
+      }
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-0.8.19-linux-x64.tar.gz",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\019-final\\pro\\CAgent-0.8.19-linux-x64.tar.gz",
+      "bytes": 44875785,
+      "sha256": "e86729e2bed2740bcd3a784298be26670bcc81fddaa23c41f2fbf9352f179e78",
+      "source": {
+        "kind": "native-posix",
+        "local": "e2fc37ed7cdde1a7d3b1d793c0a64062c7d00472",
+        "remote": "560c0c57dd55b4e765212cf2f3852a6a8920bed8",
+        "runId": 41399914894
+      }
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-0.8.19-mac-arm64.tar.gz",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\019-final\\pro\\CAgent-0.8.19-mac-arm64.tar.gz",
+      "bytes": 39550203,
+      "sha256": "4baac168e4faa1f34de184fdf480221d15fe96dc8ba4a0feafe64add29da793e",
+      "source": {
+        "kind": "native-posix",
+        "local": "e2fc37ed7cdde1a7d3b1d793c0a64062c7d00472",
+        "remote": "560c0c57dd55b4e765212cf2f3852a6a8920bed8",
+        "runId": 41399914894
+      }
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-0.8.19-mac-x64.tar.gz",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\019-final\\pro\\CAgent-0.8.19-mac-x64.tar.gz",
+      "bytes": 40782819,
+      "sha256": "5d6ac79c8ad780295ed4c1bf2eb780d6ae3b750ce9fe4ba4df14f23b06624e1d",
+      "source": {
+        "kind": "native-posix",
+        "local": "e2fc37ed7cdde1a7d3b1d793c0a64062c7d00472",
+        "remote": "560c0c57dd55b4e765212cf2f3852a6a8920bed8",
+        "runId": 41399914894
+      }
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-Setup-0.8.19-win-x64.exe",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\019-final\\pro\\CAgent-Setup-0.8.19-win-x64.exe",
+      "bytes": 26235182,
+      "sha256": "0f14a93ceb49aba2e29ff1a093bef4389507ac46355727886fbc87eec89798cc",
+      "source": {
+        "kind": "windows-package",
+        "local": "dc03f3b6ef12367edd306bc9b5b26aefbfef1d8a",
+        "receipt": "cagent-pro-windows-0.8.19.json"
+      }
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.19-android.apk",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\019-final\\pro\\CShell-Pro-0.8.19-android.apk",
+      "bytes": 4930902,
+      "sha256": "12d63467f43ac8039f1edf8a361bca48ad5174130751eb4b5f7a0baa9a10a4ae",
+      "source": {
+        "kind": "signed-android",
+        "local": "3669b97638dd69b2bd750139dbf8788cfd65305d",
+        "remote": "8d2bba8345db4f53862ef198d657acc2dd9e829d",
+        "runId": 41402913090,
+        "identity": {
+          "apk": "/home/runner/work/CShell/CShell/android/app/build/outputs/apk/release/app-release.apk",
+          "package": "org.canpshell.mobile.pro",
+          "version": "0.8.19",
+          "versionCode": 8019,
+          "certificate": "34cc1c9a0eacafc512a0837c3d286081879822f047e5637a65cdbc5b525914c5",
+          "sha256": "12d63467f43ac8039f1edf8a361bca48ad5174130751eb4b5f7a0baa9a10a4ae"
+        }
+      }
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.19-linux-amd64.deb",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\019-final\\pro\\CShell-Pro-0.8.19-linux-amd64.deb",
+      "bytes": 107790468,
+      "sha256": "0c128e677dac5fe099f810dc410633ac2582b27c5cc8b2dcbd902eb6e27098c7",
+      "source": {
+        "kind": "native-posix",
+        "local": "e2fc37ed7cdde1a7d3b1d793c0a64062c7d00472",
+        "remote": "560c0c57dd55b4e765212cf2f3852a6a8920bed8",
+        "runId": 41399914894
+      }
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.19-linux-arm64.AppImage",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\019-final\\pro\\CShell-Pro-0.8.19-linux-arm64.AppImage",
+      "bytes": 140965124,
+      "sha256": "cdc83f49932d81a0dfad5ac6b38454eb7645d9946128ccc436e851d64ebd6be4",
+      "source": {
+        "kind": "native-posix",
+        "local": "e2fc37ed7cdde1a7d3b1d793c0a64062c7d00472",
+        "remote": "560c0c57dd55b4e765212cf2f3852a6a8920bed8",
+        "runId": 41399914894
+      }
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.19-linux-arm64.deb",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\019-final\\pro\\CShell-Pro-0.8.19-linux-arm64.deb",
+      "bytes": 103288616,
+      "sha256": "9d466217112d591ede8112680f6f361dc0efb9c9a67ea02c37a2e65603473c19",
+      "source": {
+        "kind": "native-posix",
+        "local": "e2fc37ed7cdde1a7d3b1d793c0a64062c7d00472",
+        "remote": "560c0c57dd55b4e765212cf2f3852a6a8920bed8",
+        "runId": 41399914894
+      }
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.19-linux-x86_64.AppImage",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\019-final\\pro\\CShell-Pro-0.8.19-linux-x86_64.AppImage",
+      "bytes": 139705819,
+      "sha256": "3ed3df3c84dbf002db90f261ec077bd59fd5c0a06e237918f53e91f09b1789c8",
+      "source": {
+        "kind": "native-posix",
+        "local": "e2fc37ed7cdde1a7d3b1d793c0a64062c7d00472",
+        "remote": "560c0c57dd55b4e765212cf2f3852a6a8920bed8",
+        "runId": 41399914894
+      }
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.19-mac-arm64.dmg",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\019-final\\pro\\CShell-Pro-0.8.19-mac-arm64.dmg",
+      "bytes": 142635002,
+      "sha256": "7cddf7e1129d4f2658b98603a9e9432602364381db0abfac7a62159665ed432a",
+      "source": {
+        "kind": "native-posix",
+        "local": "e2fc37ed7cdde1a7d3b1d793c0a64062c7d00472",
+        "remote": "560c0c57dd55b4e765212cf2f3852a6a8920bed8",
+        "runId": 41399914894
+      }
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.19-mac-x64.dmg",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\019-final\\pro\\CShell-Pro-0.8.19-mac-x64.dmg",
+      "bytes": 146449161,
+      "sha256": "d1252a407b7b47c317b03ccd0cf9a08f5a082db506d76659440dda64c102e715",
+      "source": {
+        "kind": "native-posix",
+        "local": "e2fc37ed7cdde1a7d3b1d793c0a64062c7d00472",
+        "remote": "560c0c57dd55b4e765212cf2f3852a6a8920bed8",
+        "runId": 41399914894
+      }
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.19-win-x64.exe",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\019-final\\pro\\CShell-Pro-0.8.19-win-x64.exe",
+      "bytes": 123912958,
+      "sha256": "54e14956c8e14d898d49ce9f30a6907d8a688b5295b8fd3aaf579fb7039c4a25",
+      "source": {
+        "kind": "windows-package",
+        "local": "e2fc37ed7cdde1a7d3b1d793c0a64062c7d00472",
+        "receipt": "pro-windows-0.8.19-final.json"
+      }
+    },
+    {
+      "edition": "pro",
+      "name": "SHA256SUMS.txt",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-unified-followup\\CShell\\.local\\019-final\\pro\\SHA256SUMS.txt",
+      "bytes": 1283,
+      "sha256": "aee5ae5eecc33fb89879b70ed724acc10f62e359d63f73094d34bccc94c18713",
+      "source": {
+        "kind": "exact-inventory"
+      }
+    }
+  ],
+  "sources": {
+    "opensource": {
+      "sha": "936c799ab94308dbb1faab0f8ec1bfe2046faab1",
+      "local": "4761ea696df5c14c76a4af736755366522a0439e",
+      "tree": "17ffcf9a59a9df15730a129ab090f5d5fabd7a01"
+    },
+    "pro": {
+      "sha": "8d2bba8345db4f53862ef198d657acc2dd9e829d",
+      "local": "3669b97638dd69b2bd750139dbf8788cfd65305d",
+      "tree": "8fda3827e54275981c5d92858f658fd27b91b97d"
+    }
+  },
+  "limits": [
+    "Windows unsigned; macOS not notarized",
+    "Android original signing identity verified; native API29/35 passed",
+    "No new physical Lenovo or Mac/Linux install validation claimed"
+  ],
+  "publication": {
+    "pro": {
+      "tag": "pro-v0.8.19",
+      "releaseId": 431203987,
+      "source": "8d2bba8345db4f53862ef198d657acc2dd9e829d",
+      "publishedAt": "2026-11-02T08:16:35Z"
+    },
+    "opensource": {
+      "tag": "v0.8.19",
+      "releaseId": 431203224,
+      "source": "936c799ab94308dbb1faab0f8ec1bfe2046faab1",
+      "publishedAt": "2026-11-02T08:16:34Z"
+    }
+  }
+}
