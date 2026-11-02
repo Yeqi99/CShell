@@ -12,6 +12,7 @@ export async function fixture(
     stallShell?: boolean;
     writeFailure?: 'full' | 'permission';
     opensshRename?: boolean;
+    execResult?: {stdout:string;stderr:string;exitCode:number};
   } = {},
 ) {
   const docker = dockerFixture();
@@ -98,6 +99,13 @@ export async function fixture(
         session.on('exec', (acceptExec, _reject, info) => {
           execRequests++;
           const stream = acceptExec();
+          if (options.execResult) {
+            stream.write(options.execResult.stdout);
+            stream.stderr.write(options.execResult.stderr);
+            stream.exit(options.execResult.exitCode);
+            stream.end();
+            return;
+          }
           if (extensions.handle(info.command, stream)) return;
           if (info.command.includes('--query-gpu=')) {
             stream.exit(0);

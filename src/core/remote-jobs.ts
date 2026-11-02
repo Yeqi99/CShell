@@ -84,12 +84,38 @@ export class RemoteJobs {
     output?: (s: string) => void,
     signal?: AbortSignal,
   ): Promise<string> {
+    return this.execResult(sessionId, command, input, timeout, output, signal, 2_000_000).then(
+      (result) => {
+        if (result.exitCode !== 0)
+          throw new Error(result.stderr.trim() || `Remote command failed (${result.exitCode})`);
+        return result.stdout;
+      },
+    );
+  }
+  execResult(
+    sessionId: string,
+    command: string,
+    input?: string,
+    timeout = 15000,
+    output?: (s: string) => void,
+    signal?: AbortSignal,
+    resultLimit = 16000,
+  ): Promise<{
+    stdout: string;
+    stderr: string;
+    exitCode: number;
+    stdoutTruncated: boolean;
+    stderrTruncated: boolean;
+  }> {
     const client = this.ssh.get(sessionId).client;
     return new Promise((resolve, reject) => {
       let stream: ClientChannel | undefined,
         result = '',
         errors = '',
-        settled = false;
+        settled = false,
+        stdoutTruncated = false,
+        stderrTruncated = false,
+        exitCode = 0;
       const decoder = new StringDecoder('utf8'),
         errDecoder = new StringDecoder('utf8');
       const finish = (error?: Error) => {
@@ -102,7 +128,14 @@ export class RemoteJobs {
           stream?.signal('TERM');
           stream?.close();
           reject(error);
-        } else resolve(result);
+        } else
+          resolve({
+            stdout: result.slice(-resultLimit),
+            stderr: errors.slice(-resultLimit),
+            exitCode,
+            stdoutTruncated: stdoutTruncated || result.length > resultLimit,
+            stderrTruncated: stderrTruncated || errors.length > resultLimit,
+          });
       };
       const uncertain = (message: string) =>
         new ApiError(
@@ -130,26 +163,38 @@ export class RemoteJobs {
           const text = decoder.write(data);
           output?.(text);
           result = result + text;
-          if (result.length > 2_000_000) {
-            if (output) result = result.slice(-100_000);
-            else finish(new Error('Remote output exceeds limit'));
+          if (resultLimit < 2_000_000 && result.length > resultLimit) {
+            result = result.slice(-resultLimit);
+            stdoutTruncated = true;
+          } else if (result.length > 2_000_000) {
+            if (output) {
+              result = result.slice(-100_000);
+              stdoutTruncated = true;
+            } else finish(new Error('Remote output exceeds limit'));
           }
         });
         channel.stderr.on('data', (data: Buffer) => {
           const text = errDecoder.write(data);
-          errors = (errors + text).slice(-8000);
+          errors += text;
+          if (errors.length > 100_000) {
+            errors = errors.slice(-100_000);
+            stderrTruncated = true;
+          }
           output?.(text);
         });
         channel.on('error', finish);
-        channel.on('close', (code: number | undefined) =>
-          finish(
-            code === 0
-              ? undefined
-              : code === undefined
-                ? uncertain('Remote command channel closed without exit status')
-                : new Error(errors.trim() || `Remote command failed (${code})`),
-          ),
-        );
+        channel.on('close', (code: number | undefined) => {
+          const tail = decoder.end(),
+            errorTail = errDecoder.end();
+          result += tail;
+          errors += errorTail;
+          if (tail) output?.(tail);
+          if (errorTail) output?.(errorTail);
+          if (code === undefined)
+            return finish(uncertain('Remote command channel closed without exit status'));
+          exitCode = code;
+          finish();
+        });
         channel.end(input ?? '');
       });
     });

@@ -1,0 +1,33 @@
+{
+  "version": "0.8.20",
+  "results": [
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.20-android.apk",
+      "sha256": "daa9da8f35f3be42d156b33232b644237215f40fe70af18b6341eff1b57f6409",
+      "bytes": 4903802,
+      "run": 41414746220,
+      "artifact": 13126768306,
+      "source": "87478e407126c264cb61c774ccb294e92fdd3c22",
+      "package": "org.canpshell.mobile",
+      "versionCode": 8020,
+      "certificate": "34cc1c9a0eacafc512a0837c3d286081879822f047e5637a65cdbc5b525914c5",
+      "verification": "CI actual APK signature/package/version verified; downloaded ZIP GitHub digest and extracted APK digest independently matched",
+      "installed": false
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.20-android.apk",
+      "sha256": "0c2b2b0793695d316770bba1c1bda6cc8645d45a214ac95e63ae42cd82d89012",
+      "bytes": 4930902,
+      "run": 41414737190,
+      "artifact": 13127013476,
+      "source": "834170e8d60b901fa73c1735a8899a95e9ebcdaf",
+      "package": "org.canpshell.mobile.pro",
+      "versionCode": 8020,
+      "certificate": "34cc1c9a0eacafc512a0837c3d286081879822f047e5637a65cdbc5b525914c5",
+      "verification": "CI actual APK signature/package/version verified; downloaded ZIP GitHub digest and extracted APK digest independently matched",
+      "installed": false
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "version": "0.8.20",
+  "status": "held-pending-additional-MCP-requirements",
+  "pro": {
+    "runtimeSource": "97bf6ac",
+    "remote": "c8292340430b8c7c12edcfd77eb71433684297ad",
+    "tree": "961274c2616967dd7d1988413fdf9b929181de29",
+    "posixRun": 41417789332,
+    "posixJobs": 4,
+    "posixConclusion": "success",
+    "windowsRun": 41417788868,
+    "windowsConclusion": "success"
+  },
+  "opensource": {
+    "runtimeSource": "9ded01d",
+    "remote": "7b70c0de2c90bb08673b49511ec39c0b0e376267",
+    "tree": "3b8df88b206cbfe5c383140d410da9b5ccc3b449",
+    "posixRun": 41417809537,
+    "posixJobs": 4,
+    "posixConclusion": "success",
+    "windowsRun": 41417809640,
+    "windowsConclusion": "success"
+  },
+  "superseded": {
+    "reason": "Initial permission fixture inherited changed automation default; fixture now explicitly isolates grants and also tests new default and explicit disable through real TLS. Global tooltip production fix rebuilt desktop matrix.",
+    "corePosix": 41414744390,
+    "proDesktop": 41414733706
+  },
+  "checkedAt": "2026-11-02T09:18:05.893Z"
+}

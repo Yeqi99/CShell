@@ -1,0 +1,22 @@
+{
+  "edition": "opensource",
+  "version": "0.8.20",
+  "sha256": "bd378f5e5ec3e325ae925c95282ee4972ea4b40eb9252d0ede693089a70a89a8",
+  "deployment": "C:\\Users\\35097\\.codex\\worktrees\\core-020-model-market\\CShell\\.local\\cagent-020-final-3ac63f5-deployment",
+  "stage": "C:\\Users\\35097\\.codex\\worktrees\\core-020-model-market\\CShell\\.local\\cagent-020-final-3ac63f5",
+  "path": "C:\\Users\\35097\\.codex\\worktrees\\core-020-model-market\\CShell\\.local\\CAgent-Setup-0.8.20-win-x64.exe",
+  "bytes": 26189476,
+  "source": "3ac63f5f94ac2c6815a1b033e6d13552c592c5cf",
+  "status": "verified-candidate-not-published",
+  "preparedPath": "C:\\Users\\35097\\AppData\\Local\\Temp\\cagent-020-prepare-opensource-771b0b4ad8354667a208b5c7bbb2321a\\versions\\0.8.20-affaa7ecbbb6c615",
+  "payloadCount": 48,
+  "authenticode": "NotSigned",
+  "verifiedAt": "2026-11-02T08:52:04.1997005Z",
+  "validation": [
+    "Exact EXE /S /PREPARE isolated version directory; all 48 payload sizes and SHA256 match",
+    "Actual packaged CMD PTY, TLS, restricted authorization rejection, clean stop",
+    "Native host read reconnect; mutation not replayed; concurrent single replacement; shared runtime preserved; 401/403 not retried",
+    "Actual packaged WPF market fixture at 340/540/900; draft retained; install does not grant; no overflow",
+    "Exact packaged identity ciphertext unchanged across two clean starts"
+  ]
+}

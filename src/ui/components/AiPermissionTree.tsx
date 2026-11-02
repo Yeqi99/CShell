@@ -102,6 +102,9 @@ export function AiPermissionTree({
           <div className="permission-application-list">
             {([
               ['connections.read', tr("查询连接目标、分组与会话"), tr("可查询尚未连接的目标；不会读取凭据或连接机器。")],
+              ['connections.manage', tr("新建和修改连接配置"), tr("不会自动连接或扩大机器授权。")],
+              ['credentials.manage', tr("保存和更换连接凭据"), tr("仅写入加密存储，不读取或返回密码、私钥。")],
+              ['identity.trust', tr("接受 SSH 主机身份"), tr("先探测真实指纹，再显式确认；已改变的主机密钥不会自动接受。")],
               ['http.use', tr("使用 HTTP 扩展工具"), tr("还需选择允许的 HTTP 工作区；远端请求使用发送方机器的授权。")],
               ['connections.open', tr("为授权机器新建连接"), tr("使用已保存的凭据连接；后续操作仍受目标机器权限限制。")],
               ['agents.manage', tr("分配与管理子任务"), tr("子任务和定期目标不会扩大机器范围或操作权限。")],

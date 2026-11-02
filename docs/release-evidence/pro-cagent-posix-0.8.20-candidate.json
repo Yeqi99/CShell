@@ -1,0 +1,28 @@
+{
+  "version": "0.8.20",
+  "status": "held-pending-MCP-scope-finalization",
+  "run": 41414733706,
+  "source": "834170e8d60b901fa73c1735a8899a95e9ebcdaf",
+  "results": [
+    {
+      "name": "CAgent-0.8.20-linux-arm64.tar.gz",
+      "bytes": 44558596,
+      "sha256": "b1c6455781e1377943a613f548cfe9fed78e7af12bd5a71c3e9450c4303a57a1"
+    },
+    {
+      "name": "CAgent-0.8.20-linux-x64.tar.gz",
+      "bytes": 44876778,
+      "sha256": "b92cef0ed3e66ffcf429f144de118755a47ed0d859eb2634bc98645192d31d7f"
+    },
+    {
+      "name": "CAgent-0.8.20-mac-arm64.tar.gz",
+      "bytes": 39552359,
+      "sha256": "8a59f766a4f6de98658cb943e85c10139be1ea09de4dff98c9220417f52ac3d3"
+    },
+    {
+      "name": "CAgent-0.8.20-mac-x64.tar.gz",
+      "bytes": 40785131,
+      "sha256": "646d2af4f95324864dfa88049977980050e964f6e035db4e977d2cd6f4f40d87"
+    }
+  ]
+}

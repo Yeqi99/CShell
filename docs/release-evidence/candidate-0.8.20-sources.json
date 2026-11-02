@@ -1,0 +1,23 @@
+{
+  "version": "0.8.20",
+  "status": "candidate-builds-running-not-published",
+  "sources": {
+    "pro": {
+      "worktree": "pro-020-model-market",
+      "local": "eb0424a2273f885a87b537c24a6c0ebadad979de",
+      "remote": "834170e8d60b901fa73c1735a8899a95e9ebcdaf",
+      "tree": "5acbf92370f93b8e40f2d36d62c00803f6966cdb"
+    },
+    "opensource": {
+      "worktree": "core-020-model-market",
+      "local": "3ac63f5f94ac2c6815a1b033e6d13552c592c5cf",
+      "remote": "87478e407126c264cb61c774ccb294e92fdd3c22",
+      "tree": "fb7201c440b3c7964abaaf77faea6cf938363fba"
+    }
+  },
+  "excluded": {
+    "pro": "9f3214c",
+    "opensource": "bb1d14b",
+    "reason": "Version-only commits in 019 worktrees do not contain 020 runtime changes. They were never pushed or built. Version commits were applied to correct 020 worktrees before exact tree synchronization."
+  }
+}
