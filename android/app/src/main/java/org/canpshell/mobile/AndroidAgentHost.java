@@ -30,6 +30,7 @@ final class AndroidAgentHost implements AutoCloseable {
     void requestKeyFrame(); void quality(JSONObject quality)throws Exception;
   }
   private final Backend backend;
+  private final AndroidManagedFiles files;private final AndroidApplications applications;
   private final AndroidPhoneCapabilities phone;
   private final AndroidHostIdentity identity;
   private final SharedPreferences prefs;
@@ -57,7 +58,7 @@ final class AndroidAgentHost implements AutoCloseable {
     if(desktopReplayRejections<Long.MAX_VALUE)desktopReplayRejections++;
     desktopReplayReason="sequence-mismatch";
   }
-  AndroidAgentHost(Context context,Backend backend)throws Exception {this.backend=backend;phone=new AndroidPhoneCapabilities(context);identity=new AndroidHostIdentity(context);prefs=context.getSharedPreferences("cagent-host-peers",0);}
+  AndroidAgentHost(Context context,Backend backend)throws Exception {this.backend=backend;files=new AndroidManagedFiles(context);applications=new AndroidApplications(context);phone=new AndroidPhoneCapabilities(context);identity=new AndroidHostIdentity(context);prefs=context.getSharedPreferences("cagent-host-peers",0);}
   synchronized void start(int port,String password)throws Exception {
     if(android.os.Build.VERSION.SDK_INT<29)throw new IOException("CAgent host requires Android 10 or newer");
     if(port<1024||port>65535||password==null||password.length()<1||password.length()>128)throw new IOException("Invalid CAgent port or password");
@@ -81,7 +82,7 @@ final class AndroidAgentHost implements AutoCloseable {
   JSONObject status()throws JSONException{return new JSONObject().put("running",listener!=null&&!listener.isClosed()).put("deviceId",identity.id).put("port",listener==null?0:listener.getLocalPort()).put("bind","0.0.0.0").put("sharing",backend.available()).put("accessibilityEnabled",backend.controlAvailable()).put("connections",sockets.size()).put("error",failure);}
   JSONObject connectionInfo(String host,int port)throws Exception {if(host==null||!host.matches("[a-zA-Z0-9.:-]{1,253}")||port<1||port>65535)throw new IOException("Invalid public endpoint");return new JSONObject().put("protocol",1).put("deviceId",identity.id).put("name",name()).put("certificate",identity.pem()).put("host",host).put("port",port);}
   private String name(){return (android.os.Build.MANUFACTURER+" "+android.os.Build.MODEL).trim();}
-  synchronized void stop(){epoch.incrementAndGet();SSLServerSocket old=listener;listener=null;try{if(old!=null)old.close();}catch(IOException ignored){}Desktop d=desktop;if(d!=null)d.close();for(SSLSocket s:sockets)try{s.close();}catch(IOException ignored){}sockets.clear();pending.clear();if(clients!=null)clients.shutdownNow();if(timer!=null)timer.shutdownNow();passwordDigest=null;clearAccount();backend.releaseInput();}
+  synchronized void stop(){epoch.incrementAndGet();SSLServerSocket old=listener;listener=null;try{if(old!=null)old.close();}catch(IOException ignored){}Desktop d=desktop;if(d!=null)d.close();for(SSLSocket s:sockets)try{s.close();}catch(IOException ignored){}sockets.clear();pending.clear();files.close();if(clients!=null)clients.shutdownNow();if(timer!=null)timer.shutdownNow();passwordDigest=null;clearAccount();backend.releaseInput();}
   public void close(){stop();}
   private void serve(SSLSocket socket,long generation){
     boolean desktopProtocolOwned=false;ScheduledFuture<?> delegatedWatch=null;
@@ -124,12 +125,19 @@ final class AndroidAgentHost implements AutoCloseable {
     String password=payload.optString("password","");if(password.length()>0&&password.length()<=128&&cloudPasswordDigest!=null&&MessageDigest.isEqual(cloudPasswordDigest,passwordHash(password))){if(cloudPeers.size()>=24)throw new IOException("Account controller limit reached");cloudPeers.add(owner);return;}if(password.length()<1||password.length()>128||passwordDigest==null||!MessageDigest.isEqual(passwordDigest,passwordHash(password)))throw new IOException("CAgent authentication failed");
     if(prefs.getAll().size()>32)throw new IOException("Controller limit reached");if(!prefs.edit().putBoolean("peer."+owner,true).commit())throw new IOException("Could not save controller");
   }
-  private synchronized Object manage(String owner,String method,JSONObject params)throws Exception {
+  private Object manage(String owner,String method,JSONObject params)throws Exception {
     if(params==null)params=new JSONObject();
+    // File I/O must not hold the desktop/input state monitor while an SAF provider blocks.
+    if(method.startsWith("files."))return files.call(method,params,owner);
+    if(method.equals("packages.invoke")&&"cagent.android".equals(params.optString("packageId"))&&params.optString("toolId").startsWith("android_files_"))return files.call("files."+params.getString("toolId").substring("android_files_".length()),params.optJSONObject("args")==null?new JSONObject():params.getJSONObject("args"),owner);
+    return manageState(owner,method,params);
+  }
+  private synchronized Object manageState(String owner,String method,JSONObject params)throws Exception {
     switch(method){
-      case "agent.shells":case "agent.environments":case "applications.list":case "agent.logs":return new JSONArray();
+      case "agent.shells":case "agent.environments":case "agent.logs":return new JSONArray();
+      case "applications.list":return applications.list();
       case "packages.tools":{
-        JSONArray tools=phone.tools();
+        JSONArray tools=phone.tools();JSONArray fileTools=files.tools();for(int i=0;i<fileTools.length();i++)tools.put(fileTools.get(i));JSONArray appTools=applications.tools();for(int i=0;i<appTools.length();i++)tools.put(appTools.get(i));
         if(backend.controlAvailable())tools.put(new JSONObject().put("packageId","cagent.android").put("id","android_ui_read").put("toolId","android_ui_read")
           .put("description","Read the current Android accessibility UI; password text is omitted.").put("sideEffect",false)
           .put("inputSchema",new JSONObject().put("type","object").put("properties",new JSONObject()).put("additionalProperties",false))
@@ -139,6 +147,9 @@ final class AndroidAgentHost implements AutoCloseable {
       }
       case "packages.invoke":{
         if(!"cagent.android".equals(params.optString("packageId")))throw new IOException("Unknown Android capability");
+        if(params.optString("toolId").startsWith("android_files_"))return files.call("files."+params.getString("toolId").substring("android_files_".length()),params.optJSONObject("args")==null?new JSONObject():params.getJSONObject("args"),owner);
+        if("android_apps_list".equals(params.optString("toolId")))return applications.list();
+        if("android_app_launch".equals(params.optString("toolId")))return applications.launch(params.getJSONObject("args"));
         if(!"android_ui_read".equals(params.optString("toolId")))return phone.invoke(owner,params.optString("toolId"),params.optJSONObject("args")==null?new JSONObject():params.getJSONObject("args"));
         if(!backend.controlAvailable())throw new IOException("请先在手机系统设置中启用 CAgent 辅助控制");
         return AndroidControlService.snapshot();
@@ -175,7 +186,7 @@ final class AndroidAgentHost implements AutoCloseable {
     final SSLSocket socket;final InputStream input;final DataOutputStream output;final String owner;final long hostEpoch;
     JSONObject ticket;byte[] session,txKey,rxKey,mediaKey;long tx,rx,mediaSequence,frameId,inputSequence,lastInputNotice;volatile long awaiting=-1,writeStarted,lastAck=System.nanoTime();volatile boolean ready,hasVideo;final AtomicBoolean closed=new AtomicBoolean();
     final ExecutorService writer=new ThreadPoolExecutor(1,1,0,TimeUnit.MILLISECONDS,new ArrayBlockingQueue<>(2));
-    final AtomicBoolean frameQueued=new AtomicBoolean();volatile boolean needKey=true;
+    final AtomicBoolean frameQueued=new AtomicBoolean();final AndroidFrameQueue frameQueue=new AndroidFrameQueue();
     ScheduledFuture<?> watchdog;
     Desktop(SSLSocket s,InputStream in,OutputStream out,String owner,long hostEpoch){socket=s;input=in;output=new DataOutputStream(out);this.owner=owner;this.hostEpoch=hostEpoch;}
     void run()throws Exception {
@@ -197,11 +208,11 @@ final class AndroidAgentHost implements AutoCloseable {
       switch(op){
         case "ping":send(new JSONObject().put("op","pong").put("sent",m.opt("sent")));break;
         case "pong":break;
-        case "ack":if(String.valueOf(awaiting).equals(m.getString("id"))){awaiting=-1;lastAck=System.nanoTime();}break;
-        case "keyframe":needKey=true;backend.requestKeyFrame();break;
+        case "ack":if(String.valueOf(awaiting).equals(m.getString("id"))){awaiting=-1;lastAck=System.nanoTime();pumpFrame();}break;
+        case "keyframe":frameQueue.reset();backend.requestKeyFrame();break;
         case "release-input":backend.releaseInput();break;
         case "input":{JSONObject value=m.getJSONObject("value");if(!ticket.optBoolean("control")||!hasVideo)break;if(!backend.controlAvailable()){backend.releaseInput();ticket.put("control",false);send(new JSONObject().put("op","notice").put("value","INPUT_DISABLED: 手机辅助控制已关闭"));break;}if(value.getLong("generation")!=1||value.getLong("sequence")<=inputSequence)throw new IOException("Input ordering invalid");inputSequence=value.getLong("sequence");boolean unsupported=false;synchronized(AndroidAgentHost.this){if(closed.get()||desktop!=this||hostEpoch!=epoch.get())return;try{backend.input(value);}catch(Exception e){backend.releaseInput();unsupported=true;}}if(unsupported&&System.nanoTime()-lastInputNotice>TimeUnit.SECONDS.toNanos(2)){lastInputNotice=System.nanoTime();send(new JSONObject().put("op","notice").put("value","Android 当前界面不支持此输入操作；屏幕共享仍在继续。"));}break;}
-        case "quality":{JSONObject q=m.getJSONObject("value");validateQuality(q);synchronized(AndroidAgentHost.this){if(closed.get()||desktop!=this||hostEpoch!=epoch.get())return;backend.quality(q);needKey=true;backend.requestKeyFrame();}break;}
+        case "quality":{JSONObject q=m.getJSONObject("value");validateQuality(q);synchronized(AndroidAgentHost.this){if(closed.get()||desktop!=this||hostEpoch!=epoch.get())return;backend.quality(q);frameQueue.reset();backend.requestKeyFrame();}break;}
         case "feedback":break; // Transport receipts bound the queue; device quality remains explicit.
         case "close":close();break;
         default:throw new IOException("Invalid desktop operation");
@@ -211,9 +222,14 @@ final class AndroidAgentHost implements AutoCloseable {
     public void video(JSONObject info){try{JSONObject snapshot=new JSONObject(info.toString());writer.execute(()->{try{send(new JSONObject().put("op","video").put("value",snapshot));hasVideo=true;}catch(Exception e){failure="DESKTOP_WRITE_"+e.getClass().getSimpleName();close();}});}catch(Exception e){close();}}
     public void frame(byte[] data,long time,boolean key){
       if(closed.get()||!ready||!hasVideo)return;if(data.length==0||data.length>32*1024*1024){error("CAPTURE_FRAME_BUDGET");return;}
-      if(awaiting>=0||!frameQueued.compareAndSet(false,true)){needKey=true;return;}
-      if(needKey&&!key){frameQueued.set(false);backend.requestKeyFrame();return;}
-      needKey=false;byte[] copy=data.clone();try{writer.execute(()->{try{sendFrame(copy,time,key);}catch(Exception e){failure="DESKTOP_FRAME_"+e.getClass().getSimpleName();close();}finally{frameQueued.set(false);}});}catch(RejectedExecutionException e){frameQueued.set(false);close();}
+      if(!frameQueue.offer(data,time,key,System.nanoTime()))backend.requestKeyFrame();
+      pumpFrame();
+    }
+    private void pumpFrame(){
+      if(closed.get()||awaiting>=0||!frameQueued.compareAndSet(false,true))return;
+      AndroidFrameQueue.Frame next=frameQueue.poll(System.nanoTime());
+      if(next==null){frameQueued.set(false);if(frameQueue.needsKey())backend.requestKeyFrame();return;}
+      try{writer.execute(()->{try{sendFrame(next.data,next.timestamp,next.key);}catch(Exception e){failure="DESKTOP_FRAME_"+e.getClass().getSimpleName();close();}finally{frameQueued.set(false);if(awaiting<0)pumpFrame();}});}catch(RejectedExecutionException e){frameQueued.set(false);close();}
     }
     private void sendFrame(byte[] data,long timestamp,boolean key)throws Exception {
       long id=frameId++;if(id>0xffffffffL)throw new IOException("Frame identity exhausted");int payload=16384-48,count=(data.length+payload-1)/payload;awaiting=id;lastAck=System.nanoTime();
@@ -224,7 +240,7 @@ final class AndroidAgentHost implements AutoCloseable {
       }
     }
     public void error(String reason){failure=reason==null?"Screen capture stopped":reason;String message=failure.startsWith("SCREEN_LOCKED")?"手机已锁屏或息屏，请在手机上解锁后重新连接；管理连接仍可使用":"手机屏幕共享已结束，请在手机上重新授权共享后连接；管理连接仍可使用";try{send(new JSONObject().put("op","close").put("reason",message).put("code",failure.startsWith("SCREEN_LOCKED")?"SCREEN_LOCKED":"PROJECTION_STOPPED").put("recoverable",true));}catch(Exception ignored){}close();}
-    public void close(){if(!closed.compareAndSet(false,true))return;try{socket.close();}catch(Exception ignored){}if(watchdog!=null)watchdog.cancel(false);writer.shutdownNow();synchronized(AndroidAgentHost.this){if(desktop==this){desktop=null;backend.releaseInput();backend.stop();}}}
+    public void close(){if(!closed.compareAndSet(false,true))return;try{socket.close();}catch(Exception ignored){}if(watchdog!=null)watchdog.cancel(false);frameQueue.reset();writer.shutdownNow();synchronized(AndroidAgentHost.this){if(desktop==this){desktop=null;backend.releaseInput();backend.stop();}}}
   }
   static byte[] hmac(byte[] key,String value)throws Exception{Mac mac=Mac.getInstance("HmacSHA256");mac.init(new SecretKeySpec(key,"HmacSHA256"));return mac.doFinal(value.getBytes(StandardCharsets.UTF_8));}
   static byte[] crypt(boolean encrypt,byte[] key,byte[] sequence,byte[] aad,byte[] body)throws Exception{byte[] nonce=new byte[12];System.arraycopy(sequence,0,nonce,4,8);Cipher c=Cipher.getInstance("AES/GCM/NoPadding");c.init(encrypt?Cipher.ENCRYPT_MODE:Cipher.DECRYPT_MODE,new SecretKeySpec(key,"AES"),new GCMParameterSpec(128,nonce));c.updateAAD(aad);return c.doFinal(body);}

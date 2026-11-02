@@ -1,0 +1,422 @@
+{
+  "version": "0.8.20",
+  "status": "private-staged",
+  "verifiedAt": "2026-11-02T18:34:19.11326+08:00",
+  "count": 30,
+  "totalBytes": 2499143951,
+  "files": [
+    {
+      "name": "CAgent-0.8.20-linux-arm64.tar.gz",
+      "path": "/opt/cshell-release-staging/0.8.20-final/opensource/CAgent-0.8.20-linux-arm64.tar.gz",
+      "bytes": 44505697,
+      "sha256": "605feeb49dd18968d4495dd0e97de3b75194310071055cb25e684e5ef1ebddae",
+      "archiveSha256": "6ec45831edc8d14fb422eb194dd8612aa259d710bec6ebd1a2807b394680bd03",
+      "archiveBytes": 287484293,
+      "artifactId": 13130223911,
+      "source": "23b9bf2a0a2e4ed29986bdd671cd8dcb1487efbd",
+      "status": "private-archive-digest-verified-not-published",
+      "edition": "opensource",
+      "remotePath": "/opt/cshell-release-staging/0.8.20-final/opensource/CAgent-0.8.20-linux-arm64.tar.gz"
+    },
+    {
+      "name": "CAgent-0.8.20-linux-x64.tar.gz",
+      "path": "/opt/cshell-release-staging/0.8.20-final/opensource/CAgent-0.8.20-linux-x64.tar.gz",
+      "bytes": 44823799,
+      "sha256": "5d988168a9be6ad02bdc45187bfb5100760b2dfc1aac1f70e26aaa9588c77283",
+      "archiveSha256": "df1247a2299507ac4450b1435f257321ec6cee19f51ae93853eae187151496cc",
+      "archiveBytes": 292394045,
+      "artifactId": 13130657601,
+      "source": "23b9bf2a0a2e4ed29986bdd671cd8dcb1487efbd",
+      "status": "private-archive-digest-verified-not-published",
+      "edition": "opensource",
+      "remotePath": "/opt/cshell-release-staging/0.8.20-final/opensource/CAgent-0.8.20-linux-x64.tar.gz"
+    },
+    {
+      "name": "CAgent-0.8.20-mac-arm64.tar.gz",
+      "path": "/opt/cshell-release-staging/0.8.20-final/opensource/CAgent-0.8.20-mac-arm64.tar.gz",
+      "bytes": 39501213,
+      "sha256": "ad7cb7660bcaf238a056a010873408132511a15e1012c812089dfbc8c3128bc1",
+      "archiveSha256": "67343359d381c2ec117ad943ccefbf5bb585ce0b8f4dd40fb4db4f50dbed37fe",
+      "archiveBytes": 323014677,
+      "artifactId": 13131565717,
+      "source": "23b9bf2a0a2e4ed29986bdd671cd8dcb1487efbd",
+      "status": "private-archive-digest-verified-not-published",
+      "edition": "opensource",
+      "remotePath": "/opt/cshell-release-staging/0.8.20-final/opensource/CAgent-0.8.20-mac-arm64.tar.gz"
+    },
+    {
+      "name": "CAgent-0.8.20-mac-x64.tar.gz",
+      "path": "/opt/cshell-release-staging/0.8.20-final/opensource/CAgent-0.8.20-mac-x64.tar.gz",
+      "bytes": 40730816,
+      "sha256": "fff707ae0e4061a86621c65c56f9667c26c6047a40eb2b13c113b83d1ff9c534",
+      "archiveSha256": "c05aa0ca5459d559818b4d8103fbeda1290e7441a26351c1754bb1e5cbe44ca9",
+      "archiveBytes": 331922792,
+      "artifactId": 13132045225,
+      "source": "23b9bf2a0a2e4ed29986bdd671cd8dcb1487efbd",
+      "status": "private-archive-digest-verified-not-published",
+      "edition": "opensource",
+      "remotePath": "/opt/cshell-release-staging/0.8.20-final/opensource/CAgent-0.8.20-mac-x64.tar.gz"
+    },
+    {
+      "edition": "opensource",
+      "name": "CAgent-Setup-0.8.20-win-x64.exe",
+      "path": "C:/Users/35097/.codex/worktrees/pro-020-model-market/CShell/.local/020-final/opensource/CAgent-Setup-0.8.20-win-x64.exe",
+      "bytes": 26182280,
+      "sha256": "9e3458600599df441760ef1d4f08535f436e2fd4140a0cf23004070764a0e92e",
+      "source": {
+        "kind": "windows-agent",
+        "local": "3bfb3ed36b85b48a3986d02defadfd0c5e6f7017"
+      },
+      "remotePath": "/opt/cshell-release-staging/0.8.20-final/opensource/CAgent-Setup-0.8.20-win-x64.exe"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.20-android.apk",
+      "path": "C:/Users/35097/.codex/worktrees/pro-020-model-market/CShell/.local/020-final/opensource/CShell-0.8.20-android.apk",
+      "bytes": 4903818,
+      "sha256": "3e68764e17708e1ab9cff2e2f4ee0695f56686333bb9a20f22ebc047bd5bf009",
+      "source": {
+        "kind": "android",
+        "runId": 41423291003
+      },
+      "remotePath": "/opt/cshell-release-staging/0.8.20-final/opensource/CShell-0.8.20-android.apk"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.20-linux-amd64.deb",
+      "path": "/opt/cshell-release-staging/0.8.20-final/opensource/CShell-0.8.20-linux-amd64.deb",
+      "bytes": 108862388,
+      "sha256": "d6be790b9ca765c247657413bdbc9ed4cd154c0fa0f7e7bd3f94720b69e40d43",
+      "archiveSha256": "10b2bfc657fc2093f14b4698a0130f599c68dc7695d9f31fd0595b0c26f445a0",
+      "archiveBytes": 247855431,
+      "artifactId": 13132281023,
+      "source": "49639202f679072ae8cfb754160ee58f443f84d5",
+      "status": "private-archive-digest-verified-not-published",
+      "remotePath": "/opt/cshell-release-staging/0.8.20-final/opensource/CShell-0.8.20-linux-amd64.deb"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.20-linux-arm64.AppImage",
+      "path": "/opt/cshell-release-staging/0.8.20-final/opensource/CShell-0.8.20-linux-arm64.AppImage",
+      "bytes": 140747965,
+      "sha256": "125d23805b3e0c4ac5bbdb4756eb1744b764d176b3bcd13376161b3e6781bca2",
+      "archiveSha256": "fc579e27c2a43547b6b6eac85468bb809c0c7af8de8dd1c33b544e89068e6026",
+      "archiveBytes": 243279456,
+      "artifactId": 13131832527,
+      "source": "49639202f679072ae8cfb754160ee58f443f84d5",
+      "status": "private-archive-digest-verified-not-published",
+      "remotePath": "/opt/cshell-release-staging/0.8.20-final/opensource/CShell-0.8.20-linux-arm64.AppImage"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.20-linux-arm64.deb",
+      "path": "/opt/cshell-release-staging/0.8.20-final/opensource/CShell-0.8.20-linux-arm64.deb",
+      "bytes": 103062100,
+      "sha256": "7814b3743be4931c389ee4a537fd8357569676ca071cc00653afced1e8f14780",
+      "archiveSha256": "fc579e27c2a43547b6b6eac85468bb809c0c7af8de8dd1c33b544e89068e6026",
+      "archiveBytes": 243279456,
+      "artifactId": 13131832527,
+      "source": "49639202f679072ae8cfb754160ee58f443f84d5",
+      "status": "private-archive-digest-verified-not-published",
+      "remotePath": "/opt/cshell-release-staging/0.8.20-final/opensource/CShell-0.8.20-linux-arm64.deb"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.20-linux-x86_64.AppImage",
+      "path": "/opt/cshell-release-staging/0.8.20-final/opensource/CShell-0.8.20-linux-x86_64.AppImage",
+      "bytes": 139492755,
+      "sha256": "c1389c3cb04d9fce1742e0d97840694c7e9805b75792ca51696114ba9fc824ea",
+      "archiveSha256": "10b2bfc657fc2093f14b4698a0130f599c68dc7695d9f31fd0595b0c26f445a0",
+      "archiveBytes": 247855431,
+      "artifactId": 13132281023,
+      "source": "49639202f679072ae8cfb754160ee58f443f84d5",
+      "status": "private-archive-digest-verified-not-published",
+      "remotePath": "/opt/cshell-release-staging/0.8.20-final/opensource/CShell-0.8.20-linux-x86_64.AppImage"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.20-mac-arm64.dmg",
+      "path": "/opt/cshell-release-staging/0.8.20-final/opensource/CShell-0.8.20-mac-arm64.dmg",
+      "bytes": 142338468,
+      "sha256": "235631f5dfae89a13f749217eae1c3dd4a5edc213f7a61c521f89dbbb585e153",
+      "archiveSha256": "7d0c644f12a74fb7a9d6fbc7e5d8c79c12123b12ce7a714334377a4a07e3877b",
+      "archiveBytes": 283953217,
+      "artifactId": 13132011744,
+      "source": "49639202f679072ae8cfb754160ee58f443f84d5",
+      "status": "private-archive-digest-verified-not-published",
+      "remotePath": "/opt/cshell-release-staging/0.8.20-final/opensource/CShell-0.8.20-mac-arm64.dmg"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.20-mac-arm64.zip",
+      "path": "/opt/cshell-release-staging/0.8.20-final/opensource/CShell-0.8.20-mac-arm64.zip",
+      "bytes": 142202944,
+      "sha256": "578d84b545be45b41d930b8524c16d2f95771bd57bbd63e11188d33ac1449b5f",
+      "archiveSha256": "7d0c644f12a74fb7a9d6fbc7e5d8c79c12123b12ce7a714334377a4a07e3877b",
+      "archiveBytes": 283953217,
+      "artifactId": 13132011744,
+      "source": "49639202f679072ae8cfb754160ee58f443f84d5",
+      "status": "private-archive-digest-verified-not-published",
+      "remotePath": "/opt/cshell-release-staging/0.8.20-final/opensource/CShell-0.8.20-mac-arm64.zip"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.20-mac-x64.dmg",
+      "path": "/opt/cshell-release-staging/0.8.20-final/opensource/CShell-0.8.20-mac-x64.dmg",
+      "bytes": 146178171,
+      "sha256": "a56205baa4071f0143ac9f533c659ae7d2d29730347b8b6c0175cfff565a8bf4",
+      "archiveSha256": "bdb3dd8b10b233e36f82056d596b754d46a7ed1d289a4489a45bab481f88f4ed",
+      "archiveBytes": 291665265,
+      "artifactId": 13131488711,
+      "source": "49639202f679072ae8cfb754160ee58f443f84d5",
+      "status": "private-archive-digest-verified-not-published",
+      "remotePath": "/opt/cshell-release-staging/0.8.20-final/opensource/CShell-0.8.20-mac-x64.dmg"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.20-mac-x64.zip",
+      "path": "/opt/cshell-release-staging/0.8.20-final/opensource/CShell-0.8.20-mac-x64.zip",
+      "bytes": 146044395,
+      "sha256": "5e6f68c61701ba542bf0cd43595dc1b2db6ce31067087608667cdc08b8c29301",
+      "archiveSha256": "bdb3dd8b10b233e36f82056d596b754d46a7ed1d289a4489a45bab481f88f4ed",
+      "archiveBytes": 291665265,
+      "artifactId": 13131488711,
+      "source": "49639202f679072ae8cfb754160ee58f443f84d5",
+      "status": "private-archive-digest-verified-not-published",
+      "remotePath": "/opt/cshell-release-staging/0.8.20-final/opensource/CShell-0.8.20-mac-x64.zip"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.20-win-x64.exe",
+      "path": "C:/Users/35097/.codex/worktrees/pro-020-model-market/CShell/.local/020-final/opensource/CShell-0.8.20-win-x64.exe",
+      "bytes": 123717105,
+      "sha256": "e80c6e7701086df897b5a2be207f8f048fd1aa910832d67ab716950b0552c8d7",
+      "source": {
+        "kind": "windows-desktop",
+        "local": "6a43daa"
+      },
+      "remotePath": "/opt/cshell-release-staging/0.8.20-final/opensource/CShell-0.8.20-win-x64.exe"
+    },
+    {
+      "edition": "opensource",
+      "name": "SHA256SUMS.txt",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-020-model-market\\CShell\\.local\\020-final\\opensource\\SHA256SUMS.txt",
+      "bytes": 1437,
+      "sha256": "d06b7461f637ad2f99bcab5303c726e4345fc2a00caa00bd8c2be82f8c650859",
+      "source": {
+        "kind": "complete-verified-inventory"
+      },
+      "remotePath": "/opt/cshell-release-staging/0.8.20-final/opensource/SHA256SUMS.txt"
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-0.8.20-linux-arm64.tar.gz",
+      "path": "C:/Users/35097/.codex/worktrees/pro-020-model-market/CShell/.local/020-final/pro/CAgent-0.8.20-linux-arm64.tar.gz",
+      "bytes": 44558664,
+      "sha256": "627ee736262a4e69824cad70325025a74967a46ce6b368e0044d09e750fec344",
+      "source": {
+        "local": "69511a3d72e9e50fea8abefb24c7aca4b2bdb50f",
+        "remote": "43a12fc779f98b09c32bf2e978efc89a2bf07365",
+        "runId": 41423267456,
+        "artifactId": 13130473478,
+        "zipDigest": "sha256:83eac8dc3ebbca26868ec6613ed662ee644ab8afe232230c599d782a202c0cf4"
+      },
+      "remotePath": "/opt/cshell-release-staging/0.8.20-final/pro/CAgent-0.8.20-linux-arm64.tar.gz"
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-0.8.20-linux-x64.tar.gz",
+      "path": "C:/Users/35097/.codex/worktrees/pro-020-model-market/CShell/.local/020-final/pro/CAgent-0.8.20-linux-x64.tar.gz",
+      "bytes": 44877002,
+      "sha256": "440afec01039520abedc38fd9441394b71984f2b3edb042fb563bc5173c3741e",
+      "source": {
+        "local": "69511a3d72e9e50fea8abefb24c7aca4b2bdb50f",
+        "remote": "43a12fc779f98b09c32bf2e978efc89a2bf07365",
+        "runId": 41423267456,
+        "artifactId": 13129564706,
+        "zipDigest": "sha256:10e24b7e9ec19bf7851cb342ca441130003f2727ef21272d696ad203b0eb0539"
+      },
+      "remotePath": "/opt/cshell-release-staging/0.8.20-final/pro/CAgent-0.8.20-linux-x64.tar.gz"
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-0.8.20-mac-arm64.tar.gz",
+      "path": "C:/Users/35097/.codex/worktrees/pro-020-model-market/CShell/.local/020-final/pro/CAgent-0.8.20-mac-arm64.tar.gz",
+      "bytes": 39552508,
+      "sha256": "24e0d36f5c59d866e5fd93c664bf72b9ace8cc66f39a9ac1ec9da33c26571c93",
+      "source": {
+        "local": "69511a3d72e9e50fea8abefb24c7aca4b2bdb50f",
+        "remote": "43a12fc779f98b09c32bf2e978efc89a2bf07365",
+        "runId": 41423267456,
+        "artifactId": 13130786770,
+        "zipDigest": "sha256:8d9a9a02756d6b51d2ebf4767f9a6a705d88135475fbf523f89cf96c47b9a20c"
+      },
+      "remotePath": "/opt/cshell-release-staging/0.8.20-final/pro/CAgent-0.8.20-mac-arm64.tar.gz"
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-0.8.20-mac-x64.tar.gz",
+      "path": "C:/Users/35097/.codex/worktrees/pro-020-model-market/CShell/.local/020-final/pro/CAgent-0.8.20-mac-x64.tar.gz",
+      "bytes": 40785167,
+      "sha256": "afe707a858d5150e85ae9559d9be90c4b776cea094af9df3c1f266af0905c8dd",
+      "source": {
+        "local": "69511a3d72e9e50fea8abefb24c7aca4b2bdb50f",
+        "remote": "43a12fc779f98b09c32bf2e978efc89a2bf07365",
+        "runId": 41423267456,
+        "artifactId": 13130159497,
+        "zipDigest": "sha256:470c9192eb0cfa12c44506b9cdf965676a19bdecd2c212ffff185f36b9fa3b42"
+      },
+      "remotePath": "/opt/cshell-release-staging/0.8.20-final/pro/CAgent-0.8.20-mac-x64.tar.gz"
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-Setup-0.8.20-win-x64.exe",
+      "path": "C:/Users/35097/.codex/worktrees/pro-020-model-market/CShell/.local/020-final/pro/CAgent-Setup-0.8.20-win-x64.exe",
+      "bytes": 26231742,
+      "sha256": "67cdfc66494f8584207d7cf8e19bd0f252b6e3ec4bd6a98b6b2b0604fb00ece9",
+      "source": {
+        "kind": "windows-agent",
+        "local": "d992f2cff0bb9b72ce8488ba4047f1b3635cd14e"
+      },
+      "remotePath": "/opt/cshell-release-staging/0.8.20-final/pro/CAgent-Setup-0.8.20-win-x64.exe"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.20-android.apk",
+      "path": "C:/Users/35097/.codex/worktrees/pro-020-model-market/CShell/.local/020-final/pro/CShell-Pro-0.8.20-android.apk",
+      "bytes": 4930942,
+      "sha256": "ef41e5a1cf448ddb26e889c809331b777c9303bd8b4f5166a6be8e43dd670e73",
+      "source": {
+        "kind": "android",
+        "runId": 41423273597
+      },
+      "remotePath": "/opt/cshell-release-staging/0.8.20-final/pro/CShell-Pro-0.8.20-android.apk"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.20-linux-amd64.deb",
+      "path": "/opt/cshell-release-staging/0.8.20-final/pro/CShell-Pro-0.8.20-linux-amd64.deb",
+      "bytes": 107811960,
+      "sha256": "fd5fc31ddd59557877c259601f375ccb8842dea626c4d23ac02b4b7028f8ca73",
+      "archiveSha256": "8d277e476f2be05d56df1bfde2379325b396dbf9a3baba3c0068f3fa00ce3d20",
+      "archiveBytes": 247044785,
+      "artifactId": 13131637294,
+      "source": {
+        "head": "5b784c6faa0ebee3c3b830fdf9630a7c59aa3f60",
+        "tree": "6a17b0e841b9def5552f97a1a8f6e350270ae2e6",
+        "remote": "9a50c3b63887052783b75472943b74c68800f4ba"
+      },
+      "status": "private-archive-digest-verified-not-published",
+      "remotePath": "/opt/cshell-release-staging/0.8.20-final/pro/CShell-Pro-0.8.20-linux-amd64.deb"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.20-linux-arm64.AppImage",
+      "path": "/opt/cshell-release-staging/0.8.20-final/pro/CShell-Pro-0.8.20-linux-arm64.AppImage",
+      "bytes": 140989794,
+      "sha256": "00c7b47c1c1aee92409340c013200aab2cb99dc2ef257e39151b0b9776f2e34b",
+      "archiveSha256": "11beab2fd95c61cc5282113dee36ea16e313b4d688fe8776ba66154946f9dd8b",
+      "archiveBytes": 243767308,
+      "artifactId": 13132286260,
+      "source": {
+        "head": "5b784c6faa0ebee3c3b830fdf9630a7c59aa3f60",
+        "tree": "6a17b0e841b9def5552f97a1a8f6e350270ae2e6",
+        "remote": "9a50c3b63887052783b75472943b74c68800f4ba"
+      },
+      "status": "private-archive-digest-verified-not-published",
+      "remotePath": "/opt/cshell-release-staging/0.8.20-final/pro/CShell-Pro-0.8.20-linux-arm64.AppImage"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.20-linux-arm64.deb",
+      "path": "/opt/cshell-release-staging/0.8.20-final/pro/CShell-Pro-0.8.20-linux-arm64.deb",
+      "bytes": 103309828,
+      "sha256": "f8f07011df0f77dd4c107c34cde9ee7657bd714c05e5b4e244d9b3e62ac6c373",
+      "archiveSha256": "11beab2fd95c61cc5282113dee36ea16e313b4d688fe8776ba66154946f9dd8b",
+      "archiveBytes": 243767308,
+      "artifactId": 13132286260,
+      "source": {
+        "head": "5b784c6faa0ebee3c3b830fdf9630a7c59aa3f60",
+        "tree": "6a17b0e841b9def5552f97a1a8f6e350270ae2e6",
+        "remote": "9a50c3b63887052783b75472943b74c68800f4ba"
+      },
+      "status": "private-archive-digest-verified-not-published",
+      "remotePath": "/opt/cshell-release-staging/0.8.20-final/pro/CShell-Pro-0.8.20-linux-arm64.deb"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.20-linux-x86_64.AppImage",
+      "path": "/opt/cshell-release-staging/0.8.20-final/pro/CShell-Pro-0.8.20-linux-x86_64.AppImage",
+      "bytes": 139730499,
+      "sha256": "92a36a6f1fa752c1ae67ab0a3520b04fef10e38acdabae49d26b73be87725dd7",
+      "archiveSha256": "8d277e476f2be05d56df1bfde2379325b396dbf9a3baba3c0068f3fa00ce3d20",
+      "archiveBytes": 247044785,
+      "artifactId": 13131637294,
+      "source": {
+        "head": "5b784c6faa0ebee3c3b830fdf9630a7c59aa3f60",
+        "tree": "6a17b0e841b9def5552f97a1a8f6e350270ae2e6",
+        "remote": "9a50c3b63887052783b75472943b74c68800f4ba"
+      },
+      "status": "private-archive-digest-verified-not-published",
+      "remotePath": "/opt/cshell-release-staging/0.8.20-final/pro/CShell-Pro-0.8.20-linux-x86_64.AppImage"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.20-mac-arm64.dmg",
+      "path": "/opt/cshell-release-staging/0.8.20-final/pro/CShell-Pro-0.8.20-mac-arm64.dmg",
+      "bytes": 142650892,
+      "sha256": "60c3126935e49401bf86c7c0dc2c5c9e35ff9cead2816b1bd1b476c3721283d6",
+      "archiveSha256": "d5fb1a1c57bcda91d1fe970be28d9c5f5d2893a6ac523ac13c1e17f17d7e0428",
+      "archiveBytes": 142413182,
+      "artifactId": 13131583144,
+      "source": {
+        "head": "5b784c6faa0ebee3c3b830fdf9630a7c59aa3f60",
+        "tree": "6a17b0e841b9def5552f97a1a8f6e350270ae2e6",
+        "remote": "9a50c3b63887052783b75472943b74c68800f4ba"
+      },
+      "status": "private-archive-digest-verified-not-published",
+      "remotePath": "/opt/cshell-release-staging/0.8.20-final/pro/CShell-Pro-0.8.20-mac-arm64.dmg"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.20-mac-x64.dmg",
+      "path": "/opt/cshell-release-staging/0.8.20-final/pro/CShell-Pro-0.8.20-mac-x64.dmg",
+      "bytes": 146484071,
+      "sha256": "00ff389b80d4a88ee19dfa66d91a41a8624ea93e499dfd5c1c380946b00ccc30",
+      "archiveSha256": "4dda8523f347008625c41e2be510c5a77a33073119748565b8f77d164da81a3f",
+      "archiveBytes": 146251499,
+      "artifactId": 13132081740,
+      "source": {
+        "head": "5b784c6faa0ebee3c3b830fdf9630a7c59aa3f60",
+        "tree": "6a17b0e841b9def5552f97a1a8f6e350270ae2e6",
+        "remote": "9a50c3b63887052783b75472943b74c68800f4ba"
+      },
+      "status": "private-archive-digest-verified-not-published",
+      "remotePath": "/opt/cshell-release-staging/0.8.20-final/pro/CShell-Pro-0.8.20-mac-x64.dmg"
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-0.8.20-win-x64.exe",
+      "path": "C:/Users/35097/.codex/worktrees/pro-020-model-market/CShell/.local/020-final/pro/CShell-Pro-0.8.20-win-x64.exe",
+      "bytes": 123934248,
+      "sha256": "8cae607d0f2bf2456d26f0e7095cfa221692e291434b91c2df20087cea09f3fd",
+      "source": {
+        "kind": "windows-desktop",
+        "local": "5b784c6"
+      },
+      "remotePath": "/opt/cshell-release-staging/0.8.20-final/pro/CShell-Pro-0.8.20-win-x64.exe"
+    },
+    {
+      "edition": "pro",
+      "name": "SHA256SUMS.txt",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-020-model-market\\CShell\\.local\\020-final\\pro\\SHA256SUMS.txt",
+      "bytes": 1283,
+      "sha256": "0777ab357625d976406426371a78945f38b944b43569aadc61f89c5246137a4e",
+      "source": {
+        "kind": "complete-verified-inventory"
+      },
+      "remotePath": "/opt/cshell-release-staging/0.8.20-final/pro/SHA256SUMS.txt"
+    }
+  ],
+  "publicationGate": "blocked-pending-android-video-and-renderer-fixes"
+}

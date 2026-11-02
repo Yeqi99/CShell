@@ -1,0 +1,54 @@
+{
+  "version": "0.8.20",
+  "status": "validated-not-published",
+  "artifacts": [
+    {
+      "edition": "pro",
+      "source": "5b784c6",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-020-model-market\\CShell\\release\\pro-0.8.20\\CShell-Pro-0.8.20-win-x64.exe",
+      "size": 123934248,
+      "sha256": "8cae607d0f2bf2456d26f0e7095cfa221692e291434b91c2df20087cea09f3fd",
+      "authenticode": "NotSigned",
+      "checks": [
+        "NSIS extracted app.asar equals tested win-unpacked",
+        "actual packaged MCP management/preflight/structured command HTTP",
+        "packaged English desktop/Ping/native entry states",
+        "full desktop SSH/SFTP/layout/fonts/groups/MCP/restart",
+        "platform sandbox/SSH/SFTP",
+        "first-install defaults and saved deny preservation",
+        "simultaneous editions, distinct MCP tokens, cross-token 401, restart persistence"
+      ]
+    },
+    {
+      "edition": "opensource",
+      "source": "6a43daa",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\core-020-model-market\\CShell\\release\\0.8.20\\CShell-0.8.20-win-x64.exe",
+      "size": 123717105,
+      "sha256": "e80c6e7701086df897b5a2be207f8f048fd1aa910832d67ab716950b0552c8d7",
+      "authenticode": "NotSigned",
+      "checks": [
+        "NSIS extracted app.asar equals tested win-unpacked",
+        "actual packaged MCP management/preflight/structured command HTTP",
+        "packaged English desktop/Ping/native entry states",
+        "full desktop SSH/SFTP/layout/fonts/groups/MCP/restart",
+        "platform sandbox/SSH/SFTP",
+        "first-install defaults and saved deny preservation",
+        "simultaneous editions, distinct MCP tokens, cross-token 401, restart persistence"
+      ]
+    }
+  ],
+  "localInstallation": {
+    "edition": "pro",
+    "version": "0.8.20",
+    "directory": "E:\\CShell\\CShell Pro",
+    "normalExit": true,
+    "installerExitCode": 0,
+    "reopened": true,
+    "installedAsarMatchesValidatedPackage": true,
+    "keyConfigurationFilesShaUnchanged": 5,
+    "machines": 8,
+    "groups": 6,
+    "visualVerification": "Stopped by user Escape after reopen; no further UI operation.",
+    "core": "No existing installation verified; did not install a second edition."
+  }
+}

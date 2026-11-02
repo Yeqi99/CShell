@@ -20,6 +20,7 @@ final class AndroidHostProtocolTest {
     volatile ScheduledFuture<?> delivery;volatile AndroidAgentHost.Events events;
     final AtomicInteger inputs=new AtomicInteger(),releases=new AtomicInteger();
     volatile boolean accessible=true,projecting=true;
+    volatile int framePeriod=70;volatile boolean deltaFrames;final AtomicBoolean forceKey=new AtomicBoolean(true);
     volatile String delegationCredential="",delegationFingerprint="";volatile boolean delegationAllowed;
     public boolean delegation(String device,String credential,String fingerprint,boolean continuation){if(!delegationAllowed||!credential.equals(delegationCredential))return false;if(delegationFingerprint.isEmpty())delegationFingerprint=fingerprint;return delegationFingerprint.equals(fingerprint);}
     public boolean available(){return projecting;} public boolean controlAvailable(){return projecting&&accessible;}
@@ -27,12 +28,12 @@ final class AndroidHostProtocolTest {
     public void start(JSONObject quality,AndroidAgentHost.Events e)throws Exception{
       events=e;e.video(new JSONObject().put("width",320).put("height",240).put("sourceWidth",320).put("sourceHeight",240).put("fps",30).put("codec","avc1.42001e").put("encoder","fixture").put("hardware",false));
       byte[] frame=new byte[100000];Arrays.fill(frame,(byte)73);
-      delivery=frames.scheduleAtFixedRate(()->e.frame(frame,System.nanoTime()/1000,true),30,70,TimeUnit.MILLISECONDS);
+      delivery=frames.scheduleAtFixedRate(()->e.frame(frame,System.nanoTime()/1000,!deltaFrames||forceKey.getAndSet(false)),30,framePeriod,TimeUnit.MILLISECONDS);
     }
     public void stop(){ScheduledFuture<?> f=delivery;if(f!=null)f.cancel(false);delivery=null;events=null;}
     public void input(JSONObject event)throws IOException{if("key".equals(event.optString("kind"))&&event.optInt("code")==59)throw new IOException("Unsupported fixture key");inputs.incrementAndGet();}
     public void releaseInput(){releases.incrementAndGet();}
-    public void requestKeyFrame(){} public void quality(JSONObject q){}
+    public void requestKeyFrame(){forceKey.set(true);} public void quality(JSONObject q){}
     void close(){stop();frames.shutdownNow();}
   }
   static String fixture(android.app.Instrumentation runner)throws Exception {
@@ -49,6 +50,7 @@ final class AndroidHostProtocolTest {
     }finally{host.close();capture.close();config.delete();stop.delete();}
   }
   static String run(Context context)throws Exception {
+    AndroidFrameQueueTest.run(); AndroidManagedFilesTest.run(context);
     Capture capture=new Capture();AndroidAgentHost host=new AndroidAgentHost(context,capture);int port;
     try(ServerSocket reserve=new ServerSocket(0)){port=reserve.getLocalPort();}
     String password="fixture-"+UUID.randomUUID(),replacement="changed-"+UUID.randomUUID();
@@ -69,10 +71,23 @@ final class AndroidHostProtocolTest {
           ref[0].connect("127.0.0.1",port,attempt==0?password:"",cert->certificateMatches(cert,invitation.optString("certificate")));
           check(shells.get()!=null&&shells.get().length()==0,"Host advertised an unsupported terminal");
           JSONObject status=(JSONObject)ref[0].manage("desktop.status",new JSONObject());check(status.getBoolean("viewAllowed")&&status.getBoolean("controlAllowed"),"Real availability not reflected");
+          if(attempt==0){
+            JSONObject roots=(JSONObject)ref[0].manage("files.roots",new JSONObject());String fileRoot=roots.getJSONArray("roots").getJSONObject(0).getString("root"),filePath="/tls-fixture-"+UUID.randomUUID()+".txt";
+            JSONObject upload=(JSONObject)ref[0].manage("files.uploadStart",new JSONObject().put("root",fileRoot).put("path",filePath).put("size",3));String uploadId=upload.getString("id");
+            ref[0].manage("files.uploadChunk",new JSONObject().put("id",uploadId).put("offset",0).put("data","YWJj"));ref[0].manage("files.uploadFinish",new JSONObject().put("id",uploadId));
+            JSONObject read=(JSONObject)ref[0].manage("files.read",new JSONObject().put("root",fileRoot).put("path",filePath).put("offset",0));check("YWJj".equals(read.getString("data")),"TLS file transfer failed");
+            ref[0].manage("files.action",new JSONObject().put("root",fileRoot).put("path",filePath).put("action","delete"));check(ref[0].manage("applications.list",new JSONObject()) instanceof JSONArray,"Application list contract");
+          }
           ref[0].desktop(QUALITY,true);check(frames.await(15,TimeUnit.SECONDS),"Encrypted frame timeout");if(error.get()!=null)throw new Exception(error.get());Thread.sleep(150);
         }finally{ref[0].close();}
         long until=System.nanoTime()+TimeUnit.SECONDS.toNanos(3);while(capture.delivery!=null&&System.nanoTime()<until)Thread.sleep(20);
       }
+      // A normal frame interval shorter than ACK RTT must not discard every P frame.
+      capture.deltaFrames=true;capture.framePeriod=30;capture.forceKey.set(true);
+      AgentConnection[] delayed=new AgentConnection[1];AtomicInteger deltaCount=new AtomicInteger();CountDownLatch delayedFrames=new CountDownLatch(12);
+      delayed[0]=new AgentConnection((type,value)->{if(type.equals("desktop-frame"))try{JSONObject f=new JSONObject(value);if(!f.getBoolean("key"))deltaCount.incrementAndGet();Thread.sleep(60);delayed[0].queueDesktopCommand(new JSONObject().put("op","ack").put("id",f.getString("id")).toString());delayedFrames.countDown();}catch(Exception ignored){}});
+      try{delayed[0].connect("127.0.0.1",port,"",cert->true);delayed[0].desktop(QUALITY,true);check(delayedFrames.await(5,TimeUnit.SECONDS),"Delayed ACK starved video");check(deltaCount.get()>=3,"Delayed ACK forced every frame to keyframe");}finally{delayed[0].close();capture.deltaFrames=false;capture.framePeriod=70;}
+      long released=System.nanoTime()+TimeUnit.SECONDS.toNanos(3);while(capture.delivery!=null&&System.nanoTime()<released)Thread.sleep(20);
       check(capture.inputs.get()>0,"Control did not reach backend");check(capture.releases.get()>0,"Disconnect did not release input");
       // Losing projection must not invalidate pairing, the listener, or management access.
       capture.projecting=false;

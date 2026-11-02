@@ -1,0 +1,81 @@
+{
+  "version": "0.8.20",
+  "status": "verified-candidate-not-published",
+  "verifiedAt": "2026-11-02T10:01:48.689Z",
+  "android": [
+    {
+      "edition": "pro",
+      "artifact": {
+        "id": 13130204060,
+        "name": "pro-android-candidate",
+        "size_in_bytes": 4851488,
+        "url": "https://api.github.com/repos/Yeqi99/CShell/actions/artifacts/13130204060",
+        "archive_download_url": "https://api.github.com/repos/Yeqi99/CShell/actions/artifacts/13130204060/zip",
+        "expired": false,
+        "created_at": "2026-11-02T09:47:37Z",
+        "expires_at": "2027-01-31T09:45:39Z",
+        "updated_at": "2026-11-02T09:47:37Z",
+        "digest": "sha256:8c703ff7d5fce9ffd3fc46b73388583e116910d26bcd1099b4c8f79261f48bab",
+        "workflow_run": {
+          "id": 41423273597,
+          "repository_id": 1414250753,
+          "head_repository_id": 1414250753,
+          "head_branch": "codex/candidate-pro-0.8.20",
+          "head_sha": "43a12fc779f98b09c32bf2e978efc89a2bf07365"
+        }
+      },
+      "sha256": "ef41e5a1cf448ddb26e889c809331b777c9303bd8b4f5166a6be8e43dd670e73",
+      "certificate": "34cc1c9a0eacafc512a0837c3d286081879822f047e5637a65cdbc5b525914c5",
+      "validation": [
+        "GitHub artifact ZIP digest",
+        "APK SHA matches CI SHA256SUMS",
+        "local aapt package/versionCode 8020",
+        "local apksigner original certificate"
+      ],
+      "installed": false
+    },
+    {
+      "edition": "opensource",
+      "artifact": {
+        "id": 13130353819,
+        "name": "core-android-candidate",
+        "size_in_bytes": 4824478,
+        "url": "https://api.github.com/repos/Yeqi99/CShell/actions/artifacts/13130353819",
+        "archive_download_url": "https://api.github.com/repos/Yeqi99/CShell/actions/artifacts/13130353819/zip",
+        "expired": false,
+        "created_at": "2026-11-02T09:47:31Z",
+        "expires_at": "2027-01-31T09:45:47Z",
+        "updated_at": "2026-11-02T09:47:31Z",
+        "digest": "sha256:72be99faae92ff2100bf8d74953f37332a43a202b9858fbac0ea7bd7c478240e",
+        "workflow_run": {
+          "id": 41423291003,
+          "repository_id": 1414250753,
+          "head_repository_id": 1414250753,
+          "head_branch": "codex/candidate-core-0.8.20",
+          "head_sha": "23b9bf2a0a2e4ed29986bdd671cd8dcb1487efbd"
+        }
+      },
+      "sha256": "3e68764e17708e1ab9cff2e2f4ee0695f56686333bb9a20f22ebc047bd5bf009",
+      "certificate": "34cc1c9a0eacafc512a0837c3d286081879822f047e5637a65cdbc5b525914c5",
+      "validation": [
+        "GitHub artifact ZIP digest",
+        "APK SHA matches CI SHA256SUMS",
+        "local aapt package/versionCode 8020",
+        "local apksigner original certificate"
+      ],
+      "installed": false
+    }
+  ],
+  "desktop": {
+    "pro": {
+      "head": "5b784c6faa0ebee3c3b830fdf9630a7c59aa3f60",
+      "tree": "6a17b0e841b9def5552f97a1a8f6e350270ae2e6",
+      "remote": "9a50c3b63887052783b75472943b74c68800f4ba"
+    },
+    "core": {
+      "head": "c94e7e3688803db50292fb8f6f53875575aa14c3",
+      "tree": "cc8976cf428fbf124657afdc74f8b61dfa257f5b",
+      "remote": "49639202f679072ae8cfb754160ee58f443f84d5"
+    }
+  }
+}
