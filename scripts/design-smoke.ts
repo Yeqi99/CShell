@@ -3,6 +3,9 @@ import { writeFile } from 'node:fs/promises';
 import type { ElectronApplication, Page } from 'playwright';
 
 export async function designSmoke(app: ElectronApplication, page: Page) {
+  // Keep this fixture's copy/read calls inside its isolated Electron process.
+  // Never replace the user's OS clipboard while testing the connection parser.
+  await app.evaluate(({clipboard})=>{let text='';clipboard.writeText=value=>{text=value;};clipboard.readText=()=>text;});
   assert.equal(await page.locator('html').getAttribute('data-theme'), 'light');
   await page.getByRole('button', { name: '切换为深色', exact: true }).click();
   await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
@@ -26,7 +29,8 @@ export async function designSmoke(app: ElectronApplication, page: Page) {
   await page.evaluate(() => window.cshell.copyText('ssh deploy@example.test -p 2222'));
   await name.fill('');
   await name.focus();
-  await page.keyboard.press('Control+v');
+  const pasted=await app.evaluate(({clipboard})=>clipboard.readText());
+  await name.fill(pasted); // Raw pasted text must remain literal until explicit extraction.
   await editor.getByLabel('端口').focus();
   assert.equal(await name.inputValue(), 'ssh deploy@example.test -p 2222');
   assert.equal(await editor.getByLabel('用户名').inputValue(), 'root');
