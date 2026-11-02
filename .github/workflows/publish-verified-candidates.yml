@@ -30,6 +30,8 @@ jobs:
         with:
           node-version: 24.22.1
       - run: node --test scripts/publish-verified-candidates.test.mjs
+      - name: Read verified Hong Kong origin before switching edge manifests
+        run: echo '154.219.103.127 shell.canp.ai' | sudo tee -a /etc/hosts
       - name: Verify both complete channels before publication
         env:
           GH_TOKEN: ${{ github.token }}
