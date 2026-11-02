@@ -908,7 +908,7 @@ window.fileEvent = (json) => {
   }
 };
 
-type CAgentState = { supported?: boolean; enabled?: boolean; running?: boolean; sharing?: boolean; starting?: boolean; needsProjectionConsent?: boolean; screenLocked?: boolean; ignoringBatteryOptimizations?: boolean; accessibilityEnabled?: boolean; port?: number; advertisedHost?: string; advertisedPort?: number; password?: string; error?: string };
+type CAgentState = { accountDiscovery?: boolean; accountRelay?: {connected?: boolean; error?: string}; supported?: boolean; enabled?: boolean; running?: boolean; sharing?: boolean; starting?: boolean; needsProjectionConsent?: boolean; screenLocked?: boolean; ignoringBatteryOptimizations?: boolean; accessibilityEnabled?: boolean; port?: number; advertisedHost?: string; advertisedPort?: number; password?: string; error?: string };
 let cagentState: CAgentState = {};
 let cagentDraftDirty = false;
 const cagentInput = (id: string) => $(id) as HTMLInputElement;
@@ -920,6 +920,8 @@ function renderCAgent(fill = false) {
   const available = !!window.CShellNative?.cagentStatus && cagentState.supported !== false;
   const enabled = available && !!cagentState.enabled;
   cagentInput('cagent-enabled').checked = enabled;
+  cagentInput('cagent-account-discovery').checked = cagentState.accountDiscovery !== false;
+  $('cagent-relay-status').textContent = cagentState.accountRelay?.connected ? '账号中继已连接；同账号设备可免公网 IP 访问。' : cagentState.accountRelay?.error || '登录会员账号后，通过中继连接；屏幕共享仍需手机授权。';
   cagentInput('cagent-enabled').disabled = !available;
   ($('cagent-fields') as HTMLFieldSetElement).disabled = !enabled;
   $('cagent-card-state').textContent = !available ? '不可用' : cagentState.sharing ? '共享中' : enabled ? '已启用' : '未启用';
@@ -975,6 +977,7 @@ function configureCAgent(config: Record<string, unknown>): boolean {
   } catch (error) { cagentFeedback(error instanceof Error ? error.message : '设置未保存', true); renderCAgent(); return false; }
 }
 $('cagent-open').onclick = () => navigate('cagent');
+$('cagent-account-discovery').onchange = () => { configureCAgent({accountDiscovery:cagentInput('cagent-account-discovery').checked}); };
 $('cagent-enabled').onchange = () => {
   const enabled = cagentInput('cagent-enabled').checked;
   if (configureCAgent({ enabled })) cagentFeedback(enabled ? '已启用。保存连接设置后可开始共享。' : '已停用，远程连接已停止。');

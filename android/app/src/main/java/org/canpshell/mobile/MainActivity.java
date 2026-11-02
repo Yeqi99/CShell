@@ -47,7 +47,7 @@ public class MainActivity extends Activity {
   }
   @Override public void onCreate(Bundle state) {
     super.onCreate(state);
-    cloud=new CloudSync(this);
+    cloud=CloudSync.shared(this);
     androidx.core.content.ContextCompat.registerReceiver(this,cagentEvents,new android.content.IntentFilter(AndroidAgentService.CHANGED),androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED);
     Security.removeProvider("BC"); Security.addProvider(new BouncyCastleProvider());
     web = new WebView(this);

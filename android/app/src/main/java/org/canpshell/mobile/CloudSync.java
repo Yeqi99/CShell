@@ -19,6 +19,8 @@ final class CloudSync {
   private JSONObject membership;
   private JSONObject accounts = new JSONObject();
   private long profileChecked;
+  private static CloudSync shared;
+  static synchronized CloudSync shared(Context context){if(shared==null)shared=new CloudSync(context.getApplicationContext());return shared;}
   CloudSync(Context context) { this.context=context; }
   private SecretKey localKey()throws Exception{
     KeyStore store=KeyStore.getInstance("AndroidKeyStore");store.load(null);String alias="cshell-cloud-sync";
@@ -107,7 +109,9 @@ final class CloudSync {
     return new JSONObject().put("profiles",profiles).put("models",models).put("theme",data.getJSONObject("store").getJSONObject("preferences").optString("theme","light"));
   }
   synchronized JSONObject call(JSONObject request)throws Exception{
-    try{return callInternal(request);}catch(Exception error){state=null;accounts=new JSONObject();membership=null;profileChecked=0;load();throw error;}
+    boolean identityChange=Arrays.asList("register","login","password-login","logout").contains(request.optString("action"));
+    if(identityChange)AndroidAgentService.accountChanged();
+    try{return callInternal(request);}catch(Exception error){state=null;accounts=new JSONObject();membership=null;profileChecked=0;load();throw error;}finally{if(identityChange)AndroidAgentService.refreshAccount();}
   }
   private JSONObject callInternal(JSONObject request)throws Exception{
     load();String action=request.getString("action");JSONObject result=new JSONObject();
@@ -181,6 +185,34 @@ final class CloudSync {
     }else if(action.equals("logout")){api("auth/logout",new JSONObject());archive();state=new JSONObject();save();}
     else if(!action.equals("status"))throw new IOException("不支持的同步操作");
     return result.put("status",status());
+  }
+  /** Merge only this host into a freshly read encrypted vault; never overwrite pending edits. */
+  synchronized JSONObject enrollHost(JSONObject descriptor,AndroidAgentHost host)throws Exception{
+    load();if(!state.has("session")||!state.has("key")){host.clearAccount();return null;}
+    if(state.has("pending"))throw new IOException("请先处理云同步待上传更改");
+    if(!state.has("hostPassword")){byte[] secret=new byte[32];new SecureRandom().nextBytes(secret);state.put("hostPassword",b64(secret));save();}
+    String password=state.getString("hostPassword");
+    JSONObject account=api("account",null);state.put("membership",account.getJSONObject("membership"));
+    if(!account.getJSONObject("membership").optBoolean("active")){host.clearAccount();save();return null;}
+    JSONObject answer=api("devices/register",descriptor);
+    JSONObject remote=api("vault",null),data=decrypt(remote.getJSONObject("envelope"),state.getString("key"));
+    String id=descriptor.getString("deviceId");JSONObject endpoint=answer.getJSONObject("endpoint");
+    JSONObject device=new JSONObject(descriptor.toString()).put("protocol",1).put("host",endpoint.getString("host")).put("port",endpoint.getInt("port")).put("accountManaged",true).put("accountPassword",password);
+    JSONArray devices=data.getJSONArray("devices");boolean changed=false,found=false;
+    for(int i=0;i<devices.length();i++)if(devices.getJSONObject(i).optString("deviceId").equals(id)){
+      JSONObject old=devices.getJSONObject(i);
+      if(!old.optString("certificate").equals(device.getString("certificate")))throw new IOException("账号中设备身份不一致");
+      found=true;if(!old.optString("accountPassword").equals(password)||!old.optBoolean("accountManaged")||!old.optString("host").equals(device.getString("host"))||old.optInt("port")!=device.getInt("port")){devices.put(i,device);changed=true;}break;
+    }
+    if(!found){devices.put(device);changed=true;}
+    JSONObject store=data.getJSONObject("store");JSONArray profiles=store.getJSONArray("profiles");found=false;
+    for(int i=0;i<profiles.length();i++)if(profiles.getJSONObject(i).optString("id").equals(id)){found=true;break;}
+    if(!found){profiles.put(new JSONObject().put("id",id).put("protocol","client").put("name",descriptor.getString("name")).put("host",endpoint.getString("host")).put("port",endpoint.getInt("port")).put("username","agent").put("auth","password").put("group","同账号设备").put("favorite",false));
+      JSONArray groups=store.getJSONArray("groups");boolean group=false;for(int i=0;i<groups.length();i++)if(groups.optString(i).equals("同账号设备"))group=true;if(!group)groups.put("同账号设备");changed=true;}
+    long revision=remote.getLong("revision");
+    if(changed){validate(data);JSONObject saved=api("vault",new JSONObject().put("baseRevision",revision).put("mutationId",UUID.randomUUID().toString()).put("envelope",encrypt(data)),writeSchema(data));revision=saved.getLong("revision");}
+    state.put("bundle",data).put("revision",revision).put("lastSync",System.currentTimeMillis());save();
+    host.accountPassword(owner(),password);return answer.optJSONObject("relay");
   }
   synchronized JSONObject cloudAgent(String profileId)throws Exception{
     load();if(!state.has("session")||!state.has("key")||!state.has("bundle"))return null;

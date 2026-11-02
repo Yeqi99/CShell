@@ -1,0 +1,7 @@
+# Android account relay follow-up (0.8.19 candidate)
+
+Android host enrollment now uses the active account and stable device certificate. Only its own descriptor/profile is merged into the newest encrypted vault; existing groups, profile names and unrelated fields remain intact. Pending local writes stop enrollment rather than being silently replaced. A separately generated per-account password is stored encrypted; the user’s LAN password is not uploaded.
+
+The reverse tunnel pins the relay certificate before submitting credentials and forwards bytes only to the already running local host. The controller must still complete target TLS identity verification and authentication. Account logout or disabling discovery closes this tunnel and invalidates transient account pairings while preserving LAN pairings. MediaProjection and accessibility grants remain explicit Android system grants. `allowRelay=false` continues to mean the phone is not a general relay server.
+
+Validation so far: release Java and debug instrumentation Java compile; mobile web bundle builds. Added a real loopback TLS reverse-channel instrumentation test (unreachable nominal direct address, host authentication, account revoke and wrong relay pin). Execution on API 29/35 and physical/public relay remains pending. Android loan/delegation authentication is a separate remaining implementation, not yet claimed available.
