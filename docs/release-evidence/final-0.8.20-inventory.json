@@ -1,6 +1,6 @@
 {
   "version": "0.8.20",
-  "status": "candidate-not-published",
+  "status": "blocked-awaiting-android-remote-ui-fix",
   "files": [
     {
       "name": "CAgent-0.8.20-linux-arm64.tar.gz",
@@ -384,5 +384,6 @@
         "kind": "complete-verified-inventory"
       }
     }
-  ]
+  ],
+  "holdReason": "User requested Android remote-control scale and latency fixes before this release; retain verified artifacts, replace affected packages after scoped validation."
 }

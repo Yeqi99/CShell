@@ -1,6 +1,6 @@
 {
   "version": "0.8.20",
-  "status": "candidate-not-published",
+  "status": "blocked-awaiting-android-remote-ui-fix",
   "edition": "pro",
   "sha": "e4c4581e57b9d8fa335e5b72c37219a6a9966192",
   "tag": "pro-v0.8.20",
@@ -75,5 +75,6 @@
       "size": 1283,
       "sha256": "0777ab357625d976406426371a78945f38b944b43569aadc61f89c5246137a4e"
     }
-  ]
+  ],
+  "holdReason": "User requested Android remote-control scale and latency fixes before this release; retain verified artifacts, replace affected packages after scoped validation."
 }
