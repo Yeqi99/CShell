@@ -43,6 +43,8 @@ test('WSL setup uses fixed elevated commands and keeps installation lifecycle', 
 });
 import { decodeWslOutput, wslInstallArguments } from '../src/desktop/wsl-setup';
 test('WSL bootstrap uses only supported flags and decodes native diagnostics', () => {
+  assert.ok(wslInstallArguments('--install --no-launch --web-download', true).includes('--web-download'));
+  assert.ok(!wslInstallArguments('--install --no-launch --web-download', false).includes('--web-download'));
   assert.deepEqual(wslInstallArguments('--install --update --help', true), ['--install']);
   assert.throws(() => wslInstallArguments('--install --update --help', false), /引导程序/);
   assert.deepEqual(wslInstallArguments('--install --no-launch', true), [

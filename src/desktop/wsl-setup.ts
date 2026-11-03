@@ -21,13 +21,13 @@ export function wslInstallArguments(help: string, ubuntu: boolean) {
     return ['--install'];
   }
   return ubuntu
-    ? ['--install', '--distribution', 'Ubuntu', '--no-launch']
+    ? ['--install', '--distribution', 'Ubuntu', '--no-launch', ...(help.includes('--web-download') ? ['--web-download'] : [])]
     : ['--install', '--no-distribution'];
 }
 const quote = (value: string) => "'" + value.replace(/'/g, "''") + "'";
 export function wslFailureMessage(code: number, details: string) {
   if (/WININET_E_CANNOT_CONNECT|WININET_E_TIMEOUT|WININET_E_NAME_NOT_RESOLVED/i.test(details))
-    return '无法连接 WSL 发行版下载服务。请检查 Windows 系统代理与网络，恢复后重试安装。';
+    return '无法连接 WSL 发行版下载服务。请检查 Windows 系统代理与网络；也可按 https://shell.canp.ai/docs/wsl-offline.html 使用国内镜像离线安装。';
   return `WSL 安装未完成（退出码 ${code}）。请查看下方系统输出。`;
 }
 export function wslSetupScript(ubuntu: boolean) {
