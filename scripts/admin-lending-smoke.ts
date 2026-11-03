@@ -3,7 +3,7 @@ import {createServer} from 'node:http';
 import {readFile,mkdir} from 'node:fs/promises';
 import assert from 'node:assert/strict';
 const server=createServer(async(req,res)=>{
-  const path=req.url==='/app.js'?'app.js':req.url==='/styles.css'?'styles.css':req.url==='/icon.svg'?'icon.svg':'index.html';
+  const path=req.url==='/feedback.js'?'feedback.js':req.url==='/app.js'?'app.js':req.url==='/styles.css'?'styles.css':req.url==='/icon.svg'?'icon.svg':'index.html';
   res.setHeader('Content-Type',path.endsWith('.js')?'text/javascript':path.endsWith('.css')?'text/css':path.endsWith('.svg')?'image/svg+xml':'text/html; charset=utf-8');
   res.end(await readFile('services/admin/'+path));
 });

@@ -6,6 +6,8 @@ from devices import Devices
 from models import Models
 from quotas import Quotas, MAX_STORAGE
 from metering import Metering
+from feedback import Feedback
+from bridges import Bridges
 import base64
 import hashlib
 import hmac
@@ -63,6 +65,8 @@ class Service:
 
         self.quotas=Quotas(self,Failure)
         self.metering=Metering(self)
+        self.feedback=Feedback(self,Failure)
+        self.bridges=Bridges(self,Failure)
         self.devices=Devices(self,Failure)
         self.models=Models(self,Failure)
 
@@ -408,6 +412,9 @@ def handler(service):
                 if self.command == 'POST':
                     size = int(self.headers.get('Content-Length', '0'))
                     limit=int(FREE_BYTES*4/3)+65536
+                    if self.path=='/v1/feedback':
+                        limit=128*1024
+                        service.limit('feedback:'+service.digest(ip),10,3600)
                     if self.path=='/v1/vault':
                         token=self.headers.get('Authorization','').removeprefix('Bearer ')
                         current=service.profile(service.authenticate(token))
@@ -418,7 +425,13 @@ def handler(service):
                     body = json.loads(self.rfile.read(size))
                     if not isinstance(body, dict):
                         raise Failure(400, '请求格式不正确')
-                if admin and self.path == '/v1/admin/relay/authorize' and self.command == 'POST':
+                if self.path == '/v1/feedback' and self.command == 'POST':
+                    value=service.feedback.submit(body)
+                elif admin and self.path == '/v1/admin/feedback' and self.command == 'GET':
+                    value=service.feedback.list()
+                elif admin and self.path == '/v1/admin/feedback/status' and self.command == 'POST':
+                    value=service.feedback.update_status(body)
+                elif admin and self.path == '/v1/admin/relay/authorize' and self.command == 'POST':
                     value=service.devices.authorize(body)
                 elif admin and self.path == '/v1/admin/storage-grant' and self.command == 'POST':
                     value=service.quotas.grant(body)
@@ -449,7 +462,13 @@ def handler(service):
                 else:
                     token = self.headers.get('Authorization', '').removeprefix('Bearer ')
                     account = service.authenticate(token)
-                    if self.path == '/v1/network' and self.command in ('GET','POST'):
+                    if self.path == '/v1/mcp/bridges' and self.command == 'GET':
+                        value=service.bridges.list(account)
+                    elif self.path in ('/v1/mcp/register','/v1/mcp/poll','/v1/mcp/reply','/v1/mcp/remove') and self.command == 'POST':
+                        value=getattr(service.bridges,self.path.rsplit('/',1)[1])(account,body)
+                    elif self.path == '/v1/mcp/invoke' and self.command == 'POST':
+                        value=service.bridges.invoke(account,service.digest(token),body)
+                    elif self.path == '/v1/network' and self.command in ('GET','POST'):
                         value=service.devices.network(account,body if self.command=='POST' else None)
                     elif self.path == '/v1/models' and self.command == 'GET':
                         value=service.models.catalog()
