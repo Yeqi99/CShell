@@ -1,0 +1,53 @@
+name: pro 0.8.21 desktop candidate
+on:
+  push:
+    branches: ['codex/release-pro-0.8.21']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: windows-latest, platform: win, arch: x64}
+          - {os: macos-latest, platform: mac, arch: arm64}
+          - {os: macos-15-intel, platform: mac, arch: x64}
+          - {os: ubuntu-24.04, platform: linux, arch: x64}
+          - {os: ubuntu-24.04-arm, platform: linux, arch: arm64}
+    runs-on: ${{ matrix.os }}
+    env:
+      CSHELL_EDITION: pro
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/prepare-pty.mjs
+      - run: pnpm exec tsc --noEmit
+      - run: pnpm exec tsx --test tests/cloud-merge.test.ts tests/cloud-sync.test.ts tests/agent-relay.test.ts tests/updates.test.ts tests/portable-update.test.ts tests/posix-agent-update.test.ts
+      - name: Verify preference persistence, classroom merges and extension cleanup
+        run: pnpm exec tsx --test --test-concurrency=1 tests/cagent-update-settings.test.ts tests/managed-environment-save.test.ts tests/classroom-proxy.test.ts tests/process-extension-close.test.ts tests/process-extensions.test.ts
+      - name: Verify hosting startup deadline and real worker cleanup
+        run: pnpm exec tsx --test --test-concurrency=1 tests/hosting-startup-deadline.test.ts tests/agent-hosting.test.ts
+      - run: pnpm exec vite build && node scripts/build.mjs
+      - run: pnpm exec electron-builder --config electron-builder.pro.cjs --${{ matrix.platform }} --${{ matrix.arch }} --publish never
+      - if: matrix.platform == 'mac'
+        name: Verify in-place DMG update
+        run: pnpm exec tsx scripts/mac-update-smoke.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pro-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            release/pro-*/*.dmg
+            release/pro-*/*.AppImage
+            release/pro-*/*.deb
+            release/pro-*/*.exe
+          if-no-files-found: error

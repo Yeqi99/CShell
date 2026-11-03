@@ -1,0 +1,56 @@
+name: pro 0.8.21 agent candidate
+on:
+  push:
+    branches: ['codex/release-pro-0.8.21']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  agent:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: windows-latest, platform: win, arch: x64}
+          - {os: macos-latest, platform: mac, arch: arm64}
+          - {os: macos-15-intel, platform: mac, arch: x64}
+          - {os: ubuntu-24.04, platform: linux, arch: x64}
+          - {os: ubuntu-24.04-arm, platform: linux, arch: arm64}
+    runs-on: ${{ matrix.os }}
+    env:
+      CSHELL_EDITION: pro
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/prepare-pty.mjs
+      - run: pnpm exec tsc --noEmit
+      - name: Verify account restoration and safe portable configuration
+        run: pnpm exec tsx --test --test-timeout=120000 --test-concurrency=2 tests/cagent-cloud-accounts.test.ts tests/agent-capability-runtime.test.ts tests/cloud-sync.test.ts tests/cagent-update.test.ts tests/cagent-update-body-recovery.test.ts tests/update-source-fallback.test.ts
+      - name: Build standalone Pro CAgent on its native architecture
+        run: node scripts/agent-build.mjs
+      - name: Reject a package without the Pro account implementation
+        shell: bash
+        run: |
+          node -e "const fs=require('node:fs');const p='release/'+require('./package.json').version+'/agent-'+process.platform+'-'+process.arch+'/agent.cjs';if(!fs.readFileSync(p,'utf8').includes('CagentCloud'))throw Error('Missing Pro account implementation');"
+      - name: Verify real native PTY and TLS using the packaged runtime
+        run: pnpm exec tsx scripts/agent-package-smoke.ts
+      - name: Verify packaged Pro account API and guest appearance restart
+        run: pnpm exec tsx scripts/pro-agent-package-smoke.ts
+      - name: Package and verify archive contents
+        run: node scripts/package-agent.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pro-cagent-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            release/0.8.21/CAgent-0.8.21-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz
+            release/0.8.21/CAgent-0.8.21-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz.sha256
+            release/0.8.21/CAgent-Setup-0.8.21-win-x64.exe
+            release/0.8.21/CAgent-Setup-0.8.21-win-x64.exe.sha256
+          if-no-files-found: error
