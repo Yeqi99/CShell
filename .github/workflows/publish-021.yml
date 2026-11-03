@@ -1,0 +1,31 @@
+name: Publish verified 0.8.21
+on:
+  push:
+    branches: ['codex/publish-verified-0.8.21']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: verified-publication-0.8.21
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.22.1
+      - run: node --test scripts/publish-verified-candidates.test.mjs
+      - run: echo '154.219.103.127 shell.canp.ai' | sudo tee -a /etc/hosts
+      - name: Verify payloads and stage both channels
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CSHELL_RELEASE_VERSION: 0.8.21
+        run: node scripts/publish-verified-candidates.mjs --stage
+      - name: Publish only after both channels are verified
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CSHELL_RELEASE_VERSION: 0.8.21
+        run: node scripts/publish-verified-candidates.mjs --publish

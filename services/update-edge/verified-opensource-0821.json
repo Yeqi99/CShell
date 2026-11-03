@@ -1,0 +1,88 @@
+{
+  "version": "0.8.21",
+  "edition": "opensource",
+  "status": "candidate-not-published",
+  "sha": "67e66aa6295135899e4b576b52b42af28112a07e",
+  "assets": [
+    {
+      "name": "CAgent-0.8.21-linux-arm64.tar.gz",
+      "size": 44509028,
+      "sha256": "13135e42f9d94b88b1783f2cb537f9d915eb39448d5ea78f43cddcc70d7c6cdd"
+    },
+    {
+      "name": "CShell-0.8.21-mac-arm64.dmg",
+      "size": 142367843,
+      "sha256": "9961008f1a16a06ff8d80619c8fa97ee930f867c2aea6be28b4b8c422def057e"
+    },
+    {
+      "name": "CShell-0.8.21-mac-arm64.zip",
+      "size": 142216122,
+      "sha256": "638ddc2a929ff89141d62d3ced14a63f7e6178327b20cc91154e287beb4fccc9"
+    },
+    {
+      "name": "CAgent-0.8.21-linux-x64.tar.gz",
+      "size": 44825436,
+      "sha256": "3338a12818210393edb50be185db5770d4e2557042a4dd5f786334a8223d79af"
+    },
+    {
+      "name": "CShell-0.8.21-mac-x64.dmg",
+      "size": 146215140,
+      "sha256": "e9948d22c262b0babc6e8a052b2c5f75f682f0c74a17c7915a10ede0dcef5393"
+    },
+    {
+      "name": "CShell-0.8.21-mac-x64.zip",
+      "size": 146057573,
+      "sha256": "d2f93f9f1d5b0c8d401af7ee182b9d910f73db410e0878d1121ae4debc767d3b"
+    },
+    {
+      "name": "CAgent-Setup-0.8.21-win-x64.exe",
+      "size": 25889193,
+      "sha256": "9c904a9837eaf39c1b4229ebc21d46649c1fd3bfa7949b1d3acf63d75f0b75b4"
+    },
+    {
+      "name": "CShell-0.8.21-linux-amd64.deb",
+      "size": 108864348,
+      "sha256": "87b3ec2f844b7f99e8c5256d99d75c7fd134769e50d6e58d73f960dc447d25f5"
+    },
+    {
+      "name": "CShell-0.8.21-linux-x86_64.AppImage",
+      "size": 139504980,
+      "sha256": "ce4709297c2a695a006462782cd516678b6793b27f130d0f3608b69c37b92c13"
+    },
+    {
+      "name": "CAgent-0.8.21-mac-arm64.tar.gz",
+      "size": 39501551,
+      "sha256": "ce2e33c970aae87231d0ba76e77d3e0646c06b10913678b9b21cec480879ebae"
+    },
+    {
+      "name": "CAgent-0.8.21-mac-x64.tar.gz",
+      "size": 40730853,
+      "sha256": "e02d09d9766f37c3688ebf253db0f04dae3692dd4aab0d3fcdaaf9b0bd776fa1"
+    },
+    {
+      "name": "CShell-0.8.21-linux-arm64.AppImage",
+      "size": 140760186,
+      "sha256": "8c628cb9289bc82fba8d9dd391112519e3978de3efd0e48c9716bc6dbcc9d16d"
+    },
+    {
+      "name": "CShell-0.8.21-linux-arm64.deb",
+      "size": 103072068,
+      "sha256": "3b857ea30fb2153e8041c6e76f9636a974d3956eeefff129cc9c6daa65899955"
+    },
+    {
+      "name": "CShell-0.8.21-android.apk",
+      "size": 4914382,
+      "sha256": "ad9352a710d4ead6cc0adefe5bdda6ab6b05abae1278471301291d29a288e3b6"
+    },
+    {
+      "name": "CShell-0.8.21-win-x64.exe",
+      "size": 123724475,
+      "sha256": "ea2f3706435347aae86d587214dc5a54ab388c57b56b518af17b9082b306c48a"
+    },
+    {
+      "name": "SHA256SUMS.txt",
+      "size": 1437,
+      "sha256": "742c2aac2431926ef75b4f820fdb7a633b2e0f94170f349623acd177602e4084"
+    }
+  ]
+}

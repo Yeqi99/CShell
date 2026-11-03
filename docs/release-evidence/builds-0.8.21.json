@@ -1,0 +1,179 @@
+{
+  "version": "0.8.21",
+  "verifiedAt": "2026-11-03T02:49:58.205Z",
+  "receipts": [
+    {
+      "edition": "opensource",
+      "run": 41565432308,
+      "artifact": 13198409978,
+      "name": "core-cagent-linux-arm64",
+      "archiveDigest": "sha256:e2eb900fbdbc8dd726d7776aafd50ac26c8bca9f105874a3f88b846291bc9e9a"
+    },
+    {
+      "edition": "opensource",
+      "run": 41565432200,
+      "artifact": 13198676823,
+      "name": "desktop-mac-arm64",
+      "archiveDigest": "sha256:c95f7236559cae58a6e23ffa468a63343ddbe88232c36f5939877a1e3bc0ae5e"
+    },
+    {
+      "edition": "opensource",
+      "run": 41565432308,
+      "artifact": 13199090829,
+      "name": "core-cagent-linux-x64",
+      "archiveDigest": "sha256:07e34714d03e4984a0ec4a56895aaf197f77c8c140c8b66376f648657f059888"
+    },
+    {
+      "edition": "opensource",
+      "run": 41565432200,
+      "artifact": 13199097146,
+      "name": "desktop-mac-x64",
+      "archiveDigest": "sha256:8a8242d4feb9f5484909d4af03b112342184125d8ada93b9090302eb96a8eeec"
+    },
+    {
+      "edition": "opensource",
+      "run": 41566229212,
+      "artifact": 13199106719,
+      "name": "core-cagent-win-x64",
+      "archiveDigest": "sha256:4ca674ec771c10df25422012b18534bae6e24ff41504912043bcb01cf84e33cb"
+    },
+    {
+      "edition": "opensource",
+      "run": 41565432200,
+      "artifact": 13199435910,
+      "name": "desktop-linux-x64",
+      "archiveDigest": "sha256:3295d4f544818d5622ce33e0d408cef9c4750060997703dc41a03b168d2c8f7c"
+    },
+    {
+      "edition": "opensource",
+      "run": 41565432308,
+      "artifact": 13199575403,
+      "name": "core-cagent-mac-arm64",
+      "archiveDigest": "sha256:a4bdb0c348eef75f5f157b398629eec57b02b210925fa939f4f68fe46a61bf2a"
+    },
+    {
+      "edition": "opensource",
+      "run": 41565432308,
+      "artifact": 13199655641,
+      "name": "core-cagent-mac-x64",
+      "archiveDigest": "sha256:dcd1af29243057c3e8b86e7997e5751bd964f9ac65c5b113b56fd36c60e93ca9"
+    },
+    {
+      "edition": "opensource",
+      "run": 41565432200,
+      "artifact": 13199680664,
+      "name": "desktop-linux-arm64",
+      "archiveDigest": "sha256:9664f172f0eb00e48c259c1c813a0a07cf36f29955a38a71870d98d63b21fb79"
+    },
+    {
+      "edition": "opensource",
+      "run": 41565432248,
+      "artifact": 13199880088,
+      "name": "core-android-candidate",
+      "archiveDigest": "sha256:e50a3ae0e9fdc6a1241f44029796742719613c7a5af1aa963c81b8fe1b805da0"
+    },
+    {
+      "edition": "opensource",
+      "run": 41566976579,
+      "artifact": 13200093411,
+      "name": "desktop-win-x64",
+      "archiveDigest": "sha256:0f6e11706d6cb1b36597e2a7e4517cdb351735218b8903ac338fdb1ec5920146"
+    },
+    {
+      "edition": "pro",
+      "run": 41565415459,
+      "artifact": 13198479900,
+      "name": "pro-cagent-mac-arm64",
+      "archiveDigest": "sha256:c6d3dde21c39bc8446f85d37c8ef122057dbc154e14d8ed1eaa135d14f9e21f0"
+    },
+    {
+      "edition": "pro",
+      "run": 41565415425,
+      "artifact": 13198589854,
+      "name": "pro-win-x64",
+      "archiveDigest": "sha256:7981d8d9a1ca7e1884e71632b6e1b70d9d3f343a824309a8b966a28832914a60"
+    },
+    {
+      "edition": "pro",
+      "run": 41566282907,
+      "artifact": 13198837781,
+      "name": "pro-cagent-win-x64",
+      "archiveDigest": "sha256:e6fd302e92d231984daccfac01d129ae77e0fd900caba7030cd485edd733f9a6"
+    },
+    {
+      "edition": "pro",
+      "run": 41565415459,
+      "artifact": 13198866105,
+      "name": "pro-cagent-mac-x64",
+      "archiveDigest": "sha256:f79b350fecc3e996943408bf70621f22498ade451d624ecfaf6cbffe6885d506"
+    },
+    {
+      "edition": "pro",
+      "run": 41565415425,
+      "artifact": 13199026186,
+      "name": "pro-linux-arm64",
+      "archiveDigest": "sha256:36bd9cb7cdcd7933949f49516a009233415faa6b49fb9655813b9f1b044d12f9"
+    },
+    {
+      "edition": "pro",
+      "run": 41565415438,
+      "artifact": 13199091013,
+      "name": "pro-android-candidate",
+      "archiveDigest": "sha256:51f00b91555139eac08e8613a48398f402ac99d11f90b144ac0d405bdb66900f"
+    },
+    {
+      "edition": "pro",
+      "run": 41565415459,
+      "artifact": 13199220391,
+      "name": "pro-cagent-linux-arm64",
+      "archiveDigest": "sha256:67711dd35698ac15b22ad57d8088b04eee65096753b07fc2cfbbc22a144d1772"
+    },
+    {
+      "edition": "pro",
+      "run": 41565415425,
+      "artifact": 13199300778,
+      "name": "pro-mac-x64",
+      "archiveDigest": "sha256:32c9ee906e60c5d27e998b42ee76e454a352e1866e874bf8329e708289205706"
+    },
+    {
+      "edition": "pro",
+      "run": 41565415425,
+      "artifact": 13199445536,
+      "name": "pro-mac-arm64",
+      "archiveDigest": "sha256:9ad3f0a23fb2afc92489078e6d944858522090571c988cf51babcccd1d852c95"
+    },
+    {
+      "edition": "pro",
+      "run": 41565415459,
+      "artifact": 13199665254,
+      "name": "pro-cagent-linux-x64",
+      "archiveDigest": "sha256:527393abb7385282e3a07ac57a43f3b4b07a6daa4f7c5f99bc10bfcf6cdd7407"
+    },
+    {
+      "edition": "pro",
+      "run": 41565415425,
+      "artifact": 13199780247,
+      "name": "pro-linux-x64",
+      "archiveDigest": "sha256:9e985147e558edeea3ea9b2e87bdc84f18cb1781e78d743c9ecce414550bc27d"
+    }
+  ],
+  "localWindows": {
+    "pro": "0.8.21.0",
+    "installerExit": 0,
+    "desktopSmoke": "passed",
+    "configurationBackupFiles": 37,
+    "unchangedAfterInstallation": 36,
+    "changedFiles": [
+      "cloud-sync.enc (application restarted)"
+    ]
+  },
+  "android": {
+    "device": "Xiaomi 23113RKC6C",
+    "version": "0.8.21",
+    "installed": "adb install -r success",
+    "foregroundService": "connectedDevice without mediaProjection",
+    "listener": 24443,
+    "relay": "ESTABLISHED to account relay port 22444",
+    "rotationAfterFinalInstall": "not reauthorized/retested"
+  }
+}

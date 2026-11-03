@@ -9,7 +9,8 @@ import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { createWriteStream } from 'node:fs';
 
-const repository = 'Yeqi99/CShell', version = '0.8.20';
+const repository = 'Yeqi99/CShell', version = process.env.CSHELL_RELEASE_VERSION || '0.8.20';
+assert.match(version, /^\d+\.\d+\.\d+$/);
 export async function verifyConcurrently(items, operation, concurrency = 2) {
   assert(Number.isInteger(concurrency) && concurrency >= 1 && concurrency <= 2);
   let next = 0, failure, failed = false;
@@ -88,7 +89,7 @@ export function boundedPayload(size) {
 export async function main() {
   // No mutation, downloads or credentials unless explicitly requested by the release job.
   const requested = process.argv[2] || '--check', market = requested.startsWith('--market-');
-  const plans = market ? [JSON.parse(await readFile('services/update-edge/verified-wechat-012.json','utf8'))] : await Promise.all(['opensource', 'pro'].map(async edition => JSON.parse(await readFile(`services/update-edge/verified-${edition}-0820.json`, 'utf8'))));
+  const plans = market ? [JSON.parse(await readFile('services/update-edge/verified-wechat-012.json','utf8'))] : await Promise.all(['opensource', 'pro'].map(async edition => JSON.parse(await readFile(`services/update-edge/verified-${edition}-${version.replaceAll('.','')}.json`, 'utf8'))));
   if (market) validateMarketPlan(plans[0]); else validatePlans(plans);
   const mode = market ? requested.replace('--market-', '--') : requested;
   assert(['--check', '--stage', '--publish'].includes(mode));
