@@ -1,0 +1,25 @@
+{
+  "version": "0.8.21",
+  "verifiedAt": "2026-11-03T03:37:48.653Z",
+  "status": "github-hong-kong-edge-published",
+  "githubWorkflow": 41569281835,
+  "workerDeployment": "dcc5afab326b493a98f118363b2982d9",
+  "routes": [
+    "shell.canp.ai/downloads/opensource/v*",
+    "shell.canp.ai/downloads/pro/v*"
+  ],
+  "verified": {
+    "originSha256": true,
+    "publicAssetsRange": 30,
+    "portal": true,
+    "localPro": "0.8.21",
+    "android": "0.8.21",
+    "androidRelayWithoutScreenCapture": true
+  },
+  "hongKongFreeGiB": 23,
+  "limitations": [
+    "Final Android rotation/capture requires renewed system screen-sharing consent and was not retested after final upgrade.",
+    "macOS/Linux builds were not verified on physical hardware.",
+    "Cloudflare extension real user OAuth/deployment flow not tested; extension UI/mock protocol tests passed."
+  ]
+}
