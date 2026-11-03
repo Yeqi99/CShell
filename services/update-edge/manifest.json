@@ -1,6 +1,6 @@
 {
-  "version": "0.8.21",
-  "generatedAt": "2026-11-03T03:32:10.153Z",
+  "version": "0.8.22",
+  "generatedAt": "2026-11-03T04:46:49Z",
   "files": {
     "/downloads/opensource/v0.8.16/CAgent-0.8.16-linux-arm64.tar.gz": {
       "url": "https://github.com/Yeqi99/CShell/releases/download/v0.8.16/CAgent-0.8.16-linux-arm64.tar.gz",
@@ -1081,6 +1081,60 @@
       "size": 1283,
       "digest": "sha256:c2b571f23646f2af3579b6d5a606b3d25f5f4c46d635c4f422214e80c9523fce",
       "name": "SHA256SUMS.txt"
+    },
+    "/downloads/pro/v0.8.22/account-bridge-release.json": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/pro-v0.8.22/account-bridge-release.json",
+      "size": 1324,
+      "digest": "sha256:5f052c2b458bc64a4181b84447f5a8bb8e602417b8cd8be818ed0b0eb20be0e5",
+      "name": "account-bridge-release.json"
+    },
+    "/downloads/pro/v0.8.22/CShell-Pro-0.8.22-linux-amd64.deb": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/pro-v0.8.22/CShell-Pro-0.8.22-linux-amd64.deb",
+      "size": 107825456,
+      "digest": "sha256:8184d809bfb96304c096899d69f10210cb92eb3d28ff02b6118f89ec44489928",
+      "name": "CShell-Pro-0.8.22-linux-amd64.deb"
+    },
+    "/downloads/pro/v0.8.22/CShell-Pro-0.8.22-linux-arm64.AppImage": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/pro-v0.8.22/CShell-Pro-0.8.22-linux-arm64.AppImage",
+      "size": 141006296,
+      "digest": "sha256:76accf2b08a395dfe1c2cf1f2d92596d5e6d9e80e7800bc2c104fc6d9cb91ccb",
+      "name": "CShell-Pro-0.8.22-linux-arm64.AppImage"
+    },
+    "/downloads/pro/v0.8.22/CShell-Pro-0.8.22-linux-arm64.deb": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/pro-v0.8.22/CShell-Pro-0.8.22-linux-arm64.deb",
+      "size": 103323940,
+      "digest": "sha256:7b3edb1a88a1240184663e48eab5810bf01146212dab7461d4f1a44e80587521",
+      "name": "CShell-Pro-0.8.22-linux-arm64.deb"
+    },
+    "/downloads/pro/v0.8.22/CShell-Pro-0.8.22-linux-x86_64.AppImage": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/pro-v0.8.22/CShell-Pro-0.8.22-linux-x86_64.AppImage",
+      "size": 139751083,
+      "digest": "sha256:3cb5243a8796df1f9c69455c67a94df3d578be0da73f43706daabe1fe8447acb",
+      "name": "CShell-Pro-0.8.22-linux-x86_64.AppImage"
+    },
+    "/downloads/pro/v0.8.22/CShell-Pro-0.8.22-mac-arm64.dmg": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/pro-v0.8.22/CShell-Pro-0.8.22-mac-arm64.dmg",
+      "size": 142700959,
+      "digest": "sha256:d4d64f9c1b98dc1531858686631bf9966ccc710b73c74d0e412a0b7f03e06063",
+      "name": "CShell-Pro-0.8.22-mac-arm64.dmg"
+    },
+    "/downloads/pro/v0.8.22/CShell-Pro-0.8.22-mac-x64.dmg": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/pro-v0.8.22/CShell-Pro-0.8.22-mac-x64.dmg",
+      "size": 146486545,
+      "digest": "sha256:25b4380be3155d4399de279c3e9718bf6163ec1dad498a8e8a7791721f672ae7",
+      "name": "CShell-Pro-0.8.22-mac-x64.dmg"
+    },
+    "/downloads/pro/v0.8.22/CShell-Pro-0.8.22-win-x64.exe": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/pro-v0.8.22/CShell-Pro-0.8.22-win-x64.exe",
+      "size": 123946083,
+      "digest": "sha256:624bf71d49f720815affdf1def1095b15fc36bb2b6a2beb566e7fe1678ef8997",
+      "name": "CShell-Pro-0.8.22-win-x64.exe"
+    },
+    "/downloads/pro/v0.8.22/SHA256SUMS.txt": {
+      "url": "https://github.com/Yeqi99/CShell/releases/download/pro-v0.8.22/SHA256SUMS.txt",
+      "size": 701,
+      "digest": "sha256:c2f646b6a735cb9e34d69e808089c9b14920383e14830bb5a0da86d80fff006f",
+      "name": "SHA256SUMS.txt"
     }
   },
   "catalogs": {
@@ -1193,6 +1247,70 @@
       }
     ],
     "/downloads/pro/releases.json": [
+      {
+        "tag_name": "v0.8.22",
+        "name": "CShell Pro 0.8.22",
+        "draft": false,
+        "prerelease": false,
+        "published_at": "2026-11-03T04:46:49Z",
+        "html_url": "https://shell.canp.ai/downloads.html",
+        "assets": [
+          {
+            "name": "account-bridge-release.json",
+            "size": 1324,
+            "digest": "sha256:5f052c2b458bc64a4181b84447f5a8bb8e602417b8cd8be818ed0b0eb20be0e5",
+            "browser_download_url": "https://shell.canp.ai/downloads/pro/v0.8.22/account-bridge-release.json"
+          },
+          {
+            "name": "CShell-Pro-0.8.22-linux-amd64.deb",
+            "size": 107825456,
+            "digest": "sha256:8184d809bfb96304c096899d69f10210cb92eb3d28ff02b6118f89ec44489928",
+            "browser_download_url": "https://shell.canp.ai/downloads/pro/v0.8.22/CShell-Pro-0.8.22-linux-amd64.deb"
+          },
+          {
+            "name": "CShell-Pro-0.8.22-linux-arm64.AppImage",
+            "size": 141006296,
+            "digest": "sha256:76accf2b08a395dfe1c2cf1f2d92596d5e6d9e80e7800bc2c104fc6d9cb91ccb",
+            "browser_download_url": "https://shell.canp.ai/downloads/pro/v0.8.22/CShell-Pro-0.8.22-linux-arm64.AppImage"
+          },
+          {
+            "name": "CShell-Pro-0.8.22-linux-arm64.deb",
+            "size": 103323940,
+            "digest": "sha256:7b3edb1a88a1240184663e48eab5810bf01146212dab7461d4f1a44e80587521",
+            "browser_download_url": "https://shell.canp.ai/downloads/pro/v0.8.22/CShell-Pro-0.8.22-linux-arm64.deb"
+          },
+          {
+            "name": "CShell-Pro-0.8.22-linux-x86_64.AppImage",
+            "size": 139751083,
+            "digest": "sha256:3cb5243a8796df1f9c69455c67a94df3d578be0da73f43706daabe1fe8447acb",
+            "browser_download_url": "https://shell.canp.ai/downloads/pro/v0.8.22/CShell-Pro-0.8.22-linux-x86_64.AppImage"
+          },
+          {
+            "name": "CShell-Pro-0.8.22-mac-arm64.dmg",
+            "size": 142700959,
+            "digest": "sha256:d4d64f9c1b98dc1531858686631bf9966ccc710b73c74d0e412a0b7f03e06063",
+            "browser_download_url": "https://shell.canp.ai/downloads/pro/v0.8.22/CShell-Pro-0.8.22-mac-arm64.dmg"
+          },
+          {
+            "name": "CShell-Pro-0.8.22-mac-x64.dmg",
+            "size": 146486545,
+            "digest": "sha256:25b4380be3155d4399de279c3e9718bf6163ec1dad498a8e8a7791721f672ae7",
+            "browser_download_url": "https://shell.canp.ai/downloads/pro/v0.8.22/CShell-Pro-0.8.22-mac-x64.dmg"
+          },
+          {
+            "name": "CShell-Pro-0.8.22-win-x64.exe",
+            "size": 123946083,
+            "digest": "sha256:624bf71d49f720815affdf1def1095b15fc36bb2b6a2beb566e7fe1678ef8997",
+            "browser_download_url": "https://shell.canp.ai/downloads/pro/v0.8.22/CShell-Pro-0.8.22-win-x64.exe"
+          },
+          {
+            "name": "SHA256SUMS.txt",
+            "size": 701,
+            "digest": "sha256:c2f646b6a735cb9e34d69e808089c9b14920383e14830bb5a0da86d80fff006f",
+            "browser_download_url": "https://shell.canp.ai/downloads/pro/v0.8.22/SHA256SUMS.txt"
+          }
+        ]
+      },
       {
         "tag_name": "v0.8.21",
         "name": "CShell Pro 0.8.21",
