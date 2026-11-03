@@ -1,0 +1,40 @@
+name: Publish CShell Pro account bridge
+on:
+  push:
+    branches: ['codex/publish-pro-account-bridge']
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: publish-pro-0.8.22
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify candidate run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/Yeqi99/CShell/actions/runs/41578489408 > candidate.json
+          node -e "const r=require('./candidate.json');if(r.head_sha!=='5b00e3213b52a44076ebc50032f7739d7b975209'||r.conclusion!=='success')throw Error('Candidate not verified');"
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 41578489408
+          pattern: pro-*
+          path: candidates
+          merge-multiple: true
+      - name: Verify desktop payload inventory
+        run: node scripts/publish-account-bridge.mjs
+      - name: Publish verified desktop update
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create pro-v0.8.22 --target 5b00e3213b52a44076ebc50032f7739d7b975209 --title 'CShell Pro 0.8.22' --notes-file docs/CANPAI-ACCOUNT-BRIDGE.md --draft
+          gh release upload pro-v0.8.22 candidates/*
+          gh release edit pro-v0.8.22 --draft=false --latest=false
