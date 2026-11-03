@@ -19,6 +19,10 @@ jobs:
           node-version: 24.22.1
       - run: node --test scripts/publish-verified-candidates.test.mjs
       - run: echo '154.219.103.127 shell.canp.ai' | sudo tee -a /etc/hosts
+      - name: Wait for complete origin payloads
+        env:
+          CSHELL_RELEASE_VERSION: 0.8.21
+        run: node scripts/wait-release-origin.mjs
       - name: Verify payloads and stage both channels
         env:
           GH_TOKEN: ${{ github.token }}
