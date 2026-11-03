@@ -4,6 +4,8 @@ Run behind HTTPS reverse proxy on loopback. CF token is scoped to Email Sending.
 """
 from devices import Devices
 from models import Models
+from quotas import Quotas, MAX_STORAGE
+from metering import Metering
 import base64
 import hashlib
 import hmac
@@ -23,7 +25,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 FREE_BYTES = 2 * 1024 * 1024
 MEMBER_BYTES = 64 * 1024 * 1024
-MAX_BODY = 90 * 1024 * 1024
+MAX_BODY = int(MAX_STORAGE * 4 / 3) + 65536
 VAULT_SLOTS = threading.BoundedSemaphore(1)
 
 
@@ -59,6 +61,8 @@ class Service:
                 db.execute('ALTER TABLE vaults ADD COLUMN byte_size INTEGER NOT NULL DEFAULT 0')
                 db.execute("UPDATE vaults SET byte_size=max(0,length(json_extract(envelope,'$.ciphertext'))/4*3-2+length(replace(substr(json_extract(envelope,'$.ciphertext'),-2),'=',''))-16)")
 
+        self.quotas=Quotas(self,Failure)
+        self.metering=Metering(self)
         self.devices=Devices(self,Failure)
         self.models=Models(self,Failure)
 
@@ -81,13 +85,16 @@ class Service:
             stored=db.execute('SELECT byte_size FROM vaults WHERE account=?',(account,)).fetchone()
         used=stored[0] if stored else 0
         active=expires>time.time()
-        return {'email':email[0], 'membership':{'active':active,'expiresAt':expires or None},'storage':{'usedBytes':used,'limitBytes':MEMBER_BYTES if active else FREE_BYTES},'entitlements':{'relay':active,'officialModels':bool(self.models.entries)}}
+        with self.db() as db:
+            allowance=self.quotas.allowance(db,account,MEMBER_BYTES if active else FREE_BYTES)
+        return {'email':email[0], 'membership':{'active':active,'expiresAt':expires or None},'storage':{'usedBytes':used,'limitBytes':allowance},'entitlements':{'relay':active,'officialModels':bool(self.models.entries)}}
 
     def admin_accounts(self):
         with self.db() as db:
             rows = db.execute('SELECT a.id,a.email,COALESCE(v.revision,0),COALESCE(m.expires,0),COALESCE(v.byte_size,0) FROM accounts a LEFT JOIN vaults v ON v.account=a.id LEFT JOIN memberships m ON m.account=a.id ORDER BY a.email LIMIT 1000').fetchall()
             audit = db.execute('SELECT at,account,action,detail FROM admin_audit ORDER BY id DESC LIMIT 50').fetchall()
-        return {'accounts': [{'id': r[0], 'email': r[1], 'revision': r[2], 'storage':{'usedBytes':r[4],'limitBytes':MEMBER_BYTES if r[3]>time.time() else FREE_BYTES}, 'membership': {'active': r[3] > time.time(), 'expiresAt': r[3] or None}} for r in rows], 'audit': [{'at': r[0], 'account': r[1], 'action': r[2], 'detail': r[3]} for r in audit]}
+            allowances={r[0]:self.quotas.allowance(db,r[0],MEMBER_BYTES if r[3]>time.time() else FREE_BYTES) for r in rows}
+        return {'accounts': [{'id': r[0], 'email': r[1], 'revision': r[2], 'storage':{'usedBytes':r[4],'limitBytes':allowances[r[0]]}, 'membership': {'active': r[3] > time.time(), 'expiresAt': r[3] or None}} for r in rows], 'audit': [{'at': r[0], 'account': r[1], 'action': r[2], 'detail': r[3]} for r in audit]}
 
     def admin_membership(self, body):
         account, expires, reason = body.get('account'), body.get('expiresAt'), body.get('reason')
@@ -290,7 +297,7 @@ class Service:
             raise Failure(400, '不支持的密文格式')
         try:
             nonce, ciphertext = base64.b64decode(envelope['nonce'], validate=True), base64.b64decode(envelope['ciphertext'], validate=True)
-            if len(nonce) != 12 or not 16 <= len(ciphertext) <= MEMBER_BYTES + 16:
+            if len(nonce) != 12 or not 16 <= len(ciphertext) <= MAX_STORAGE + 16:
                 raise ValueError()
         except (ValueError, TypeError):
             raise Failure(400, '密文大小或编码不正确')
@@ -304,7 +311,7 @@ class Service:
                     raise Failure(409, '重复请求内容不一致')
                 return {'revision': row[0]}
             member=db.execute('SELECT expires FROM memberships WHERE account=?',(account,)).fetchone()
-            allowance=MEMBER_BYTES if member and member[0]>time.time() else FREE_BYTES
+            allowance=self.quotas.allowance(db,account,MEMBER_BYTES if member and member[0]>time.time() else FREE_BYTES)
             previous_size=len(base64.b64decode(json.loads(row[2])['ciphertext'])) if row else 0
             if len(ciphertext)>allowance+16 and len(ciphertext)>=previous_size:
                 raise Failure(413, '云空间已满，请减少同步内容或升级会员；现有云端数据保留')
@@ -413,6 +420,8 @@ def handler(service):
                         raise Failure(400, '请求格式不正确')
                 if admin and self.path == '/v1/admin/relay/authorize' and self.command == 'POST':
                     value=service.devices.authorize(body)
+                elif admin and self.path == '/v1/admin/storage-grant' and self.command == 'POST':
+                    value=service.quotas.grant(body)
                 elif admin and self.path == '/v1/admin/model-usage' and self.command == 'GET':
                     value=service.models.usage()
                 elif admin and self.path == '/v1/admin/lending' and self.command == 'GET':

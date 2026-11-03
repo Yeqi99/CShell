@@ -28,5 +28,5 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec tsx --test tests/cloud-*.test.ts
       - run: pnpm exec tsx scripts/cloud-java-interop.ts
-      - run: python -m unittest -v test_server.py
+      - run: python -m unittest discover -v -p 'test_*.py'
         working-directory: services/cloud-sync
