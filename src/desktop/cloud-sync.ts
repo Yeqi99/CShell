@@ -18,6 +18,7 @@ import { emptySharedAi } from '../shared/shared-ai';
 import type { DesktopAccountProfiles } from '../core/desktop-account-profiles';
 import {AccountWorkspaceMismatch} from '../core/desktop-account-profiles';
 import {registerAccountImports} from './account-import';
+import {AccountMcpBridge} from '../core/account-mcp-bridge';
 
 const assetName = z.string().regex(/^[a-f0-9]{64}\.(?:ttf|otf|woff|woff2|png)$/);
 const bundleSchema = z
@@ -51,6 +52,7 @@ export async function registerCloudHandlers(
   tavily?: import('../extensions/tavily/service').TavilyExtension,
   desktopLooks?:import('../core/desktop-looks').DesktopLooks,
   identityNetwork?:{cloudExport():unknown;cloudImport(input:unknown):Promise<void>;hasPortableState?():boolean;reconcileAfterCloud?():Promise<void>},
+  mcp?:()=>import('../core/mcp').McpService|undefined,
 ) {
   const directory = app.getPath('userData');
   const assertAccountIdle=()=>{profileOptions?.assertIdle();if(ai.snapshot().threads.some(t=>t.state==='running'||t.state==='approval'||t.goal?.state==='active'))throw Error('请先停止智能体任务，再切换账号');};
@@ -265,4 +267,5 @@ export async function registerCloudHandlers(
   const timer = setInterval(() => { void tick(); }, 15000);
   timer.unref();
   app.once('before-quit', () => clearInterval(timer));
+  if(mcp){const bridge=new AccountMcpBridge(directory,clientCodec,cloud,mcp);bridge.start();app.once('before-quit',()=>bridge.stop());}
 }

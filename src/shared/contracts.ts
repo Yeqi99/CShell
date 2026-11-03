@@ -168,6 +168,7 @@ export type ApiClient = z.infer<typeof apiClientSchema>;
 export const mcpSettingsSchema = z
   .object({
     enabled: z.boolean(),
+    accountBridge: z.object({clientId:z.string().uuid()}).strict().optional(),
     port: z.number().int().min(1024).max(65535),
     allowedProfiles: z.array(z.string().uuid()).max(1000),
     allowCommands: z.boolean(),

@@ -685,7 +685,7 @@ else
           profiles:accountProfiles,
           assertIdle:()=>{if(ssh.size||ftp.size||localTerminal.size||clientProvider.size||transfers.size||http.running||classroomTasks?.hasActiveWork)throw Error('请先关闭连接并等待传输及机房任务结束，再切换账号');},
           block:(value:boolean)=>{accountTransition=value;if(value){accountContextEpoch++;mcp?.invalidateAccountContext();classroomTasks?.dispose();enrollment?.clear();}},
-        }:undefined, network, tavily, desktopLooks,identityNetwork);await identityNetwork.activate();ssh.networkShell=profile=>identityNetwork!.shell(profile.id);handle('network:identity',input=>identityNetwork!.call(input));window.once('closed',()=>void identityNetwork?.close());})();},
+        }:undefined, network, tavily, desktopLooks,identityNetwork,()=>mcp??undefined);await identityNetwork.activate();ssh.networkShell=profile=>identityNetwork!.shell(profile.id);handle('network:identity',input=>identityNetwork!.call(input));window.once('closed',()=>void identityNetwork?.close());})();},
         () => [...processExtensions.applicationTools(),...(identityNetwork?.tools()??[])],
         new MachineNetworkRoute(store, clientProvider),
         !accountProfiles || accountProfiles.current() === undefined || accountProfiles.current() === 'guest',

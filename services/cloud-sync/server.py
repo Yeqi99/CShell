@@ -4,6 +4,7 @@ Run behind HTTPS reverse proxy on loopback. CF token is scoped to Email Sending.
 """
 from devices import Devices
 from models import Models
+from bridges import Bridges
 import base64
 import hashlib
 import hmac
@@ -61,6 +62,7 @@ class Service:
 
         self.devices=Devices(self,Failure)
         self.models=Models(self,Failure)
+        self.bridges=Bridges(self,Failure)
 
     @contextmanager
     def db(self):
@@ -440,7 +442,13 @@ def handler(service):
                 else:
                     token = self.headers.get('Authorization', '').removeprefix('Bearer ')
                     account = service.authenticate(token)
-                    if self.path == '/v1/network' and self.command in ('GET','POST'):
+                    if self.path == '/v1/mcp/bridges' and self.command == 'GET':
+                        value=service.bridges.list(account)
+                    elif self.path in ('/v1/mcp/register','/v1/mcp/poll','/v1/mcp/reply','/v1/mcp/remove') and self.command == 'POST':
+                        value=getattr(service.bridges,self.path.rsplit('/',1)[1])(account,body)
+                    elif self.path == '/v1/mcp/invoke' and self.command == 'POST':
+                        value=service.bridges.invoke(account,service.digest(token),body)
+                    elif self.path == '/v1/network' and self.command in ('GET','POST'):
                         value=service.devices.network(account,body if self.command=='POST' else None)
                     elif self.path == '/v1/models' and self.command == 'GET':
                         value=service.models.catalog()
