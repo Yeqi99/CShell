@@ -1,3 +1,4 @@
+import {CloudflareExtension} from '../extensions/cloudflare/service';
 import {WindowsSystemProxy} from './system-proxy';
 import {OfficialOpenCode} from '../extensions/opencode/official-runtime';
 import {TavilyExtension} from '../extensions/tavily/service';
@@ -77,8 +78,15 @@ export async function registerAiHandlers(
   await openCode.load();
   ai.providerExtensions.register(openCode);
   const tavily=new TavilyExtension({directory:join(directory,'extensions','tavily'),enabled:()=>pluginEnabled(store.plugins(),'tavily'),encrypt:s=>store.encryptPrivate(s),decrypt:s=>store.decryptPrivate(s)},ai.requestTransport);
-  await tavily.load();ai.extensionTools=()=>[...tavily.tools(),...(customTools?.()??[])];
-  handle('ai:extension-call',(id,action,input)=>id==='cshell.tavily'?tavily.call(z.string().max(80).parse(action),input):ai.providerExtensions.call(z.string().max(100).parse(id),z.string().max(80).parse(action),input));
+  const cloudflare = new CloudflareExtension({
+    directory: join(directory, 'extensions', 'cloudflare'), enabled: () => pluginEnabled(store.plugins(), 'cloudflare'),
+    encrypt: s => store.encryptPrivate(s), decrypt: s => store.decryptPrivate(s),
+    open: async url => (await import('electron')).shell.openExternal(url),
+    authorized: async () => { const policy = ai.snapshot().policy; if (!policy.application.includes('cloudflare.manage')) await ai.savePolicy({...policy, application:[...policy.application, 'cloudflare.manage']}); },
+  }, ai.requestTransport);
+  await cloudflare.load();
+  await tavily.load();ai.extensionTools=()=>[...tavily.tools(),...cloudflare.tools(),...(customTools?.()??[])];
+  handle('ai:extension-call',(id,action,input)=>id==='cshell.cloudflare'?cloudflare.call(z.enum(['status','authorize','refresh','disconnect']).parse(action)):id==='cshell.tavily'?tavily.call(z.string().max(80).parse(action),input):ai.providerExtensions.call(z.string().max(100).parse(id),z.string().max(80).parse(action),input));
   const bindingKey=(id:string)=>{
     const thread=ai.snapshot().threads.find(t=>t.id===id);
     if(!thread||!ai.canReceiveEvent(id))throw new Error('请选择已配置基座的普通智能体会话');

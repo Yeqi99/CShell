@@ -19,6 +19,12 @@ public final class AndroidAgentService extends Service {
   private static volatile boolean starting;
   private final ExecutorService worker=Executors.newSingleThreadExecutor();
   private volatile AndroidAgentHost host;
+  static void resumeConnection(Context context){
+    try{JSONObject settings=AndroidAgentSettings.read(context);
+      if(!settings.optBoolean("enabled")||settings.optString("password").isEmpty())return;
+      androidx.core.content.ContextCompat.startForegroundService(context,new Intent(context,AndroidAgentService.class).setAction("connect"));
+    }catch(Exception e){starting(context,false,"设备连接服务未能恢复，请在 CAgent 设置中重试。");}
+  }
   private volatile AndroidScreenCapture capture;
   private volatile MediaProjection projection;
   private volatile AndroidAgentHost.Events viewer;
@@ -90,9 +96,9 @@ public final class AndroidAgentService extends Service {
     try{
       JSONObject settings=AndroidAgentSettings.read(this);
       if(!settings.getBoolean("enabled")||settings.getString("password").isEmpty())throw new IllegalStateException("请启用 CAgent 并设置连接密码");
-      foreground(true);
       Intent consent=intent.getParcelableExtra("consent");
-      if(consent==null)throw new IllegalArgumentException("缺少屏幕共享授权");
+      if(consent==null){foreground(false);worker.execute(()->{try{startConnection(settings);starting=false;lastError="";changed(this);}catch(Exception e){fail(e.getMessage());}});return START_NOT_STICKY;}
+      foreground(true);
       projection=getSystemService(MediaProjectionManager.class).getMediaProjection(intent.getIntExtra("result",Activity.RESULT_CANCELED),consent);
       if(projection==null)throw new IllegalStateException("屏幕共享未获授权");
       worker.execute(()->{
@@ -113,7 +119,10 @@ public final class AndroidAgentService extends Service {
       public void onError(String reason){captureEnded(session,reason);}
       public void onStopped(){captureEnded(session,"屏幕共享已结束，请在手机上重新授权");}
     });
-    if(host!=null)return;
+    startConnection(settings);
+  }
+  private void startConnection(JSONObject settings)throws Exception{
+    if(destroying||host!=null)return;
     host=new AndroidAgentHost(this,new AndroidAgentHost.Backend(){
       public boolean available(){return sharing&&!destroying&&!locked()&&interactive();}
       public String unavailableReason(){return locked()||!interactive()?"SCREEN_LOCKED: 请先在手机上亮屏并解锁；管理连接保持可用":"PROJECTION_STOPPED: 请在手机上重新授权屏幕共享；管理连接保持可用";}

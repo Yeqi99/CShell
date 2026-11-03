@@ -61,6 +61,7 @@ export const aiPolicySchema = z
         'goals.manage',
         'events.manage',
         'web.search',
+        'cloudflare.manage',
         'http.use',
         'ai.providers.manage',
         'wechat.read',

@@ -215,6 +215,11 @@ export function AgentDesktopView({
                 const c = canvas.current;
                 if (!c) { ack(false); return; }
                 {
+                  if (c.width !== frame.displayWidth || c.height !== frame.displayHeight) {
+                    // Decoder output is authoritative after an Android orientation change.
+                    setInfo(previous => previous ? {...previous, width:frame.displayWidth, height:frame.displayHeight} : previous);
+                    videoSizeCallback.current?.({width:frame.displayWidth,height:frame.displayHeight});
+                  }
                   if (c.width !== frame.displayWidth) c.width = frame.displayWidth;
                   if (c.height !== frame.displayHeight) c.height = frame.displayHeight;
                   const context = c.getContext('2d', { alpha: false });
