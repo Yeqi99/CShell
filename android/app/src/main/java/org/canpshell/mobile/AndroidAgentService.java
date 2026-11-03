@@ -20,6 +20,12 @@ public final class AndroidAgentService extends Service {
   private final ExecutorService worker=Executors.newSingleThreadExecutor();
   private volatile AndroidAgentHost host;
   private volatile AndroidAccountRelay accountRelay;
+  static void resumeConnection(Context context){
+    try{JSONObject settings=AndroidAgentSettings.read(context);
+      if(!settings.optBoolean("enabled")||settings.optString("password").isEmpty())return;
+      androidx.core.content.ContextCompat.startForegroundService(context,new Intent(context,AndroidAgentService.class).setAction("connect"));
+    }catch(Exception e){starting(context,false,"设备连接服务未能恢复，请在 CAgent 设置中重试。");}
+  }
   static void accountChanged(){AndroidAgentService live=current;if(live!=null){if(live.host!=null)live.host.clearAccount();AndroidAccountRelay relay=live.accountRelay;live.accountRelay=null;if(relay!=null)relay.close();}}
   static void refreshAccount(){AndroidAgentService live=current;if(live!=null)try{live.worker.execute(()->{try{live.startAccountRelay();}catch(Exception ignored){}});}catch(RejectedExecutionException ignored){}}
   private void startAccountRelay()throws Exception{
@@ -100,9 +106,13 @@ public final class AndroidAgentService extends Service {
     try{
       JSONObject settings=AndroidAgentSettings.read(this);
       if(!settings.getBoolean("enabled")||settings.getString("password").isEmpty())throw new IllegalStateException("请启用 CAgent 并设置连接密码");
-      foreground(true);
       Intent consent=intent.getParcelableExtra("consent");
-      if(consent==null)throw new IllegalArgumentException("缺少屏幕共享授权");
+      if(consent==null){
+        foreground(false);
+        worker.execute(()->{try{startConnection(settings);starting=false;lastError="";changed(this);}catch(Exception e){fail(e.getMessage());}});
+        return START_NOT_STICKY;
+      }
+      foreground(true);
       projection=getSystemService(MediaProjectionManager.class).getMediaProjection(intent.getIntExtra("result",Activity.RESULT_CANCELED),consent);
       if(projection==null)throw new IllegalStateException("屏幕共享未获授权");
       worker.execute(()->{
@@ -123,7 +133,11 @@ public final class AndroidAgentService extends Service {
       public void onError(String reason){captureEnded(session,reason);}
       public void onStopped(){captureEnded(session,"屏幕共享已结束，请在手机上重新授权");}
     });
-    if(host!=null)return;
+    startConnection(settings);
+  }
+  private void startConnection(JSONObject settings)throws Exception{
+    if(destroying)return;
+    if(host!=null){startAccountRelay();return;}
     host=new AndroidAgentHost(this,new AndroidAgentHost.Backend(){
       public boolean delegation(String device,String credential,String fingerprint,boolean continuation){return CloudSync.shared(AndroidAgentService.this).verifyHostDelegation(device,credential,fingerprint,continuation);}
       public boolean available(){return sharing&&!destroying&&!locked()&&interactive();}

@@ -101,10 +101,12 @@ final class CloudSync {
     return new JSONObject().put("owner",owner()).put("membership",state.optJSONObject("membership")).put("email",state.has("session")?state.getJSONObject("session").getString("email"):"")
       .put("unlocked",state.has("key")).put("revision",state.optLong("revision",0)).put("lastSync",state.optLong("lastSync",0));
   }
+  private String localHostId(){return context.getSharedPreferences("cagent-host-identity",0).getString("id","");}
   private JSONObject publicData(JSONObject data)throws Exception{
     JSONArray profiles=new JSONArray(),models=new JSONArray();JSONArray all=data.getJSONObject("store").getJSONArray("profiles");
     for(int i=0;i<all.length();i++){
       JSONObject p=all.getJSONObject(i);String protocol=p.optString("protocol","ssh");if(!protocol.equals("ssh")&&!protocol.equals("client"))continue;
+      if(protocol.equals("client")&&p.optString("id").equals(localHostId()))continue;
       profiles.put(new JSONObject().put("id",p.getString("id")).put("protocol",protocol.equals("client")?"agent":"ssh").put("name",p.getString("name"))
         .put("host",p.getString("host")).put("port",String.valueOf(p.getInt("port"))).put("username",p.getString("username"))
         .put("auth",p.getString("auth")).put("group",p.optString("group")).put("favorite",p.optBoolean("favorite")));
@@ -181,7 +183,7 @@ final class CloudSync {
           updated.add(next);
         }
         JSONArray merged=new JSONArray();
-        for(JSONObject p:CloudProfileOrder.merge(original,updated,p->p.optString("id"),p->Arrays.asList("ssh","client").contains(p.optString("protocol","ssh"))))merged.put(p);
+        for(JSONObject p:CloudProfileOrder.merge(original,updated,p->p.optString("id"),p->!p.optString("id").equals(localHostId())&&Arrays.asList("ssh","client").contains(p.optString("protocol","ssh"))))merged.put(p);
         store.put("profiles",merged);String theme=request.getString("theme");if(!theme.equals("light")&&!theme.equals("dark"))throw new IOException("主题不正确");store.getJSONObject("preferences").put("theme",theme);
         validate(data);state.put("pendingBundle",data).put("pending",new JSONObject().put("baseRevision",state.getLong("revision")).put("mutationId",UUID.randomUUID().toString()).put("envelope",encrypt(data)));save();
       }

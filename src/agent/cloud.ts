@@ -88,8 +88,6 @@ export class CagentCloud {
     try {
       if (this.sync.status().email && this.hooks) {
         const profile = await this.sync.accountRequest('/v1/account');
-        const catalog = await this.sync.accountRequest('/v1/models');
-        await this.assistant.ensureOfficialModels(catalog.models.map((m: { id: string }) => m.id));
         {
           if (Date.now() - this.lastEnroll > 30000) {
             const device = await this.hooks.enroll();
@@ -118,16 +116,21 @@ export class CagentCloud {
                 port: entry.port,
                 username: 'agent',
                 auth: 'password',
-                group: '我的云端机器',
+                group: '同账号设备',
                 favorite: false,
               });
-            if (!this.cached.store.groups.includes('我的云端机器'))
-              this.cached.store.groups.push('我的云端机器');
+            if (!this.cached.store.groups.includes('同账号设备'))
+              this.cached.store.groups.push('同账号设备');
             this.lastEnroll = Date.now();
             this.transportError = undefined;
           }
         }
         if (!profile.membership.active) await this.hooks.stop();
+        // Model catalog availability must never prevent an authenticated machine coming online.
+        try {
+          const catalog = await this.sync.accountRequest('/v1/models');
+          await this.assistant.ensureOfficialModels(catalog.models.map((m: { id: string }) => m.id));
+        } catch { /* Keep the previously verified models and retry on the next tick. */ }
       }
     } catch (e) {
       this.transportError = e instanceof Error ? e.message : '云连接暂时不可用';

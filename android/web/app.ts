@@ -375,7 +375,7 @@ function render() {
     filtered = profiles.filter((p) =>
       [p.name, p.host, p.group].some((v) => v.toLowerCase().includes(query)),
     );
-  for (const group of [...new Set(profiles.map((p) => p.group))].sort()) {
+  for (const group of [...new Set(profiles.map((p) => p.group))].sort((a,b)=>a==='同账号设备'?-1:b==='同账号设备'?1:a.localeCompare(b))) {
     const option = document.createElement('option');
     option.value = group;
     $('groups').append(option);

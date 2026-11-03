@@ -111,6 +111,7 @@ export function AiPermissionTree({
               ['goals.manage', tr("管理定期目标"), ''],
               ['events.manage', tr("管理事件订阅与触发任务"), ''],
               ['web.search', tr("网络搜索（Tavily）"), ''],
+              ['cloudflare.manage', tr("管理 Cloudflare"), tr('仅限扩展中已授权的 Cloudflare 资源')],
               ['ai.providers.manage', tr("查询、添加与测试 AI 基座"), tr("基座地址、模型与密钥来源需确认；密钥不会返回对话。")],
               ['wechat.read', tr("读取本机微信状态、联系人与授权消息"), ''],
               ['wechat.send', tr("向授权联系人发送微信文本"), ''],

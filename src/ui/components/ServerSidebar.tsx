@@ -448,7 +448,7 @@ export function ServerSidebar({
                       )}
                       <div>
                         <strong>{profile.name}</strong>
-                        <div className="server-metadata"><small title={profile.host}>{profile.protocol === 'http' ? 'HTTP' : profile.host}</small>{accountDevices.some(d=>d.id===profile.id)&&<span className="account-device-badge" title={tr('此设备来自当前登录账号')} aria-label={tr('账号设备')}><Share2 size={11} aria-hidden="true" />{!online.includes(profile.id)&&accountDevices.find(d=>d.id===profile.id)?.online!==true&&<span>{tr(accountDevices.find(d=>d.id===profile.id)?.online===false?'离线':'状态未知')}</span>}</span>}</div>
+                        <div className="server-metadata"><small title={profile.host}>{profile.protocol === 'http' ? 'HTTP' : profile.host}</small>{accountDevices.some(d=>d.id===profile.id)&&<span className="account-device-badge" title={tr('同账号设备')+' · '+tr(accountDevices.find(d=>d.id===profile.id)?.online===true?'在线':accountDevices.find(d=>d.id===profile.id)?.online===false?'离线':'状态未知')} aria-label={tr('账号设备')}><Share2 size={11} aria-hidden="true" /></span>}</div>
                       </div>
                     </button>
                     {profile.protocol!=='http'&&<PingButton key={profile.host} profileId={profile.id}/>}
