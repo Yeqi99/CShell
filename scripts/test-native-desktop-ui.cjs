@@ -9,7 +9,7 @@ const esbuild=require('esbuild'),{chromium}=require('playwright'),assert=require
  try{
   const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('http://127.0.0.1:'+server.address().port);
   await page.locator('#request').click();await page.locator('#native-content').waitFor({state:'visible'});
-  await page.getByRole('button',{name:'关闭原生桌面窗口',exact:true}).click();await page.locator('#native-content').waitFor({state:'hidden'});
+  await page.getByRole('button',{name:/^关闭\s*原生桌面窗口$/}).click();await page.locator('#native-content').waitFor({state:'hidden'});
   await page.locator('#request').click();await page.locator('#native-content').waitFor({state:'visible'});
   for(const font of [15,22,28]){await page.evaluate(f=>document.documentElement.style.setProperty('--ui-font-size',f+'px'),font);const visible=await page.locator('.tabs').evaluate(el=>{const b=el.getBoundingClientRect();return [...el.children].filter(t=>{const a=t.getBoundingClientRect();return a.left>=b.left&&a.right<=b.right+1}).length});assert(visible>=3,`At ${font}px fewer than three tabs fit`);}
   await page.locator('#overflow').click();await page.waitForFunction(()=>{const el=document.querySelector('.tabs'),a=el.querySelector('.active').getBoundingClientRect(),b=el.getBoundingClientRect();return el.scrollLeft>0&&a.right<=b.right+1});
