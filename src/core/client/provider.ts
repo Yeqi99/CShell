@@ -134,7 +134,7 @@ class ClientChannel {
     );
   }
 }
-async function dial(
+export async function dial(
   device: { host: string; port: number; certificate?: string; relay?: AgentRelayConnection },
   identity: ClientIdentity,
   event: (e: string, data?: string) => void,
@@ -143,7 +143,11 @@ async function dial(
   signal.throwIfAborted();
   const expected = device.certificate ? fingerprint(device.certificate) : undefined;
   const tunnel = device.relay ? await openRelayTunnel({ ...device.relay, signal }) : undefined;
-  const socket = connect({
+  // A relay can finish opening in the same turn that its caller is cancelled.
+  // Do not create a new TLS connection after that cancellation.
+  if (signal.aborted) { tunnel?.destroy(); signal.throwIfAborted(); }
+  let socket: TLSSocket;
+  try { socket = connect({
     ...(tunnel ? { socket: tunnel } : {}),
     host: device.host,
     port: device.port,
@@ -153,22 +157,46 @@ async function dial(
     rejectUnauthorized: false,
     // Self-signed leaf trust is checked below BEFORE any application bytes are sent.
     // This scoped socket uses an exact invitation pin; it does not trust system CAs.
-  });
-  const abort = () => socket.destroy(new Error('Client operation cancelled'));
+  }); } catch (error) { tunnel?.destroy(); throw error; }
+  // Cancellation closes the transport; it must not inject a second error after
+  // the handshake's error listener has already handled a connection failure.
+  let rejectHandshake: ((error: Error) => void) | undefined;
+  let releaseHandshakeError = () => {};
+  const abort = () => {
+    rejectHandshake?.(new Error('Client operation cancelled'));
+    socket.destroy();
+  };
   signal.addEventListener('abort', abort, { once: true });
   socket.once('close', () => signal.removeEventListener('abort', abort));
   try {
     await new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => socket.destroy(new Error('Client connection timeout')), 10000);
-      socket.once('error', reject);
-      socket.once('secureConnect', () => {
+      let settled = false;
+      const finish = (error?: Error) => {
+        if (settled) return;
+        settled = true;
         clearTimeout(timer);
-        resolve();
-      });
-      socket.once('close', () => {
-        clearTimeout(timer);
-        reject(new Error('Client closed during handshake'));
-      });
+        rejectHandshake = undefined;
+        socket.removeListener('secureConnect', ready);
+        socket.removeListener('close', closed);
+        // Keep the scoped error handler through socket teardown on failure.
+        // On success ClientChannel installs its own handler before removal.
+        if (error) { reject(error); }
+        else { resolve(); }
+      };
+      const failed = (error: Error) => finish(error);
+      const ready = () => finish();
+      const closed = () => finish(new Error('Client closed during handshake'));
+      const timer = setTimeout(() => {
+        finish(new Error('Client connection timeout'));
+        socket.destroy();
+      }, 10000);
+      socket.on('error', failed);
+      releaseHandshakeError = () => socket.removeListener('error', failed);
+      socket.once('secureConnect', ready);
+      socket.once('close', closed);
+      socket.once('close', () => socket.removeListener('error', failed));
+      rejectHandshake = failed;
+      if (signal.aborted) abort();
     });
     const cert = socket.getPeerCertificate();
     if (!cert.raw) throw new Error('Client certificate missing');
@@ -181,6 +209,7 @@ async function dial(
       throw new Error('Client identity changed or expired');
     signal.throwIfAborted();
     const channel = new ClientChannel(socket, event);
+    releaseHandshakeError();
     channel.certificate = verified.toString();
     return channel;
   } catch (e) {
