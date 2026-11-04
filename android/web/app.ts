@@ -1,4 +1,5 @@
 import {MachineHome,type MachineApp} from './machine-home';
+import {mobilePreferences} from './account-preferences';
 import {MobileCoding} from './coding';
 import {MobileIde} from './ide';
 import { Terminal } from '@xterm/xterm';
@@ -36,6 +37,8 @@ declare global {
       acknowledge(id: string): void;
       resize(id: string, cols: number, rows: number): void;
       disconnect(id: string): void;
+      openFeedback(): void;
+      openNetworkVpn(): void;
       checkUpdate(): void;
       installUpdate(): void;
       version(): string;
@@ -198,6 +201,24 @@ window.agentTrustReset = (host, port) => {
 };
 const drafts = new Map<string, Record<string, string>>();
 let dark = localStorage.getItem('theme') === 'dark';
+function readAccountPreferences(){try{return JSON.parse(localStorage.getItem('account-render-preferences')||'null');}catch{return {};}}
+let accountPreferences=mobilePreferences(readAccountPreferences());
+function applyAccountPreferences(value:unknown){accountPreferences=mobilePreferences(value);localStorage.setItem('account-render-preferences',JSON.stringify(value??{}));document.body.style.fontFamily=accountPreferences.uiFont;document.body.style.fontSize=accountPreferences.uiFontSize+'px';for(const s of sessions.values()){s.terminal.options.fontSize=accountPreferences.fontSize;s.terminal.options.fontFamily=accountPreferences.fontFamily;s.terminal.options.lineHeight=accountPreferences.lineHeight;s.fit.fit();}}
+applyAccountPreferences(readAccountPreferences());
+let accountExtensions:Record<string,boolean>={};
+function applyAccountExtensions(value:unknown){
+  accountExtensions={};
+  if(value&&typeof value==='object')for(const [id,enabled] of Object.entries(value))if(typeof enabled==='boolean')accountExtensions[id]=enabled;
+  const section=document.getElementById('synced-extension-choices');
+  if(!section)return;
+  section.replaceChildren();
+  const selected=Object.entries(accountExtensions).filter(([,enabled])=>enabled);
+  section.hidden=!selected.length;
+  if(!selected.length)return;
+  const summary=document.createElement('summary');summary.textContent='账号扩展 · '+selected.length;section.append(summary);
+  const note=document.createElement('p');note.className='muted caption';note.textContent='已保留账号中的扩展选择。桌面扩展不在手机执行，手机远程服务仍由本机开关控制。';section.append(note);
+  for(const [id] of selected){const row=document.createElement('p');row.className='muted caption';row.textContent=id+' · 已同步';section.append(row);}
+}
 const theme = () => ({
   background: dark ? '#141b24' : '#ffffff',
   foreground: dark ? '#e0e7ef' : '#243348',
@@ -554,7 +575,9 @@ form.onsubmit = (e) => {
   element.className = 'terminal';
   $('terminals').append(element);
   const terminal = new Terminal({
-      fontSize: 14,
+      fontSize: accountPreferences.fontSize,
+      fontFamily: accountPreferences.fontFamily,
+      lineHeight: accountPreferences.lineHeight,
       theme: theme(),
       cursorBlink: true,
       scrollback: 5000,
@@ -1002,3 +1025,6 @@ for (const [id, action] of [
 window.addEventListener('focus', () => { if (page === 'cagent') refreshCAgent(); });
 document.addEventListener('visibilitychange', () => { if (!document.hidden && page === 'cagent') refreshCAgent(); });
 window.addEventListener('cagent-status', ((event: CustomEvent) => receiveCAgent(typeof event.detail === 'string' ? event.detail : JSON.stringify(event.detail))) as EventListener);
+
+document.getElementById("open-feedback")?.addEventListener("click",()=>window.CShellNative.openFeedback());
+document.getElementById("open-network-vpn")?.addEventListener("click",()=>window.CShellNative.openNetworkVpn());

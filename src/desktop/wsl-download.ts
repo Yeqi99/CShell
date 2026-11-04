@@ -34,7 +34,7 @@ export function ubuntuImage(manifest: unknown, arch: string) {
     throw new Error('Ubuntu 下载地址不受信任');
   return image;
 }
-export async function downloadUbuntu(path: string, fetcher: typeof fetch, arch = process.arch) {
+export async function downloadUbuntu(path: string, fetcher: typeof fetch, arch = process.arch, progress: (bytes:number,total?:number)=>void = () => {}) {
   let manifest: unknown;
   // Both endpoints are Microsoft-controlled metadata, fetched through Electron's
   // system proxy rather than the WSL installer's separate WinINet network path.
@@ -66,6 +66,7 @@ export async function downloadUbuntu(path: string, fetcher: typeof fetch, arch =
   const file = await open(path, 'wx'),
     reader = response.body.getReader(),
     hash = createHash('sha256');
+  const total=Number(response.headers.get('content-length')) || undefined;
   let size = 0,
     valid = false;
   try {
@@ -76,6 +77,7 @@ export async function downloadUbuntu(path: string, fetcher: typeof fetch, arch =
       if (size > 4 * 1024 ** 3) throw new Error('Ubuntu 镜像大小超出限制');
       hash.update(next.value);
       await file.writeFile(next.value);
+      progress(size,total);
     }
     if (hash.digest('hex').toLowerCase() !== image.Sha256.toLowerCase())
       throw new Error('Ubuntu 镜像校验失败，未执行安装');

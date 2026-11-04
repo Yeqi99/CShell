@@ -11,3 +11,6 @@ await run(compiler,['-std=c++17','-O2','-static','tests/desktop-clipboard-native
 // The test creates its own Window Station and Desktop before touching any
 // clipboard format. It must never access the user's WinSta0 clipboard.
 await run(executable,[]);
+const unavailable=resolve(output,'clipboard-unavailable-test.exe');
+await run(compiler,['-std=c++17','-O2','-static','tests/desktop-clipboard-unavailable-native.cpp','-o',unavailable,'-ld3d11','-ldxgi','-lmfplat','-lmfuuid','-lmf','-lole32','-loleaut32','-luuid','-lwmcodecdspuuid','-luser32','-lgdi32','-ladvapi32','-lshell32','-lgdiplus','-lwtsapi32']);
+await run(unavailable,[]);

@@ -41,6 +41,7 @@ export interface LocalTerminalBridge {
   wslAccountStatus(distribution: string): Promise<{ ready: boolean }>;
   wslInitialize(input: { distribution: string; username: string; password: string }): Promise<void>;
   wslInstall(ubuntu: boolean): Promise<WslSetupState>;
+  wslImport(name:string): Promise<WslSetupState>;
   wslInstallStatus(): Promise<WslSetupState>;
   wslDistributions(): Promise<{ available: boolean; distributions: string[]; error?: string }>;
   localTerminal(shell: LocalShell): Promise<{ sessionId: string; name: string }>;

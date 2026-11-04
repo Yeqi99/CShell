@@ -28,6 +28,10 @@ jobs:
           gradle-version: '8.13'
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec tsc --noEmit -p android/web/tsconfig.json
+      - name: Build pinned TCP VPN engine
+        run: |
+          sdkmanager "ndk;27.3.13750724"
+          ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.3.13750724" node scripts/prepare-android-vpn.mjs
       - run: node scripts/build-android.mjs
       - name: Restore persistent signing key
         env:

@@ -27,7 +27,7 @@ export async function createWechatCapability(options:{directory:string;runtime:s
   const manifest:AgentCapabilityManifest={protocol:1,id:'cagent.wechat',name:'微信掌控',version:'0.1.6',license:'MIT',
     description:'控制此 Windows 机器当前登录的微信：通讯录、最近会话、历史、收发、订阅、备注及已实现的朋友圈能力。需绑定受支持的微信版本。',
     source:{repository:'https://github.com/Yeqi99/CShell',releaseTag:'v0.6.32',assetUrl:'https://github.com/Yeqi99/CShell/releases/download/v0.6.32/CAgent-Setup-0.6.32-win-x64.exe'},
-    compatibility:{platforms:['win32'],architectures:['x64'],agentVersion:{min:'0.6.32',maxExclusive:'1.0.0'}},
+    compatibility:{platforms:['win32'],architectures:['x64'],agentVersion:{min:'0.6.32',maxExclusive:'1.1.0'}},
     adapterId:'cagent.wechat',files:[],permissions:['wechat.read','wechat.send','wechat.contacts.manage'],
     tools:tools.map(tool=>({id:tool.name,description:'On the selected CAgent machine ONLY. '+tool.description.replace('independent of the conversation remote machine','bound to this CAgent machine'),inputSchema:z.toJSONSchema(tool.input,{io:'input'}) as AgentCapabilityManifest['tools'][number]['inputSchema'],outputSchema:{type:'object',properties:{},additionalProperties:true},permissions:[tool.capability],sideEffect:tool.needsReview({})})),
     events:wechatEventTypes().map(event=>({id:event.id,description:event.name+'。通过已授权的 wechat_subscribe / wechat_events 消息队列交付；收款通知不代表已领取。',payloadSchema:{type:'object',properties:{},additionalProperties:true},permissions:['wechat.read']}))};

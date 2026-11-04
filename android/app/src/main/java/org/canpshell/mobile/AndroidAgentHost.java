@@ -32,6 +32,7 @@ final class AndroidAgentHost implements AutoCloseable {
   private final Backend backend;
   private final AndroidManagedFiles files;private final AndroidApplications applications;
   private final AndroidPhoneCapabilities phone;
+  final AndroidNetworkProxy networkProxy;private final AndroidNetworkStreams networkStreams;
   private final AndroidHostIdentity identity;
   private final SharedPreferences prefs;
   private final Set<SSLSocket> sockets=ConcurrentHashMap.newKeySet();
@@ -58,7 +59,7 @@ final class AndroidAgentHost implements AutoCloseable {
     if(desktopReplayRejections<Long.MAX_VALUE)desktopReplayRejections++;
     desktopReplayReason="sequence-mismatch";
   }
-  AndroidAgentHost(Context context,Backend backend)throws Exception {this.backend=backend;files=new AndroidManagedFiles(context);applications=new AndroidApplications(context);phone=new AndroidPhoneCapabilities(context);identity=new AndroidHostIdentity(context);prefs=context.getSharedPreferences("cagent-host-peers",0);}
+  AndroidAgentHost(Context context,Backend backend)throws Exception {this.backend=backend;files=new AndroidManagedFiles(context);applications=new AndroidApplications(context);phone=new AndroidPhoneCapabilities(context);identity=new AndroidHostIdentity(context);prefs=context.getSharedPreferences("cagent-host-peers",0);SharedPreferences route=context.getSharedPreferences("cagent-network-route",0);networkProxy=new AndroidNetworkProxy(this::authorized,(selected,owner,binding)->{if(!route.edit().putBoolean("selected",selected).putString("owner",owner).putString("binding",binding).commit())throw new IOException("Cannot save proxy selection");},route.getBoolean("selected",false),route.getString("owner",""),route.getString("binding",""));networkStreams=new AndroidNetworkStreams(networkProxy,this::authorized);}
   synchronized void start(int port,String password)throws Exception {
     if(android.os.Build.VERSION.SDK_INT<29)throw new IOException("CAgent host requires Android 10 or newer");
     if(port<1024||port>65535||password==null||password.length()<1||password.length()>128)throw new IOException("Invalid CAgent port or password");
@@ -77,12 +78,13 @@ final class AndroidAgentHost implements AutoCloseable {
     listener=server;long generation=epoch.incrementAndGet();
     clients=new ThreadPoolExecutor(0,8,15,TimeUnit.SECONDS,new SynchronousQueue<>());
     timer=Executors.newSingleThreadScheduledExecutor();
+    timer.scheduleAtFixedRate(()->{networkProxy.expire();networkStreams.expire();},1,1,TimeUnit.SECONDS);
     Thread accept=new Thread(()->{while(listener==server&&!server.isClosed()){try{SSLSocket s=(SSLSocket)server.accept();sockets.add(s);try{clients.execute(()->serve(s,generation));}catch(RejectedExecutionException e){sockets.remove(s);s.close();}}catch(Exception e){if(listener==server)failure="CAgent listener stopped";break;}}},"cagent-host-listener");accept.setDaemon(true);accept.start();
   }
   JSONObject status()throws JSONException{return new JSONObject().put("running",listener!=null&&!listener.isClosed()).put("deviceId",identity.id).put("port",listener==null?0:listener.getLocalPort()).put("bind","0.0.0.0").put("sharing",backend.available()).put("accessibilityEnabled",backend.controlAvailable()).put("connections",sockets.size()).put("error",failure);}
   JSONObject connectionInfo(String host,int port)throws Exception {if(host==null||!host.matches("[a-zA-Z0-9.:-]{1,253}")||port<1||port>65535)throw new IOException("Invalid public endpoint");return new JSONObject().put("protocol",1).put("deviceId",identity.id).put("name",name()).put("certificate",identity.pem()).put("host",host).put("port",port);}
   private String name(){return (android.os.Build.MANUFACTURER+" "+android.os.Build.MODEL).trim();}
-  synchronized void stop(){epoch.incrementAndGet();SSLServerSocket old=listener;listener=null;try{if(old!=null)old.close();}catch(IOException ignored){}Desktop d=desktop;if(d!=null)d.close();for(SSLSocket s:sockets)try{s.close();}catch(IOException ignored){}sockets.clear();pending.clear();files.close();if(clients!=null)clients.shutdownNow();if(timer!=null)timer.shutdownNow();passwordDigest=null;clearAccount();backend.releaseInput();}
+  synchronized void stop(){epoch.incrementAndGet();SSLServerSocket old=listener;listener=null;try{if(old!=null)old.close();}catch(IOException ignored){}Desktop d=desktop;if(d!=null)d.close();for(SSLSocket s:sockets)try{s.close();}catch(IOException ignored){}sockets.clear();pending.clear();files.close();networkProxy.close();networkStreams.close();if(clients!=null)clients.shutdownNow();if(timer!=null)timer.shutdownNow();passwordDigest=null;clearAccount();backend.releaseInput();}
   public void close(){stop();}
   private void serve(SSLSocket socket,long generation){
     boolean desktopProtocolOwned=false;ScheduledFuture<?> delegatedWatch=null;
@@ -105,7 +107,7 @@ final class AndroidAgentHost implements AutoCloseable {
           else {if(!authenticated||(delegatedToken==null&&!authorized(owner))||epoch.get()!=generation)throw new IOException("CAgent authentication required");
             if(delegatedToken!=null&&!backend.delegation(identity.id,delegatedToken,owner,true))throw new IOException("Borrowed device authorization expired");
             if(op.equals("ping"))result=new JSONObject();
-            else if(op.equals("manage")){JSONObject p=request.getJSONObject("payload");String method=p.getString("method");if(delegatedToken!=null&&method.matches("^(connection\\.|account\\.|relay\\.|hosting\\.|packages\\.(grant|install|uninstall)|assistant\\.configure).*"))throw new IOException("借用连接不能修改设备身份与授权");result=manage(owner,method,p.optJSONObject("params"));}
+            else if(op.equals("manage")){JSONObject p=request.getJSONObject("payload");String method=p.getString("method");if(delegatedToken!=null&&method.startsWith("network.proxy."))throw new IOException("借用连接不能修改设备网络出口");if(delegatedToken!=null&&method.matches("^(connection\\.|account\\.|relay\\.|hosting\\.|packages\\.(grant|install|uninstall)|assistant\\.configure).*"))throw new IOException("借用连接不能修改设备身份与授权");result=manage(owner,method,p.optJSONObject("params"));}
             else if(op.equals("desktop-stream")){writeLine(out,new JSONObject().put("id",id).put("result",new JSONObject().put("desktopStream",true)));desktopProtocolOwned=true;new Desktop(socket,in,out,owner,generation).run();return;}
             else throw new IOException("Operation is not supported by Android CAgent");
           }
@@ -128,6 +130,8 @@ final class AndroidAgentHost implements AutoCloseable {
   private Object manage(String owner,String method,JSONObject params)throws Exception {
     if(params==null)params=new JSONObject();
     // File I/O must not hold the desktop/input state monitor while an SAF provider blocks.
+    if(method.startsWith("network.proxy."))return networkProxy.call(method,params,owner);
+    if(method.startsWith("browser."))return networkStreams.call(method,params,owner);
     if(method.startsWith("files."))return files.call(method,params,owner);
     if(method.equals("packages.invoke")&&"cagent.android".equals(params.optString("packageId"))&&params.optString("toolId").startsWith("android_files_"))return files.call("files."+params.getString("toolId").substring("android_files_".length()),params.optJSONObject("args")==null?new JSONObject():params.getJSONObject("args"),owner);
     return manageState(owner,method,params);

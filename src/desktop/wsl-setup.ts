@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, stat, readdir } from 'node:fs/promises';
 import type { WslSetupState } from '../shared/local-terminal';
 import { downloadUbuntu } from './wsl-download';
 const exec = promisify(execFile);
@@ -21,19 +21,20 @@ export function wslInstallArguments(help: string, ubuntu: boolean) {
     return ['--install'];
   }
   return ubuntu
-    ? ['--install', '--distribution', 'Ubuntu', '--no-launch']
+    ? ['--install', '--distribution', 'Ubuntu', '--no-launch', ...(help.includes('--web-download') ? ['--web-download'] : [])]
     : ['--install', '--no-distribution'];
 }
 const quote = (value: string) => "'" + value.replace(/'/g, "''") + "'";
 export function wslFailureMessage(code: number, details: string) {
   if (/WININET_E_CANNOT_CONNECT|WININET_E_TIMEOUT|WININET_E_NAME_NOT_RESOLVED/i.test(details))
-    return '无法连接 WSL 发行版下载服务。请检查 Windows 系统代理与网络，恢复后重试安装。';
+    return '无法连接 WSL 发行版下载服务。请检查 Windows 系统代理与网络；也可按 https://shell.canp.ai/docs/wsl-offline.html 使用国内镜像离线安装。';
   return `WSL 安装未完成（退出码 ${code}）。请查看下方系统输出。`;
 }
 export function wslSetupScript(ubuntu: boolean) {
   return `$p=Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\\wsl.exe') -ArgumentList ${wslInstallArguments('--no-launch', ubuntu).map(quote).join(',')} -Verb RunAs -WindowStyle Hidden -Wait -PassThru; Write-Output $p.ExitCode`;
 }
-async function install(ubuntu: boolean): Promise<{ code: number; details: string }> {
+type Progress = (message: string, details?: string) => void;
+async function install(ubuntu: boolean, progress: Progress = () => {}): Promise<{ code: number; details: string }> {
   const system = join(process.env.SystemRoot || 'C:/Windows', 'System32');
   const executable = join(system, 'wsl.exe');
   let help: Buffer;
@@ -58,11 +59,15 @@ async function install(ubuntu: boolean): Promise<{ code: number; details: string
   );
   if (ubuntu && installed) {
     try {
-      const result = await exec(executable, args, {
+      const running = exec(executable, args, {
         encoding: 'buffer',
         windowsHide: true,
         maxBuffer: 4_000_000,
       });
+      let output = Buffer.alloc(0);
+      const update = (chunk: Buffer) => { output = Buffer.concat([output, chunk]).subarray(-24000); progress('Windows 正在安装 Ubuntu', decodeWslOutput(output)); };
+      running.child.stdout?.on('data', update); running.child.stderr?.on('data', update);
+      const result = await running;
       return {
         code: 0,
         details: [result.stdout, result.stderr]
@@ -85,7 +90,7 @@ async function install(ubuntu: boolean): Promise<{ code: number; details: string
           image = join(directory, 'Ubuntu.wsl');
         try {
           const { net } = await import('electron');
-          await downloadUbuntu(image, net.fetch.bind(net) as typeof fetch);
+          await downloadUbuntu(image, net.fetch.bind(net) as typeof fetch, process.arch, (bytes,total) => progress(`正在下载 Ubuntu：${(bytes/1024/1024).toFixed(1)} MiB${total ? ' / '+(total/1024/1024).toFixed(1)+' MiB' : ''}`));
           const installed = await exec(
             executable,
             ['--install', '--from-file', image, '--no-launch'],
@@ -121,6 +126,9 @@ async function install(ubuntu: boolean): Promise<{ code: number; details: string
   const inner = `$ErrorActionPreference='Stop'; try { $p=Start-Process -FilePath ${quote(executable)} -ArgumentList ${args.map(quote).join(',')} -RedirectStandardOutput ${quote(output)} -RedirectStandardError ${quote(error)} -WindowStyle Hidden -Wait -PassThru; exit $p.ExitCode } catch { $_.Exception.Message | Out-File -LiteralPath ${quote(error)} -Encoding utf8; exit 1 }`;
   const encoded = Buffer.from(inner, 'utf16le').toString('base64');
   const outer = `$ErrorActionPreference='Stop'; try { $p=Start-Process -FilePath ${quote(ps)} -ArgumentList '-NoProfile','-NonInteractive','-EncodedCommand','${encoded}' -Verb RunAs -WindowStyle Hidden -Wait -PassThru; Write-Output $p.ExitCode } catch { exit 1 }`;
+  let lastLog='';
+  const pollLog=setInterval(()=>void Promise.all([output,error].map(p=>readFile(p).catch(()=>Buffer.alloc(0)))).then(buffers=>{const log=buffers.map(decodeWslOutput).filter(Boolean).join('\n').slice(-12000);if(log&&log!==lastLog){lastLog=log;progress('Windows 正在配置 WSL',log);}}),1000);
+  pollLog.unref();
   try {
     let stdout: string;
     try {
@@ -159,17 +167,35 @@ async function install(ubuntu: boolean): Promise<{ code: number; details: string
     const code = /^-?\d+$/.test(stdout.trim()) ? Number(stdout.trim()) : -1;
     return { code, details };
   } finally {
+    clearInterval(pollLog);
     // Exact files in a directory created by this operation; never remove an arbitrary tree.
     await Promise.all([output, error].map((p) => rm(p, { force: true }).catch(() => {})));
   }
 }
 export class WslSetup {
+  private lastProgress = 0;
   private state: WslSetupState = { phase: 'idle' };
   constructor(
-    private run: (ubuntu: boolean) => Promise<number | { code: number; details: string }> = install,
+    private run: (ubuntu: boolean, progress: Progress) => Promise<number | { code: number; details: string }> = install,
   ) {}
   snapshot(): WslSetupState {
-    return { ...this.state };
+    return this.state.phase === 'running' && Date.now()-this.lastProgress > 90000 ? {...this.state, message:'安装已超过 90 秒没有新的输出，可能正在等待下载或系统授权。可查看系统输出及国内离线安装指南；尚不能判定安装失败。'} : { ...this.state };
+  }
+  importImage(name:string,image:string,directory:string) {
+    if(this.state.phase==='running')throw Error('请等待当前 WSL 安装完成。');
+    if(!/^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/.test(name))throw Error('发行版名称只能使用字母、数字、点、下划线和短横线。');
+    this.state={phase:'running',message:'正在检查离线镜像与目标目录'};this.lastProgress=Date.now();
+    void (async()=>{
+      if(!(await stat(image)).isFile())throw Error('请选择有效的 rootfs 文件。');
+      if((await readdir(directory)).length)throw Error('目标目录必须为空，已有文件不会被覆盖。');
+      const exe=join(process.env.SystemRoot||'C:/Windows','System32','wsl.exe');
+      const names=decodeWslOutput((await exec(exe,['--list','--quiet'],{encoding:'buffer',windowsHide:true,timeout:15000})).stdout).split(/\r?\n/).map(s=>s.trim().toLowerCase());
+      if(names.includes(name.toLowerCase()))throw Error('此发行版名称已存在，请使用新名称。');
+      this.state={phase:'running',message:'正在导入到所选空目录，请勿关闭安装'};this.lastProgress=Date.now();
+      const result=await exec(exe,['--import',name,directory,image,'--version','2'],{encoding:'buffer',windowsHide:true,maxBuffer:4000000});
+      this.state={phase:'complete',message:'导入完成。刷新后即可打开终端；首次以 root 进入，请按离线指南创建普通用户。',details:decodeWslOutput(result.stdout)};
+    })().catch(e=>{this.state={phase:'error',message:'离线导入未完成：'+e.message};});
+    return this.snapshot();
   }
   start(ubuntu: boolean) {
     if (this.state.phase === 'running') return this.snapshot();
@@ -177,7 +203,8 @@ export class WslSetup {
       phase: 'running',
       message: '正在安装，请稍候；如 Windows 请求管理员授权，请完成授权。',
     };
-    void this.run(ubuntu)
+    this.lastProgress = Date.now();
+    void this.run(ubuntu, (message, details) => { this.lastProgress=Date.now(); this.state={phase:'running',message,details:details ?? this.state.details}; })
       .then((result) => {
         const { code, details } =
           typeof result === 'number' ? { code: result, details: '' } : result;

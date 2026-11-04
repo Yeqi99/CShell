@@ -1,3 +1,4 @@
+import {ProviderFileCopyActions} from './ProviderFileCopyActions';
 import {ErrorNotice} from './ErrorNotice';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {ArrowUp,Check,Copy,Download,File,Folder,FolderPlus,Pencil,RefreshCw,Trash2,Upload,X} from 'lucide-react';
@@ -59,7 +60,7 @@ export function FtpFilePanel({sessionId,closed,transfers}:{sessionId:string;clos
       <form onSubmit={event=>{event.preventDefault();if(!busy)void load(draft);}}><input aria-label="路径" value={draft} disabled={closed} onChange={event=>setDraft(event.target.value)}/></form>
       <button className="icon" aria-label="刷新目录" title="刷新目录" disabled={busy} onClick={()=>void load(path)}><RefreshCw size={16} className={loading?'spin':''}/></button>
       <button className="icon" aria-label="复制路径" title="复制路径" disabled={closed} onClick={()=>void run(()=>window.cshell.copyText(path))}><Copy size={15}/></button></div>
-    <div className="ftp-actions" role="toolbar" aria-label="文件操作">
+    <div className="ftp-actions" role="toolbar" aria-label="文件操作"><ProviderFileCopyActions provider="ftp" sessionId={sessionId} path={path} selected={chosen.length===1?chosen[0]:undefined} disabled={busy} refresh={()=>void load(path)} onError={e=>setError(errorMessage(e))}/>
       <button disabled={busy} onClick={()=>void run(()=>window.cshell.upload(sessionId,path))}><Upload size={15}/>上传文件</button>
       <button disabled={busy||!downloadable} title={chosen.some(entry=>entry.directory)?'FTP 仅支持下载文件，请先进入目录选择文件':'下载所选文件'} onClick={()=>void run(()=>window.cshell.download(sessionId,chosen.map(entry=>entry.path)))}><Download size={15}/>下载</button>
       <button className="icon" aria-label="新建目录" title="新建目录" disabled={busy} onClick={()=>begin('mkdir')}><FolderPlus size={16}/></button>

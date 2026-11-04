@@ -1,5 +1,5 @@
 import { build } from 'esbuild';
-await build({
+await build({define:{__CSHELL_PRO__:"false"},
   entryPoints: ['src/desktop/main.ts'],
   outfile: 'dist/main/main.cjs',
   bundle: true,
@@ -8,7 +8,7 @@ await build({
   external: ['node-pty', 'electron', 'ssh2', '@modelcontextprotocol/sdk', 'selfsigned'],
   sourcemap: true,
 });
-await build({
+await build({define:{__CSHELL_PRO__:"false"},
   entryPoints: ['src/desktop/preload.ts'],
   outfile: 'dist/main/preload.cjs',
   bundle: true,
@@ -17,6 +17,6 @@ await build({
   external: ['electron'],
 });
 
-await build({entryPoints:["src/agent/cli.ts"],outfile:"dist/agent/agent.cjs",bundle:true,platform:"node",format:"cjs",target:"node22",external:["node-pty"]});
+await build({define:{__CSHELL_PRO__:"false"},entryPoints:["src/agent/cli.ts"],outfile:"dist/agent/agent.cjs",bundle:true,platform:"node",format:"cjs",target:"node22",external:["node-pty"]});
 
-await build({entryPoints:['src/cli/entry.ts'],define:{__CSHELL_PRO__:JSON.stringify(process.env.CSHELL_EDITION==='pro')},outfile:'dist/cli/cshell.mjs',bundle:true,platform:'node',format:'esm',target:'node22'});
+await build({define:{__CSHELL_PRO__:"false"},entryPoints:['src/cli/entry.ts'],outfile:'dist/cli/cshell.mjs',bundle:true,platform:'node',format:'esm',target:'node22'});

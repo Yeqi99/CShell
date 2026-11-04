@@ -1,7 +1,7 @@
 {
   "name": "canpshell",
   "productName": "CShell",
-  "version": "0.8.21",
+  "version": "1.0.0",
   "private": true,
   "description": "CanpShell offline-first terminal workbench",
   "author": "CanpShell contributors",

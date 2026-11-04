@@ -21,6 +21,7 @@
 #include <functional>
 #include <iostream>
 #include <mutex>
+#include <memory>
 #include <set>
 #include <sstream>
 #include <thread>
@@ -51,7 +52,9 @@ void bindSystemDesktop(){
  DWORD n=0;GetTokenInformation(token,TokenUser,nullptr,0,&n);std::vector<BYTE> buffer(n);BOOL ok=GetTokenInformation(token,TokenUser,buffer.data(),n,&n);CloseHandle(token);
  if(!ok||!IsWellKnownSid(((TOKEN_USER*)buffer.data())->User.Sid,WinLocalSystemSid))throw std::runtime_error("System desktop worker requires the installed service");
  // Request playback on the already-authorized input desktop; do not change its ACL or token.
- systemDesktop=OpenInputDesktop(0,FALSE,DESKTOP_READOBJECTS|DESKTOP_WRITEOBJECTS|DESKTOP_JOURNALPLAYBACK|DESKTOP_SWITCHDESKTOP);
+ // The optional clipboard owner uses a message-only window on this desktop.
+ // Without CREATEWINDOW capture itself works but clipboard initialization fails.
+ systemDesktop=OpenInputDesktop(0,FALSE,DESKTOP_READOBJECTS|DESKTOP_WRITEOBJECTS|DESKTOP_CREATEWINDOW|DESKTOP_JOURNALPLAYBACK|DESKTOP_SWITCHDESKTOP);
  if(!systemDesktop||!SetThreadDesktop(systemDesktop))throw std::runtime_error("CAPTURE_DESKTOP_UNAVAILABLE");systemWorker=true;
 }
 void checkCaptureDesktop(){
@@ -132,7 +135,10 @@ struct GpuConverter{
 #include "clipboard.hpp"
 struct NativeInput {
  Capture& capture;HANDLE pipe;std::mutex mutex;std::atomic<bool> quitting{false};
- InputState state;std::thread watchdog;DesktopClipboard clipboard;
+ // Clipboard ownership can be unavailable on an otherwise capturable desktop.
+ // Do not acquire its window during capture/input initialization. Failed creation
+ // leaves this empty so a later authorized request can retry after desktop recovery.
+ InputState state;std::thread watchdog;std::unique_ptr<DesktopClipboard> clipboard;
  static std::wstring desktopName(HDESK desktop){
   DWORD bytes=0;GetUserObjectInformationW(desktop,UOI_NAME,nullptr,0,&bytes);
   if(!bytes)throw std::runtime_error("INPUT_DESKTOP_UNAVAILABLE");
@@ -194,12 +200,12 @@ struct NativeInput {
    Sleep(50);
   }});
  }
- json clipboardCommand(const json&c){std::lock_guard<std::mutex> lock(mutex);state.tick(micros()/1000);if(!state.allowed||state.generation!=c.at("generation").get<uint64_t>())throw std::runtime_error("CLIPBOARD_CONTROL_DENIED");checkDesktop();return clipboard.command(c);}
+ json clipboardCommand(const json&c){std::lock_guard<std::mutex> lock(mutex);state.tick(micros()/1000);if(!state.allowed||state.generation!=c.at("generation").get<uint64_t>())throw std::runtime_error("CLIPBOARD_CONTROL_DENIED");checkDesktop();if(!clipboard)clipboard=std::make_unique<DesktopClipboard>();return clipboard->command(c);}
  json command(const json&c,bool initialized){
   std::lock_guard<std::mutex> lock(mutex);const auto op=c.at("op").get<std::string>();
   if(op=="input-grant"){
    if(!initialized)throw std::runtime_error("INPUT_CAPTURE_NOT_READY");checkDesktop();state.grant(InputState::integer(c.at("generation")),micros()/1000);
-  }else if(op=="input-revoke"){state.revoke();clipboard.clear();}else state.apply(c.at("event"),micros()/1000);
+  }else if(op=="input-revoke"){state.revoke();if(clipboard)clipboard->clear();}else state.apply(c.at("event"),micros()/1000);
   return {{"type","input-status"},{"allowed",state.allowed},{"generation",state.generation},{"sequence",state.lastSequence},{"ownedKeys",state.keys.size()},{"ownedButtons",state.buttons.size()}};
  }
  ~NativeInput(){quitting=true;if(watchdog.joinable())watchdog.join();try{state.revoke();}catch(const std::exception&e){std::cerr<<"INPUT_RELEASE_FAILED ownedKeys="<<state.keys.size()<<" ownedButtons="<<state.buttons.size()<<" "<<e.what()<<std::endl;}}

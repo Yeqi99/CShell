@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile, realpath } from 'node:fs/promises';
 import { dirname, join, relative, isAbsolute } from 'node:path';
 import { z } from 'zod';
 import { updateRequest } from './update-request';
+import { openCapabilityDownload } from './capability-download-source';
 import { capabilityDigest, type CapabilityCatalogEntry } from './capability-catalog';
 import { parseCapabilityManifest, verifyCapabilityFiles } from './capability-packages';
 
@@ -32,12 +33,7 @@ export async function stageCapabilityBundle(root:string,entry:CapabilityCatalogE
     const url=new URL(entry.url??'');
     if(url.protocol!=='https:'||url.hostname!=='github.com'||url.username||url.password||url.search||url.hash||!/^\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/releases\/download\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(url.pathname))throw new Error('Expected trusted GitHub release asset');
     // GitHub's signed asset redirect is explicitly constrained; credentials are never forwarded.
-    let response=await download(url,{signal,redirect:'manual'});
-    if([301,302,303,307,308].includes(response.status)){
-      const next=new URL(response.headers.get('location')??'',url);await response.body?.cancel();
-      if(next.protocol!=='https:'||next.hostname!=='release-assets.githubusercontent.com'||next.username||next.password)throw new Error('Unexpected GitHub asset redirect');
-      response=await download(next,{signal,redirect:'error'});
-    }
+    const response=await openCapabilityDownload(entry,download,signal);
     if(!response.ok||!response.body)throw new Error(`Package download failed: ${response.status}`);
     const length=response.headers.get('content-length');if(length&&Number(length)!==entry.bundleBytes){await response.body.cancel();throw new Error('Package download size mismatch');}
     const reader=response.body.getReader(),chunks:Uint8Array[]=[];let size=0;

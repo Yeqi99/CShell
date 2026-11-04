@@ -183,6 +183,11 @@ export class McpService {
     };
   }
   private principal(owner: string, profileId?: string, settings = this.store.mcpSettings()) {
+    if(owner.startsWith('bridge:')){
+      const scoped=/^bridge:([a-f0-9-]{36}):[a-f0-9]{64}$/.exec(owner);
+      if(!scoped||settings.accountBridge?.clientId!==scoped[1])throw new ApiError('FORBIDDEN','Account bridge authorization changed.','Review the account bridge client.');
+      owner=scoped[1];
+    }
     if (owner === 'legacy')
       return profileId && settings.targetPolicies?.[profileId]
         ? { ...settings, ...settings.targetPolicies[profileId] }
@@ -221,6 +226,25 @@ export class McpService {
       this.tokenLoads.delete(owner);
     }
   }
+  /** Authenticated outbound bridge only. Each remote consumer gets isolated sessions/tasks,
+   * while every discovery and execution uses the selected local client's live grants. */
+  async accountBridgeCall(clientId:string,consumer:string,name:string,args:Record<string,unknown>,signal:AbortSignal){
+    z.string().uuid().parse(clientId);z.string().min(32).max(128).parse(consumer);
+    if(!this.status().running||this.store.mcpSettings().accountBridge?.clientId!==clientId)throw Error('Account bridge is disabled');
+    const owner=`bridge:${clientId}:${createHash('sha256').update(consumer).digest('hex')}`;
+    if(!this.ownerSignals.has(owner)&&this.ownerSignals.size>=256)throw Error('Too many API callers');
+    this.principal(owner);signal.throwIfAborted();
+    const endpoint=this.endpoint(owner,signal);
+    if(name==='list_application_tools')return this.discover({...args,level:'contract'},owner);
+    if(name==='describe_application_tool'){
+      const input=z.object({name:z.string().min(1).max(160)}).strict().parse(args);
+      return this.discover({capabilityId:input.name,level:'guide'},owner);
+    }
+    const invocation=name==='invoke_application_tool'?callSchema.parse(args):{name,arguments:args};
+    const result=await endpoint.call(invocation);const value=JSON.parse(result.content[0].text);
+    if(result.isError)throw new ApiError(value.code??'UNAVAILABLE',value.message??'Operation failed',value.nextAction??'Review local MCP permissions.');
+    return value;
+  }
   async rotateToken(clientId?: string) {
     return this.transition(async () => {
       if (clientId !== undefined) {
@@ -232,17 +256,11 @@ export class McpService {
       await this.store.setMcpToken(token, clientId);
       if (!clientId) return this.startNow();
       this.clientTokens.set(clientId, token);
-      this.ownerSignals
-        .get(clientId)
-        ?.abort(
-          new ApiError('CANCELLED', 'Client token rotated.', 'Reconnect with the new token.'),
-        );
-      this.tasks.revoke(clientId);
-      this.ownerSignals.delete(clientId);
-      this.dropCatalog(clientId);
+      const affected=(owner:string)=>owner===clientId||owner.startsWith(`bridge:${clientId}:`);
+      for(const [owner,controller]of this.ownerSignals){if(!affected(owner))continue;controller.abort(new ApiError('CANCELLED','Client token rotated.','Reconnect with the new token.'));this.tasks.revoke(owner);this.ownerSignals.delete(owner);this.dropCatalog(owner);}
       await Promise.allSettled(
         [...this.connections.keys()]
-          .filter((id) => this.sessionOwners.get(id) === clientId)
+          .filter((id) => affected(this.sessionOwners.get(id)??''))
           .map(async (id) => {
             this.dropCatalog(`${clientId}:${id}`);
             await this.manager.disconnect(id);

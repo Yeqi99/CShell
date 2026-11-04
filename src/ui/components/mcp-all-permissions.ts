@@ -1,4 +1,4 @@
-import { apiCapabilitySchema, type McpSettings, type Profile } from '../../shared/contracts';
+import { apiApplicationCapabilities, apiCapabilitySchema, type McpSettings, type Profile } from '../../shared/contracts';
 import type { LocalShell } from '../../shared/local-terminal';
 
 /** Explicit global action, applied only when the settings draft is saved. */
@@ -8,7 +8,7 @@ export function selectAllMcpPermissions(settings: McpSettings, profiles: Profile
     allowedLocalShells: [...new Set(shells)],
     allowCommands: true,
     capabilities: [...apiCapabilitySchema.options],
-    applicationCapabilities: ['plugins.read', 'plugins.manage', 'connections.read', 'connections.manage', 'credentials.manage', 'identity.trust', 'http.use'] as NonNullable<McpSettings['applicationCapabilities']>,
+    applicationCapabilities: [...apiApplicationCapabilities],
     review: 'authorized' as const,
     targetPolicies: {},
   };

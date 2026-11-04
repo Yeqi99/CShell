@@ -1,3 +1,4 @@
+import {DirectFileTransfer} from './file-transfer';
 import {executeHttp} from '../core/http-transport';
 import {AgentNetworkProxy} from './network-proxy';
 import {modelTransport} from './model-request';
@@ -35,10 +36,13 @@ import { AgentApplicationService } from './applications';
 import { CagentAutomation } from './automation';
 import { createManagedWechatCapability } from './managed-wechat-capability';
 import { managedWechatCatalog } from './managed-wechat-catalog';
+import { runningWechatVersions, selectWechatMarket, requireWechatVersion } from './wechat-market';
 import { CagentAssistant } from './assistant';
 import { CapabilityRuntime } from './capability-runtime';
 import { createDesktopCapability } from './desktop-capability';
 import { version as agentVersion } from '../../package.json';
+import {submitFeedback} from '../shared/feedback-submit';
+import {redactFeedback,feedbackDiagnostic} from '../shared/feedback';
 import { agentMethods } from '../shared/agent';
 import { SafeAgentUpdate } from './safe-update';
 
@@ -112,6 +116,7 @@ export async function createAgentRuntime(
     canImportLegacy = false;
   }
   let server: ClientServer;
+  const directFiles=new DirectFileTransfer(files,()=>vault.identity(),owner=>!updateAdmissionClosed&&(owner==='local'||server.managementAllowed(owner)));
   const terminal = options.terminal ?? new AgentTerminalProvider((event) => server.event(event));
   terminal.setUpdateGuard(()=>updateAdmissionClosed);
   const shells = async () =>
@@ -121,6 +126,8 @@ export async function createAgentRuntime(
       ...(s.distribution ? { distribution: s.distribution } : {}),
     }));
   server = new ClientServer(vault, terminal, {
+    fileTransferReset:()=>directFiles.close(),
+    fileTransfer:(input,recipient,signal)=>directFiles.read(input,recipient,signal),
     http:(request,signal)=>executeHttp(request,signal,networkProxy.configured?(host,port,abort)=>networkProxy.open(host,port,abort):undefined,65536),
     manage: (method, params, signal, owner) => dispatch(method, params, signal, false, owner),
     desktopStream: async (socket,owner) => {if(updateAdmissionClosed){socket.destroy();return;}await desktop.service.acceptAuthenticated(socket,owner);},
@@ -276,6 +283,12 @@ export async function createAgentRuntime(
   ): Promise<unknown> {
     signal.throwIfAborted();
     if (closed) throw new Error('Agent 已关闭');
+    if(method==='feedback.preview'||method==='feedback.submit'){
+      if(!local)throw Error('反馈只允许本机主动提交');
+      const data=z.object({id:z.string().uuid(),message:z.string().max(6000),contact:z.string().max(254).optional(),diagnostic:z.string().max(12000).optional()}).strict().parse(params);
+      const body={...data,message:redactFeedback(data.message),contact:data.contact?redactFeedback(data.contact):undefined,diagnostic:data.diagnostic?feedbackDiagnostic(data.diagnostic):undefined,version:agentVersion,platform:process.platform};
+      return method==='feedback.preview'?body:submitFeedback(body,(input,init)=>networkProxy.configured?networkProxy.fetch(input,init):fetch(input,init));
+    }
     if(method.startsWith('update.')){
       if(!local)throw new Error('更新只允许在本机执行');
       if(method==='update.commit'){
@@ -315,6 +328,7 @@ export async function createAgentRuntime(
       if(method==='visual.close')return visual.close(owner);
       throw new Error('未知可视化操作');
     }
+    if(method.startsWith('files.transfer')){if(!admin)throw Error('未授权远程管理');return directFiles.manage(method,params,owner,signal);}
     if(method.startsWith('files.')){if(!admin)throw new Error('未授权远程管理');return files.call(method,params,owner,signal);}
     if(method==='connection.autostart'){if(!admin)throw new Error('未授权远程管理');return setStartup(z.object({enabled:z.boolean()}).strict().parse(params).enabled);}
     if(method==='connection.settings') {
@@ -367,7 +381,7 @@ export async function createAgentRuntime(
     }
     if(method.startsWith('packages.')){
       if(!local&&(owner==='local'||!server.managementAllowed(owner)))throw new Error('未授权控制端管理能力包');
-      if(method==='packages.catalog')return packages.catalog();
+      if(method==='packages.catalog')return selectWechatMarket(packages.catalog(),await runningWechatVersions().catch(()=>[]));
       if(method==='packages.list')return packages.list();
       if(method==='packages.tools')return packages.tools();
       if(method==='packages.invoke'){
@@ -376,7 +390,7 @@ export async function createAgentRuntime(
         try{return await packages.invoke(params,owner,AbortSignal.any([signal,controller.signal]));}finally{clearInterval(guard);}
       }
       if(!admin)throw new Error('未授权管理能力包');
-      if(method==='packages.install')return packages.install(params,signal);
+      if(method==='packages.install'){const id=z.object({id:z.string()}).parse(params).id;if(id.startsWith('cagent.wechat.v'))requireWechatVersion(id,await runningWechatVersions());const result=await packages.install(params,signal);return result;}
       if(method==='packages.grant')return packages.grant(params);
       if(method==='packages.uninstall')return packages.uninstall(params);
       if(method==='packages.refresh')return packages.refresh(params);
@@ -653,7 +667,7 @@ export async function createAgentRuntime(
     const failures:unknown[]=[];
     // A failed optional service must not leave the authenticated control socket
     // or listener half alive when an update needs to restore the old runtime.
-    for(const stop of [()=>lanRegistration.close(),()=>visual.dispose(),()=>files.close(),()=>networkProxy.dispose(),()=>browserNetwork.close(),()=>coding.close(),()=>ide.close(),
+    for(const stop of [()=>lanRegistration.close(),()=>visual.dispose(),()=>{directFiles.close();return files.close();},()=>networkProxy.dispose(),()=>browserNetwork.close(),()=>coding.close(),()=>ide.close(),
       ()=>managedScripts.close(),()=>automation.close(),()=>assistant.close(),()=>control?.close(),()=>mutation,()=>packages.dispose(),...managedWechat.map(pack=>()=>pack.shutdown()),()=>wechat?.shutdown(),()=>desktop.shutdown(),
       ()=>applications.dispose(),()=>wsl.dispose(),()=>hosting.dispose(),()=>reverseRelay.stop(),()=>relay.stop(),()=>server.stop(),
       ()=>terminal.dispose(),()=>vault.flush(),()=>options.onClose?.()])try{await stop();}catch(error){failures.push(error);}

@@ -31,3 +31,14 @@
 @container(max-width:600px){.agent-machine>header{padding:14px 16px}.machine-panel{padding:16px}.agent-machine>header>nav button{padding:8px 10px}.machine-files-toolbar{flex-wrap:wrap}.machine-files-toolbar form{flex-basis:100%}}
 .machine-assistant pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:260px;overflow:auto;padding:12px;background:var(--field);border-radius:8px}.machine-assistant details{margin:12px 0}.agent-applications>.form-error{overflow-wrap:anywhere}
 .machine-device-status h3{font-size:16px;margin:0 0 16px}.machine-device-status dl{display:grid;grid-template-columns:minmax(100px,auto) minmax(0,1fr);gap:16px 24px;max-width:680px;margin-top:24px;font-size:13px;line-height:1.6}.machine-device-status dt{color:var(--muted)}.machine-device-status dd{margin:0;overflow-wrap:anywhere}@container(max-width:420px){.machine-device-status dl{grid-template-columns:1fr;gap:4px}.machine-device-status dd{margin-bottom:12px}}
+.machine-files-toolbar{flex-wrap:wrap;overflow:visible;gap:6px;margin-bottom:10px;padding:2px}
+.machine-files-toolbar select{max-width:160px;min-width:100px}
+.machine-files-toolbar form{flex:1 1 200px;min-width:120px}
+.machine-file-tool-divider{height:20px;width:1px;background:var(--border);margin-inline:4px}
+.machine-file-transfer{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;padding:10px 12px;background:var(--panel);border-radius:8px;margin-block:8px}
+.machine-file-transfer>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.machine-file-transfer progress{grid-column:1/-1;width:100%;height:4px;accent-color:var(--accent)}.machine-file-transfer small{grid-column:1/-1;color:var(--muted)}
+.machine-file-copy-actions{display:inline-flex;gap:6px;flex-shrink:0}.machine-files-toolbar button{border:1px solid var(--border,#d9e2ee);background:var(--panel,#f8fafc);color:inherit}.machine-files-toolbar button:hover:not(:disabled){background:var(--accent-soft,#eaf2ff);border-color:var(--accent,#2671ed)}.machine-files-toolbar button:disabled{opacity:.4}.machine-files-toolbar .machine-file-copy-actions button{width:34px;height:34px}
+
+.provider-copy-controls{display:inline-flex;align-items:center;gap:6px;min-width:0;flex-wrap:wrap}.provider-copy-controls>[role="status"]{font-size:11px;white-space:nowrap;color:var(--muted)}
+
+.machine-copy-receipt{font-size:12px;margin:8px 0;color:var(--muted)}.machine-copy-receipt code{display:block;overflow-wrap:anywhere;margin:6px 0}.provider-copy-controls>small{max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

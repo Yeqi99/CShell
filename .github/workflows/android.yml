@@ -34,6 +34,10 @@ jobs:
         with:
           gradle-version: '8.13'
       - run: pnpm install --frozen-lockfile
+      - name: Build pinned TCP VPN engine
+        run: |
+          sdkmanager "ndk;27.3.13750724"
+          ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.3.13750724" node scripts/prepare-android-vpn.mjs
       - run: node scripts/build-android.mjs
       - run: pnpm exec tsc -p android/web/tsconfig.json
       - name: Verify bounded local file streams
@@ -75,6 +79,10 @@ jobs:
           gradle-version: '8.13'
       - run: pnpm install --frozen-lockfile
       - run: node scripts/prepare-pty.mjs
+      - name: Build pinned TCP VPN engine
+        run: |
+          sdkmanager "ndk;27.3.13750724"
+          ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.3.13750724" node scripts/prepare-android-vpn.mjs
       - run: node scripts/build-android.mjs
       - run: gradle -p android assembleDebug assembleDebugAndroidTest
       - name: Enable emulator acceleration

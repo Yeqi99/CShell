@@ -22,6 +22,7 @@ const result = await build({
   platform: 'node',
   format: 'cjs',
   bundle: true,
+  define: { __CSHELL_PRO__: "false" },
   target: 'node22',
   external: ['node-pty'],
   metafile: true,

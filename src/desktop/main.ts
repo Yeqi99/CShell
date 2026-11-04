@@ -51,6 +51,7 @@ import { MonitorWindows } from './monitor-windows';
 import { registerExtensionHandlers } from './extensions';
 import { createExtensionServices } from '../core/api/extensions';
 import { registerUpdateHandlers } from './updates';
+import {registerFeedback} from './feedback';
 import {LocalClipboard} from './local-clipboard';
 import { initialWindowBounds } from './window-bounds';
 import { registerAiHandlers } from './ai';
@@ -503,6 +504,7 @@ else
       handle('desktop-look:save',(id,value)=>desktopLooks.save(id,value));
       registerAppearanceHandlers(handle, window, app.getPath('userData'), consume, text);
       registerUpdateHandlers(handle, window);
+      registerFeedback(handle);
       registerUsage(handle, window);
       const classroomEnabled=()=>store.plugins().some(p=>p.manifest.id==='cshell.classroom'&&p.enabled);
       enrollment=new AgentLanEnrollment({sources:()=>agentLan.status().sources,enabled:classroomEnabled,probe:endpoint=>clientProvider.probe(endpoint),pair:async(info,password)=>{const device=await clientProvider.pairPassword(info,password);await syncClientProfiles(store,[device]);return device;}});
@@ -618,13 +620,14 @@ else
         if (event.type === 'state' && event.reason) diagnostics.record('desktop.' + event.state, event.reason);
         if (!window.isDestroyed()) window.webContents.send('desktop:view-event', event);
         monitorWindows.publish('desktop:view-event', event);
-      }, linuxWorkspace, transfer => emit({type:'transfer',transfer}));
+      }, linuxWorkspace, transfer => emit({type:'transfer',transfer}),{ssh,ftp});
       machineBrowser.setAgentTransport(agent.browserTarget);
       connections.tools.registerToolSource('cshell.visual',visualCapabilities,visualToolSource({
         browser:(id,action,input,signal,guard)=>machineBrowser.automation(connections.tools.describe(id).providerId==='cshell.client'?'agent-session:'+id:id,action,input,signal,guard),
         desktop:(id,action,input,signal,guard)=>agent.desktopTool(id,action,input,signal,guard),
       }));
       let identityNetwork:IdentityNetwork|undefined;
+
       const disposeAi = await registerAiHandlers(
         handle,
         app.getPath('userData'),
@@ -863,6 +866,16 @@ else
         return true;
       });
       handle('local-terminal:wsl-install-status', () => wslSetup.snapshot());
+      handle('local-terminal:wsl-import', async (input) => {
+        if(process.platform!=='win32'||!store.snapshot().plugins.some(p=>p.enabled&&p.manifest.id==='cshell.wsl'))throw Error('请先启用 WSL 插件。');
+        const name=z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/).parse(input);
+        if(wslSetup.snapshot().phase==='running')throw Error('请等待当前 WSL 安装完成。');
+        const image=await dialog.showOpenDialog({title:'选择已下载的 WSL rootfs 镜像',properties:['openFile'],filters:[{name:'Linux rootfs',extensions:['tar','gz','xz']}]});
+        if(image.canceled)return wslSetup.snapshot();
+        const directory=await dialog.showOpenDialog({title:'选择安装目录（必须为空）',properties:['openDirectory','createDirectory']});
+        if(directory.canceled)return wslSetup.snapshot();
+        return wslSetup.importImage(name,image.filePaths[0],directory.filePaths[0]);
+      });
       handle('local-terminal:wsl-install', (ubuntu) => {
         if (
           process.platform !== 'win32' ||
