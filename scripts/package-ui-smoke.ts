@@ -15,6 +15,10 @@ try{
  await page.getByRole('heading',{name:'工作台',exact:true}).waitFor();
  await page.evaluate(async()=>{const c=await window.cshell.config();await window.cshell.preferences({...c.preferences,locale:'en-US',workbenchView:'visual'});});await page.reload();
  await page.locator('[data-desktop-icon="connections"]').waitFor();
+ await page.getByRole('heading',{name:'Workspace',exact:true}).first().waitFor();
+ for(const name of ['Overview','Command line','Visual'])await page.getByRole('tab',{name,exact:true}).waitFor();
+ if(identity.name==='CShell Pro'){const account=page.getByRole('button',{name:'Account and membership',exact:true});assert.equal((await account.innerText()).trim(),'Sign in');}
+
  assert.equal((await page.locator('[data-desktop-icon="connections"]').innerText()).trim(),'Connections & views');
  assert.equal((await page.locator('[data-desktop-icon="preferences"]').innerText()).trim(),'Preferences');
  await page.locator('.linux-desktop').evaluate(el=>{(el as HTMLElement).style.width='320px';});
