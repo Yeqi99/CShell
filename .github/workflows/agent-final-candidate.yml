@@ -1,7 +1,5 @@
-name: core final CAgent candidates
+name: 1.0 agent candidates (no publication)
 on:
-  push:
-    branches: ['codex/agent-core-0.8.20-final']
   workflow_dispatch:
 permissions:
   contents: read
@@ -11,15 +9,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {os: macos-latest, platform: mac, arch: arm64}
-          - {os: macos-15-intel, platform: mac, arch: x64}
-          - {os: ubuntu-24.04, platform: linux, arch: x64}
-          - {os: ubuntu-24.04-arm, platform: linux, arch: arm64}
+          - {os: windows-latest, platform: win, arch: x64, edition: opensource}
+          - {os: macos-latest, platform: mac, arch: arm64, edition: opensource}
+          - {os: macos-15-intel, platform: mac, arch: x64, edition: opensource}
+          - {os: ubuntu-24.04, platform: linux, arch: x64, edition: opensource}
+          - {os: ubuntu-24.04-arm, platform: linux, arch: arm64, edition: opensource}
     runs-on: ${{ matrix.os }}
     env:
-      CSHELL_EDITION: opensource
+      CSHELL_EDITION: ${{ matrix.edition }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
           version: 11.25.0
@@ -28,20 +29,35 @@ jobs:
           node-version: 24.19.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: node scripts/verify-1.0-candidate.mjs
+      - run: pnpm exec tsx --test tests/agent-build-edition.test.ts tests/agent-installed-launcher.test.ts
+      - if: matrix.platform == 'win'
+        name: Prepare checksum-pinned desktop compiler
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'llvm-mingw.zip'
+          Invoke-WebRequest 'https://github.com/mstorsjo/llvm-mingw/releases/download/20261006/llvm-mingw-20261006-ucrt-x86_64.zip' -OutFile $archive
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne '317492c456aa27ee607a5919f1d2d38dcdc1112516a24d0bf4b00d078f52d17a') { throw 'Compiler checksum mismatch' }
+          Expand-Archive -LiteralPath $archive -DestinationPath $env:RUNNER_TEMP
+          "CAGENT_NATIVE_CXX=$env:RUNNER_TEMP/llvm-mingw-20261006-ucrt-x86_64/bin/x86_64-w64-mingw32-clang++.exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - run: node scripts/prepare-pty.mjs
       - run: pnpm exec tsc --noEmit
       - name: Verify account restoration and safe portable configuration
         run: pnpm exec tsx --test --test-timeout=120000 --test-concurrency=2 tests/agent-capability-runtime.test.ts tests/cagent-update.test.ts tests/cagent-update-body-recovery.test.ts tests/update-source-fallback.test.ts
       - name: Build standalone CAgent on its native architecture
         run: node scripts/agent-build.mjs
+      - run: node scripts/verify-1.0-candidate.mjs --agent
       - name: Verify real native PTY and TLS using the packaged runtime
         run: pnpm exec tsx scripts/agent-package-smoke.ts
       - name: Package and verify archive contents
         run: node scripts/package-agent.mjs
       - uses: actions/upload-artifact@v4
         with:
-          name: core-cagent-${{ matrix.platform }}-${{ matrix.arch }}
+          name: 1.0-${{ matrix.edition }}-cagent-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
-            release/0.8.20/CAgent-0.8.20-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz
-            release/0.8.20/CAgent-0.8.20-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz.sha256
+            release/1.0.0/CAgent-1.0.0-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz
+            release/1.0.0/CAgent-1.0.0-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz.sha256
+            release/1.0.0/CAgent-Setup-1.0.0-win-x64.exe
+            release/1.0.0/CAgent-Setup-1.0.0-win-x64.exe.sha256
           if-no-files-found: error
+

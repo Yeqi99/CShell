@@ -1,7 +1,5 @@
-name: Core final desktop candidates
+name: 1.0 desktop candidates (no publication)
 on:
-  push:
-    branches: ['codex/desktop-core-0.8.20-final']
   workflow_dispatch:
 permissions:
   contents: read
@@ -11,13 +9,19 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: macos-latest, platform: mac, arch: arm64 }
-          - { os: macos-15-intel, platform: mac, arch: x64 }
-          - { os: ubuntu-latest, platform: linux, arch: x64 }
-          - { os: ubuntu-24.04-arm, platform: linux, arch: arm64 }
+          - {os: windows-latest, platform: win, arch: x64, edition: opensource}
+          - {os: macos-latest, platform: mac, arch: arm64, edition: opensource}
+          - {os: macos-15-intel, platform: mac, arch: x64, edition: opensource}
+          - {os: ubuntu-24.04, platform: linux, arch: x64, edition: opensource}
+          - {os: ubuntu-24.04-arm, platform: linux, arch: arm64, edition: opensource}
     runs-on: ${{ matrix.os }}
+    env:
+      CSHELL_EDITION: ${{ matrix.edition }}
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
           version: 11.25.0
@@ -26,141 +30,28 @@ jobs:
           node-version: 24.19.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Prepare the native PTY dependency for this runner
-        run: node scripts/prepare-pty.mjs
-      - run: pnpm build
-      - run: pnpm test
-        timeout-minutes: 8
-      - if: matrix.platform == 'win'
-        name: Verify cancelled update and concurrent editor reload
-        run: |
-          pnpm exec tsx scripts/update-lifecycle-smoke.ts
-          pnpm exec tsx scripts/text-reload-race-smoke.ts
-      - if: matrix.platform == 'win'
-        run: pnpm exec tsx scripts/ai-ui-smoke.ts
-      - if: matrix.platform == 'win'
-        name: Verify draft persistence recovery and per-conversation warnings
-        run: pnpm exec tsx scripts/ai-draft-recovery-smoke.ts
-      - if: matrix.platform == 'win'
-        name: Verify settings preview and layout update convergence
-        run: |
-          pnpm exec tsx scripts/settings-preview-race-smoke.ts
-          pnpm exec tsx scripts/machine-tools-layout-smoke.ts
-          node scripts/test-native-desktop-ui.cjs
-      - if: matrix.platform == 'win'
-        name: Verify terminal parser UI update convergence
-        run: |
-          pnpm exec tsx scripts/terminal-parsed-race-smoke.ts
-          pnpm exec tsx scripts/terminal-stability-smoke.ts
-      - if: matrix.platform == 'win'
-        run: pnpm exec tsx scripts/activity-smoke.ts
-      - if: matrix.platform == 'win'
-        name: Verify OpenCode catalog and hidden terminal layout
-        run: |
-          pnpm exec tsx scripts/opencode-catalog-smoke.ts
-          pnpm exec tsx scripts/terminal-measurement-smoke.ts
-          pnpm exec tsx scripts/ssh-visual-activity-smoke.ts
-      - if: matrix.platform == 'win'
-        name: Verify compact workbench and desktop layouts
-        run: |
-          pnpm exec tsx scripts/workbench-layout-smoke.ts
-          pnpm exec tsx scripts/monitor-layout-smoke.ts
-          pnpm exec tsx scripts/opencode-pane-smoke.ts
-          pnpm exec tsx scripts/desktop-compact-ui-smoke.ts
-          pnpm exec tsx scripts/monitor-views-smoke.ts
-          pnpm exec tsx scripts/monitor-ai-electron-smoke.ts
-          pnpm exec tsx scripts/ai-view-smoke.ts
-      - run: pnpm run licenses
-      - if: matrix.platform == 'win'
-        name: Prepare checksum-pinned desktop compiler
-        shell: pwsh
-        run: |
-          $archive = Join-Path $env:RUNNER_TEMP 'llvm-mingw.zip'
-          Invoke-WebRequest 'https://github.com/mstorsjo/llvm-mingw/releases/download/20261006/llvm-mingw-20261006-ucrt-x86_64.zip' -OutFile $archive
-          if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne '317492c456aa27ee607a5919f1d2d38dcdc1112516a24d0bf4b00d078f52d17a') { throw 'Compiler checksum mismatch' }
-          Expand-Archive -LiteralPath $archive -DestinationPath $env:RUNNER_TEMP
-          "CAGENT_NATIVE_CXX=$env:RUNNER_TEMP/llvm-mingw-20261006-ucrt-x86_64/bin/x86_64-w64-mingw32-clang++.exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-      - uses: actions/setup-python@v5
-        if: runner.os == 'Windows'
-        with:
-          python-version: '3.12'
-          architecture: 'x64'
-      - if: matrix.platform == 'win'
-        run: pnpm test:desktop
-      - if: matrix.platform == 'win'
-        run: pnpm exec tsx scripts/minimal-pin-smoke.ts
-      - if: matrix.platform == 'win'
-        run: pnpm exec tsx scripts/refinement-smoke.ts
-      - if: matrix.platform == 'win'
-        run: pnpm exec tsx scripts/saved-connect-smoke.ts
-      - if: matrix.platform == 'win'
-        name: Verify native RDP surface lifecycle
-        run: pnpm exec tsx scripts/rdp-surface-smoke.ts
-      - if: matrix.platform == 'win'
-        run: pnpm exec tsx scripts/connection-lifecycle-smoke.ts
-      - if: matrix.platform == 'win'
-        run: pnpm exec tsx scripts/terminal-focus-race-smoke.ts
-      - if: matrix.platform == 'win'
-        run: pnpm exec tsx scripts/ai-work-smoke.ts
-      - if: matrix.platform == 'win'
-        run: pnpm exec tsx scripts/ai-exit-smoke.ts
-      - if: matrix.platform == 'win'
-        run: ./scripts/windows-shortcut-smoke.ps1
-      - if: matrix.platform == 'win'
-        run: pnpm exec tsx scripts/mcp-startup-smoke.ts
-      - if: matrix.platform == 'win'
-        run: pnpm exec tsx scripts/settings-smoke.ts
-      - if: matrix.platform == 'win'
-        run: pnpm exec tsx scripts/floating-smoke.ts
-      - if: matrix.platform == 'win'
-        run: pnpm exec tsx scripts/extraction-smoke.ts
-      - if: matrix.platform == 'win'
-        run: pnpm exec tsx scripts/update-smoke.ts
-      - if: matrix.platform == 'win'
-        run: pnpm exec tsx scripts/http-agent-smoke.ts
-      - if: matrix.platform == 'win'
-        run: |
-          node scripts/build-android.mjs
-          pnpm exec tsx scripts/mobile-smoke.ts
-          pnpm exec tsx scripts/mobile-apps-smoke.ts
-          pnpm exec tsx scripts/mobile-app-lifecycle-smoke.ts
-          pnpm exec tsx scripts/mobile-ssh-workspace-smoke.ts
-          pnpm exec tsx scripts/browser-lifecycle-smoke.ts
-          pnpm exec tsx scripts/ide-launch-smoke.ts
-      - run: pnpm exec electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish never
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - run: node scripts/verify-1.0-candidate.mjs
+      - run: pnpm exec tsx --test tests/agent-build-edition.test.ts tests/agent-installed-launcher.test.ts
+      - run: node scripts/prepare-pty.mjs
+      - run: pnpm exec tsc --noEmit
+      - run: pnpm exec tsx --test tests/agent-relay.test.ts tests/updates.test.ts tests/portable-update.test.ts tests/posix-agent-update.test.ts
+      - name: Verify preference persistence, classroom merges and extension cleanup
+        run: pnpm exec tsx --test --test-concurrency=1 tests/cagent-update-settings.test.ts tests/managed-environment-save.test.ts tests/classroom-proxy.test.ts tests/process-extension-close.test.ts tests/process-extensions.test.ts
+      - name: Verify hosting startup deadline and real worker cleanup
+        run: pnpm exec tsx --test --test-concurrency=1 tests/hosting-startup-deadline.test.ts tests/agent-hosting.test.ts
+      - run: pnpm exec vite build && node scripts/build.mjs
+      - if: matrix.edition == 'opensource'
+        run: pnpm exec electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish never
       - if: matrix.platform == 'mac'
         name: Verify in-place DMG update
         run: pnpm exec tsx scripts/mac-update-smoke.ts
-      - if: matrix.platform == 'mac'
-        name: Verify CAgent desktop viewer on macOS
-        run: |
-          pnpm exec playwright install chromium
-          pnpm exec tsx scripts/desktop-view-race-smoke.ts
-          pnpm exec tsx scripts/desktop-fullscreen-smoke.ts
-          pnpm exec tsx scripts/desktop-compact-ui-smoke.ts
-      - if: matrix.platform != 'linux'
-        run: pnpm exec tsx scripts/platform-package-smoke.ts
-      - if: matrix.platform == 'linux'
-        name: Verify packaged Linux application on its native architecture
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb gnome-keyring libsecret-1-0 libsecret-tools
-          dbus-run-session -- xvfb-run -a bash scripts/linux-package-smoke.sh
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: verification-${{ matrix.platform }}-${{ matrix.arch }}
-          path: test-results/*.png
       - uses: actions/upload-artifact@v4
         with:
-          name: desktop-${{ matrix.platform }}-${{ matrix.arch }}
-          if-no-files-found: error
+          name: 1.0-${{ matrix.edition }}-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
-            release/*/*.exe
-            release/*/*.dmg
-            release/*/*.zip
-            release/*/*.AppImage
-            release/*/*.deb
+            release/**/*.dmg
+            release/**/*.AppImage
+            release/**/*.deb
+            release/**/*.exe
+          if-no-files-found: error
 

@@ -1,17 +1,21 @@
-name: core 0.8.21 android candidate
+name: 1.0 android candidates (no publication)
 on:
-  push:
-    branches: ['codex/release-core-0.8.21']
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   android:
+    strategy:
+      fail-fast: false
+      matrix:
+        edition: [opensource]
     runs-on: ubuntu-latest
     env:
-      CSHELL_EDITION: opensource
+      CSHELL_EDITION: ${{ matrix.edition }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
           version: 11.25.0
@@ -27,6 +31,7 @@ jobs:
         with:
           gradle-version: '8.13'
       - run: pnpm install --frozen-lockfile
+      - run: node scripts/verify-1.0-candidate.mjs
       - run: pnpm exec tsc --noEmit -p android/web/tsconfig.json
       - name: Build pinned TCP VPN engine
         run: |
@@ -50,10 +55,11 @@ jobs:
         run: |
           mkdir -p candidate-artifacts
           VERSION=$(node -p 'require("./package.json").version')
-          cp android/app/build/outputs/apk/release/app-release.apk "candidate-artifacts/CShell-${VERSION}-android.apk"
+          cp android/app/build/outputs/apk/release/app-release.apk "candidate-artifacts/CShell-${CSHELL_EDITION}-${VERSION}-android.apk"
           sha256sum candidate-artifacts/*.apk > candidate-artifacts/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: core-android-candidate
+          name: 1.0-${{ matrix.edition }}-android-candidate
           if-no-files-found: error
           path: candidate-artifacts/*
+
