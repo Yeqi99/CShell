@@ -15,6 +15,7 @@ import java.util.concurrent.*;
 public final class AndroidAgentService extends Service {
   static final String CHANGED="org.canpshell.mobile.CAGENT_STATUS",STOP="org.canpshell.mobile.CAGENT_STOP";
   private static volatile AndroidAgentService current;
+  static AndroidNetworkProxy networkProxy() throws java.io.IOException {AndroidAgentService live=current;if(live==null||!live.hostReady||live.host==null)throw new java.io.IOException("CAgent network service unavailable");return live.host.networkProxy;}
   private static volatile String lastError="";
   private static volatile boolean starting;
   private final ExecutorService worker=Executors.newSingleThreadExecutor();
