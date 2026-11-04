@@ -21,7 +21,7 @@ try{
  await page.getByRole('alert').waitFor();await page.getByRole('button',{name:'重试'}).click();assert.ok(await page.evaluate(()=>(window as any).retried));
  await page.getByText('诊断详情',{exact:true}).click();await page.getByRole('button',{name:'复制内容'}).click();assert.equal(await page.evaluate(()=>(window as any).copied),'AI API HTTP 503');
  await page.getByText('反馈问题或建议',{exact:true}).click();
- const description=page.locator('.feedback-fields textarea');
+ const description=page.getByLabel('问题描述',{exact:true});
  await description.fill('点击更新后失败 password=private-test');
  await page.getByLabel('附带以下错误代码',{exact:true}).check();
  assert.ok(!(await page.locator('.feedback-preview').innerText()).includes('private-test'));
