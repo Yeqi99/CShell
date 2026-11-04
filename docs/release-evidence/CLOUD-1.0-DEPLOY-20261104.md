@@ -15,9 +15,16 @@
 - admin 静态文件已更新，原目录备份 `/opt/cshell-web-stage/admin-before-1.0`。
 - 使用实际 CShell User-Agent 经公网匿名提交两次同 ID 测试反馈，管理员认证读取只出现一次。测试记录 `f5b40377-09ba-4084-aaea-f588e2bbbecf`，明确标记部署验收而非用户投诉。Python 默认 User-Agent 被公网 403 拒绝，实际应用 User-Agent 成功。
 
+## 真实 HTTPS MCP 验收
+
+- 使用本机当前登录账号，通过正常账户 API 注册临时只读 bridge 和仅含 list_servers_page 的专用客户端；令牌只在进程内，未输出。
+- 真实 MCP SDK StreamableHTTPClientTransport 连接 `https://shell.canp.ai/mcp`，同一 session 两次读取授权服务器目录，间隔 12 秒，跨过网关周期权限检查。实际 bridge 请求转发本机已授权 MCP，并检查 HTTP 成功、无错误、返回 result 存在。未修改本机授权范围。
+- 撤销临时客户端后，同一 SDK 连接再次 listTools 被拒绝；finally 撤销客户端并移除临时 bridge。上述流程重复验收通过。
+- 原账号当时没有活动 bridge；该验收使用独立只读验收桥接进程，不能声称已替用户启用安装版应用的常驻账号桥接设置。
+
 ## 尚待验收
 
-- 已部署网关尚需真实账号专用 MCP 客户端令牌和活动桌面 bridge 执行 SDK 长连接、计量及重连，不得仅凭未认证 401 宣称全部通过。
+- HTTPS SDK 会话及撤销已验证；长时间负载、跨月计量及实际安装版账号桥接配置仍需后续验证。
 - canp.site 专用 DNS 令牌文件仍不存在；未执行真实 DNS 写入或 HTTPS 建站验收。
 - 服务启动及本机健康验证不能代替实际用户中继流量验收；应继续真实连接测试。
 
