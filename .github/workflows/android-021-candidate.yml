@@ -33,6 +33,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: node scripts/verify-1.0-candidate.mjs
       - run: pnpm exec tsc --noEmit -p android/web/tsconfig.json
+      - uses: android-actions/setup-android@v3
       - name: Build pinned TCP VPN engine
         run: |
           sdkmanager "ndk;27.3.13750724"
@@ -62,4 +63,5 @@ jobs:
           name: 1.0-${{ matrix.edition }}-android-candidate
           if-no-files-found: error
           path: candidate-artifacts/*
+
 
