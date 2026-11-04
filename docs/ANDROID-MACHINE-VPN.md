@@ -37,3 +37,9 @@ gradle -p android assembleDebug
 2. 去掉私有文件读取与 instrumentation，仅执行上面的 `am start`；同样执行前拒绝，原文 `blocked by policy`。没有更具体理由，没有改用包装命令或其他工具执行同一操作。
 
 保留的测试状态：`E:/CShell-vpn-test/avd/CAgentVPN.avd`、模拟器序列 `emulator-5580`，三个 APK 已安装但 probe/fixture 未启动、VPN 未授权。独立 probe 工程保留在 `E:/CShell-vpn-test/probe`；受控 HTTP fixture 仅监听宿主 `127.0.0.1:59996`，不访问外站。
+# 应用自身的数据请求（2026-11-04）
+
+CShell 从 VPN 排除是为了避免账号/中继控制链路递归，但不代表应用数据请求应绕过选中的机器。更新清单、校验和、APK 下载、主动反馈、同步 vault 与分块请求现在显式使用已选机器的本地 HTTP 代理入口。入口失效、服务未启动、租约过期时返回失败，不改用直连。没有选中机器出口时沿用系统默认网络。
+
+登录、设备注册、会员租约等控制链路保持独立，使选择机器出口本身不依赖尚未建立的出口。更新重定向每一跳仍受原先 HTTPS 和官方域名限制；不放宽证书验证。`test-android-app-network.mjs` 使用真实 HTTP origin/proxy 验证实际出口和失败不访问 origin；Android Release Java 编译通过。此项不是手机跨 UID VPN 实机验收。
+

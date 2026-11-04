@@ -16,6 +16,7 @@ public final class AndroidAgentService extends Service {
   static final String CHANGED="org.canpshell.mobile.CAGENT_STATUS",STOP="org.canpshell.mobile.CAGENT_STOP";
   private static volatile AndroidAgentService current;
   static AndroidNetworkProxy networkProxy() throws java.io.IOException {AndroidAgentService live=current;if(live==null||!live.hostReady||live.host==null)throw new java.io.IOException("CAgent network service unavailable");return live.host.networkProxy;}
+  static java.net.HttpURLConnection dataConnection(Context context,java.net.URL url)throws java.io.IOException {return AndroidAppNetwork.open(url,context.getSharedPreferences("cagent-network-route",0).getBoolean("selected",false),()->networkProxy().proxy());}
   private static volatile String lastError="";
   private static volatile boolean starting;
   private final ExecutorService worker=Executors.newSingleThreadExecutor();

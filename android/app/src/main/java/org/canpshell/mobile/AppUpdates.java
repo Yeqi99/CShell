@@ -49,7 +49,7 @@ final class AppUpdates {
     for(int i=0;i<6;i++){
       URL u=new URL(address);
       if(!"https".equals(u.getProtocol())||!"shell.canp.ai".equals(u.getHost()))throw new IOException("更新下载地址无效");
-      HttpURLConnection c=(HttpURLConnection)u.openConnection();c.setConnectTimeout(20000);c.setReadTimeout(30000);c.setInstanceFollowRedirects(false);c.setRequestProperty("User-Agent","CShell/"+current());
+      HttpURLConnection c=AndroidAgentService.dataConnection(activity,u);c.setConnectTimeout(20000);c.setReadTimeout(30000);c.setInstanceFollowRedirects(false);c.setRequestProperty("User-Agent","CShell/"+current());
       int status=c.getResponseCode();
       if(status>=300&&status<400){String location=c.getHeaderField("Location");c.disconnect();address=new URL(u,location).toString();continue;}
       if(status!=200){c.disconnect();throw new IOException(status==403||status==429?"香港下载服务限制了当前网络的请求，请稍后重试或打开下载页":"香港下载服务 HTTP "+status);}return c;

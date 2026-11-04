@@ -64,7 +64,8 @@ final class CloudSync {
   static int safeVaultBytes(){return (int)Math.max(2*1024*1024,Math.min(256L*1024*1024,Runtime.getRuntime().maxMemory()/24));}
   static final class HttpFailure extends IOException{final int status;HttpFailure(int status,String message){super(message);this.status=status;}}
   private JSONObject rawApi(String path,JSONObject body,int writeSchema)throws Exception{
-    HttpURLConnection connection=(HttpURLConnection)new URL("https://shell.canp.ai/api/v1/"+path).openConnection();
+    URL address=new URL("https://shell.canp.ai/api/v1/"+path);
+    HttpURLConnection connection=(path.equals("vault")||path.startsWith("vault/"))?AndroidAgentService.dataConnection(context,address):(HttpURLConnection)address.openConnection();
     connection.setConnectTimeout(15000);connection.setReadTimeout(25000);connection.setInstanceFollowRedirects(false);
     connection.setRequestProperty("Content-Type","application/json");
     connection.setRequestProperty("X-CShell-Vault-Max-Bytes",Integer.toString(safeVaultBytes()));
