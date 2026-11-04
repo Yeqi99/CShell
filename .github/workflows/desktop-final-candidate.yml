@@ -1,7 +1,5 @@
-name: Pro final desktop candidates
+name: 1.0 desktop candidates (no publication)
 on:
-  push:
-    branches: ['codex/desktop-pro-0.8.20-final']
   workflow_dispatch:
 permissions:
   contents: read
@@ -11,16 +9,19 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {os: macos-latest, platform: mac, arch: arm64}
-          - {os: macos-15-intel, platform: mac, arch: x64}
-          - {os: ubuntu-24.04, platform: linux, arch: x64}
-          - {os: ubuntu-24.04-arm, platform: linux, arch: arm64}
+          - {os: windows-latest, platform: win, arch: x64, edition: pro}
+          - {os: macos-latest, platform: mac, arch: arm64, edition: pro}
+          - {os: macos-15-intel, platform: mac, arch: x64, edition: pro}
+          - {os: ubuntu-24.04, platform: linux, arch: x64, edition: pro}
+          - {os: ubuntu-24.04-arm, platform: linux, arch: arm64, edition: pro}
     runs-on: ${{ matrix.os }}
     env:
-      CSHELL_EDITION: pro
+      CSHELL_EDITION: ${{ matrix.edition }}
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
           version: 11.25.0
@@ -29,6 +30,8 @@ jobs:
           node-version: 24.19.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: node scripts/verify-1.0-candidate.mjs
+      - run: pnpm exec tsx --test tests/agent-build-edition.test.ts tests/agent-installed-launcher.test.ts tests/account-mcp-bridge.test.ts
       - run: node scripts/prepare-pty.mjs
       - run: pnpm exec tsc --noEmit
       - run: pnpm exec tsx --test tests/cloud-merge.test.ts tests/cloud-sync.test.ts tests/agent-relay.test.ts tests/updates.test.ts tests/portable-update.test.ts tests/posix-agent-update.test.ts
@@ -37,15 +40,20 @@ jobs:
       - name: Verify hosting startup deadline and real worker cleanup
         run: pnpm exec tsx --test --test-concurrency=1 tests/hosting-startup-deadline.test.ts tests/agent-hosting.test.ts
       - run: pnpm exec vite build && node scripts/build.mjs
-      - run: pnpm exec electron-builder --config electron-builder.pro.cjs --${{ matrix.platform }} --${{ matrix.arch }} --publish never
+      - if: matrix.edition == 'pro'
+        run: pnpm exec electron-builder --config electron-builder.pro.cjs --${{ matrix.platform }} --${{ matrix.arch }} --publish never
+      - if: matrix.edition == 'opensource'
+        run: pnpm exec electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish never
       - if: matrix.platform == 'mac'
         name: Verify in-place DMG update
         run: pnpm exec tsx scripts/mac-update-smoke.ts
       - uses: actions/upload-artifact@v4
         with:
-          name: pro-${{ matrix.platform }}-${{ matrix.arch }}
+          name: 1.0-${{ matrix.edition }}-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
-            release/pro-*/*.dmg
-            release/pro-*/*.AppImage
-            release/pro-*/*.deb
+            release/**/*.dmg
+            release/**/*.AppImage
+            release/**/*.deb
+            release/**/*.exe
           if-no-files-found: error
+
