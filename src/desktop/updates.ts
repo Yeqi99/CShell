@@ -217,6 +217,7 @@ export function registerUpdateHandlers(
         (window as EventEmitter).once('update-close-cancelled', () => {
           app.removeListener('quit', launch); queued = false; busy = false; void staged.cancel();
         });
+        if(operation==='install')window.emit('update-mcp-approved');
         app.quit(); return;
       }
       if (process.platform === 'darwin') {
@@ -231,6 +232,7 @@ export function registerUpdateHandlers(
         };
         app.once('quit', launch); queued = true;
         (window as EventEmitter).once('update-close-cancelled', () => { app.removeListener('quit', launch); queued = false; busy = false; void staged.cancel(); });
+        if(operation==='install')window.emit('update-mcp-approved');
         app.quit(); return;
       }
       throw Error('当前平台尚不支持应用内安装');
