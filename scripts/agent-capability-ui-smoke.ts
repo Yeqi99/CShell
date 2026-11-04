@@ -68,8 +68,12 @@ try {
   assert.deepEqual(call.params.local, { view: true, control: false });
   await page.getByRole('button', { name: '切换目标', exact: true }).click();
   await page.getByRole('button', { name: /远程桌面.*待授权/ }).click();
-  assert.equal(await page.getByRole('button', { name: '保存工具权限', exact: true }).count(), 0);
-  assert.equal(await page.getByText('服务与访问权限', { exact: true }).count(), 0);
+  // Authorized remote management is supported now; opening its controls must
+  // still not submit grants or desktop configuration by itself.
+  assert.equal(await page.getByRole('button', { name: '保存工具权限', exact: true }).count(), 1);
+  assert.equal(await page.getByText('服务与访问权限', { exact: true }).count(), 1);
+  assert.equal(await page.evaluate(() => (window as any).fixtureCalls.filter((c: any) => c.method === 'packages.grant').length), 0);
+  assert.equal(await page.evaluate(() => (window as any).fixtureCalls.filter((c: any) => c.method === 'desktop.configure').length), 1);
   await mkdir('test-results', { recursive: true });
   await page.screenshot({ path: 'test-results/agent-capability-remote-ui.png' });
   await writeFile(
@@ -83,7 +87,7 @@ try {
           'service-default-off',
           'view-control-independent',
           'draft-before-save',
-          'remote-no-mutation-controls',
+          'remote-management-controls-no-implicit-mutation',
           'viewer-disabled-without-view-grant',
         ],
       },
