@@ -27,3 +27,23 @@ test('next release preserves verified historical assets and selects the requeste
  assert.throws(()=>mergeRelease({...current,files:{}},next,'0.8.18'));
 });
 
+test('1.0 uses explicitly reviewed platform inventory without publishing unavailable platforms',()=>{
+ const releases=JSON.parse(JSON.stringify(fixture()).replaceAll('0.8.17','1.0.0'));
+ const inventories={};
+ for(const edition of ['opensource','pro']){
+  const r=releases[edition];r.target_commitish='a'.repeat(40);
+  r.assets=r.assets.filter(a=>a.name==='SHA256SUMS.txt'||a.name.endsWith('.exe'));
+  inventories[edition]={edition,version:'1.0.0',sha:r.target_commitish,status:'candidate-not-published',expectedAssets:r.assets.map(a=>a.name),assets:r.assets.map(a=>({name:a.name,size:a.size,sha256:a.digest.slice(7)}))};
+ }
+ const m=mergeRelease(previous,releases,'1.0.0',inventories);
+ // Production can have a Pro-only patch while opensource remains on its previous version.
+ assert.equal(mergeRelease({...previous,version:'0.8.22'},releases,'1.0.0',inventories).version,'1.0.0');
+ assert.equal(m.catalogs['/downloads/pro/releases.json'][0].assets.length,releases.pro.assets.length);
+ for(const [p,a]of Object.entries(previous.files))assert.deepEqual(m.files[p],a);
+ assert.throws(()=>mergeRelease(previous,releases,'1.0.0'),/reviewed/);
+ for(const mutate of [x=>x.pro.expectedAssets.pop(),x=>x.pro.expectedAssets.push(x.pro.expectedAssets[0]),x=>x.pro.status='blocked',x=>x.pro.edition='opensource']){
+  const i=structuredClone(inventories);mutate(i);assert.throws(()=>mergeRelease(previous,releases,'1.0.0',i));
+ }
+ const incomplete=structuredClone(releases);incomplete.pro.assets.pop();assert.throws(()=>mergeRelease(previous,incomplete,'1.0.0',inventories),/inventory/);
+});
+

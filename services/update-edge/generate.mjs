@@ -5,9 +5,10 @@ const root=new URL('./',import.meta.url);
 export function verifyReleaseAssets(release,expected){
  if(expected.status!==undefined&&expected.status!=='candidate-not-published')throw Error('Verified inventory is blocked or superseded');
  if(release.target_commitish!==expected.sha)throw Error('Final source changed');
+ if(release.assets.length!==expected.assets.length||new Set(release.assets.map(a=>a.name)).size!==release.assets.length)throw Error('Final asset inventory incomplete or duplicate');
  for(const a of release.assets){const e=expected.assets.find(e=>e.name===a.name);if(!e||a.size!==e.size||a.digest!=='sha256:'+e.sha256)throw Error('Final package differs from verified manifest');}
 }
-export function mergeRelease(previous,releases,version='0.8.17'){
+export function mergeRelease(previous,releases,version='0.8.17',inventories){
  if(!/^\d+\.\d+\.\d+$/.test(version)||!/^\d+\.\d+\.\d+$/.test(previous.version))throw Error('Invalid release version');
  const prior=previous.version;
  if(version.localeCompare(prior,undefined,{numeric:true})<=0)throw Error('Release version must increase');
@@ -15,8 +16,17 @@ export function mergeRelease(previous,releases,version='0.8.17'){
  for(const edition of ['opensource','pro']){
   const tag=(edition==='pro'?'pro-v':'v')+version,release=releases[edition];
   const old=Object.entries(previous.files).filter(([p])=>p.startsWith(`/downloads/${edition}/v${prior}/`));
-  if(!old.length)throw Error('Previous channel has no verified assets: '+edition);
-  const expected=new Set(old.map(([,a])=>a.name.replaceAll(prior,version).replace(`CShell-${version}-android-test.apk`,`CShell-${version}-android.apk`)));
+  if(!old.length&&version!=='1.0.0')throw Error('Previous channel has no verified assets: '+edition);
+  let names=old.map(([,a])=>a.name.replaceAll(prior,version).replace(`CShell-${version}-android-test.apk`,`CShell-${version}-android.apk`));
+  if(version==='1.0.0'){
+   const inventory=inventories?.[edition];
+   if(!inventory||inventory.edition!==edition||inventory.version!==version||inventory.status!=='candidate-not-published'||!Array.isArray(inventory.expectedAssets)||inventory.expectedAssets.length<2)throw Error('1.0 needs reviewed channel inventory');
+   names=inventory.expectedAssets;
+   if(new Set(names).size!==names.length||!names.includes('SHA256SUMS.txt')||JSON.stringify([...names].sort())!==JSON.stringify(inventory.assets.map(a=>a.name).sort()))throw Error('Reviewed inventory differs from verified assets');
+   for(const name of names)if(name!=='SHA256SUMS.txt'&&(!/^(?:CAgent[-\w.]+\.(?:exe|tar\.gz)|CShell[-\w.]+\.(?:exe|dmg|zip|deb|AppImage|apk))$/.test(name)||!name.includes(version)||(name.startsWith('CShell')&&name.startsWith('CShell-Pro-')!==(edition==='pro'))))throw Error('Invalid channel asset');
+   verifyReleaseAssets(release,inventory);
+  }
+  const expected=new Set(names);
   if(!release||release.draft||release.prerelease||release.tag_name!==tag||!release.published_at||release.assets.length!==expected.size)throw Error('Release not public/complete: '+edition);
   const assets=[];
   for(const a of release.assets){
@@ -42,8 +52,9 @@ async function main(){
   const r=await fetch(`https://api.github.com/repos/Yeqi99/CShell/releases/tags/${tag}`,{headers:{'User-Agent':'CShell-update-edge'},signal:AbortSignal.timeout(30000)});
   if(r.status!==200)throw Error('Public release unavailable: '+r.status);releases[edition]=await r.json();
  }
- for(const edition of ['opensource','pro']){const expected=JSON.parse(await readFile(new URL('verified-'+edition+'-'+version.replaceAll('.','')+'.json',root),'utf8'));verifyReleaseAssets(releases[edition],expected);}
- const manifest=mergeRelease(previous,releases,version);
+ const inventories={};
+ for(const edition of ['opensource','pro']){const expected=JSON.parse(await readFile(new URL('verified-'+edition+'-'+version.replaceAll('.','')+'.json',root),'utf8'));verifyReleaseAssets(releases[edition],expected);inventories[edition]=expected;}
+ const manifest=mergeRelease(previous,releases,version,inventories);
  // Require the actual published SHA256SUMS body to agree with every API digest.
  const {createHandler}=await import('./worker.mjs');const handler=createHandler(manifest);
  for(const edition of ['opensource','pro']){
