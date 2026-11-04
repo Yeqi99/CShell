@@ -16,7 +16,7 @@
 | CAgent 应用和扩展能力 | agent_capabilities_list / agent_capability_invoke | 实时能力目录、contractDigest、显式授权与审核；不裸转发任意 RPC | remote-capability-tools |
 | 目标、事件订阅、执行记录 | agent_automation_* | 当前控制端所有权、条件与有界调度；不能提高远端权限 | remote-automation-tools、remote-wechat-events |
 | 微信能力与事件 | remote_* 微信工具及能力包装 | 已安装匹配包、当前授权；版本差异如实返回 | remote-wechat-tools、remote-wechat-event-tools-integration |
-| 会员域名认领、改名、DNS、建站工作流 | member-domain-tools 八项 | domains.read/manage；仅自有 namespace，UTC 月改名限制和幂等请求；DNS不等同部署完成 | member-domain-tools（含真实 MCP HTTP）、member-domains-ui-smoke |
+| 会员域名认领、改名、DNS、建站工作流 | member-domain-tools 八项 | domains.read/manage；仅自有 namespace，Asia/Shanghai 自然月改名限制和幂等请求；DNS不等同部署完成 | member-domain-tools（含真实 MCP HTTP）、member-domains-ui-smoke |
 | 本月中继/MCP 已用、预留、上限和余额 | `account_traffic_read` 与账号设置流量卡片 | 独立 account.read；仅当前账号，切换账号丢弃结果，不返回内部成本或凭据 | account-traffic-tool、test_account_traffic.py、account-traffic-ui-smoke |
 
 ## 不能宣称无条件全覆盖的部分

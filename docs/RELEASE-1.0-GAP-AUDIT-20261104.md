@@ -10,6 +10,14 @@
 
 ## 仍有的代码或范围缺口
 
+2026-11-04 最终回归补充：下表保留发现时的证据。Android 应用数据请求已由 `05bc6ba` 接入 `AndroidAppNetwork`（更新、反馈、vault 数据走选中出口，账号和中继控制链路单独保留），真实 JVM 代理与断路测试及双方 Java 编译通过。账号流量余额已由 `47dd42c` 补齐 `/v1/account/traffic`、账号 UI 与 `account_traffic_read`，真实 HTTP 账号隔离等测试通过。这两项不再是未实现缺口，但不能替代生产/手机验收。
+
+GUI→MCP→CLI 对照现见 `GUI-MCP-CLI-COVERAGE-1.0.md`，新增应用更新见 `MCP-APPLICATION-UPDATE.md`、CAgent 更新见 `CAGENT-MCP-UPDATE.md`。权限扩大与平台授权不提供自我提权；窗口/主题/标签偏好仍未全部开放成 MCP，不宣称逐按钮全覆盖。
+
+统一微信市场已仅展示一个应用，并只允许精确支持版本 4.1.15.56 / 4.2.0.12 的聊天发送与消息订阅；4.1.15.50 因稳定性隔离，未知/多个运行版本拒绝安装。这是准确收敛能力，不是全业务接口对齐。
+
+系统网络运行层仍未接入能力安装包、系统服务和 UI。`SYSTEM-NETWORK-EXIT-1.0.md` 明确尚未开放；未执行用户机器的 TUN/WFP/nft 变更。
+
 | 优先级 | 证据 | 剩余动作 |
 | --- | --- | --- |
 | P1 | `src/desktop/identity-network.ts` 明确返回 `scope: applications`；Windows 是 WinINET，SSH 是新进程环境变量 | 不可把它宣传成任意进程的整机网络代偿。若 1.0 要承诺整机覆盖，需要对应系统级路由实现及 TCP/UDP/失败断路测试；现有 HTTP/应用范围需明确展示。 |
