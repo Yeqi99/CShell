@@ -1,4 +1,14 @@
+import {copyMachineOperation} from '../core/machine-copy-operation';
+import {directMachineCopy} from '../core/direct-machine-copy';
+import {mkdtemp,rm,stat as fileStat} from 'node:fs/promises';
+import {createReadStream} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {createHash} from 'node:crypto';
+import {providerFileCall} from '../core/provider-file-call';
+import type {SshService} from '../core/ssh';
+import type {FtpService} from '../core/ftp';
 import {createTransferProgress} from '../shared/transfer-progress';
+import {copyMachineFile} from '../core/machine-file-copy';
 import type {Transfer} from '../shared/contracts';
 import type {LinuxWorkspaceService} from '../core/linux-workspace';
 import { app,dialog } from 'electron';
@@ -36,6 +46,7 @@ export async function registerAgent(
   publish: (event: DesktopViewEvent) => void,
   linuxWorkspace?: LinuxWorkspaceService,
   publishTransfer: (state: Transfer) => void = () => {},
+  fileProviders?: {ssh:SshService;ftp:FtpService},
 ) {
   const directory = process.env.CSHELL_AGENT_DATA;
   const bundledAvailable = false;
@@ -207,6 +218,34 @@ export async function registerAgent(
     return createTransferProgress(id,target,name,direction,publishTransfer);
   };
   handle('agent:file-cancel',(id:unknown)=>{downloads.get(z.string().uuid().parse(id))?.abort();});
+  handle('agent:file-copy',async(input:unknown)=>{
+    const location=z.object({target:z.string().min(1),root:z.string(),path:z.string().min(1).max(4096),provider:z.enum(['sftp','ftp']).optional()}).strict();
+    const p=z.object({id:z.string().uuid(),source:location,destination:location,name:z.string().min(1).max(255),directory:z.boolean().optional()}).strict().parse(input);
+    safeName(p.name);if(p.destination.provider==='ftp'){const dot=p.name.lastIndexOf('.'),base=dot>0?p.name.slice(0,dot):p.name,ext=dot>0?p.name.slice(dot):'';p.destination.path=p.destination.path.slice(0,p.destination.path.length-p.name.length)+base+'-copy-'+randomUUID()+ext;}for(const place of [p.source,p.destination]){if(place.provider){z.string().uuid().parse(place.target);if(!fileProviders)throw Error('File provider unavailable');if(place.provider==='ftp')fileProviders.ftp.get(place.target);}else {z.string().uuid().parse(place.root);checkTarget(place.target);}}
+
+    if(p.source.target===p.destination.target&&p.source.root===p.destination.root&&p.source.path===p.destination.path)throw Error('源文件与目标相同');
+    if(downloads.size>=4||downloads.has(p.id))throw Error('传输任务已满');
+    const controller=new AbortController();downloads.set(p.id,controller);
+    const progress=fileProgress(p.id,p.destination.target,p.name,'copy');let finished=false;
+    const bound=(target:string)=>(method:string,params:unknown,signal?:AbortSignal)=>{checkTarget(target);return remoteCall(target,{method,params} as any,signal);};
+    const checkTargetForCopy=(place:typeof p.source)=>{if(place.provider==='ftp')fileProviders!.ftp.get(place.target);else if(place.provider==='sftp')fileProviders!.ssh.get(place.target);else checkTarget(place.target);};
+    const adapters:ReturnType<typeof providerFileCall>[]=[];
+    const endpoint=async(place:typeof p.source)=>{if(!place.provider)return bound(place.target);const adapter=providerFileCall({sessionId:place.target,...(place.provider==='sftp'?{sftp:await fileProviders!.ssh.sftp(place.target)}:{ftp:fileProviders!.ftp})},controller.signal);adapters.push(adapter);return adapter.call;};
+    try{
+      const tryDirect=async(from:{root:string;path:string},to:{root:string;path:string},report:(done:number,total:number)=>void)=>{
+      if(p.source.provider==='ftp'&&p.destination.provider==='ftp'&&p.source.target===p.destination.target){
+        const folder=await mkdtemp(join(tmpdir(),'cshell-file-copy-')),file=join(folder,'payload');
+        try{await fileProviders!.ftp.download(p.source.target,from.path,file,controller.signal,(done,total)=>report(done,total*2));const size=(await fileStat(file)).size;const hash=createHash('sha256');for await(const chunk of createReadStream(file)){controller.signal.throwIfAborted();hash.update(chunk);}await fileProviders!.ftp.upload(p.destination.target,file,to.path,controller.signal,(done)=>report(size+done,size*2));return {bytes:size,sha256:hash.digest('hex'),verified:false,destinationPath:to.path,route:'controller-disk'};}finally{await rm(folder,{recursive:true,force:true});}
+      }
+        if(p.source.provider||p.destination.provider||p.source.target===p.destination.target)return undefined;
+        const sourceTarget=activeTarget(p.source.target),device=sourceTarget&&provider.list().find(d=>d.deviceId===sourceTarget.resourceId);if(!device)return undefined;
+        return directMachineCopy(bound(p.source.target),bound(p.destination.target),{host:device.host,port:device.port},from,to,controller.signal,()=>{checkTarget(p.source.target);checkTarget(p.destination.target);},report);
+      };
+      if(p.directory){const factory=(place:typeof p.source)=>async()=>place.provider?providerFileCall({sessionId:place.target,...(place.provider==='sftp'?{sftp:await fileProviders!.ssh.sftp(place.target)}:{ftp:fileProviders!.ftp})},controller.signal):{call:bound(place.target),dispose:async()=>{}};const result=await copyMachineOperation(factory(p.source),p.source,factory(p.destination),p.destination,true,controller.signal,()=>{checkTargetForCopy(p.source);checkTargetForCopy(p.destination);},event=>{const state=event as {bytes:number;total?:number};progress.update(state.bytes,state.total??0,state.total!==undefined);},tryDirect);finished=true;return {...result,sha256:'',destinationPath:p.destination.path};}
+      const direct=await tryDirect(p.source,p.destination,(done,total)=>progress.update(done,total,true));if(direct){finished=true;return {...direct,destinationPath:p.destination.path};}
+      const result=await copyMachineFile(await endpoint(p.source),{root:p.source.root,path:p.source.path},await endpoint(p.destination),{root:p.destination.root,path:p.destination.path},controller.signal,(done,total)=>progress.update(done,total,true));finished=true;return {...result,destinationPath:p.destination.path};}
+    finally{await Promise.all(adapters.map(a=>a.dispose()));progress.finish(finished?'done':controller.signal.aborted?'cancelled':'failed');downloads.delete(p.id);}
+  });
   handle('agent:file-paste',async(target:unknown,input:unknown)=>{
     const key=z.string().parse(target),p=z.object({id:z.string().uuid(),root:z.string().uuid(),path:z.string().max(4096)}).strict().parse(input);
     checkTarget(key);

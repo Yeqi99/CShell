@@ -2,6 +2,7 @@ import { useI18n } from './i18n';
 
 // Product chrome only: never pass user machine, group or application names here.
 export const desktopEnglish: Record<string, string> = {
+  '查看会员域名与 DNS':'Read member domains and DNS','只读取当前账号拥有的域名。':'Read only domains owned by the signed-in account.','管理会员域名与 DNS':'Manage member domains and DNS','认领、改名和修改解析；服务器仍核验会员与账号归属。':'Claim, rename and edit DNS; membership and ownership are checked by the server.',
   '状态未知':'Status unknown','离线':'Offline','同账号设备':'Account devices','账号设备':'Account device','此设备来自当前登录账号':'Device discovered from the signed-in account',
   '新建和修改连接配置':'Create and edit connection profiles','不会自动连接或扩大机器授权。':'Does not connect automatically or expand machine access.',
   '保存和更换连接凭据':'Save and replace connection credentials','仅写入加密存储，不读取或返回密码、私钥。':'Write-only encrypted storage. Passwords and private keys are not returned.',

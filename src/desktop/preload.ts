@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { Bridge, SessionEvent } from '../shared/contracts';
 const bridge: Bridge = {
+  cloudDomains:input=>ipcRenderer.invoke('cloud:domains',input),
+  cloudMcpClients:input=>ipcRenderer.invoke('cloud:mcp-clients',input),
   desktopViewClipboard:(id,input,generation)=>ipcRenderer.invoke('desktop:view-clipboard',id,input,generation),
   localClipboardRead:()=>ipcRenderer.invoke('clipboard:content-read'),
   localClipboardWrite:value=>ipcRenderer.invoke('clipboard:content-write',value),
@@ -59,6 +61,7 @@ const bridge: Bridge = {
   linuxWorkspaceInstall:(id,planId)=>ipcRenderer.invoke('linux:install',id,planId),
   linuxWorkspaceJob:(id,jobId,cancel)=>ipcRenderer.invoke('linux:job',id,jobId,cancel),
   reportError: error => ipcRenderer.send('diagnostics:error', error),
+  submitFeedback: input => ipcRenderer.invoke('feedback:submit',input),
   openDiagnostics: () => ipcRenderer.invoke('diagnostics:open'),
   aiEventsSnapshot:()=>ipcRenderer.invoke('ai:events-snapshot'),
   aiEventSave:rule=>ipcRenderer.invoke('ai:event-save',rule),
@@ -104,6 +107,7 @@ const bridge: Bridge = {
   agentMachineOpen: (id) => ipcRenderer.invoke('agent:machine-open',id),
   agentFilePaste:(target,input)=>ipcRenderer.invoke('agent:file-paste',target,input),
   agentFileDownload:(target,input)=>ipcRenderer.invoke('agent:file-download',target,input),
+  agentFileCopy:input=>ipcRenderer.invoke('agent:file-copy',input),
   agentFileCancel:(id)=>ipcRenderer.invoke('agent:file-cancel',id),
   agentMachineClose: (target) => ipcRenderer.invoke('agent:machine-close',target),
   agentLaunch: () => ipcRenderer.invoke('agent:launch'),
@@ -178,6 +182,7 @@ const bridge: Bridge = {
   wslAccountStatus: (name) => ipcRenderer.invoke('local-terminal:wsl-account', name),
   wslInitialize: (input) => ipcRenderer.invoke('local-terminal:wsl-initialize', input),
   wslInstall: (ubuntu) => ipcRenderer.invoke('local-terminal:wsl-install', ubuntu),
+  wslImport: (name) => ipcRenderer.invoke('local-terminal:wsl-import', name),
   wslInstallStatus: () => ipcRenderer.invoke('local-terminal:wsl-install-status'),
   localTerminal: (shell) => ipcRenderer.invoke('local-terminal:open', shell),
   localEnvironment: () => ipcRenderer.invoke('local-terminal:environment'),

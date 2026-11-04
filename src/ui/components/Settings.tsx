@@ -6,6 +6,7 @@ import { NetworkSettings } from './NetworkSettings';
 import { Search, Globe } from 'lucide-react';
 import { Palette, Terminal, PanelsTopLeft, Blocks, ShieldCheck, Download } from 'lucide-react';
 import { UpdateSettings } from './UpdateSettings';
+import {FeedbackPanel} from './FeedbackPanel';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { defaults, type Preferences } from '../../shared/contracts';
 import { useI18n } from '../i18n';
@@ -156,6 +157,7 @@ export function Settings({
         </header>
         <div hidden={category !== 'updates'}>
           <UpdateSettings english={!cn} />
+          <FeedbackPanel english={!cn}/>
           <UsageConsent english={!cn} active={category === 'updates'} />
         </div>
         <div hidden={category !== 'cloud'}><CloudSettings /></div>

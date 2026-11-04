@@ -138,7 +138,7 @@ export const apiLocalFileRootSchema = z.object({
   mutations: z.array(z.enum(['create', 'write', 'rename', 'delete', 'mkdir', 'rmdir', 'renameDirectory'])).max(7).optional(),
 }).strict();
 const apiLocalFileRoots = z.array(apiLocalFileRootSchema).max(32).refine((roots) => new Set(roots.map((root) => root.id)).size === roots.length).optional();
-export const apiApplicationCapabilities = ['plugins.read', 'plugins.manage', 'connections.read', 'connections.manage', 'credentials.manage', 'identity.trust', 'http.use'] as const;
+export const apiApplicationCapabilities = ['plugins.read', 'plugins.manage', 'connections.read', 'connections.manage', 'credentials.manage', 'identity.trust', 'http.use', 'domains.read', 'domains.manage'] as const;
 export const apiClientSchema = z
   .object({
     id: z.string().uuid(),
@@ -168,6 +168,7 @@ export type ApiClient = z.infer<typeof apiClientSchema>;
 export const mcpSettingsSchema = z
   .object({
     enabled: z.boolean(),
+    accountBridge: z.object({clientId:z.string().uuid()}).strict().optional(),
     port: z.number().int().min(1024).max(65535),
     allowedProfiles: z.array(z.string().uuid()).max(1000),
     allowCommands: z.boolean(),
@@ -404,6 +405,7 @@ export interface Bridge
   onDesktopLookChanged?(listener:()=>void):()=>void;
   networkSave?(route: import('./network-route').NetworkRoute): Promise<import('./network-route').NetworkRouteStatus>;
   reportError(error: { message: string; stack?: string }): void;
+  submitFeedback?(input:import('./feedback').FeedbackInput):Promise<{ok:boolean;id:string}>;
   openDiagnostics(): Promise<void>;
   setAlwaysOnTop(enabled: boolean): Promise<boolean>;
   setMinimalMode(enabled: boolean): Promise<void>;
