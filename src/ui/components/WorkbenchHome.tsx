@@ -1,3 +1,4 @@
+import {useI18n} from '../i18n';
 import {ErrorNotice} from './ErrorNotice';
 import { useEffect, useState } from 'react';
 import { ArrowUpRight, Grid2X2, LayoutDashboard, Monitor, Plus, Terminal, View, Blocks, Settings2, Bot, Code2 } from 'lucide-react';
@@ -14,18 +15,19 @@ type OverviewProps = { config: Config; active: boolean; currentCount: number; on
 type WorkbenchProps = OverviewProps & { onView: (view: 'overview' | 'command' | 'visual') => Promise<void>; onSettings: () => void;
   onExtensions: () => void; onAgent: () => void; onCommandTab: () => void };
 export function WorkbenchHome(props: WorkbenchProps) {
+  const {t}=useI18n();
   const mode = props.config.preferences.workbenchView ?? 'overview';
   const [seen, setSeen] = useState(() => new Set([mode])), [error, setError] = useState('');
   useEffect(() => { setSeen(v => v.has(mode) ? v : new Set([...v, mode])); }, [mode]);
-  return <section className="workbench-shell" aria-label="工作台"><header className="workbench-switcher"><h1>工作台</h1><div role="tablist" aria-label="工作台显示方式">{([
-    ['overview', '概览', LayoutDashboard], ['command', '命令行', Terminal], ['visual', '可视化', Monitor],
+  return <section className="workbench-shell" aria-label={t('workspace')}><header className="workbench-switcher"><h1>{t('workspace')}</h1><div role="tablist" aria-label={t('workspaceModes')}>{([
+    ['overview', t('workspaceOverview'), LayoutDashboard], ['command', t('workspaceCommand'), Terminal], ['visual', t('workspaceVisual'), Monitor],
   ] as const).map(([value, label, Icon], index, all) => <button key={value} role="tab" aria-selected={mode === value} tabIndex={mode === value ? 0 : -1} onClick={() => void props.onView(value).catch(e => setError(String(e)))} onKeyDown={e => {
     if (e.key === 'ArrowRight' || e.key === 'ArrowLeft' || e.key === 'Home' || e.key === 'End') { e.preventDefault(); const next = e.key === 'Home' ? 0 : e.key === 'End' ? 2 : (index + (e.key === 'ArrowRight' ? 1 : 2)) % 3; (e.currentTarget.parentElement?.children[next] as HTMLButtonElement)?.focus(); void props.onView(all[next][0]).catch(err => setError(String(err))); }
   }}><Icon size={15}/>{label}</button>)}</div></header>
     {error && <ErrorNotice title="操作未完成" error={error}/>}
-    <div className="workbench-mode" role="tabpanel" aria-label="概览" hidden={mode !== 'overview'}><WorkbenchOverview {...props} active={props.active && mode === 'overview'}/></div>
-    {seen.has('command') && <div className="workbench-mode" role="tabpanel" aria-label="命令行" hidden={mode !== 'command'}><CommandConsole active={props.active && mode === 'command'} onSettings={props.onSettings} onNewTab={props.onCommandTab}/></div>}
-    {seen.has('visual') && <div className="workbench-mode" role="tabpanel" aria-label="可视化" hidden={mode !== 'visual'}><WorkbenchStudio {...props} active={props.active && mode === 'visual'}/></div>}
+    <div className="workbench-mode" role="tabpanel" aria-label={t('workspaceOverview')} hidden={mode !== 'overview'}><WorkbenchOverview {...props} active={props.active && mode === 'overview'}/></div>
+    {seen.has('command') && <div className="workbench-mode" role="tabpanel" aria-label={t('workspaceCommand')} hidden={mode !== 'command'}><CommandConsole active={props.active && mode === 'command'} onSettings={props.onSettings} onNewTab={props.onCommandTab}/></div>}
+    {seen.has('visual') && <div className="workbench-mode" role="tabpanel" aria-label={t('workspaceVisual')} hidden={mode !== 'visual'}><WorkbenchStudio {...props} active={props.active && mode === 'visual'}/></div>}
   </section>;
 }
 const workbenchMachine = { deviceId: 'cshell-workbench', desktopOnly: true };
@@ -41,6 +43,7 @@ function WorkbenchStudio(props: WorkbenchProps) {
   ]}/>;
 }
 function WorkbenchOverview({ config, active, currentCount, onNew, onViews, onConnect, onCurrent }: OverviewProps) {
+  const {t}=useI18n();
   const [views, setViews] = useState<MonitorView[]>([]), [error, setError] = useState(''), [busy, setBusy] = useState(false);
   useEffect(() => {
     if (active) void window.cshell.monitorViews().then(setViews).catch(e => setError(String(e)));
@@ -48,7 +51,7 @@ function WorkbenchOverview({ config, active, currentCount, onNew, onViews, onCon
   const run = async (fn: () => Promise<unknown>) => { setBusy(true); setError(''); try { await fn(); } catch (e) { setError(String(e)); } finally { setBusy(false); } };
   const connections = [...config.profiles].sort((a, b) => Number(b.favorite) - Number(a.favorite)).slice(0, 6);
   return <section className="workbench-home" aria-label="工作台首页">
-    <header className="home-heading"><h1>工作台</h1></header>
+    <header className="home-heading"><h1>{t('workspace')}</h1></header>
     <div className="home-overview">
       <section className="home-current"><header><h2>当前连接</h2><span className="home-count">{currentCount}</span></header>
         <div className="home-mode-options">{([
