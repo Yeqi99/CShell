@@ -1,3 +1,4 @@
+import {accountTrafficTool} from '../core/account-traffic-tool';
 import {identityRulesSchema} from '../shared/identity-network';
 import {AccountDiscovery} from '../core/account-discovery';
 import { syncClientProfiles } from '../core/client/profiles';
@@ -227,8 +228,9 @@ export async function registerCloudHandlers(
     const discovery=await cloud.accountRequest('/v1/devices');
     return {...result,devices:(discovery.devices??[]).filter((d:any)=>!d.borrowed).map((d:any)=>({id:d.deviceId,name:d.name}))};
   });
+  handle('cloud:traffic',()=>cloud.traffic());
   handle('cloud:domains',input=>cloud.domains(input));
-  const domainTools=createMemberDomainTools({accountId:()=>cloud.accountId(),domains:(input,signal)=>cloud.domains(input,signal)});
+  const domainTools=[...createMemberDomainTools({accountId:()=>cloud.accountId(),domains:(input,signal)=>cloud.domains(input,signal)}),accountTrafficTool({accountId:()=>cloud.accountId(),traffic:()=>cloud.traffic()})];
   const previousExtensionTools=ai.extensionTools;
   ai.extensionTools=()=>[...(previousExtensionTools?.()??[]),...domainTools];
   handle('cloud:lending',async(input:any)=>{

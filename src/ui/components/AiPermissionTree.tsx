@@ -112,6 +112,7 @@ export function AiPermissionTree({
               ['events.manage', tr("管理事件订阅与触发任务"), ''],
               ['web.search', tr("网络搜索（Tavily）"), ''],
               ['cloudflare.manage', tr("管理 Cloudflare"), tr('仅限扩展中已授权的 Cloudflare 资源')],
+              ['account.read', tr('查看本账号流量与额度'), tr('只读取当前账号本月中继与 MCP 用量，不修改额度。')],
               ['domains.read', tr('查看会员域名与 DNS'), tr('只读取当前账号拥有的域名。')],
               ['domains.manage', tr('管理会员域名与 DNS'), tr('认领、改名和修改解析；服务器仍核验会员与账号归属。')],
               ['ai.providers.manage', tr("查询、添加与测试 AI 基座"), tr("基座地址、模型与密钥来源需确认；密钥不会返回对话。")],

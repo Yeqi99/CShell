@@ -107,6 +107,27 @@ class Metering:
             rows=db.execute('SELECT period,category,ingress,egress FROM traffic_totals WHERE account=? ORDER BY period DESC,category LIMIT 48',(account,)).fetchall()
         return [{'period':p,'category':c,'ingressBytes':i,'egressBytes':e} for p,c,i,e in rows]
 
+    def account_view(self, account, now=None):
+        """Authenticated owner-only view; never exposes stream IDs or internal costs."""
+        instant=datetime.fromtimestamp(time.time() if now is None else now,timezone.utc)
+        period=instant.strftime('%Y-%m')
+        start=instant.replace(day=1,hour=0,minute=0,second=0,microsecond=0)
+        end=start.replace(year=start.year+1,month=1) if start.month==12 else start.replace(month=start.month+1)
+        channels=[]
+        with self.service.db() as db:
+            db.execute('BEGIN')
+            if not db.execute('SELECT 1 FROM accounts WHERE id=?',(account,)).fetchone():raise ValueError('Unknown account')
+            for category in CATEGORIES:
+                cap=db.execute('SELECT bytes FROM traffic_limits WHERE account=? AND category=?',(account,category)).fetchone()
+                extra=db.execute('SELECT COALESCE(SUM(bytes),0) FROM traffic_grants WHERE account=? AND period=? AND category=?',(account,period,category)).fetchone()[0]
+                totals=db.execute('SELECT ingress,egress FROM traffic_totals WHERE account=? AND period=? AND category=?',(account,period,category)).fetchone() or (0,0)
+                held=db.execute('SELECT COALESCE(SUM(budget),0) FROM traffic_reservations WHERE account=? AND period=? AND category=? AND settled=0',(account,period,category)).fetchone()[0]
+                base=cap[0] if cap else None
+                limit=None if base is None else base+extra
+                used=sum(totals)
+                channels.append(dict(category=category,ingressBytes=totals[0],egressBytes=totals[1],usedBytes=used,reservedBytes=held,baseLimitBytes=base,addonBytes=extra,limitBytes=limit,remainingBytes=None if limit is None else max(0,limit-used-held)))
+        return dict(period=period,timezone='UTC',periodStartsAt=int(start.timestamp()),periodEndsAt=int(end.timestamp()),updatedAt=int(instant.timestamp()),channels=channels)
+
     def admin_change(self, body):
         action=body.get('action');reason=body.get('reason');category=body.get('category');period=body.get('period')
         if not isinstance(reason,str) or not 2<=len(reason.strip())<=300 or category not in CATEGORIES:raise ValueError('Invalid change')

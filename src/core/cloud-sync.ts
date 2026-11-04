@@ -1,3 +1,4 @@
+import {accountTrafficSchema} from '../shared/account-traffic';
 export function vaultWriteSchema(snapshot:any):number{return snapshot?.store?.accountPreferences?.autoDiscoverDevices!==undefined?4:snapshot?.store?.extensions?.external!==undefined||snapshot?.store?.capabilityPackages!==undefined||snapshot?.identityNetwork!==undefined?3:snapshot?.store?.extensions?.enabled!==undefined?2:1;}
 import { CloudImportConflict } from './cloud-import';
 import { mkdir, readFile, rename, writeFile, readdir, unlink } from 'node:fs/promises';
@@ -211,6 +212,7 @@ export class CloudSync {
     }
   }
   async accountRequest(path:string,body?:unknown,signal?:AbortSignal){if(this.handedOff)throw Error('正在打开账号工作区，请稍候');if(!this.data.session)throw Error('请先登录');return this.api(path,body,undefined,signal);}
+  async traffic(){return accountTrafficSchema.parse(await this.accountRequest('/v1/account/traffic'));}
   async domains(input?:MemberDomainCommand,signal?:AbortSignal){
     if(input!==undefined){const {action,...body}=memberDomainCommandSchema.parse(input);const route={claim:'claim',rename:'rename',create:'records',update:'records/update',delete:'records/delete'}[action];await this.accountRequest('/v1/domains/'+route,body,signal);}
     return memberDomainStateSchema.parse(await this.accountRequest('/v1/domains',undefined,signal));

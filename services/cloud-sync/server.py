@@ -551,6 +551,8 @@ def handler(service):
                         value=service.devices.lease(account,body)
                     elif self.path == '/v1/devices/remove' and self.command == 'POST':
                         value=service.devices.remove(account,body)
+                    elif self.path == '/v1/account/traffic' and self.command == 'GET':
+                        value=service.metering.account_view(account)
                     elif self.path == '/v1/account' and self.command == 'GET':
                         value = service.profile(account)
                     elif self.path == '/v1/auth/keybox' and self.command == 'POST':

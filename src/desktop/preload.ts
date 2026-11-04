@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { Bridge, SessionEvent } from '../shared/contracts';
 const bridge: Bridge = {
+  cloudTraffic:()=>ipcRenderer.invoke('cloud:traffic'),
   cloudDomains:input=>ipcRenderer.invoke('cloud:domains',input),
   cloudMcpClients:input=>ipcRenderer.invoke('cloud:mcp-clients',input),
   desktopViewClipboard:(id,input,generation)=>ipcRenderer.invoke('desktop:view-clipboard',id,input,generation),

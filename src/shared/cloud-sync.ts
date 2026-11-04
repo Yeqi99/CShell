@@ -27,6 +27,7 @@ export interface CloudStatus {
 }
 export interface AccountDiscoveryStatus {enabled:boolean;devices:{id:string;online:boolean|null}[];pending:number}
 export interface CloudBridge extends importAccountBridge {
+  cloudTraffic():Promise<import('./account-traffic').AccountTraffic>;
   cloudDomains(input?:import('./member-domains').MemberDomainCommand):Promise<import('./member-domains').MemberDomainState>;
   cloudMcpClients(input?:{action:'create'|'revoke';id?:string;name?:string;bridgeId?:string;scopes?:string[]}):Promise<{endpoint?:string;bridges?:{id:string;name:string}[];clients?:{id:string;name:string;bridgeId:string;expiresAt:number;revoked:boolean}[];token?:string}>;
   cloudDiscovery(enabled?:boolean):Promise<AccountDiscoveryStatus>;

@@ -62,6 +62,7 @@ export const aiPolicySchema = z
         'events.manage',
         'web.search',
         'cloudflare.manage',
+        'account.read',
         'domains.read',
         'domains.manage',
         'http.use',
