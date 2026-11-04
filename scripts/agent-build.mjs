@@ -46,6 +46,7 @@ await writeFile(
   JSON.stringify(
     {
       name: 'cagent-runtime',
+      edition: 'opensource',
       version,
       private: true,
       dependencies: {
@@ -233,6 +234,7 @@ await writeFile(
       arch: process.arch,
       node: process.versions.node,
       electron: false,
+      edition: 'opensource',
       desktopNative,
     },
     null,

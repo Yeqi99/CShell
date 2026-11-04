@@ -11,6 +11,11 @@ const installed = (await readdir(join(sdk, 'build-tools')))
   .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
 if (!installed.length) throw new Error('Android build-tools missing');
 const tools = join(sdk, 'build-tools', installed[0]);
+const entries = execFileSync(join(tools, process.platform === 'win32' ? 'aapt.exe' : 'aapt'), ['list', apk], {encoding:'utf8', windowsHide:true}).split(/\r?\n/);
+for (const abi of ['armeabi-v7a','arm64-v8a','x86','x86_64']) {
+  if (!entries.includes(`lib/${abi}/libhev-socks5-tunnel.so`)) throw new Error(`APK missing VPN engine for ${abi}; run prepare-android-vpn.mjs`);
+}
+if (!entries.includes('assets/VPN_THIRD_PARTY_NOTICES.txt')) throw new Error('APK missing VPN third-party notices');
 const version = JSON.parse(await readFile('package.json', 'utf8')).version;
 const identity = JSON.parse(
   await readFile(new URL('./android-release-identity.json', import.meta.url), 'utf8'),

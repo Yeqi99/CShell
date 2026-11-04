@@ -135,3 +135,11 @@
 | `tests/wsl-setup.test.ts` | 自动三方合并 |
 | `tools/cagent-desktop/install-system-service.ps1` | 自动三方合并 |
 | `tools/cagent-desktop/native/desktop.cpp` | 自动三方合并 |
+
+## 增量与隔离 Agent 实包核验
+
+- e4b6bd0 的系统桌面与 WSL 内容与已迁移内容一致（两文件仅尾部空行差异）。c9374eb 保留通用反馈与 VPN 本地入口，排除账号同步专属代码。
+- 补入 VPN JVM 测试脚本、说明和 APK 四 ABI/许可证强制检查；真实 SOCKS 测试通过 TCP 往返、DNS、UDP 拒绝、注入拒绝及出口失效关闭。
+- 使用已核验 LLVM-MinGW 工具链构建 `.local/core-1.0-agent`；原生桌面、原生窗口及 PTY 通过。build-info 明确 `version=1.0.0`、`edition=opensource`。
+- 从该实际包启动独立临时数据目录 Agent，远程监听保持关闭，通过真实本地 IPC 调用 `update.check` 成功，回执 current=1.0.0、available=false；完成后关闭该测试进程，未触及用户 Agent 或应用升级。
+- 实包核验回执：`.local/core-1.0-check/agent-runtime-receipt.json`。此结果不表示 1.0 已发布，线上更新目录没有新包是正常状态。
