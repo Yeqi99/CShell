@@ -186,6 +186,7 @@ export function registerUpdateHandlers(
       if (process.platform === 'win32') {
         // The normal window close guard protects sessions; will-quit flushes
         // histories before the installer is launched from the final quit event.
+        installAuthorization?.();
         const launch = () => {
           const installer = spawn(file, ['/S', '--force-run', '/D=' + dirname(app.getPath('exe'))], {
             detached: true, stdio: 'ignore', windowsHide: true, windowsVerbatimArguments: true,
@@ -196,7 +197,6 @@ export function registerUpdateHandlers(
         app.once('quit', launch);
         queued = true;
         (window as EventEmitter).once('update-close-cancelled', () => { app.removeListener('quit', launch); queued = false; busy = false; });
-        installAuthorization?.();
         if(operation==='install')window.emit('update-mcp-approved');
         app.quit();
         return;
@@ -204,6 +204,7 @@ export function registerUpdateHandlers(
       if (process.platform === 'linux') {
         const target = process.env.APPIMAGE || '';
         const staged = await prepareAppImageUpdate(file, target);
+        installAuthorization?.();
         const launch = () => {
           try {
             staged.commit();
@@ -220,6 +221,7 @@ export function registerUpdateHandlers(
       }
       if (process.platform === 'darwin') {
         const staged = await prepareMacUpdate(file, app.getPath('exe'), release!.version);
+        installAuthorization?.();
         const launch = () => {
           try {
             staged.commit();
