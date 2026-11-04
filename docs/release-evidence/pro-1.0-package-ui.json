@@ -1,0 +1,62 @@
+{
+  "date": "2026-11-04",
+  "version": "1.0.0",
+  "edition": "Pro",
+  "executable": "release/pro-1.0.0/win-unpacked/CShell Pro.exe",
+  "isolation": "Each smoke launched a separate packaged process under temporary CSHELL_TEST_DATA; no user application closed or modified.",
+  "passed": [
+    {
+      "script": "scripts/package-ui-smoke.ts",
+      "checks": [
+        "packaged version/name identity",
+        "isolated data directory",
+        "English desktop icon labels",
+        "320px desktop layout",
+        "icon-only Ping and menu clamped in viewport",
+        "native desktop app hidden for absent/unknown and shown for present"
+      ]
+    },
+    {
+      "script": "scripts/connection-view-package-smoke.ts",
+      "checks": [
+        "real loopback SSH connection",
+        "original terminal default",
+        "visual/original switch retains same SSH session and terminal history",
+        "saved opening preference persists"
+      ]
+    },
+    {
+      "script": "scripts/file-connection-package-smoke.ts",
+      "checks": [
+        "SFTP-only connection",
+        "read and atomic save",
+        "mkdir",
+        "zero SSH shell requests",
+        "no floating terminal",
+        "three home modes",
+        "offline draft retained",
+        "reconnect produces separate session"
+      ]
+    }
+  ],
+  "screenshots": [
+    {
+      "path": "test-results/1.0.0-packaged-ui/CShell Pro-english.png",
+      "sha256": "ff8101d007a404c8aa694d05f9b7b866745b374f369b48c73c07f7aee0d7d262"
+    },
+    {
+      "path": "test-results/1.0.0-packaged-ui/CShell Pro-desktop-present.png",
+      "sha256": "2d5b3258cc2b4df4245bbcf520d146d9915b8428f07a568b1cef7b2b47b6d0dc"
+    },
+    {
+      "path": "test-results/file-connection-package/sftp-old-draft-after-reconnect.png",
+      "sha256": "cd8ec7f14f10f91f78e0ef5c257a87188eab3b5901c694d74d27a0a57159b77c"
+    }
+  ],
+  "limitations": [
+    "Native desktop detection used controlled IPC states; does not prove physical Linux desktop capture.",
+    "English mode still has Chinese workbench heading/mode labels and sign-in; full application localization is not complete.",
+    "320px desktop screenshot deliberately narrows only desktop element; remaining workspace blank area is fixture-induced.",
+    "Not a physical Android, remote Windows, or cross-network visual acceptance."
+  ]
+}
