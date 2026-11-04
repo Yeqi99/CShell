@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {preferencesTool} from '../src/core/preferences-tool';import {defaults} from '../src/shared/contracts';
 test('preferences tools keep sensitive configuration out, serialize revision writes and preserve omitted fields',async()=>{
- let saved={...defaults,uiFontAsset:null};let writes=0;
+ let saved:typeof defaults={...defaults,uiFontAsset:null};let writes=0;
  const tool=preferencesTool({read:()=>saved,save:async value=>{writes++;saved=value;}});const signal=new AbortController().signal;
  const read=JSON.parse(await tool.invoke({action:'read'},signal));assert(!('uiFontAsset' in read.value));
  await assert.rejects(tool.invoke({action:'patch',revision:read.revision,changes:{mcp:{enabled:true}}},signal));
