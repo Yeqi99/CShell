@@ -6,7 +6,8 @@ export async function syncClientProfiles(store: Store, devices: ClientDevice[]) 
   for (const device of devices) {
     const existing = store.snapshot().profiles.find((p) => p.id === device.deviceId);
     if (existing && existing.protocol !== 'client') throw new Error('Connection identity conflict');
-    if (existing && existing.host === device.host && existing.port === device.port) continue;
+    // Discovery refreshes transport metadata, never user-owned connection addresses.
+    if (existing) continue;
     await store.saveProfile({
       id: device.deviceId,
       name: device.name,
@@ -15,7 +16,6 @@ export async function syncClientProfiles(store: Store, devices: ClientDevice[]) 
       favorite: false,
       auth: 'password',
       clientShell: 'powershell',
-      ...existing,
       protocol: 'client',
       host: device.host,
       port: device.port,

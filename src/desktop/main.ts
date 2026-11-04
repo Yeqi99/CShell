@@ -307,6 +307,10 @@ else
         emit,
       );
       await clientProvider.load();
+      for (const device of clientProvider.list()) {
+        const saved=store.snapshot().profiles.find(p=>p.id===device.deviceId&&p.protocol==='client');
+        if(saved&&(saved.host!==device.host||saved.port!==device.port))await clientProvider.updateEndpoint(device.deviceId,{host:saved.host,port:saved.port});
+      }
       await syncClientProfiles(store, clientProvider.list());
       connections.register(clientProvider);
       floating = new FloatingWindows(
@@ -913,7 +917,7 @@ else
       handle('clipboard:files-begin',files=>localClipboard.begin(files as any));
       handle('clipboard:files-chunk',(id,index,offset,data)=>localClipboard.chunk(String(id),Number(index),Number(offset),String(data)));
       handle('clipboard:files-commit',id=>localClipboard.commit(String(id)));
-      handle('profile:save', (value) => {
+      handle('profile:save', async (value) => {
         const profile = profileSchema.parse(value);
         const old = store.snapshot().profiles.find((p) => p.id === profile.id);
         if (old && (old.protocol ?? 'ssh') !== (profile.protocol ?? 'ssh'))
@@ -922,8 +926,8 @@ else
         if (profile.protocol === 'http') http.workspace(profile.id);
         if (profile.protocol === 'client') {
           const device = clientProvider.list().find((d) => d.deviceId === profile.id);
-          if (!device || device.host !== profile.host || device.port !== profile.port)
-            throw new Error('Client identity or endpoint mismatch');
+          if (!device) throw new Error('Client identity missing');
+          await clientProvider.updateEndpoint(profile.id,{host:profile.host,port:profile.port});
         }
         return store.saveProfile(profile);
       });

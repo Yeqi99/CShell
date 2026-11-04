@@ -248,6 +248,14 @@ export class ClientProvider implements ManagedProvider {
   async load() {
     this.devices = (await this.vault.read('devices', z.array(deviceSchema).max(100))) ?? [];
   }
+  async updateEndpoint(deviceId: string, value: unknown) {
+    const endpoint = clientEndpointSchema.parse(value);
+    const current = this.devices.find(d => d.deviceId === deviceId);
+    if (!current) throw Error('Client identity missing');
+    const next = this.devices.map(d => d.deviceId === deviceId ? {...d, ...endpoint} : d);
+    await this.vault.write('devices', next);
+    this.devices = next;
+  }
   list(): ClientDevice[] {
     return this.devices.map(({ certificate, relay: _relay, ...d }) => ({
       ...d,
