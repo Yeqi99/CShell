@@ -8,6 +8,9 @@ from quotas import Quotas, MAX_STORAGE
 from metering import Metering
 from feedback import Feedback
 from bridges import Bridges
+from mcp_clients import McpClients
+from vault_chunks import VaultChunks
+from domains import Domains
 import base64
 import hashlib
 import hmac
@@ -67,8 +70,11 @@ class Service:
         self.metering=Metering(self)
         self.feedback=Feedback(self,Failure)
         self.bridges=Bridges(self,Failure)
+        self.mcp_clients=McpClients(self,Failure)
+        self.vault_chunks=VaultChunks(self,Failure)
         self.devices=Devices(self,Failure)
         self.models=Models(self,Failure)
+        self.domains=Domains(self,Failure)
 
     @contextmanager
     def db(self):
@@ -287,11 +293,17 @@ class Service:
         if row and schema < row[0]:
             raise Failure(426, "此账号已使用新版同步格式，请更新 CShell / CAgent；本机及云端数据均已保留")
 
-    def read(self, account, schema=1):
+    def read(self, account, schema=1, max_bytes=MEMBER_BYTES):
+        if type(max_bytes) is not int or not 1 <= max_bytes <= MAX_STORAGE:
+            raise Failure(400,'客户端同步容量声明不正确')
         with self.db() as db:
             self.check_vault_schema(db,account,schema)
+            size=db.execute('SELECT byte_size FROM vaults WHERE account=?',(account,)).fetchone()
+            if size and size[0]>min(max_bytes,MEMBER_BYTES):
+                raise Failure(413,'云端数据超过此客户端可读取容量，请升级支持分块同步的客户端；云端数据保持完整')
             row = db.execute('SELECT revision,envelope FROM vaults WHERE account=?', (account,)).fetchone()
-        return {'revision': row[0], 'envelope': json.loads(row[1])} if row else {'revision': 0, 'envelope': None}
+            chunked=self.vault_chunks.legacy(db,account) if row else None
+        return {'revision': row[0], 'envelope': chunked or json.loads(row[1])} if row else {'revision': 0, 'envelope': None}
 
     def write(self, account, body, schema=1):
         revision, mutation, envelope = body.get('baseRevision'), body.get('mutationId'), body.get('envelope')
@@ -301,7 +313,7 @@ class Service:
             raise Failure(400, '不支持的密文格式')
         try:
             nonce, ciphertext = base64.b64decode(envelope['nonce'], validate=True), base64.b64decode(envelope['ciphertext'], validate=True)
-            if len(nonce) != 12 or not 16 <= len(ciphertext) <= MAX_STORAGE + 16:
+            if len(nonce) != 12 or not 16 <= len(ciphertext) <= MEMBER_BYTES + 16:
                 raise ValueError()
         except (ValueError, TypeError):
             raise Failure(400, '密文大小或编码不正确')
@@ -316,12 +328,13 @@ class Service:
                 return {'revision': row[0]}
             member=db.execute('SELECT expires FROM memberships WHERE account=?',(account,)).fetchone()
             allowance=self.quotas.allowance(db,account,MEMBER_BYTES if member and member[0]>time.time() else FREE_BYTES)
-            previous_size=len(base64.b64decode(json.loads(row[2])['ciphertext'])) if row else 0
+            previous_size=db.execute('SELECT byte_size+16 FROM vaults WHERE account=?',(account,)).fetchone()[0] if row else 0
             if len(ciphertext)>allowance+16 and len(ciphertext)>=previous_size:
                 raise Failure(413, '云空间已满，请减少同步内容或升级会员；现有云端数据保留')
             if revision != (row[0] if row else 0):
                 raise Failure(409, '另一台设备已更新云端，请检查同步冲突')
             db.execute('INSERT OR REPLACE INTO vaults(account,revision,envelope,mutation,byte_size) VALUES(?,?,?,?,?)', (account, revision + 1, encoded, mutation,len(ciphertext)-16))
+            db.execute('DELETE FROM vault_chunk_meta WHERE account=?',(account,));db.execute('DELETE FROM vault_chunks WHERE account=?',(account,))
             db.execute('INSERT INTO vault_versions VALUES(?,?) ON CONFLICT(account) DO UPDATE SET schema=max(schema,excluded.schema)',(account,schema))
         return {'revision': revision + 1}
 
@@ -393,9 +406,10 @@ def handler(service):
                     if not acquired:raise Failure(429,'同步服务繁忙，客户端会自动重试')
                 admin = self.path.startswith('/v1/admin/')
                 if admin:
-                    relay_auth=self.path=='/v1/admin/relay/authorize'
-                    secret = os.environ.get('RELAY_AUTH_TOKEN' if relay_auth else 'ADMIN_API_TOKEN', '')
-                    if not secret or not hmac.compare_digest(self.headers.get('X-Relay-Token' if relay_auth else 'X-Admin-Token', ''), secret):
+                    relay_auth=self.path in ('/v1/admin/relay/authorize','/v1/admin/relay/traffic')
+                    mcp_auth=self.path in ('/v1/admin/mcp/authorize','/v1/admin/mcp/invoke')
+                    secret = os.environ.get('MCP_AUTH_TOKEN' if mcp_auth else 'RELAY_AUTH_TOKEN' if relay_auth else 'ADMIN_API_TOKEN', '')
+                    if not secret or not hmac.compare_digest(self.headers.get('X-Mcp-Token' if mcp_auth else 'X-Relay-Token' if relay_auth else 'X-Admin-Token', ''), secret):
                         raise Failure(403, '管理员认证失败')
                     if self.headers.get('Origin') not in (None, 'https://admin-shell.canp.ai'):
                         raise Failure(403, '来源不允许')
@@ -407,34 +421,66 @@ def handler(service):
                     if bearer and not self.path.startswith('/v1/auth/'):
                         service.authenticate(bearer);bucket=service.digest(bearer)
                     else:bucket=service.digest(ip)
-                    service.limit('api:' + bucket, 240, 60)
+                    service.limit(('vault-chunks:' if self.path=='/v1/vault/chunks' else 'api:') + bucket, 1200 if self.path=='/v1/vault/chunks' else 240, 60)
                 body = {}
                 if self.command == 'POST':
                     size = int(self.headers.get('Content-Length', '0'))
                     limit=int(FREE_BYTES*4/3)+65536
+                    if self.path=='/v1/mcp/reply':limit=8*1024*1024+4096
+                    if self.path=='/v1/vault/chunks':limit=1024*1024+4096
                     if self.path=='/v1/feedback':
                         limit=128*1024
                         service.limit('feedback:'+service.digest(ip),10,3600)
                     if self.path=='/v1/vault':
                         token=self.headers.get('Authorization','').removeprefix('Bearer ')
                         current=service.profile(service.authenticate(token))
-                        limit=int(max(current['storage']['limitBytes'],current['storage']['usedBytes'])*4/3)+65536
+                        limit=int(min(MEMBER_BYTES,max(current['storage']['limitBytes'],current['storage']['usedBytes']))*4/3)+65536
                     if size>limit: raise Failure(413,'请求超过账号云空间额度')
                     if not 0 < size <= MAX_BODY or self.headers.get('Transfer-Encoding'):
                         raise Failure(413, '请求大小不正确')
                     body = json.loads(self.rfile.read(size))
                     if not isinstance(body, dict):
                         raise Failure(400, '请求格式不正确')
-                if self.path == '/v1/feedback' and self.command == 'POST':
+                if admin and self.path == '/v1/admin/mcp/authorize' and self.command == 'POST':
+                    value=service.mcp_clients.authorize(body.get('token'))
+                elif admin and self.path == '/v1/admin/mcp/invoke' and self.command == 'POST':
+                    value=service.mcp_clients.invoke(body)
+                elif self.path == '/v1/feedback' and self.command == 'POST':
                     value=service.feedback.submit(body)
                 elif admin and self.path == '/v1/admin/feedback' and self.command == 'GET':
                     value=service.feedback.list()
                 elif admin and self.path == '/v1/admin/feedback/status' and self.command == 'POST':
                     value=service.feedback.update_status(body)
+                elif admin and self.path == '/v1/admin/relay/traffic' and self.command == 'POST':
+                    identity=body.get('id');action=body.get('action')
+                    if not isinstance(identity,str) or not re.fullmatch('[a-f0-9-]{36}',identity):raise Failure(400,'流量计量参数无效')
+                    try:
+                        if action=='reserve':
+                            authorization=service.devices.authorize(dict(body,operation='forward',continuation=True))
+                            if not authorization['allowed']:raise Failure(403,'中继授权已失效')
+                            amount=body.get('budget')
+                            if type(amount) is not int or not 0<amount<=1024*1024:raise ValueError('Invalid window')
+                            service.metering.reserve(authorization['account'],'relay:'+identity,'relay',amount)
+                        elif action=='settle':
+                            with service.db() as db:row=db.execute("SELECT account FROM traffic_reservations WHERE id=? AND category='relay'",('relay:'+identity,)).fetchone()
+                            if not row:raise ValueError('Unknown reservation')
+                            service.metering.settle(row[0],'relay:'+identity,body.get('ingress'),body.get('egress'))
+                        else:raise ValueError('Unknown accounting action')
+                        value={'ok':True}
+                    except ValueError:raise Failure(400,'流量计量参数无效')
+                    except Exception as error:
+                        from metering import TrafficLimitExceeded
+                        if isinstance(error,TrafficLimitExceeded):raise Failure(429,'中继流量额度已用完')
+                        raise
                 elif admin and self.path == '/v1/admin/relay/authorize' and self.command == 'POST':
                     value=service.devices.authorize(body)
                 elif admin and self.path == '/v1/admin/storage-grant' and self.command == 'POST':
                     value=service.quotas.grant(body)
+                elif admin and self.path == '/v1/admin/traffic' and self.command == 'GET':
+                    value=service.metering.admin_view()
+                elif admin and self.path == '/v1/admin/traffic' and self.command == 'POST':
+                    try:value=service.metering.admin_change(body)
+                    except ValueError:raise Failure(400,'流量配置或对账数据无效')
                 elif admin and self.path == '/v1/admin/model-usage' and self.command == 'GET':
                     value=service.models.usage()
                 elif admin and self.path == '/v1/admin/lending' and self.command == 'GET':
@@ -462,7 +508,9 @@ def handler(service):
                 else:
                     token = self.headers.get('Authorization', '').removeprefix('Bearer ')
                     account = service.authenticate(token)
-                    if self.path == '/v1/mcp/bridges' and self.command == 'GET':
+                    if self.path == '/v1/mcp/clients' and self.command in ('GET','POST'):
+                        value=service.mcp_clients.manage(account,body if self.command=='POST' else None)
+                    elif self.path == '/v1/mcp/bridges' and self.command == 'GET':
                         value=service.bridges.list(account)
                     elif self.path in ('/v1/mcp/register','/v1/mcp/poll','/v1/mcp/reply','/v1/mcp/remove') and self.command == 'POST':
                         value=getattr(service.bridges,self.path.rsplit('/',1)[1])(account,body)
@@ -476,6 +524,13 @@ def handler(service):
                         value=service.models.complete(account,body,self.stream_event if body.get('stream') is True else None)
                         if self.streaming:
                             return
+                    elif self.path == '/v1/domains' and self.command == 'GET':
+                        value=service.domains.list(account)
+                    elif self.path in ('/v1/domains/claim','/v1/domains/rename','/v1/domains/records','/v1/domains/records/update','/v1/domains/records/delete') and self.command=='POST':
+                        service.limit('domain-write:'+account,30,60)
+                        if self.path.endswith('/claim') or self.path.endswith('/rename'):value=service.domains.claim(account,body)
+                        elif self.path.endswith('/delete'):value=service.domains.delete(account,body)
+                        else:value=service.domains.write(account,body)
                     elif self.path == '/v1/devices' and self.command == 'GET':
                         value=service.devices.list(account)
                     elif self.path == '/v1/devices/register' and self.command == 'POST':
@@ -509,8 +564,18 @@ def handler(service):
                         value = {'ok': True}
                     elif self.path == '/v1/auth/password' and self.command == 'POST':
                         value = service.set_password(account, body.get('password'))
+                    elif self.path == '/v1/vault/chunks' and self.command in ('GET','POST'):
+                        if self.headers.get('X-CShell-Vault-Transport')!='1':raise Failure(426,'请升级支持分块同步的客户端')
+                        capacity=self.headers.get('X-CShell-Vault-Max-Bytes',str(MEMBER_BYTES))
+                        if not re.fullmatch(r'[0-9]{1,10}',capacity) or not 1<=int(capacity)<=MAX_STORAGE:raise Failure(400,'客户端容量声明错误')
+                        schema=int(self.headers.get('X-CShell-Vault-Schema','1')) if self.headers.get('X-CShell-Vault-Schema') in ('1','2','3','4') else 1
+                        if body.get('action') in ('begin','put','commit'):
+                            write=self.headers.get('X-CShell-Vault-Write-Schema','1');schema=min(schema,int(write)) if write in ('1','2','3','4') else 1
+                        value=service.vault_chunks.manifest(account,schema,int(capacity)) if self.command=='GET' else service.vault_chunks.operate(account,body,schema,int(capacity))
                     elif self.path == '/v1/vault' and self.command == 'GET':
-                        value = service.read(account, int(self.headers.get('X-CShell-Vault-Schema')) if self.headers.get('X-CShell-Vault-Schema') in ('1','2','3','4') else 1)
+                        capacity=self.headers.get('X-CShell-Vault-Max-Bytes',str(MEMBER_BYTES))
+                        if not re.fullmatch(r'[0-9]{1,10}',capacity):raise Failure(400,'客户端同步容量声明不正确')
+                        value = service.read(account, int(self.headers.get('X-CShell-Vault-Schema')) if self.headers.get('X-CShell-Vault-Schema') in ('1','2','3','4') else 1,int(capacity))
                     elif self.path == '/v1/vault' and self.command == 'POST':
                         value = service.write(account, body, min(int(self.headers.get('X-CShell-Vault-Schema', '1')), int(self.headers.get('X-CShell-Vault-Write-Schema', '1'))) if self.headers.get('X-CShell-Vault-Schema') in ('1','2','3','4') and self.headers.get('X-CShell-Vault-Write-Schema') in ('1','2','3','4') else 1)
                     elif self.path == '/v1/auth/logout' and self.command == 'POST':

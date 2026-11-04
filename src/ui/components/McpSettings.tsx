@@ -1,4 +1,5 @@
 import {ErrorNotice} from './ErrorNotice';
+import {CloudMcpClients} from './CloudMcpClients';
 import { defaultMcpPort } from '../../shared/mcp-endpoint';
 import { selectAllMcpPermissions } from './mcp-all-permissions';
 import { apiCapabilitySchema } from '../../shared/contracts';
@@ -87,6 +88,7 @@ export function McpSettings({
     <section className="mcp-settings">
       <h2>{t('mcpService')}</h2>
       <p className="muted">{t('mcpHint')}</p>
+      <CloudMcpClients/>
       {draft && (
         <fieldset disabled={busy || saving}>
           <div className="capability-selection mcp-global-actions">
@@ -107,6 +109,14 @@ export function McpSettings({
             />
             {t('mcpEnable')}
           </label>
+          <label>
+            {locale === 'zh-CN' ? '同账号 CanpAI 接入' : 'CanpAI account connection'}
+            <select value={draft.accountBridge?.clientId ?? ''} onChange={e=>setDraft({...draft,accountBridge:e.target.value?{clientId:e.target.value}:undefined})}>
+              <option value="">{locale === 'zh-CN' ? '关闭' : 'Off'}</option>
+              {(draft.clients??[]).filter(client=>client.enabled).map(client=><option key={client.id} value={client.id}>{client.name}</option>)}
+            </select>
+          </label>
+          <p className="muted">{locale === 'zh-CN' ? '选择独立客户端后，同账号 CanpAI 可通过云端调用此客户端已授权的机器与能力，无需公网 IP。请先在下方创建并配置客户端；此设置不会扩大权限。' : 'Select a dedicated API client to let the same CanpAI account use its granted machines through the cloud, without a public IP. Configure the client below; existing grants still apply.'}</p>
           <label>
             {t('mcpPort')}
             <input

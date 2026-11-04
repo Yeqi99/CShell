@@ -18,6 +18,8 @@ import { emptySharedAi } from '../shared/shared-ai';
 import type { DesktopAccountProfiles } from '../core/desktop-account-profiles';
 import {AccountWorkspaceMismatch} from '../core/desktop-account-profiles';
 import {registerAccountImports} from './account-import';
+import {AccountMcpBridge} from '../core/account-mcp-bridge';
+import {createMemberDomainTools} from '../core/member-domain-tools';
 
 const assetName = z.string().regex(/^[a-f0-9]{64}\.(?:ttf|otf|woff|woff2|png)$/);
 const bundleSchema = z
@@ -51,6 +53,7 @@ export async function registerCloudHandlers(
   tavily?: import('../extensions/tavily/service').TavilyExtension,
   desktopLooks?:import('../core/desktop-looks').DesktopLooks,
   identityNetwork?:{cloudExport():unknown;cloudImport(input:unknown):Promise<void>;hasPortableState?():boolean;reconcileAfterCloud?():Promise<void>},
+  mcp?:()=>import('../core/mcp').McpService|undefined,
 ) {
   const directory = app.getPath('userData');
   const assertAccountIdle=()=>{profileOptions?.assertIdle();if(ai.snapshot().threads.some(t=>t.state==='running'||t.state==='approval'||t.goal?.state==='active'))throw Error('请先停止智能体任务，再切换账号');};
@@ -220,6 +223,10 @@ export async function registerCloudHandlers(
     const discovery=await cloud.accountRequest('/v1/devices');
     return {...result,devices:(discovery.devices??[]).filter((d:any)=>!d.borrowed).map((d:any)=>({id:d.deviceId,name:d.name}))};
   });
+  handle('cloud:domains',input=>cloud.domains(input));
+  const domainTools=createMemberDomainTools({accountId:()=>cloud.accountId(),domains:(input,signal)=>cloud.domains(input,signal)});
+  const previousExtensionTools=ai.extensionTools;
+  ai.extensionTools=()=>[...(previousExtensionTools?.()??[]),...domainTools];
   handle('cloud:lending',async(input:any)=>{
     const action=z.enum(['list','create','redeem','revoke']).parse(input?.action);
     const result=await cloud.accountRequest(action==='list'?'/v1/lending':'/v1/lending/'+action,action==='list'?undefined:input.body);
@@ -254,6 +261,7 @@ export async function registerCloudHandlers(
     cloud.sync(z.enum(['upload', 'download']).optional().parse(direction)),
   );
   handle('cloud:logout', () => {assertAccountIdle();return cloud.logout();});
+  handle('cloud:mcp-clients',input=>cloud.accountRequest('/v1/mcp/clients',input===undefined?undefined:z.object({action:z.enum(['create','revoke']),id:z.string().uuid().optional(),name:z.string().min(1).max(80).optional(),bridgeId:z.string().uuid().optional(),scopes:z.array(z.enum(['list_servers_page','connect','describe_connection','invoke_connection','disconnect','list_application_tools','describe_application_tool','invoke_application_tool'])).min(1).max(8).optional()}).strict().parse(input)));
   const discovery=new AccountDiscovery(directory,store,()=>cloud.activationDeferred()?undefined:cloud.accountId(),()=>client.cloudExport(),async()=>{
     const result=await cloud.accountRequest('/v1/devices');
     return z.array(z.object({deviceId:z.string().uuid(),certificate:z.string().min(100).max(8192),online:z.boolean(),borrowed:z.boolean().optional()})).max(200).parse(result.devices);
@@ -265,4 +273,6 @@ export async function registerCloudHandlers(
   const timer = setInterval(() => { void tick(); }, 15000);
   timer.unref();
   app.once('before-quit', () => clearInterval(timer));
+  if(mcp){const bridge=new AccountMcpBridge(directory,clientCodec,cloud,mcp);bridge.start();app.once('before-quit',()=>bridge.stop());}
+  return domainTools;
 }
