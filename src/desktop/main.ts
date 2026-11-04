@@ -1144,6 +1144,7 @@ else
       let closing = false,
         closePrompt = false;
       (window as import('node:events').EventEmitter).on('update-mcp-approved',()=>{closing=true;});
+      (window as import('node:events').EventEmitter).on('update-mcp-cancelled',()=>{closing=false;});
       window.on('close', (event) => {
         if (
           closing ||

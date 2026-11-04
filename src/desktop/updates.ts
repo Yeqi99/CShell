@@ -66,7 +66,7 @@ export function registerUpdateHandlers(
   handle('update:state', () => state);
   handle('update:open-page', () => shell.openExternal(releasesPage));
   const check = async () => {
-    if (busy) return state;
+    if (busy || operation) return state;
     busy = true;
     release = undefined;
     file = '';
@@ -171,7 +171,7 @@ export function registerUpdateHandlers(
   // Keep checking for updates until the application actually exits.
   app.once('quit',()=>{clearTimeout(initial);clearInterval(repeat);});
   handle('update:install', async () => {
-    if (busy || state.phase !== 'ready' || !file)
+    if (busy || (operation && operation!=='install') || state.phase !== 'ready' || !file)
       throw new Error('Download and verify the update first');
     busy = true;
     try {
@@ -181,6 +181,7 @@ export function registerUpdateHandlers(
           .digest('hex') !== expected
       )
         throw new Error('Update file changed; download again');
+      if(operation==='install')window.emit('update-mcp-approved');
       if (process.platform === 'win32') {
         // The normal window close guard protects sessions; will-quit flushes
         // histories before the installer is launched from the final quit event.
@@ -237,21 +238,25 @@ export function registerUpdateHandlers(
     }
   });
   return applicationUpdateTool({
+    ready:()=>receiptReady,
     state:()=>({update:state,operation,receipt:receipt.status()}),
     run:async(action,authorize)=>{
       await receiptReady;authorize();
       if(operation||busy)throw Error('An update operation is already running; poll status');
       if(action==='install'){
         if(state.phase!=='ready'||!file||!release)throw Error('Download and verify the update first');
+        operation='install';
+        try {
         if(createHash('sha256').update(await readFile(file)).digest('hex')!==expected)throw Error('Update file changed; download again');
         authorize();
         await receipt.save({targetVersion:release.version,previousVersion:app.getVersion(),channel:isPro?'pro':'opensource',requestedAt:Date.now(),phase:'scheduled'});
         authorize();operation='install';
-        setTimeout(()=>{void (async()=>{try{authorize();window.emit('update-mcp-approved');await handlers.get('update:install')!();}catch(e){operation=undefined;await receipt.save({targetVersion:release?.version,phase:'failed',error:String(e)});}})().catch(e=>console.error('Update handoff receipt failed',e));},1500);
+        setTimeout(()=>{void (async()=>{try{authorize();await handlers.get('update:install')!();}catch(e){operation=undefined;await receipt.save({targetVersion:release?.version,phase:'failed',error:String(e)});}})().catch(e=>console.error('Update handoff receipt failed',e));},1500);
         return;
+        } catch(e){operation=undefined;throw e;}
       }
-      operation=action;
-      void Promise.resolve(handlers.get('update:'+action)!()).catch(e=>fail(e,action)).finally(()=>{operation=undefined;});
+      const pending=handlers.get('update:'+action)!();operation=action;
+      void Promise.resolve(pending).catch(e=>fail(e,action)).finally(()=>{operation=undefined;});
     },
   });
 
