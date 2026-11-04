@@ -12,6 +12,7 @@ import { dirname, join } from 'node:path';
 import { spawn } from 'node:child_process';
 import {readCustomExtension,installCustomExtension} from '../core/custom-extensions';
 import { provisionAgent } from './provisioning';
+import {assertCurrentInstalledRuntime} from './installed-launcher';
 
 async function jsonInput() {
   if (stdin.isTTY) throw new Error('请通过标准输入提供 JSON；不要将密码写入命令参数');
@@ -57,6 +58,7 @@ async function secret(prompt: string) {
 const print = (value: unknown) => stdout.write(JSON.stringify(value, null, 2) + '\n');
 async function main() {
   const [command = 'help', method] = process.argv.slice(2);
+  if(['run','app','app-host','restart-app-host'].includes(command))await assertCurrentInstalledRuntime(process.argv[1]);
   if(command==='provision'){
     if(!method || process.argv.slice(4).some(arg=>arg!=='--apply'))throw Error('用法：cagent provision <配置.json> [--apply]；不接受密码参数');
     try { print(await provisionAgent(method,agentDirectory(),process.argv.includes('--apply'))); }

@@ -99,6 +99,12 @@ export class FtpService {
  upload(id:string,localPath:string,remotePath:string,signal?:AbortSignal,progress:Progress=()=>{}){
   return this.run(id,signal,async(client,s)=>{const file=await lstat(localPath);if(!file.isFile()||file.isSymbolicLink())throw Error('请选择一个普通文件，目录和链接不能作为单文件上传');await this.put(client,checkedPath(s.home,remotePath),localPath,file.size,signal,progress);},true);
  }
+ streamUpload(id:string,path:string,source:Readable,size:number,signal:AbortSignal){
+  return this.run(id,signal,(client,s)=>this.put(client,checkedPath(s.home,path),source,size,signal,()=>{}),true);
+ }
+ streamDownload(id:string,path:string,destination:Writable,signal:AbortSignal){
+  return this.run(id,signal,async(client,s)=>{const full=checkedPath(s.home,path),file=await this.find(client,full);if(!file||file.directory||file.symlink)throw Error('请选择普通文件');await client.downloadTo(destination,full);});
+ }
  writeText(id:string,path:string,content:string,signal?:AbortSignal,guard?:()=>void){
   const data=Buffer.from(content);if(data.length>262144)throw Error('文本写入限 256 KiB');
   return this.run(id,signal,(client,s)=>this.put(client,checkedPath(s.home,path),Readable.from(data),data.length,signal,()=>{},guard),true);

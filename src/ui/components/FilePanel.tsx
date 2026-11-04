@@ -1,3 +1,4 @@
+import {ProviderFileCopyActions} from './ProviderFileCopyActions';
 import {ErrorNotice} from './ErrorNotice';
 import {formatFileBytes} from '../../shared/transfer-progress';
 import {FilePermissions} from './FilePermissions';
@@ -217,7 +218,7 @@ export function FilePanel({
       }}
       onDrop={(e) => dropped(e, path)}
     >
-      <div className="file-toolbar">
+      <div className="file-toolbar">{!localRoot&&<ProviderFileCopyActions provider="sftp" sessionId={sessionId} path={path} selected={selected.length===1?entries.find(e=>e.path===selected[0]):undefined} disabled={closed||busy} refresh={()=>void load(path)} onError={reportError}/>}
         <button title={t('parent')} className="icon" onClick={() => void load(`${path}/..`)}>
           <ArrowUp size={16} />
         </button>

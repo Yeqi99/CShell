@@ -31,6 +31,7 @@ const requestSchema = z
   .object({
     id: z.string().uuid(),
     op: z.enum([
+      'file-ticket',
       'info',
       'auth',
       'open',
@@ -48,7 +49,7 @@ const requestSchema = z
   })
   .strict();
 type Peer = z.infer<typeof peerSchema>;
-type Channel = { socket: TLSSocket; peer?: Peer; terminal?: string; alive: boolean; delegation?: {token:string;fingerprint:string}; };
+type Channel = { fileTransfer?:boolean; fileTransferAbort?:AbortController; socket: TLSSocket; peer?: Peer; terminal?: string; alive: boolean; delegation?: {token:string;fingerprint:string}; };
 export class ClientServer {
   private server?: Server;
   private identity!: ClientIdentity;
@@ -71,6 +72,8 @@ export class ClientServer {
     private options: {
       delegation?: (credential:string,fingerprint:string,continuation?:boolean)=>Promise<boolean>;
       http?: (request:import('../../shared/http').HttpWireRequest,signal:AbortSignal)=>Promise<unknown>;
+      fileTransferReset?:()=>void;
+      fileTransfer?: (input:unknown,recipient:string,signal:AbortSignal)=>Promise<unknown>;
       desktopStream?: (socket: TLSSocket, owner: string) => Promise<void>;
       manage?: (method: string, params: unknown, signal: AbortSignal, owner: string) => Promise<unknown>;
       shells?: () => Promise<AgentShellOption[]>;
@@ -235,6 +238,7 @@ export class ClientServer {
     return this.status();
   }
   async stop() {
+    this.options.fileTransferReset?.();
     this.invitation = undefined;
     const server = this.server;
     this.server = undefined;
@@ -311,7 +315,7 @@ export class ClientServer {
     socket.setTimeout(45000, () => socket.destroy());
     socket.on('error', () => {});
     const timeout = setTimeout(() => {
-      if (!c.peer) socket.destroy();
+      if (!c.peer&&!c.fileTransfer) socket.destroy();
     }, 10000);
     socket.once('close', () => {
       clearTimeout(timeout);
@@ -367,6 +371,8 @@ export class ClientServer {
     });
   }
   private async handle(c: Channel, fp: string, op: string, payload: unknown): Promise<unknown> {
+    if(op==='file-ticket'){if(!this.options.fileTransfer||c.peer||c.terminal)throw Error('File transfer unavailable');if(!c.fileTransferAbort){c.fileTransferAbort=new AbortController();c.socket.once('close',()=>c.fileTransferAbort!.abort());}const result=await this.options.fileTransfer(payload,fp,c.fileTransferAbort.signal);c.fileTransfer=true;return result;}
+    if(c.fileTransfer)throw Error('Transfer channel cannot perform other operations');
     if (op === 'info' && !c.peer)
       return { protocol: 1, deviceId: this.identity.id, name: hostname() };
     if (op === 'auth') {
