@@ -520,7 +520,7 @@ else
       handle('desktop-look:get',(id,legacy)=>desktopLooks.get(id,legacy));
       handle('desktop-look:save',(id,value)=>desktopLooks.save(id,value));
       registerAppearanceHandlers(handle, window, app.getPath('userData'), consume, text);
-      registerUpdateHandlers(handle, window);
+      const updateTool=registerUpdateHandlers(handle, window);
       registerFeedback(handle);
       registerUsage(handle, window);
       const classroomEnabled=()=>!accountTransition&&store.plugins().some(p=>p.manifest.id==='cshell.classroom'&&p.enabled);
@@ -729,7 +729,7 @@ else
           fileTransferEndpoint:async(sessionId,signal)=>providerFileCall({sessionId,...(connections!.tools.describe(sessionId).providerId==='cshell.ssh'?{sftp:await ssh.sftp(sessionId)}:{ftp})},signal),
           accountContext:()=>({key:`${accountProfiles?.current()??'local'}:${accountContextEpoch}`,transitioning:accountTransition}),
           http,
-          applicationTools: [...extensionServices.applicationTools,...(identityNetwork?.tools()??[]),...memberDomainTools],
+          applicationTools: [updateTool,...extensionServices.applicationTools,...(identityNetwork?.tools()??[]),...memberDomainTools],
           connectEnvironment: async (parent, conda, prefix, signal, ready) => {
             let child: string | undefined;
             try {
@@ -1143,6 +1143,7 @@ else
       registerFileHandlers(handle, window, ssh, transfers, text);
       let closing = false,
         closePrompt = false;
+      (window as import('node:events').EventEmitter).on('update-mcp-approved',()=>{closing=true;});
       window.on('close', (event) => {
         if (
           closing ||
@@ -1213,3 +1214,4 @@ else
       app.quit();
     });
 app.on('window-all-closed', () => app.quit());
+

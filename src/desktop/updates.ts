@@ -1,3 +1,5 @@
+import {applicationUpdateTool} from '../core/application-update-tool';
+import {UpdateReceipt} from './update-receipt';
 import { requestUpdateWithFallback } from '../shared/update-source-fallback';
 import {agentDownloads,type AgentDownload} from '../shared/agent-downloads';
 import { isPro } from '../shared/edition';
@@ -20,9 +22,14 @@ import {
 
 // Only the main process resolves release assets. Renderer cannot supply a URL or path.
 export function registerUpdateHandlers(
-  handle: (name: string, fn: (...args: any[]) => any) => void,
+  register: (name: string, fn: (...args: any[]) => any) => void,
   window: BrowserWindow,
 ) {
+  const handlers=new Map<string,(...args:any[])=>any>();
+  const handle=(name:string,fn:(...args:any[])=>any)=>{handlers.set(name,fn);register(name,fn);};
+  const receipt=new UpdateReceipt(app.getPath('userData'),app.getVersion());
+  const receiptReady=receipt.load();
+  let operation: string|undefined;
   let state: UpdateState = { current: app.getVersion(), phase: 'idle', platform: process.platform, automatic:true };
   let release: UpdateRelease | undefined,
     file = '',
@@ -229,5 +236,24 @@ export function registerUpdateHandlers(
       busy = queued;
     }
   });
+  return applicationUpdateTool({
+    state:()=>({update:state,operation,receipt:receipt.status()}),
+    run:async(action,authorize)=>{
+      await receiptReady;authorize();
+      if(operation||busy)throw Error('An update operation is already running; poll status');
+      if(action==='install'){
+        if(state.phase!=='ready'||!file||!release)throw Error('Download and verify the update first');
+        if(createHash('sha256').update(await readFile(file)).digest('hex')!==expected)throw Error('Update file changed; download again');
+        authorize();
+        await receipt.save({targetVersion:release.version,previousVersion:app.getVersion(),channel:isPro?'pro':'opensource',requestedAt:Date.now(),phase:'scheduled'});
+        authorize();operation='install';
+        setTimeout(()=>{void (async()=>{try{authorize();window.emit('update-mcp-approved');await handlers.get('update:install')!();}catch(e){operation=undefined;await receipt.save({targetVersion:release?.version,phase:'failed',error:String(e)});}})().catch(e=>console.error('Update handoff receipt failed',e));},1500);
+        return;
+      }
+      operation=action;
+      void Promise.resolve(handlers.get('update:'+action)!()).catch(e=>fail(e,action)).finally(()=>{operation=undefined;});
+    },
+  });
+
 }
 
