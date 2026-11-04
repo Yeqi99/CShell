@@ -1,10 +1,57 @@
 {
   "date": "2026-11-04",
-  "published": false,
-  "checks": ["original bundle digest", "unchanged binary file digests", "production installer staging", "agentVersion 1.0.0 compatibility"],
-  "packages": [
-    {"id":"cagent.wechat.v411556","version":"0.1.3","files":93,"bytes":264771703,"sha256":"a73b1767e46f2737021d4815b672d7f7b023b1cf6cdb381b3b391cb09e912e09"},
-    {"id":"cagent.wechat.v42012","version":"0.1.3","files":93,"bytes":264771599,"sha256":"a044a1f1826613c775465a02cf16ec116f08a2df63791bd4d6e74a93de35a7ba"}
+  "published": true,
+  "checks": [
+    "original bundle digest",
+    "unchanged binary file digests",
+    "production installer staging",
+    "agentVersion 1.0.0 compatibility",
+    "active catalog pins exactly match validated production installer candidates and immutable Hong Kong digest allowlist"
   ],
-  "limitations": ["Does not prove new real WeChat operations", "Public mirrors and release catalog not switched", "4.2 adapter retains its existing text-chat-only capability scope"]
+  "packages": [
+    {
+      "id": "cagent.wechat.v411556",
+      "version": "0.1.3",
+      "files": 93,
+      "bytes": 264771703,
+      "sha256": "a73b1767e46f2737021d4815b672d7f7b023b1cf6cdb381b3b391cb09e912e09"
+    },
+    {
+      "id": "cagent.wechat.v42012",
+      "version": "0.1.3",
+      "files": 93,
+      "bytes": 264771599,
+      "sha256": "a044a1f1826613c775465a02cf16ec116f08a2df63791bd4d6e74a93de35a7ba"
+    }
+  ],
+  "limitations": [
+    "Does not prove new real WeChat operations",
+    "4.2 adapter retains its existing text-chat-only capability scope",
+    "GitHub source URL retained as immutable manifest provenance; actual first download source is verified Hong Kong; GitHub fallback unavailable pending release"
+  ],
+  "hongKong": {
+    "uploaded": true,
+    "remoteSha256Verified": true,
+    "root": "https://shell.canp.ai/downloads/toolkit/v0.1.3/",
+    "catalogSwitched": true,
+    "httpRangeVerified": [
+      {
+        "id": "cagent.wechat.v411556",
+        "status": 206,
+        "rangeBytes": 32,
+        "total": 264771703
+      },
+      {
+        "id": "cagent.wechat.v42012",
+        "status": 206,
+        "rangeBytes": 32,
+        "total": 264771599
+      }
+    ]
+  },
+  "publicationChannel": "Hong Kong immutable packages",
+  "github": {
+    "published": false,
+    "status": "draft upload pending; not an available fallback"
+  }
 }
