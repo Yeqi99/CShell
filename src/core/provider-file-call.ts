@@ -17,6 +17,16 @@ export function providerFileCall(provider:{sftp?:SFTPWrapper;ftp?:FtpService;ses
  const abort=()=>{reader?.destroy(Error('Transfer cancelled'));writer?.destroy(Error('Transfer cancelled'));};signal.addEventListener('abort',abort,{once:true});
  const call=async(method:string,raw:unknown)=>{
   signal.throwIfAborted();const p=raw as any;
+  if(method==='files.list'){
+   if(provider.sftp){const info=await stat(p.path);if(!info.isDirectory()||info.isSymbolicLink())throw Error('Source is not a regular directory');const rows=await new Promise<any[]>((r,j)=>provider.sftp!.readdir(p.path,(e,v)=>e?j(e):r(v)));if(rows.length>10000)throw Error('Directory too large');return {entries:rows.map(row=>({name:row.filename,directory:row.attrs.isDirectory(),symlink:row.attrs.isSymbolicLink(),size:row.attrs.size}))};}
+   if(p.path!=='/'){const parent=await provider.ftp!.list(provider.sessionId,posix.dirname(p.path),signal);const info=parent.entries.find(e=>e.name===posix.basename(p.path));if(!info?.directory||info.symlink)throw Error('Source is not a regular directory');}
+   return provider.ftp!.list(provider.sessionId,p.path,signal);
+  }
+  if(method==='files.action'&&p.action==='mkdir'){
+   if(provider.sftp){if(await exists(p.path))throw Error('Destination already exists; original preserved');await new Promise<void>((r,j)=>provider.sftp!.mkdir(p.path,{mode:0o700},e=>e?j(e):r()));}
+   else await provider.ftp!.action(provider.sessionId,{action:'mkdir',path:p.path},signal);
+   return {ok:true};
+  }
   if(method==='files.read'){
    if(!iterator){
     if(provider.sftp){const s=await stat(p.path);if(!s.isFile()||s.isSymbolicLink())throw Error('Only regular files can be copied');size=s.size;version=`${s.size}:${s.mtime}`;reader=provider.sftp.createReadStream(p.path,{highWaterMark:65536});}

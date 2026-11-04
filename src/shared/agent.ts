@@ -99,7 +99,7 @@ export type AgentTarget = {
 export interface AgentBridge {
   agentFilePaste(target:string,input:{id:string;root:string;path:string}):Promise<{completed:string[]}>;
   agentFileDownload(target:string,input:{id:string;root:string;path:string;name:string}):Promise<{cancelled?:boolean}>;
-  agentFileCopy(input:{id:string;source:{target:string;root:string;path:string;provider?:'sftp'|'ftp'};destination:{target:string;root:string;path:string;provider?:'sftp'|'ftp'};name:string}):Promise<{bytes:number;sha256:string;route:string;destinationPath?:string;verified?:boolean}>;
+  agentFileCopy(input:{id:string;source:{target:string;root:string;path:string;provider?:'sftp'|'ftp'};destination:{target:string;root:string;path:string;provider?:'sftp'|'ftp'};name:string;directory?:boolean}):Promise<{bytes:number;sha256:string;route:string;destinationPath?:string;verified?:boolean}>;
   agentFileCancel(id:string):Promise<void>;
   agentMachineOpen(deviceId:string): Promise<AgentTarget>;
   agentMachineClose(target:string): Promise<void>;

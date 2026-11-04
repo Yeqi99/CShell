@@ -1,7 +1,7 @@
 import {useI18n} from '../i18n';
 import {useSyncExternalStore} from 'react';
 import {Copy,ClipboardPaste} from 'lucide-react';
-type Selection={target:string;root:string;path:string;name:string;provider?:'sftp'|'ftp'};
+type Selection={target:string;root:string;path:string;name:string;directory?:boolean;provider?:'sftp'|'ftp'};
 let selection:Selection|undefined;
 const listeners=new Set<()=>void>();
 const subscribe=(callback:()=>void)=>{listeners.add(callback);return()=>{listeners.delete(callback);};};

@@ -143,3 +143,11 @@
 - 使用已核验 LLVM-MinGW 工具链构建 `.local/core-1.0-agent`；原生桌面、原生窗口及 PTY 通过。build-info 明确 `version=1.0.0`、`edition=opensource`。
 - 从该实际包启动独立临时数据目录 Agent，远程监听保持关闭，通过真实本地 IPC 调用 `update.check` 成功，回执 current=1.0.0、available=false；完成后关闭该测试进程，未触及用户 Agent 或应用升级。
 - 实包核验回执：`.local/core-1.0-check/agent-runtime-receipt.json`。此结果不表示 1.0 已发布，线上更新目录没有新包是正常状态。
+
+## 最后共享增量（2026-11-04）
+
+- 同步 Pro 1dbf567 的 MCP 高层目录复制、直传 helper 和 GUI 目录复制能力；d5a5bf8 的 Agent/main 接线按语义三方合并。开源不引入会员账号桥、私有域名后端或域名权限入口。
+- 同步 9cfdb18：VPN SOCKS 已握手成功后遇到断流只关闭连接，不将 SOCKS 错误帧混入应用数据。实际 socket 负向测试通过。
+- `pnpm exec tsc --noEmit` 与 `pnpm build` 通过；全套 791 项，787 通过、0 失败、4 跳过，日志 `.local/core-1.0-check/tests-mcp-final.log`。
+- 文件复制交互测试覆盖切换来源会话不改变复制对象、目录复制、目标路径、取消与进度；390/1100 像素组件测试无横向溢出。截图在 `test-results/file-copy/`，为独立组件测试，不冒充真实双机吞吐验收。
+- 最终再次构建实际独立 Agent 包，临时数据目录真实 IPC 验证 `1.0.0 / opensource` 与开源更新清单，测试进程正常退出。未升级本机应用、未推送、未发布。

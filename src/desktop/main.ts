@@ -1,3 +1,4 @@
+import {providerFileCall} from '../core/provider-file-call';
 import {IdentityNetwork} from './identity-network';
 import {remoteAppProxy,proxyShellCommand} from './remote-app-proxy';
 import { MachineNetworkRoute } from './machine-network-route';
@@ -697,6 +698,8 @@ else
         },
         {
           manager: connections,
+          fileTransferAddress:sessionId=>{const target=connections!.tools.describe(sessionId);const device=clientProvider.list().find(d=>d.deviceId===target.resourceId);return device?{host:device.host,port:device.port}:undefined;},
+          fileTransferEndpoint:async(sessionId,signal)=>providerFileCall({sessionId,...(connections!.tools.describe(sessionId).providerId==='cshell.ssh'?{sftp:await ssh.sftp(sessionId)}:{ftp})},signal),
           http,
           applicationTools: [...extensionServices.applicationTools,...(identityNetwork?.tools()??[])],
           connectEnvironment: async (parent, conda, prefix, signal, ready) => {
