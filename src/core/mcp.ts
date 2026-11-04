@@ -46,6 +46,7 @@ import { remoteExecutable, pluginEnabled } from '../shared/plugins';
 import { requiresReview, apiCallerPolicy, allowsApplication, allowsCapability, advertisesCapability } from './connections/authorization';
 
 export interface McpHost {
+  pairedEndpoints?: import('./api/connection-management').PairedEndpointAccess;
   fileTransferAddress?: (sessionId:string)=>{host:string;port:number}|undefined;
   fileTransferEndpoint?: (sessionId:string,signal:AbortSignal)=>Promise<CopyEndpoint>;
   accountContext?: () => { key: string; transitioning: boolean };
@@ -129,7 +130,7 @@ export class McpService {
     private confirm: (name: string, command: string, signal?: AbortSignal) => Promise<boolean>,
     private host?: McpHost,
   ) {
-    this.connectionManagement = new ConnectionManagement(store, () => this.accountKey());
+    this.connectionManagement = new ConnectionManagement(store, () => this.accountKey(),undefined,host?.pairedEndpoints);
     this.ssh = new SshService(
       (event) => {
         if (!this.event(event) && event.type === 'data')

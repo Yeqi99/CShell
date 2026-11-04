@@ -290,3 +290,16 @@ test('account epoch changes during review abort creation even when account retur
     );
     assert.equal(s.snapshot().profiles.length, 0);
   }));
+
+test('paired Agent updates require grants, retain identity adapter and roll back failed profile persistence',async()=>fixture(async(s,_m,c)=>{
+ const id='34343434-3434-4343-8343-343434343434';await s.saveProfile({...profile,id,protocol:'client',port:24443});
+ let endpoint={host:'example.com',port:24443},updates=0,reviews=0;
+ const m=new ConnectionManagement(s,()=> 'account',undefined,{get:key=>key===id?endpoint:undefined,update:async(_id,value)=>{updates++;endpoint={...value};}});
+ const request=()=>({action:'update',id,revision:s.connectionRevision(id),patch:{host:'p3.deviy.cn',port:53773}});
+ await assert.rejects(m.call(request(),{...c,authorize:()=>{throw Error('DENIED');}}),/DENIED/);assert.equal(updates,0);
+ await m.call(request(),{...c,review:async()=>{reviews++;}});assert.equal(reviews,1);assert.equal(endpoint.host,'p3.deviy.cn');
+ await assert.rejects(m.call({...request(),patch:{username:'other'}},c),/PAIRED_CONNECTION_PATCH_UNSUPPORTED/);
+ const save=s.saveConnection.bind(s);s.saveConnection=async()=>{throw Error('DISK_FAILED');};
+ await assert.rejects(m.call({...request(),patch:{host:'other.example'}},c),/DISK_FAILED/);assert.equal(endpoint.host,'p3.deviy.cn');s.saveConnection=save;
+ await assert.rejects(m.call({action:'create',profile:{...profile,protocol:'client'}},c),/USE_PROTOCOL_PAIRING_WORKFLOW/);
+}));
