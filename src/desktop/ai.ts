@@ -89,7 +89,7 @@ export async function registerAiHandlers(
   await cloudflare.load();
   await tavily.load();ai.extensionTools=()=>[...tavily.tools(),...cloudflare.tools(),...(customTools?.()??[])];
   await setupCloud?.(ai, openCode, network, tavily);
-  handle('ai:extension-call',(id,action,input)=>id==='cshell.cloudflare'?cloudflare.call(z.enum(['status','authorize','refresh','disconnect']).parse(action)):id==='cshell.tavily'?tavily.call(z.string().max(80).parse(action),input):ai.providerExtensions.call(z.string().max(100).parse(id),z.string().max(80).parse(action),input));
+  handle('ai:extension-call',(id,action,input)=>id==='cshell.cloudflare'?cloudflare.call(z.enum(['status','authorize','restart','refresh','disconnect']).parse(action)):id==='cshell.tavily'?tavily.call(z.string().max(80).parse(action),input):ai.providerExtensions.call(z.string().max(100).parse(id),z.string().max(80).parse(action),input));
   const bindingKey=(id:string)=>{
     const thread=ai.snapshot().threads.find(t=>t.id===id);
     if(!thread||!ai.canReceiveEvent(id))throw new Error('请选择已配置基座的普通智能体会话');

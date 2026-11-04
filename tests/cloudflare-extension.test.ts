@@ -36,7 +36,12 @@ test('official MCP OAuth flow, encrypted persistence, tools, disable and disconn
   try{
     await service.load();assert.equal(service.tools().length,0);
     await service.authorize();assert.ok(opened);
+    const stale=new URL(opened);
+    await service.call('restart');
     const auth=new URL(opened),callback=auth.searchParams.get('redirect_uri')!;
+    assert.notEqual(auth.searchParams.get('state'),stale.searchParams.get('state'));
+    assert.notEqual(auth.searchParams.get('code_challenge'),stale.searchParams.get('code_challenge'));
+    assert.equal((await fetch(callback+'?state='+stale.searchParams.get('state')+'&code=fixture')).status,400);
     assert.equal((await fetch(callback+'?state=wrong&code=fixture')).status,400);
     assert.equal(service.status().pending,true);
     assert.equal((await fetch(callback+'?state='+auth.searchParams.get('state')+'&code=fixture')).status,200);

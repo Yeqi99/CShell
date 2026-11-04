@@ -144,6 +144,7 @@ export class CloudflareExtension {
   }
   async call(action: string) {
     if (action === 'status') return this.status();
+    if (action === 'restart') { await this.disconnect(); return this.authorize(); }
     if (action === 'authorize') return this.authorize();
     if (action === 'disconnect') { await this.disconnect(); return this.status(); }
     if (action === 'refresh') { await this.connect(); return this.status(); }
