@@ -18,6 +18,6 @@ await build({
   external: ['electron'],
 });
 
-await build({entryPoints:["src/agent/cli.ts"],outfile:"dist/agent/agent.cjs",bundle:true,platform:"node",format:"cjs",target:"node22",external:["node-pty"]});
+await build({entryPoints:["src/agent/cli.ts"],define:{__CSHELL_PRO__:JSON.stringify(process.env.CSHELL_EDITION==='pro')},outfile:"dist/agent/agent.cjs",bundle:true,platform:"node",format:"cjs",target:"node22",external:["node-pty"]});
 
 await build({entryPoints:['src/cli/entry.ts'],define:{__CSHELL_PRO__:JSON.stringify(process.env.CSHELL_EDITION==='pro')},outfile:'dist/cli/cshell.mjs',bundle:true,platform:'node',format:'esm',target:'node22'});

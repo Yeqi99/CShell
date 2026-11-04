@@ -22,6 +22,7 @@ const result = await build({
   platform: 'node',
   format: 'cjs',
   bundle: true,
+  define: { __CSHELL_PRO__: JSON.stringify(process.env.CSHELL_EDITION === 'pro') },
   target: 'node22',
   external: ['node-pty'],
   metafile: true,
@@ -46,6 +47,7 @@ await writeFile(
     {
       name: 'cagent-runtime',
       version,
+        edition: process.env.CSHELL_EDITION === 'pro' ? 'pro' : 'opensource',
       private: true,
       dependencies: {
         'node-pty': JSON.parse(await readFile(join(pty, 'package.json'), 'utf8')).version,
@@ -232,6 +234,7 @@ await writeFile(
       arch: process.arch,
       node: process.versions.node,
       electron: false,
+      edition: process.env.CSHELL_EDITION === 'pro' ? 'pro' : 'opensource',
       desktopNative,
     },
     null,

@@ -1,0 +1,42 @@
+{
+  "commit": "9e227c47d662f372f5fce0b129f91025fe9acd4e",
+  "version": "0.8.22",
+  "files": [
+    {
+      "path": "services/cloud-sync/bridges.py",
+      "sha256": "aa57f14e0bba81dcfca62b0604916104002d3e8ccb9f71dd7939d36df7672970"
+    },
+    {
+      "path": "services/cloud-sync/server.py",
+      "sha256": "ceff9f097c1a33b87998042532ebe852fd2bfbc9dba2511d32a742201393bcd1"
+    },
+    {
+      "path": "services/cloud-sync/test_bridges.py",
+      "sha256": "f716d04fdf8b4d9f70bcfa3215efc75212a526ab9236eeed80bf9bec76e1d126"
+    },
+    {
+      "path": "src/core/account-mcp-bridge.ts",
+      "sha256": "a9f04f6e6ae93033cf921ec7f9846f599761ef6b59bc062f2fe21509f4805277"
+    },
+    {
+      "path": "src/desktop/cloud-sync.ts",
+      "sha256": "a7ef2f1dbe3619f13b7ee36170b82e46dd804467e8d0743561aec2ff08c74094"
+    },
+    {
+      "path": "src/desktop/main.ts",
+      "sha256": "f2efb62c949aac086b791d95776134a79056607ddebae1aba52848438ee7d2ce"
+    },
+    {
+      "path": "src/shared/contracts.ts",
+      "sha256": "ce25467a8a277291af237c1a405710011819ed3cd765e1351a93d276fa50cbc4"
+    },
+    {
+      "path": "src/ui/components/McpSettings.tsx",
+      "sha256": "4cfd094469ac93c4243c0082b93e4b719b5f9980d4d610327ed7793a1be77691"
+    },
+    {
+      "path": "tests/account-mcp-bridge.test.ts",
+      "sha256": "d0957a97216449ac59e8794a2d3dfe04ef701d50b40a80da8fbcadd82d874af6"
+    }
+  ]
+}
