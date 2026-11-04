@@ -2,6 +2,7 @@ param(
   [ValidateSet('Install','Status')][string]$Action='Install',
   [string]$RuntimeImagePath,
   [string]$SourceDirectory,
+  [switch]$RefreshExisting,
   [ValidatePattern('^S-1-5-21-[0-9-]+$')][string]$OwnerSid,
   [ValidatePattern('^[A-Fa-f0-9]{64}$')][string]$WorkerSha256,
   [ValidatePattern('^[A-Fa-f0-9]{64}$')][string]$BrokerSha256
@@ -9,6 +10,17 @@ param(
 $ErrorActionPreference='Stop'
 $destination=Join-Path ([Environment]::GetFolderPath('ProgramFiles')) 'CAgentDesktopService'
 $registry='HKLM:\SOFTWARE\CAgent\DesktopBroker'
+if($RefreshExisting){
+  $existingService=Get-Service -Name CAgentDesktopBroker -ErrorAction SilentlyContinue
+  $existingConfiguration=Get-ItemProperty -LiteralPath $registry -ErrorAction SilentlyContinue
+  $currentOwner=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+  if(!$existingService -or !$existingConfiguration -or $existingConfiguration.OwnerSid -ne $currentOwner){throw 'Existing desktop service must belong to the current user'}
+  # Refresh never enrolls a new owner or installs a previously absent service.
+  $OwnerSid=$currentOwner
+  $SourceDirectory=Join-Path $PSScriptRoot 'system-desktop'
+  $WorkerSha256=(Get-FileHash -LiteralPath (Join-Path $SourceDirectory 'cagent-desktop.exe') -Algorithm SHA256).Hash
+  $BrokerSha256=(Get-FileHash -LiteralPath (Join-Path $SourceDirectory 'cagent-desktop-broker.exe') -Algorithm SHA256).Hash
+}
 if($Action -eq 'Status'){
   $installedService=Get-Service -Name CAgentDesktopBroker -ErrorAction SilentlyContinue
   $configuration=Get-ItemProperty -LiteralPath $registry -ErrorAction SilentlyContinue

@@ -1,0 +1,7 @@
+.wsl-offline {margin-block:16px;padding:16px;border:1px solid var(--border,#d8e0ea);border-radius:12px}
+.wsl-offline summary {cursor:pointer;font-weight:600}
+.wsl-offline p {line-height:1.65;color:var(--muted,#718096)}
+.wsl-offline label {display:grid;gap:8px;margin-block:16px;max-width:360px}
+.wsl-offline input {width:100%;box-sizing:border-box;min-height:36px;padding:8px;border:1px solid var(--border,#d8e0ea);border-radius:8px;background:var(--bg,#fff);color:inherit}
+.wsl-offline button {display:block;min-height:36px;padding:8px 14px;margin-block:12px;border-radius:8px}
+.wsl-offline a {display:inline-block;line-height:1.6;margin-top:4px}

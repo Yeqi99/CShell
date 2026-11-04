@@ -10,7 +10,7 @@ import type {AgentCapabilityManifest} from '../shared/agent-capability-packages'
 import {desktopConfigSchema,desktopQualitySchema} from '../shared/agent-desktop';
 import {DesktopService} from './desktop-service';
 import {VirtualDisplayBackend,virtualDisplayHost,prepareVirtualDisplayPackage,virtualDisplayInstallInput} from './virtual-display';
-import {systemDesktopStatus} from './system-desktop';
+import {systemDesktopStatus,needsSystemDesktopRefresh,refreshExistingSystemDesktop} from './system-desktop';
 
 /** Native bytes are bundled as an optional verified capability, never executed
  * just because the runtime starts or the package is installed. */
@@ -23,9 +23,15 @@ export async function createDesktopCapability(options:{identity:string;nativeExe
  let selectedSystemProxy:string|undefined;
  let systemStatusCache:{at:number;value:Awaited<ReturnType<typeof systemDesktopStatus>>}|undefined;
  let systemStatusPending:Promise<Awaited<ReturnType<typeof systemDesktopStatus>>>|undefined;
+ let systemRefreshAttempted=false;
  const refreshSystemDesktop=async(force=false)=>{
   if(!force&&systemStatusCache&&Date.now()-systemStatusCache.at<5000)return systemStatusCache.value;
-  if(!systemStatusPending)systemStatusPending=systemDesktopStatus(dirname(options.nativeExecutable)).then(value=>{
+  if(!systemStatusPending)systemStatusPending=systemDesktopStatus(dirname(options.nativeExecutable)).then(async value=>{
+   if(!systemRefreshAttempted&&needsSystemDesktopRefresh(value)){
+    systemRefreshAttempted=true;
+    try{await refreshExistingSystemDesktop(dirname(options.nativeExecutable));value=await systemDesktopStatus(dirname(options.nativeExecutable));}
+    catch{value={...value,error:'系统桌面服务仍需更新，请以原安装用户的管理员身份重新安装 CAgent；现有权限未改变'};}
+   }
    selectedSystemProxy=value.ready&&'proxyPath' in value&&value.proxyPath?value.proxyPath:undefined;
    systemStatusCache={at:Date.now(),value};return value;
   }).finally(()=>{systemStatusPending=undefined;});
@@ -38,7 +44,7 @@ export async function createDesktopCapability(options:{identity:string;nativeExe
  const bytes=process.platform==='win32'&&process.arch==='x64'?await readFile(options.nativeExecutable).catch(()=>undefined):undefined;
  const extras:{entry:CapabilityCatalogEntry;adapter:TrustedCapabilityAdapter}[]=[];
  if(bytes){
-  const manifest:AgentCapabilityManifest={protocol:1,id:'cagent.desktop',name:'远程桌面',version:'0.1.2',license:'MIT',description:'Windows 原生桌面采集、H.264 视频及独立观看/控制授权。安装后仍需配置监听和调用方权限；公网与跨平台尚待验收。',source:{repository:'https://github.com/Yeqi99/CShell',releaseTag:'capability-desktop-0.1.2',assetUrl:'https://github.com/Yeqi99/CShell/releases/download/capability-desktop-0.1.2/desktop.cagent-package.json'},compatibility:{platforms:['win32'],architectures:['x64'],agentVersion:{min:'0.6.34',maxExclusive:'1.0.0'}},adapterId:'cagent.desktop',files:[],permissions:['desktop.view','desktop.control'],tools:[{id:'desktop_status',description:'Read desktop service readiness and the caller viewing/control permission. Does not start or connect.',inputSchema:{type:'object',properties:{},additionalProperties:false},outputSchema:{type:'object',properties:{},additionalProperties:true},permissions:['desktop.view'],sideEffect:false},{id:'desktop_close',description:'Close a desktop session owned by this caller; releases its input state.',inputSchema:{type:'object',properties:{id:{type:'string'}},required:['id'],additionalProperties:false},outputSchema:{type:'object',properties:{},additionalProperties:true},permissions:['desktop.view'],sideEffect:true}],events:[]};
+  const manifest:AgentCapabilityManifest={protocol:1,id:'cagent.desktop',name:'远程桌面',version:'0.1.2',license:'MIT',description:'Windows 原生桌面采集、H.264 视频及独立观看/控制授权。安装后仍需配置监听和调用方权限；公网与跨平台尚待验收。',source:{repository:'https://github.com/Yeqi99/CShell',releaseTag:'capability-desktop-0.1.2',assetUrl:'https://github.com/Yeqi99/CShell/releases/download/capability-desktop-0.1.2/desktop.cagent-package.json'},compatibility:{platforms:['win32'],architectures:['x64'],agentVersion:{min:'0.6.34',maxExclusive:'1.1.0'}},adapterId:'cagent.desktop',files:[],permissions:['desktop.view','desktop.control'],tools:[{id:'desktop_status',description:'Read desktop service readiness and the caller viewing/control permission. Does not start or connect.',inputSchema:{type:'object',properties:{},additionalProperties:false},outputSchema:{type:'object',properties:{},additionalProperties:true},permissions:['desktop.view'],sideEffect:false},{id:'desktop_close',description:'Close a desktop session owned by this caller; releases its input state.',inputSchema:{type:'object',properties:{id:{type:'string'}},required:['id'],additionalProperties:false},outputSchema:{type:'object',properties:{},additionalProperties:true},permissions:['desktop.view'],sideEffect:true}],events:[]};
   const adapter:TrustedCapabilityAdapter={
    inspect:async root=>{const actual=await readFile(join(root,'cagent-desktop.exe')).catch(()=>undefined);const installed=!!actual&&capabilityDigest(actual)===capabilityDigest(bytes);return {installed,configured:installed,systemVersion:'0.1.2'};},
    register:async(root,permissions)=>{installedExecutable=join(root,'cagent-desktop.exe');grants=[...permissions];registered=true;try{await service.configure(saved);}catch(error){registered=false;grants=[];throw error;}},

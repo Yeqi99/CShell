@@ -1,3 +1,4 @@
+import './wsl-offline.css';
 import {ErrorNotice} from './ErrorNotice';
 import { useEffect, useState } from 'react';
 import { WslNetwork } from './WslNetwork';
@@ -14,6 +15,7 @@ export function WslPlugin({ onOpen }: { onOpen: (shell: LocalShell) => Promise<v
     [ubuntu, setUbuntu] = useState(true),
     [setup, setSetup] = useState<WslSetupState>({ phase: 'idle' }),
     [copied, setCopied] = useState(false);
+  const [importName,setImportName]=useState('Ubuntu-Offline');
   const refresh = async () => {
     setBusy(true);
     setError('');
@@ -98,6 +100,7 @@ export function WslPlugin({ onOpen }: { onOpen: (shell: LocalShell) => Promise<v
       ))}
       {!state && <p role="status">正在检测 WSL…</p>}
       {state?.available && <WslNetwork />}
+      <details className="wsl-offline"><summary>从离线镜像安装</summary><p>从国内下载源取得 rootfs 后，在这里选择文件与空安装目录。不会覆盖已有发行版，不修改系统代理或自动重启。</p><label>新发行版名称 <input value={importName} maxLength={64} onChange={e=>setImportName(e.target.value)} disabled={setup.phase==='running'}/></label><button className="secondary" disabled={setup.phase==='running'||!importName.trim()} onClick={()=>void window.cshell.wslImport(importName.trim()).then(setSetup).catch(e=>setError(e.message))}>选择镜像与安装目录</button><a href="https://shell.canp.ai/docs/wsl-offline.html" target="_blank" rel="noreferrer">国内下载源与普通用户设置</a></details>
       {state && !state.distributions.length && (
         <div className="ai-provider-empty">
           <div>
