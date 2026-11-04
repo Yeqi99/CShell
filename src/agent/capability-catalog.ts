@@ -21,7 +21,7 @@ const manifest: AgentCapabilityManifest = {
   description: '检查常用系统应用安装计划并管理安装任务。系统安装授权与工具授权分别生效。',
   // Provenance only: this bundled declaration is not advertised as an uploaded release asset.
   source: { repository: 'https://github.com/Yeqi99/CShell', releaseTag: 'capability-system-apps-1.0.0', assetUrl: 'https://github.com/Yeqi99/CShell/releases/download/capability-system-apps-1.0.0/system-apps.cagent-package.json' },
-  compatibility: { platforms: ['win32', 'linux', 'darwin'], architectures: ['x64', 'arm64'], agentVersion: { min: '0.6.9', maxExclusive: '1.0.0' } },
+  compatibility: { platforms: ['win32', 'linux', 'darwin'], architectures: ['x64', 'arm64'], agentVersion: { min: '0.6.9', maxExclusive: '1.1.0' } },
   adapterId: 'cagent.system-apps', files: [{ path: 'NOTICE.txt', bytes: Buffer.byteLength(notice), sha256: capabilityDigest(notice) }],
   permissions: ['applications.read', 'applications.plan', 'applications.install'],
   tools: [

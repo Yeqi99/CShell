@@ -15,7 +15,7 @@ test('bundled capability installs actual verified files, grants separately and s
  const vault=new ClientVault(directory,{encrypt:async s=>Buffer.from(s).toString('base64'),decrypt:async s=>Buffer.from(s,'base64').toString()});
  let catalogCalls=0;
  const applications={list:async(owner:string)=>{catalogCalls++;return {owner,platform:process.platform,applications:[]};},install:async()=>{throw new Error('System installation permission denied');}} as unknown as AgentApplicationService;
- const options={directory,vault,applications,agentVersion:'0.6.11'};
+ const options={directory,vault,applications,agentVersion:'1.0.0'};
  const runtime=new CapabilityRuntime(options);await runtime.load();
  try{
   assert.equal(runtime.catalog()[0].installed,false);
