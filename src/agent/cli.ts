@@ -13,6 +13,7 @@ import { spawn } from 'node:child_process';
 import {readCustomExtension,installCustomExtension} from '../core/custom-extensions';
 import { provisionAgent } from './provisioning';
 import {assertCurrentInstalledRuntime} from './installed-launcher';
+import {updateCliRequest} from './update-cli';
 
 async function jsonInput() {
   if (stdin.isTTY) throw new Error('请通过标准输入提供 JSON；不要将密码写入命令参数');
@@ -58,6 +59,11 @@ async function secret(prompt: string) {
 const print = (value: unknown) => stdout.write(JSON.stringify(value, null, 2) + '\n');
 async function main() {
   const [command = 'help', method] = process.argv.slice(2);
+  if(command==='update') {
+    const request=updateCliRequest(process.argv.slice(3));
+    print(await callAgent(request.method,request.params));
+    return;
+  }
   if(['run','app','app-host','restart-app-host'].includes(command))await assertCurrentInstalledRuntime(process.argv[1]);
   if(command==='provision'){
     if(!method || process.argv.slice(4).some(arg=>arg!=='--apply'))throw Error('用法：cagent provision <配置.json> [--apply]；不接受密码参数');
@@ -113,6 +119,7 @@ async function main() {
     return;
   }
   if (command === 'help' || command === '--help') {
+    stdout.write('update check|download|status  检查、下载校验、查询更新；update install --confirm 等待空闲后安装\n');
     stdout.write('provision FILE [--apply]  初始部署；默认仅预检，密码通过配置中的 passwordFile 读取，已有数据不覆盖\n');
     stdout.write(
       `CAgent (Canp Agent)\n\napp        打开独立本机智能体界面（Windows 原生窗口；其他系统使用浏览器）\ninit       本机初始配置（交互输入密码；不启动远程监听）\nrun        前台运行后台服务，允许当前用户的 CShell 管理\nstatus     查看状态\nstart      从标准输入读取 {"bind":"127.0.0.1","port":24443} 并开启监听\nstop       关闭远程监听和已连接会话\nlogs       查看审计日志\nshutdown   退出 Agent 进程\nshells     检测本机 Shell 与 WSL\ncall METHOD  从标准输入读取参数并执行本机管理操作\nrecover    显示本机恢复方法（不删除身份、凭据或授权）\n\n数据目录：${agentDirectory()}\n`,

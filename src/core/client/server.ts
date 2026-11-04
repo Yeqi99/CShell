@@ -478,7 +478,7 @@ export class ClientServer {
     }
     if (op === 'manage') {
       const call = agentCallSchema.parse(payload);
-      if(c.delegation&&/^(connection\.|account\.|relay\.|hosting\.|packages\.(grant|install|uninstall)|assistant\.configure)/.test(call.method))throw Error('借用连接不能读取或修改设备身份与授权');
+      if(c.delegation&&/^(update\.|connection\.|account\.|relay\.|hosting\.|packages\.(grant|install|uninstall)|assistant\.configure)/.test(call.method))throw Error('借用连接不能读取或修改设备身份与授权');
       if (call.method === 'agent.shells')
         return this.options.shells
           ? (await this.options.shells()).filter((s) =>
