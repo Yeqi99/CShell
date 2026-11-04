@@ -138,7 +138,7 @@ export const apiLocalFileRootSchema = z.object({
   mutations: z.array(z.enum(['create', 'write', 'rename', 'delete', 'mkdir', 'rmdir', 'renameDirectory'])).max(7).optional(),
 }).strict();
 const apiLocalFileRoots = z.array(apiLocalFileRootSchema).max(32).refine((roots) => new Set(roots.map((root) => root.id)).size === roots.length).optional();
-export const apiApplicationCapabilities = ['plugins.read', 'plugins.manage', 'connections.read', 'connections.manage', 'credentials.manage', 'identity.trust', 'http.use', 'domains.read', 'domains.manage', 'updates.manage', 'account.read'] as const;
+export const apiApplicationCapabilities = ['plugins.read', 'plugins.manage', 'connections.read', 'connections.manage', 'credentials.manage', 'identity.trust', 'http.use', 'domains.read', 'domains.manage', 'updates.manage', 'preferences.manage', 'account.read'] as const;
 export const apiClientSchema = z
   .object({
     id: z.string().uuid(),
