@@ -9,6 +9,10 @@ const distribution = z.string().min(1).max(100).regex(/^[A-Za-z0-9][A-Za-z0-9._-
 // See agent-exposure.ts for required classification of deliberately unexposed methods.
 const empty = z.object({}).strict().optional();
 const manageParams = {
+  'update.check': empty,
+  'update.download': empty,
+  'update.status': empty,
+  'update.install': z.object({confirm:z.literal(true)}).strict(),
   'applications.list': empty,
   'applications.plan': appPlanInput,
   'applications.install': appInstallInput,

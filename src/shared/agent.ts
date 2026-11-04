@@ -3,6 +3,7 @@ import {codingMethods} from './coding';
 import { z } from 'zod';
 export const agentMethods = [
   'network.probe','machine.snapshot',
+  'update.check','update.download','update.status','update.install',
   'automation.list','automation.create','automation.change',
   'environment.read','environment.save','assistant.model.configure','management.script.start','management.script.status','management.script.cancel',
   'network.proxy.clear','network.proxy.start','network.proxy.poll','network.proxy.read','network.proxy.write','network.proxy.close','network.proxy.stop',
@@ -115,3 +116,4 @@ export const agentCapability = (method: string) =>
     : method.startsWith('relay.')
       ? 'agent.relay'
       : 'agent.manage';
+

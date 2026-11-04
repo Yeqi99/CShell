@@ -42,7 +42,8 @@ test('new access defaults remain usable while explicit opt-outs and empty shells
 test('management-only Agent connections expose real tools without opening a phantom terminal',async()=>{
   const dir=await mkdtemp(join(tmpdir(),'cshell-management-'));let opens=0;
   const terminal:ManagedProvider={id:'test',version:'1',capabilities:[],configuration:z.any(),async connect(){opens++;throw Error('No interactive terminal on this device');},disconnect(){},resolve(){throw Error('No terminal');}};
-  const server=new ClientServer(new ClientVault(join(dir,'host'),codec),terminal,{manage:async()=>[]});
+  const managementCalls:string[]=[];
+  const server=new ClientServer(new ClientVault(join(dir,'host'),codec),terminal,{manage:async method=>{managementCalls.push(method);return [];}});
   const controller=new ClientProvider(new ClientVault(join(dir,'controller'),codec),()=>{});
   try{
     await server.load();await controller.load();await server.setAccess({password:'isolated-management-fixture',shells:[],allowManage:true});
@@ -56,6 +57,15 @@ test('management-only Agent connections expose real tools without opening a phan
     assert.equal(connection.tools.some(tool=>tool.name==='execute_command'),false);
     assert.deepEqual(await connection.agent!({method:'agent.shells'},signal),[]);
     await assert.rejects(controller.connect({...config,distribution:'Ubuntu'},undefined,signal));
+    assert(connection.tools.some(tool=>tool.name==='agent_manage'));
+    await connection.agent!({method:'update.status'},signal);
+    assert(managementCalls.includes('update.status'));
+    const calls=managementCalls.length;
+    await server.stop();
+    await server.setAccess({password:'isolated-management-fixture',shells:[],allowManage:false});
+    await server.start({bind:'127.0.0.1',port});
+    await assert.rejects(connection.agent!({method:'update.download'},signal));
+    assert.equal(managementCalls.length,calls,'revocation rejects update before updater dispatch');
   }finally{controller.dispose();await server.stop();await rm(dir,{recursive:true,force:true});}
 });
 test('Client authenticates mutual TLS, consumes invitations, scopes shells, revokes live terminals and persists trust', async () => {

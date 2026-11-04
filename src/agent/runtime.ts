@@ -290,7 +290,12 @@ export async function createAgentRuntime(
       return method==='feedback.preview'?body:submitFeedback(body,(input,init)=>networkProxy.configured?networkProxy.fetch(input,init):fetch(input,init));
     }
     if(method.startsWith('update.')){
-      if(!local)throw new Error('更新只允许在本机执行');
+      if(!local){
+        // Remote calls arrive only through the authenticated allowManage gate.
+        // Never expose installer paths, startup commit tokens or auto-update policy.
+        if(!['update.check','update.download','update.status','update.install'].includes(method))throw new Error('此更新操作只允许在本机执行');
+        if(method!=='update.install')z.object({}).strict().parse(params??{});
+      }
       if(method==='update.commit'){
         const input=z.object({token:z.string().regex(/^[a-f0-9]{64}$/)}).strict().parse(params);
         if(!updateCommitToken||input.token!==updateCommitToken)throw Error('更新启动凭据不匹配');
@@ -300,9 +305,10 @@ export async function createAgentRuntime(
         safeUpdate.start();return{committed:true,deviceId:server.status().deviceId,agentVersion};
       }
       if(method==='update.settings')return updater.settings(z.object({automatic:z.boolean().optional()}).parse(params??{}).automatic);
-      if(method==='update.check')return updater.check();
-      if(method==='update.download')return updater.start();
-      if(method==='update.status')return {...updater.status(),coordination:safeUpdate.status()};
+      const publicUpdate=(value:any)=>{if(local)return value;const {path,...state}=value;return state;};
+      if(method==='update.check')return publicUpdate(await updater.check());
+      if(method==='update.download')return publicUpdate(await updater.start());
+      if(method==='update.status')return publicUpdate({...updater.status(),coordination:safeUpdate.status()});
       if(method==='update.verify')return updater.verify();
       if(method==='update.install')return installRuntimeUpdate(params);
       throw new Error('未知更新操作');
