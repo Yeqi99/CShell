@@ -13,7 +13,8 @@
         "English desktop icon labels",
         "320px desktop layout",
         "icon-only Ping and menu clamped in viewport",
-        "native desktop app hidden for absent/unknown and shown for present"
+        "native desktop app hidden for absent/unknown and shown for present",
+        "English Workspace heading, Overview / Command line / Visual tabs and Sign in text"
       ]
     },
     {
@@ -42,21 +43,29 @@
   "screenshots": [
     {
       "path": "test-results/1.0.0-packaged-ui/CShell Pro-english.png",
-      "sha256": "ff8101d007a404c8aa694d05f9b7b866745b374f369b48c73c07f7aee0d7d262"
+      "sha256": "54ab8a74b989532948f9c6b609a2955712cdeaf9f6a3512da3a34832a3632b42"
     },
     {
       "path": "test-results/1.0.0-packaged-ui/CShell Pro-desktop-present.png",
-      "sha256": "2d5b3258cc2b4df4245bbcf520d146d9915b8428f07a568b1cef7b2b47b6d0dc"
+      "sha256": "7481a15fe3d373b50b748191b9751d30ab790c348e08559200049c55925097dd"
     },
     {
       "path": "test-results/file-connection-package/sftp-old-draft-after-reconnect.png",
-      "sha256": "cd8ec7f14f10f91f78e0ef5c257a87188eab3b5901c694d74d27a0a57159b77c"
+      "sha256": "0a55c5f9126f12a4483be7ad976b545ce5962dc39494aad7e75d9b042f730235"
     }
   ],
   "limitations": [
     "Native desktop detection used controlled IPC states; does not prove physical Linux desktop capture.",
-    "English mode still has Chinese workbench heading/mode labels and sign-in; full application localization is not complete.",
     "320px desktop screenshot deliberately narrows only desktop element; remaining workspace blank area is fixture-induced.",
     "Not a physical Android, remote Windows, or cross-network visual acceptance."
-  ]
+  ],
+  "finalBuild": {
+    "sourceI18nCommit": "776c706",
+    "testedAt": "2026-11-04T11:46:50.590Z",
+    "executableSha256": "27f35e183030fca290d37124f3a713d02b870871f3464ff58563e7951852cab7",
+    "installer": "release/pro-1.0.0/CShell-Pro-1.0.0-win-x64.exe",
+    "installerSha256": "b9f331760cd6cd8ec0aed9a97f72975266e1f9f1974be27e76a08544327d3f6d",
+    "allThreeSmokesRepeated": true
+  },
+  "localization": "The five screenshot-confirmed mixed-language labels were fixed and asserted in the rebuilt packaged renderer; does not claim exhaustive translation coverage of every application screen."
 }
