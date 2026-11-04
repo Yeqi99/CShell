@@ -1,7 +1,8 @@
 import {homedir} from 'node:os';
 import {join,dirname} from 'node:path';
 import {lstat,open,unlink,link} from 'node:fs/promises';
-import {randomUUID} from 'node:crypto';
+import {randomUUID,createHash} from 'node:crypto';
+import {createReadStream} from 'node:fs';
 import {z} from 'zod';
 import {LocalFiles} from '../core/local-files';
 
@@ -36,9 +37,9 @@ export class AgentFiles {
    if(this.uploads.size>=8)throw new Error('上传任务已满');
    const target=await this.fs.resolve(p.root,p.path);if(await lstat(target).then(()=>true,()=>false))throw new Error('目标已存在，请先重命名');
    const id=randomUUID(),temporary=join(dirname(target),`.cagent-${id}.part`);const h=await open(temporary,'wx',0o600);await h.close();
-   this.uploads.set(id,{owner,target,temporary,size:p.size,offset:0,expires:Date.now()+20*60_000,busy:false});return {id,chunkSize:chunk};
+   this.uploads.set(id,{owner,target,temporary,size:p.size,offset:0,expires:Date.now()+20*60_000,busy:false});return {id,chunkSize:chunk,sha256:true};
   }
-  const p=z.object({id:z.string().uuid(),offset:z.number().int().nonnegative().optional(),data:z.string().max(Math.ceil(chunk/3)*4).optional()}).strict().parse(params);
+  const p=z.object({id:z.string().uuid(),offset:z.number().int().nonnegative().optional(),data:z.string().max(Math.ceil(chunk/3)*4).optional(),sha256:z.string().regex(/^[a-f0-9]{64}$/).optional()}).strict().parse(params);
   const u=this.uploads.get(p.id);if(!u||u.owner!==owner)throw new Error('上传任务不存在或已过期');if(u.busy)throw new Error('上传任务正在处理');u.busy=true;
   try{
    if(method==='files.uploadCancel'){await unlink(u.temporary);this.uploads.delete(p.id);return {ok:true};}
@@ -47,7 +48,7 @@ export class AgentFiles {
     const h=await open(u.temporary,'r+');try{let written=0;while(written<buffer.length){signal.throwIfAborted();const r=await h.write(buffer,written,buffer.length-written,u.offset+written);if(!r.bytesWritten)throw new Error('文件写入未完成');written+=r.bytesWritten;}}finally{await h.close();}
     u.offset+=buffer.length;u.expires=Date.now()+20*60_000;return {next:u.offset};
    }
-   if(method==='files.uploadFinish'){if(u.offset!==u.size)throw new Error('上传尚未完成');signal.throwIfAborted();await link(u.temporary,u.target);await unlink(u.temporary);this.uploads.delete(p.id);return {ok:true};}
+   if(method==='files.uploadFinish'){if(u.offset!==u.size)throw new Error('上传尚未完成');let digest:string|undefined;if(p.sha256){const hash=createHash('sha256');for await(const bytes of createReadStream(u.temporary,{signal})){hash.update(bytes);}digest=hash.digest('hex');if(digest!==p.sha256)throw Error('文件摘要不一致，未保存目标文件');}signal.throwIfAborted();await link(u.temporary,u.target);await unlink(u.temporary);this.uploads.delete(p.id);return {ok:true,...(digest?{sha256:digest}:{})};}
    throw new Error('不支持的文件操作');
   }finally{u.busy=false;}
  }

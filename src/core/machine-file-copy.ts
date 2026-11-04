@@ -8,7 +8,7 @@ const chunkSchema=z.object({data:z.string().max(349528),size:z.number().int().no
 /** Bounded streaming fallback through the controller. Both calls must already be
  * bound to authenticated targets; this function never selects another route. */
 export async function copyMachineFile(source:Call,from:MachineFile,target:Call,to:MachineFile,signal:AbortSignal,progress:(done:number,total:number)=>void){
- let upload='',offset=0,writeSize=65536,version:string|undefined,size:number|undefined;
+ let upload='',offset=0,writeSize=65536,verify=false,version:string|undefined,size:number|undefined;
  const hash=createHash('sha256');
  try{
   for(;;){
@@ -19,10 +19,11 @@ export async function copyMachineFile(source:Call,from:MachineFile,target:Call,t
    if(size!==undefined&&(size!==part.size||version!==part.version))throw Error('Source file changed during transfer');
    size=part.size;version=part.version;
    if(!upload){
-    const start=z.object({id:z.string().min(1),chunkSize:z.number().int().min(1).max(262144)}).parse(await target('files.uploadStart',{...to,size},signal));
+    const start=z.object({id:z.string().min(1),chunkSize:z.number().int().min(1).max(262144),sha256:z.boolean().optional()}).parse(await target('files.uploadStart',{...to,size},signal));
     upload=start.id;
     // Retain the negotiated maximum for subsequent writes.
     writeSize=start.chunkSize;
+    verify=start.sha256===true;
    }
    for(let at=0;at<bytes.length;at+=writeSize){
     signal.throwIfAborted();const data=bytes.subarray(at,at+writeSize);
@@ -32,7 +33,8 @@ export async function copyMachineFile(source:Call,from:MachineFile,target:Call,t
    hash.update(bytes);offset=part.next;progress(offset,size);
    if(part.done){if(offset!==size)throw Error('Incomplete source file');break;}
   }
-  signal.throwIfAborted();await target('files.uploadFinish',{id:upload},signal);upload='';
-  return {bytes:offset,sha256:hash.digest('hex'),route:'controller-stream' as const};
+  const digest=hash.digest('hex');signal.throwIfAborted();const receipt=await target('files.uploadFinish',{id:upload,...(verify?{sha256:digest}:{})},signal) as {sha256?:string};upload='';
+  if(verify&&receipt.sha256!==digest)throw Error('Destination checksum receipt missing');
+  return {bytes:offset,sha256:digest,verified:verify,route:'controller-stream' as const};
  }finally{if(upload)await target('files.uploadCancel',{id:upload},AbortSignal.timeout(5000)).catch(()=>{});}
 }

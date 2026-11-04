@@ -27,6 +27,8 @@ test('machine files: chunked transfer, identity isolation, no overwrite, changes
   const listing=await call('list',{root,path:base});assert.equal(listing.entries.length,2);
   await call('action',{root,path:base+'/renamed.bin',action:'delete'});
   const cancel=await call('uploadStart',{root,path:base+'/cancel.bin',size:1});await call('uploadCancel',{id:cancel.id});assert.equal((await call('list',{root,path:base})).entries.length,1);
+  const checked=await call('uploadStart',{root,path:base+'/checked.bin',size:1});assert.equal(checked.sha256,true);await call('uploadChunk',{id:checked.id,offset:0,data:'YQ=='});
+  await assert.rejects(call('uploadFinish',{id:checked.id,sha256:'0'.repeat(64)}),/摘要/);assert.ok(!(await call('list',{root,path:base})).entries.some((e:any)=>e.name==='checked.bin'));await call('uploadCancel',{id:checked.id});
   await assert.rejects(call('action',{root,path:'/',action:'delete'}),/root/);
   await assert.rejects(call('read',{root,path:base+'/../NUL',offset:0}),/Unsafe/);
   await mkdir(join(dir,'actual'));
