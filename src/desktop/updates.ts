@@ -30,6 +30,7 @@ export function registerUpdateHandlers(
   const receipt=new UpdateReceipt(app.getPath('userData'),app.getVersion());
   const receiptReady=receipt.load();
   let operation: string|undefined;
+  let installAuthorization:(()=>void)|undefined;
   let state: UpdateState = { current: app.getVersion(), phase: 'idle', platform: process.platform, automatic:true };
   let release: UpdateRelease | undefined,
     file = '',
@@ -181,7 +182,7 @@ export function registerUpdateHandlers(
           .digest('hex') !== expected
       )
         throw new Error('Update file changed; download again');
-      if(operation==='install')window.emit('update-mcp-approved');
+      installAuthorization?.();
       if (process.platform === 'win32') {
         // The normal window close guard protects sessions; will-quit flushes
         // histories before the installer is launched from the final quit event.
@@ -195,6 +196,8 @@ export function registerUpdateHandlers(
         app.once('quit', launch);
         queued = true;
         (window as EventEmitter).once('update-close-cancelled', () => { app.removeListener('quit', launch); queued = false; busy = false; });
+        installAuthorization?.();
+        if(operation==='install')window.emit('update-mcp-approved');
         app.quit();
         return;
       }
@@ -250,8 +253,8 @@ export function registerUpdateHandlers(
         if(createHash('sha256').update(await readFile(file)).digest('hex')!==expected)throw Error('Update file changed; download again');
         authorize();
         await receipt.save({targetVersion:release.version,previousVersion:app.getVersion(),channel:isPro?'pro':'opensource',requestedAt:Date.now(),phase:'scheduled'});
-        authorize();operation='install';
-        setTimeout(()=>{void (async()=>{try{authorize();await handlers.get('update:install')!();}catch(e){operation=undefined;await receipt.save({targetVersion:release?.version,phase:'failed',error:String(e)});}})().catch(e=>console.error('Update handoff receipt failed',e));},1500);
+        authorize();installAuthorization=authorize;operation='install';
+        setTimeout(()=>{void (async()=>{try{authorize();await handlers.get('update:install')!();}catch(e){operation=undefined;installAuthorization=undefined;await receipt.save({targetVersion:release?.version,phase:'failed',error:String(e)});}})().catch(e=>console.error('Update handoff receipt failed',e));},1500);
         return;
         } catch(e){operation=undefined;throw e;}
       }
