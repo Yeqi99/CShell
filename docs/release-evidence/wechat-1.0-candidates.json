@@ -26,8 +26,7 @@
   ],
   "limitations": [
     "Does not prove new real WeChat operations",
-    "4.2 adapter retains its existing text-chat-only capability scope",
-    "GitHub source URL retained as immutable manifest provenance; actual first download source is verified Hong Kong; GitHub fallback unavailable pending release"
+    "4.2 adapter retains its existing text-chat-only capability scope"
   ],
   "hongKong": {
     "uploaded": true,
@@ -47,11 +46,16 @@
         "rangeBytes": 32,
         "total": 264771599
       }
-    ]
+    ],
+    "productionInstallerLiveDownloadVerified": true,
+    "productionInstallerResult": "Both 264MB packages downloaded anonymously from Hong Kong and fully staged; bundle and all 93 file hashes verified; no fallback used"
   },
-  "publicationChannel": "Hong Kong immutable packages",
+  "publicationChannel": "GitHub Release and Hong Kong immutable packages",
   "github": {
-    "published": false,
-    "status": "draft upload pending; not an available fallback"
+    "published": true,
+    "releaseId": 433821974,
+    "url": "https://github.com/Yeqi99/CShell/releases/tag/wechat-toolkit-v0.1.3",
+    "anonymousMetadataVerified": true,
+    "assetSizesAndDigestsVerified": true
   }
 }
