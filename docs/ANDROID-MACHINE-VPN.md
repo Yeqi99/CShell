@@ -30,3 +30,10 @@ gradle -p android assembleDebug
 发布验收仍需在隔离 Android 设备上验证系统授权、其他应用 TCP/DNS、横跨两台机器的真实出口 IP、撤销和进程结束行为、失效时不外泄、既有 VPN 拒绝启动。当前不能把构建与桥接测试称为完整实机 VPN 验收。
 
 隔离验证准备：官方 AOSP API 35 x86_64 镜像和 Emulator 已校验官方 SHA-1，在 E 盘创建独立 `CAgentVPN` AVD，AEHD 2.2 检查可用；主 APK、Instrumentation APK、独立 UID 的 HTTP probe APK 均成功安装。`AndroidVpnFixture` 只允许模拟器，使用真实 VpnService/native TUN 与受控反向 HTTP 出口，不接触用户账号和手机。执行工具策略拒绝 `adb shell am start`，因此尚未执行系统授权与跨 UID 请求。此项仍是发布验收缺口，不能记为通过。
+
+自动审批记录（未绕过）：
+
+1. 组合操作 `adb -s emulator-5580 shell am start -n org.canpshell.vpnprobe/.Probe --es url http://10.0.2.2:59996/baseline`，等待后读取测试 app 的 `files/result`，再运行 `am instrument -w -e vpnMode true org.canpshell.mobile.test/org.canpshell.mobile.AgentProtocolTest`；工具在执行前拒绝，原文 `blocked by policy`。
+2. 去掉私有文件读取与 instrumentation，仅执行上面的 `am start`；同样执行前拒绝，原文 `blocked by policy`。没有更具体理由，没有改用包装命令或其他工具执行同一操作。
+
+保留的测试状态：`E:/CShell-vpn-test/avd/CAgentVPN.avd`、模拟器序列 `emulator-5580`，三个 APK 已安装但 probe/fixture 未启动、VPN 未授权。独立 probe 工程保留在 `E:/CShell-vpn-test/probe`；受控 HTTP fixture 仅监听宿主 `127.0.0.1:59996`，不访问外站。
