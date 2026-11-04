@@ -8,6 +8,7 @@ assert.equal(pkg.version,'1.0.0','Candidate must come from 1.0 source');
 assert.equal(pkg.build.directories.output,'release/1.0.0');
 const edition=process.env.CSHELL_EDITION||'opensource';
 assert.ok(['opensource','pro'].includes(edition),'Unknown edition');
+assert.equal(edition,'pro','This checkout contains Pro sources; build OSS only from the separate Core checkout');
 const gradle=await readFile('android/app/build.gradle','utf8');
 assert.match(gradle,/versionCode releaseCode; versionName releaseVersion/);
 assert.match(gradle,/versionParts\[0\] \* 1000000 \+ versionParts\[1\] \* 1000 \+ versionParts\[2\]/);

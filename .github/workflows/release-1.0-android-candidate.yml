@@ -8,7 +8,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        edition: [opensource, pro]
+        edition: [pro]
     runs-on: ubuntu-latest
     env:
       CSHELL_EDITION: ${{ matrix.edition }}
@@ -62,3 +62,4 @@ jobs:
           name: 1.0-${{ matrix.edition }}-android-candidate
           if-no-files-found: error
           path: candidate-artifacts/*
+
