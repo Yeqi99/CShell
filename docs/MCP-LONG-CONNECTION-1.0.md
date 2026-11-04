@@ -4,7 +4,7 @@
 
 `gateway.ts` 使用官方 MCP SDK 提供有状态 Streamable HTTP POST / GET SSE / DELETE。独立 `csmcp_` 客户端令牌仅签发时显示，服务端保存摘要；每次请求及最长 10 秒周期重新验证会员、撤销、目标归属。会话绑定令牌摘要，不能跨客户端复用。空闲 30 分钟回收，最大 128 会话；入口只监听 127.0.0.1，必须经 HTTPS 反向代理公开。浏览器 Origin 请求拒绝。
 
-网关复用已发布账号 bridge 的五个方法 `list_servers_page/connect/describe_connection/invoke_connection/disconnect`，机器操作从 `describe_connection` 返回的能力目录发现，再通过 `invoke_connection` 调用；本机现有 MCP 客户端和权限继续校验，不把公网令牌映射为全局权限。原 CanpAI bridge 不增加会员限制。会员要求仅约束新签发的公网 MCP 客户端。
+新签发会员客户端可明确授权八个方法：三个应用工具发现/描述/调用方法，加上已发布账号 bridge 的五个方法 `list_servers_page/connect/describe_connection/invoke_connection/disconnect`，旧令牌保留原五方法范围，不自动扩权。机器操作从 `describe_connection` 返回的能力目录发现，再通过 `invoke_connection` 调用；本机现有 MCP 客户端和权限继续校验，不把公网令牌映射为全局权限。原 CanpAI bridge 不增加会员限制。会员要求仅约束新签发的公网 MCP 客户端。
 
 每次 bridge 请求先预留请求和最大 8 MiB 结果预算，投递前拒绝超额，返回或超时后结算实际已投递的应用负载，释放余量。超时表示结果未知，不自动重新执行。进程崩溃的预算保守保留，管理员根据可信记录对账，见 `TRAFFIC-ACCOUNTING-1.0.md`。此上限意味着剩余额度不足 8 MiB 时即使小请求也会拒绝，需要扩容；不能伪装为已精确预测结果大小。
 
@@ -60,3 +60,14 @@ New member tokens may explicitly include `list_application_tools`, `describe_app
 The desktop derives an isolated principal per bridge-client + remote consumer. Permissions are inherited from the selected local MCP client, while sessions/tasks/catalogs are isolated per consumer. Changing the selected client invalidates old principals; rotating its token aborts scoped calls and removes its scoped sessions/tasks. Session IDs created through either direct connect or application invocation retain the same consumer ownership. Existing five-scope tokens and the old CanpAI bridge are not expanded; the new route is accepted only through the authenticated member token path. To opt in, create a new member client token. All operation results still use the durable journal and the same traffic reservations.
 
 Acceptance: real local MCP application dispatch verifies denied review has no side effect, allowed domain mutation, live permission revocation, actual SSH session isolation between consumers, and scoped audit records. Cloud tests verify old token/legacy bridge rejection of application invocation and new token delegation with its authenticated owner. This is not proof that every GUI-only operation already has a local MCP tool; only real registered authorized capabilities are advertised.
+
+
+## 跨机器文件复制（1.0）
+
+`files_copy_start` 是本机 MCP、会员长连接应用工具及通用 CLI 共同发现的高层入口。先用调用方自己的 `connect` 建立源、目标两个会话，再提供 `source/destination: {sessionId, root, path}`；SSH/FTP 的 root 留空，CAgent 使用其文件根目录 ID。返回任务 ID，使用 `task_read` 查看字节进度与结果，`task_cancel` 请求取消，`task_release` 释放已完成结果。提供 idempotencyKey 可在当前进程的保留期内找回原任务，不能跨重启盲目重放。
+
+源端要求 files.read，目标要求 files.create，并分别遵守审核策略；调用方不能使用其他调用方或 GUI 的会话。每个延迟操作重新核验两端权限和身份，撤销后不能读复制结果。底层传输票据不暴露给 MCP。
+
+`directory: true` 先完整预检最多 10,000 项、32 层的目录树，拒绝复制符号链接，随后创建目录并逐个流式传输文件。已有目标不覆盖；失败保留已经完成的文件/目录，并报告 partial 进度，未提交临时文件取消清理。不保证与外部并发修改之间具有目录快照隔离。GUI 与高层工具共用 Agent 直连探测：绑定接收方证书验证票据，探测失败才退回有界控制端流转；开始写入后失败不重放。目录逐文件同样选择路径，SSH/FTP 使用流式传输。
+
+回归覆盖真实 SSH → SSH 长连接调用、消费者隔离、结果撤权、幂等，真实 Agent 目录及取消清理，以及 SFTP/FTP 双向二进制传输。

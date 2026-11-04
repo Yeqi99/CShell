@@ -12,6 +12,9 @@ import { z } from 'zod';
 import { withMcpImage } from './mcp-images';
 import { visualAuditArguments } from './visual-privacy';
 import { Store } from './store';
+import {copyMachineOperation,type CopyEndpoint} from './machine-copy-operation';
+import {directMachineCopy} from './direct-machine-copy';
+import {providerFileCall} from './provider-file-call';
 import { SshService } from './ssh';
 import { mcpSettingsSchema, type McpSettings, type McpStatus } from '../shared/contracts';
 import { CapabilityCatalog, discoverySchema, type CapabilityDefinition } from './api/catalog';
@@ -43,6 +46,8 @@ import { remoteExecutable, pluginEnabled } from '../shared/plugins';
 import { requiresReview, apiCallerPolicy, allowsApplication, allowsCapability, advertisesCapability } from './connections/authorization';
 
 export interface McpHost {
+  fileTransferAddress?: (sessionId:string)=>{host:string;port:number}|undefined;
+  fileTransferEndpoint?: (sessionId:string,signal:AbortSignal)=>Promise<CopyEndpoint>;
   accountContext?: () => { key: string; transitioning: boolean };
   connectEnvironment?: (parent: string, conda: string, prefix: string, signal: AbortSignal, ready: (id: string) => void) => Promise<string>;
   manager: ConnectionManager;
@@ -641,6 +646,10 @@ export class McpService {
         'Select a supported target returned by list_servers.',
       );
     return profile;
+  }
+  private copyTaskAllowed(permission:string,target:string,owner:string){
+    const source=permission.slice('files.copy:'.length);this.allowed(source,owner);this.allowed(target,owner);
+    return this.capabilityAllowed('files.read',owner,source)&&this.capabilityAllowed('files.create',owner,target);
   }
   private owned(id: string, owner = 'legacy') {
     const profileId = this.connections.get(id);
@@ -1312,6 +1321,7 @@ export class McpService {
         run('task_list', () => {
           return this.tasks.list(owner, { limit, after }, (t) => {
             try {
+              if(t.permission.startsWith('files.copy:'))return this.copyTaskAllowed(t.permission,t.target,owner);
               if (t.permission.startsWith('local.files.'))
                 return Boolean(
                   this.principal(owner)
@@ -2049,6 +2059,22 @@ export class McpService {
           );
         }),
     );
+    register('files_copy_start', {
+      description:'Copy a regular file or bounded directory tree between two owned live sessions. No overwrites or symbolic links. Returns taskId for task_read/task_cancel; progress is task events. Partial files remain on failure. Controller streams bounded chunks, never exposing transfer tickets. Agent root IDs come from files.roots; SSH/FTP root is empty.',
+      inputSchema:{source:z.object({sessionId:z.string().uuid(),root:z.string().default(''),path:z.string().min(1).max(4096)}).strict(),destination:z.object({sessionId:z.string().uuid(),root:z.string().default(''),path:z.string().min(1).max(4096)}).strict(),directory:z.boolean().default(false),idempotencyKey:z.string().min(1).max(128).optional()},
+      annotations:{destructiveHint:true},
+    }, async args=>run('files_copy_start',()=>{
+      const guard=()=>{for(const [place,permission] of [[args.source,'files.read'],[args.destination,'files.create']] as const){this.owned(place.sessionId,owner);if(!this.capabilityAllowed(permission,owner,this.connections.get(place.sessionId)))throw new ApiError('FORBIDDEN','File copy permission revoked.','Review both file scopes.');}};
+      guard();if(args.source.sessionId===args.destination.sessionId)throw new ApiError('INVALID_ARGUMENT','Use distinct source and destination sessions.','Open a second connection.');
+      const identities=[args.source,args.destination].map(p=>JSON.stringify(this.owned(p.sessionId,owner)));
+      const liveGuard=()=>{guard();[args.source,args.destination].forEach((p,i)=>{if(JSON.stringify(this.owned(p.sessionId,owner))!==identities[i])throw Error('File target identity changed');});};
+      return this.tasks.start(owner,this.connections.get(args.destination.sessionId)!,args,args.idempotencyKey,async(abort,output)=>{
+        const combined=AbortSignal.any([ownerSignal,abort]);liveGuard();
+        for(const place of [args.source,args.destination])if(requiresReview(this.principal(owner,this.connections.get(place.sessionId)).review,place===args.destination)&&!(await this.confirm(this.owned(place.sessionId,owner).label,JSON.stringify({tool:'files_copy_start',arguments:args}),combined)))throw new ApiError('FORBIDDEN','Copy declined.','Do not repeat declined operations.');
+        const endpoint=(id:string)=>async(signal:AbortSignal):Promise<CopyEndpoint>=>{liveGuard();const target=this.owned(id,owner);if(this.host?.fileTransferEndpoint&&['cshell.ssh','cshell.ftp'].includes(target.providerId))return this.host.fileTransferEndpoint(id,signal);if(target.providerId==='cshell.ssh')return providerFileCall({sftp:await this.ssh.sftp(id),sessionId:id},signal);if(target.providerId==='cshell.ftp'){if(!this.host?.fileTransferEndpoint)throw Error('FTP transfer unavailable');return this.host.fileTransferEndpoint(id,signal);}const agent=this.manager.tools.agent(id);return {call:(method,input,s)=>agent({method,params:input} as any,s??signal),dispose:async()=>{}};};
+        return copyMachineOperation(endpoint(args.source.sessionId),args.source,endpoint(args.destination.sessionId),args.destination,args.directory,combined,liveGuard,event=>output(JSON.stringify(event)),this.host?.fileTransferAddress?.(args.source.sessionId)?async(from,to,progress)=>{const address=this.host!.fileTransferAddress!(args.source.sessionId);if(!address)return undefined;let sourceCall,targetCall;try{sourceCall=this.manager.tools.agent(args.source.sessionId);targetCall=this.manager.tools.agent(args.destination.sessionId);}catch{return undefined;}const bind=(call:typeof sourceCall)=>(method:string,params:unknown,s=combined)=>call({method,params} as any,s);return directMachineCopy(bind(sourceCall),bind(targetCall),address,from,to,combined,liveGuard,progress);}:undefined);
+      },'files.copy:'+this.connections.get(args.source.sessionId)!);
+    }));
     register(
       'task_start',
       {
@@ -2116,6 +2142,7 @@ export class McpService {
       async ({ taskId, after, limit }) =>
         run('task_read', () => {
           const result = this.tasks.read(owner, taskId, after, limit);
+          if(result.permission.startsWith('files.copy:')){if(!this.copyTaskAllowed(result.permission,result.target,owner))throw new ApiError('FORBIDDEN','Copy result permission revoked.','Review both file scopes.');return result;}
           if (result.permission.startsWith('local.files.')) {
             const root = this.principal(owner).localFileRoots?.find((r) => r.id === result.target);
             if (!root?.mutations?.some((action) => result.permission === `local.files.${action}`)) throw new ApiError('FORBIDDEN', 'Task root grant was revoked.', 'Review the local root action grant.');

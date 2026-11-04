@@ -6,12 +6,23 @@ test('account application bridge preserves live grants, review, consumer session
  const ssh=new SshService(()=>{},async(_p,pin)=>{await store.trust(profile.host+':'+profile.port,pin);return true});const initial=await ssh.connect(profile,{password:f.password});ssh.disconnect(initial.sessionId);
  const net=createServer();await new Promise<void>(r=>net.listen(0,'127.0.0.1',r));const port=(net.address()as any).port;await new Promise<void>(r=>net.close(()=>r()));
  let approved=false,writes=0;const tools=createMemberDomainTools({accountId:()=> 'a',domains:async input=>{if(input)writes++;return {namespace:null,records:[]}as any;}});
- const service=new McpService(store,dir,async()=>approved,{applicationTools:tools}as any);const client=apiClientSchema.parse({id:randomUUID(),name:'bridge',enabled:true,allowedProfiles:[id],allowCommands:true,capabilities:[],applicationCapabilities:['domains.read','domains.manage','connections.read'],review:'always',disclosure:{mode:'full',level:'contract',budgetBytes:65536}});
+ const service=new McpService(store,dir,async()=>approved,{applicationTools:tools}as any);const client=apiClientSchema.parse({id:randomUUID(),name:'bridge',enabled:true,allowedProfiles:[id],allowCommands:true,capabilities:['files.read','files.create'],applicationCapabilities:['domains.read','domains.manage','connections.read'],review:'always',disclosure:{mode:'full',level:'contract',budgetBytes:65536}});
  const call=(consumer:string,name:string,args:Record<string,unknown>={})=>service.accountBridgeCall(client.id,consumer.repeat(43),'invoke_application_tool',{name,arguments:args},new AbortController().signal);
  try{await service.configure({...store.mcpSettings(),enabled:true,port,clients:[client],accountBridge:{clientId:client.id}});
  const listing=await service.accountBridgeCall(client.id,'a'.repeat(43),'list_application_tools',{},new AbortController().signal);assert(JSON.stringify(listing).includes('list_member_domains'));
  await assert.rejects(call('a','claim_member_domain',{prefix:'alice',requestId:'claim-test-01'}));assert.equal(writes,0);approved=true;await call('a','claim_member_domain',{prefix:'alice',requestId:'claim-test-01'});assert.equal(writes,1);
- (service as any).host=undefined;const result=await call('a','connect',{profileId:id});const sessionId=result.sessionId;assert.equal((await call('a','session_list')).sessions[0].sessionId,sessionId);assert.deepEqual((await call('b','session_list')).sessions,[]);await assert.rejects(call('b','describe_connection',{sessionId}));await call('a','disconnect',{sessionId});
+ (service as any).host=undefined;const result=await call('a','connect',{profileId:id});const sessionId=result.sessionId;assert.equal((await call('a','session_list')).sessions[0].sessionId,sessionId);assert.deepEqual((await call('b','session_list')).sessions,[]);await assert.rejects(call('b','describe_connection',{sessionId}));
+ const second=(await call('a','connect',{profileId:id})).sessionId;
+ const copy={source:{sessionId,root:'',path:'/hello.txt'},destination:{sessionId:second,root:'',path:'/copied.txt'},idempotencyKey:'copy-once'};
+ await assert.rejects(call('b','files_copy_start',copy));
+ const task=await call('a','files_copy_start',copy);let status:any;
+ for(let i=0;i<100;i++){status=await call('a','task_read',{taskId:task.taskId??task.id});if(['succeeded','failed','cancelled','unknown'].includes(status.state))break;await new Promise(r=>setTimeout(r,20));}
+ assert.equal(status.state,'succeeded',JSON.stringify(status));assert.equal(await readFile(join(f.root,'copied.txt'),'utf8'),await readFile(join(f.root,'hello.txt'),'utf8'));
+ assert.equal((await call('a','files_copy_start',copy)).taskId,task.taskId);
+ await assert.rejects(call('b','task_read',{taskId:task.taskId??task.id}));
+ await call('a','disconnect',{sessionId:second});await call('a','disconnect',{sessionId});
+ await service.configure({...store.mcpSettings(),clients:[{...client,capabilities:['files.create']}]});await assert.rejects(call('a','task_read',{taskId:task.taskId??task.id}));await service.configure({...store.mcpSettings(),clients:[client]});
+
  (service as any).host={applicationTools:tools};await service.rotateToken(client.id);await service.configure({...store.mcpSettings(),clients:[{...client,applicationCapabilities:['connections.read']}]});await assert.rejects(call('a','claim_member_domain',{prefix:'bob',requestId:'claim-test-02'}));assert.equal(writes,1);
  const audit=await readFile(join(dir,'mcp-audit.jsonl'),'utf8');assert(audit.includes('bridge:'+client.id+':'));assert(audit.includes('claim_member_domain'));
  }finally{await service.stop();f.disconnectAll();await f.close();await rm(dir,{recursive:true,force:true})}
