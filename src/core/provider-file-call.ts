@@ -1,6 +1,6 @@
 import {PassThrough,Readable,Writable} from 'node:stream';
 import {pipeline} from 'node:stream/promises';
-import {randomUUID} from 'node:crypto';
+import {randomUUID,createHash} from 'node:crypto';
 import type {SFTPWrapper,Stats} from 'ssh2';
 import type {FtpService} from './ftp';
 import {posix} from 'node:path';
@@ -11,6 +11,7 @@ export function providerFileCall(provider:{sftp?:SFTPWrapper;ftp?:FtpService;ses
  let readingCompletion:Promise<unknown>|undefined;
  let reader:Readable|undefined,iterator:AsyncIterator<any>|undefined,size=0,version='',offset=0;
  let writer:Writable|undefined,completion:Promise<unknown>|undefined,temporary='',destination='',upload='',written=0,expected=0;
+ let expectedDigest='';
  const stat=(path:string)=>new Promise<Stats>((resolve,reject)=>provider.sftp!.lstat(path,(e,s)=>e?reject(e):resolve(s)));
  const exists=async(path:string)=>{try{await stat(path);return true;}catch(e){if((e as any).code===2)return false;throw e;}};
  const cleanup=async()=>{controller.abort();reader?.destroy();writer?.destroy();await completion?.catch(()=>{});if(temporary&&provider.sftp)await new Promise<void>(r=>provider.sftp!.unlink(temporary,()=>r()));};
@@ -43,9 +44,9 @@ export function providerFileCall(provider:{sftp?:SFTPWrapper;ftp?:FtpService;ses
   if(method==='files.uploadStart'){
    if(upload)throw Error('Upload already active');expected=p.size;destination=p.path;upload=randomUUID();writer=new PassThrough({highWaterMark:65536});writer.on('error',()=>{});
    if(provider.sftp){if(await exists(destination))throw Error('Destination already exists; original preserved');temporary=destination+'.cshell-'+upload+'.part';completion=pipeline(writer as PassThrough,provider.sftp.createWriteStream(temporary,{flags:'wx',mode:0o600,highWaterMark:65536}),{signal});}
-   else completion=provider.ftp!.streamUpload(provider.sessionId,destination,writer as PassThrough,expected,signal);
+   else completion=provider.ftp!.streamUpload(provider.sessionId,destination,writer as PassThrough,expected,signal,()=>expectedDigest);
    // Attach immediately: remote rejection may precede the next IPC chunk.
-   void completion.catch(e=>writer?.destroy(e));return {id:upload,chunkSize:65536};
+   void completion.catch(e=>writer?.destroy(e));return {id:upload,chunkSize:65536,sha256:true};
   }
   if(p.id!==upload||!upload)throw Error('Unknown transfer');
   if(method==='files.uploadChunk'){
@@ -53,9 +54,17 @@ export function providerFileCall(provider:{sftp?:SFTPWrapper;ftp?:FtpService;ses
    await Promise.race([new Promise<void>((r,j)=>writer!.write(bytes,e=>e?j(e):r())),completion!.then(()=>{throw Error('Upload ended before all chunks');})]);written+=bytes.length;return{next:written};
   }
   if(method==='files.uploadFinish'){
-   if(written!==expected)throw Error('Incomplete upload');writer!.end();await completion;signal.throwIfAborted();
-   if(provider.sftp){if(await exists(destination))throw Error('Destination appeared; original preserved');await new Promise<void>((r,j)=>provider.sftp!.rename(temporary,destination,e=>e?j(e):r()));temporary='';}
-   upload='';return{};
+   if(written!==expected)throw Error('Incomplete upload');
+   if(typeof p.sha256!=='string'||!/^[a-f0-9]{64}$/.test(p.sha256))throw Error('Missing destination checksum');
+   expectedDigest=p.sha256;writer!.end();await completion;signal.throwIfAborted();
+   if(provider.sftp){
+    const hash=createHash('sha256');let received=0;
+    const sink=new Writable({highWaterMark:65536,write(chunk,_encoding,done){received+=chunk.length;if(received>expected){done(Error('Destination size changed'));return;}hash.update(chunk);done();}});
+    await pipeline(provider.sftp.createReadStream(temporary,{highWaterMark:65536}),sink,{signal});
+    if(received!==expected||hash.digest('hex')!==expectedDigest)throw Error('Destination checksum mismatch');
+    signal.throwIfAborted();if(await exists(destination))throw Error('Destination appeared; original preserved');await new Promise<void>((r,j)=>provider.sftp!.rename(temporary,destination,e=>e?j(e):r()));temporary='';
+   }
+   upload='';return{sha256:expectedDigest};
   }
   if(method==='files.uploadCancel'){await cleanup();upload='';return{};}
   throw Error('Unsupported file transfer operation');
