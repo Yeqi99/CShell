@@ -1,3 +1,4 @@
+import {preferencesTool} from '../core/preferences-tool';
 import {providerFileCall} from '../core/provider-file-call';
 import {IdentityNetwork} from './identity-network';
 import {remoteAppProxy,proxyShellCommand} from './remote-app-proxy';
@@ -706,7 +707,7 @@ else
           fileTransferAddress:sessionId=>{const target=connections!.tools.describe(sessionId);const device=clientProvider.list().find(d=>d.deviceId===target.resourceId);return device?{host:device.host,port:device.port}:undefined;},
           fileTransferEndpoint:async(sessionId,signal)=>providerFileCall({sessionId,...(connections!.tools.describe(sessionId).providerId==='cshell.ssh'?{sftp:await ssh.sftp(sessionId)}:{ftp})},signal),
           http,
-          applicationTools: [updateTool,...extensionServices.applicationTools,...(identityNetwork?.tools()??[])],
+          applicationTools: [preferencesTool({read:()=>store.snapshot().preferences,save:async value=>{await store.preferences(value);if(process.platform!=='darwin')window.setTitleBarOverlay(titleBarColors(value.theme));}}),updateTool,...extensionServices.applicationTools,...(identityNetwork?.tools()??[])],
           connectEnvironment: async (parent, conda, prefix, signal, ready) => {
             let child: string | undefined;
             try {
