@@ -58,18 +58,27 @@ final class CloudSync {
   private JSONObject api(String path,JSONObject body)throws Exception{return api(path,body,1);}
   private JSONObject api(String path,JSONObject body,int writeSchema)throws Exception{
     if(transport!=null)return transport.request(path,body,writeSchema);
+    if(path.equals("vault")&&state.has("session"))try{return CloudVaultChunks.transfer(part->rawApi("vault/chunks",part,writeSchema),new File(context.getCacheDir(),"cloud-transfer/"+state.getJSONObject("session").getString("accountId")),body,safeVaultBytes());}catch(CloudVaultChunks.Unsupported ignored){}
+    return rawApi(path,body,writeSchema);
+  }
+  static int safeVaultBytes(){return (int)Math.max(2*1024*1024,Math.min(256L*1024*1024,Runtime.getRuntime().maxMemory()/24));}
+  static final class HttpFailure extends IOException{final int status;HttpFailure(int status,String message){super(message);this.status=status;}}
+  private JSONObject rawApi(String path,JSONObject body,int writeSchema)throws Exception{
     HttpURLConnection connection=(HttpURLConnection)new URL("https://shell.canp.ai/api/v1/"+path).openConnection();
     connection.setConnectTimeout(15000);connection.setReadTimeout(25000);connection.setInstanceFollowRedirects(false);
     connection.setRequestProperty("Content-Type","application/json");
+    connection.setRequestProperty("X-CShell-Vault-Max-Bytes",Integer.toString(safeVaultBytes()));
+    connection.setRequestProperty("X-CShell-Vault-Transport","1");
     connection.setRequestProperty("X-CShell-Vault-Schema","4");if(body!=null)connection.setRequestProperty("X-CShell-Vault-Write-Schema",Integer.toString(writeSchema));
     if(state.has("session"))connection.setRequestProperty("Authorization","Bearer "+state.getJSONObject("session").getString("token"));
     try{
       if(body!=null){connection.setRequestMethod("POST");connection.setDoOutput(true);byte[] payload=bytes(body.toString());connection.setFixedLengthStreamingMode(payload.length);try(OutputStream out=connection.getOutputStream()){out.write(payload);}}
       int status=connection.getResponseCode();InputStream input=status<400?connection.getInputStream():connection.getErrorStream();
       if(input==null)throw new IOException("云端响应为空");
-      ByteArrayOutputStream output=new ByteArrayOutputStream();try(InputStream in=input){byte[] buffer=new byte[8192];int n;while((n=in.read(buffer))!=-1){if(output.size()+n>90*1024*1024)throw new IOException("云端响应超过上限");output.write(buffer,0,n);}}
+      int responseLimit=path.equals("vault/chunks")?1024*1024+4096:(int)Math.min(90L*1024*1024,safeVaultBytes()*4L/3+65536);
+      ByteArrayOutputStream output=new ByteArrayOutputStream();try(InputStream in=input){byte[] buffer=new byte[8192];int n;while((n=in.read(buffer))!=-1){if(output.size()+n>responseLimit)throw new IOException("云端响应超过本设备安全容量");output.write(buffer,0,n);}}
       JSONObject result=new JSONObject(output.toString("UTF-8"));
-      if(status!=200)throw new IOException(result.optString("error","云端请求失败"));return result;
+      if(status!=200)throw new HttpFailure(status,result.optString("error","云端请求失败"));return result;
     }finally{connection.disconnect();}
   }
   private JSONObject decrypt(JSONObject envelope,String key)throws Exception{
@@ -81,7 +90,7 @@ final class CloudSync {
   }
   private JSONObject encrypt(JSONObject data)throws Exception{
     byte[] raw=Base64.decode(state.getString("key"),Base64.URL_SAFE|Base64.NO_WRAP|Base64.NO_PADDING),nonce=new byte[12];new SecureRandom().nextBytes(nonce);
-    byte[] plaintext=bytes(data.toString());if(plaintext.length>64*1024*1024)throw new IOException("同步数据超过 64 MiB");
+    byte[] plaintext=bytes(data.toString());if(plaintext.length>safeVaultBytes())throw new IOException("同步数据超过本设备安全内存容量；原数据保留");
     return new JSONObject().put("format",1).put("nonce",b64(nonce)).put("ciphertext",b64(CloudCipher.transform(true,raw,nonce,plaintext,state.getJSONObject("session").getString("accountId"))));
   }
   private void validate(JSONObject data)throws Exception{
@@ -112,7 +121,7 @@ final class CloudSync {
         .put("auth",p.getString("auth")).put("group",p.optString("group")).put("favorite",p.optBoolean("favorite")));
     }
     JSONArray providers=data.getJSONObject("ai").getJSONArray("providers");for(int i=0;i<providers.length();i++){JSONObject p=providers.getJSONObject(i);models.put(new JSONObject().put("name",p.optString("name")).put("model",p.optString("model")));}
-    return new JSONObject().put("profiles",profiles).put("models",models).put("theme",data.getJSONObject("store").getJSONObject("preferences").optString("theme","light"));
+    return CloudPortableSettings.project(data.getJSONObject("store")).put("profiles",profiles).put("models",models);
   }
   synchronized JSONObject call(JSONObject request)throws Exception{
     boolean identityChange=Arrays.asList("register","login","password-login","logout").contains(request.optString("action"));
