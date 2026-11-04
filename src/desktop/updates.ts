@@ -204,7 +204,7 @@ export function registerUpdateHandlers(
       if (process.platform === 'linux') {
         const target = process.env.APPIMAGE || '';
         const staged = await prepareAppImageUpdate(file, target);
-        installAuthorization?.();
+        try {installAuthorization?.();} catch(error) {await staged.cancel();throw error;}
         const launch = () => {
           try {
             staged.commit();
@@ -222,7 +222,7 @@ export function registerUpdateHandlers(
       }
       if (process.platform === 'darwin') {
         const staged = await prepareMacUpdate(file, app.getPath('exe'), release!.version);
-        installAuthorization?.();
+        try {installAuthorization?.();} catch(error) {await staged.cancel();throw error;}
         const launch = () => {
           try {
             staged.commit();
@@ -237,6 +237,7 @@ export function registerUpdateHandlers(
       }
       throw Error('当前平台尚不支持应用内安装');
     } catch (e) {
+      window.emit('update-mcp-cancelled');
       file = '';
       fail(e, 'download');
       throw e;
