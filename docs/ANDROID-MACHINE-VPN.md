@@ -28,3 +28,5 @@ gradle -p android assembleDebug
 2026-11-04：四 ABI 原生编译成功；完整 Android Java 编译与 debug APK 构建成功；纯 JVM 真实套接字验证 TCP 往返、域名由出口解析、拒绝 UDP、拒绝头注入及租约失效不直连。没有开启用户手机 VPN，没有替换已有 VPN。
 
 发布验收仍需在隔离 Android 设备上验证系统授权、其他应用 TCP/DNS、横跨两台机器的真实出口 IP、撤销和进程结束行为、失效时不外泄、既有 VPN 拒绝启动。当前不能把构建与桥接测试称为完整实机 VPN 验收。
+
+隔离验证准备：官方 AOSP API 35 x86_64 镜像和 Emulator 已校验官方 SHA-1，在 E 盘创建独立 `CAgentVPN` AVD，AEHD 2.2 检查可用；主 APK、Instrumentation APK、独立 UID 的 HTTP probe APK 均成功安装。`AndroidVpnFixture` 只允许模拟器，使用真实 VpnService/native TUN 与受控反向 HTTP 出口，不接触用户账号和手机。执行工具策略拒绝 `adb shell am start`，因此尚未执行系统授权与跨 UID 请求。此项仍是发布验收缺口，不能记为通过。
