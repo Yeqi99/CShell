@@ -113,6 +113,10 @@ export function probeSshHost(
     }
   });
 }
+export type PairedEndpointAccess = {
+  get(id:string): {host:string;port:number}|undefined;
+  update(id:string,endpoint:{host:string;port:number}):Promise<void>;
+};
 export class ConnectionManagement {
   private challenges = new Map<
     string,
@@ -130,6 +134,7 @@ export class ConnectionManagement {
     private store: Store,
     private account: () => string,
     private probe: typeof probeSshHost = probeSshHost,
+    private paired?:PairedEndpointAccess,
   ) {}
   private result(profile: Profile) {
     return {
@@ -201,7 +206,9 @@ export class ConnectionManagement {
         ? profileSchema.parse({ ...input.profile, id: randomUUID() })
         : this.store.profile(input.id);
     guard(profile);
-    if (!['ssh', 'sftp', 'ftp', 'ftps', 'rdp'].includes(profile.protocol ?? 'ssh'))
+    const pairedUpdate=profile.protocol==='client'&&input.action==='update'&&this.paired?.get(profile.id);
+    if(profile.protocol==='client'&&pairedUpdate&&input.action==='update'&&Object.keys(input.patch).some(k=>!['name','group','favorite','host','port'].includes(k)))throw Error('PAIRED_CONNECTION_PATCH_UNSUPPORTED');
+    if (!pairedUpdate&&!['ssh', 'sftp', 'ftp', 'ftps', 'rdp'].includes(profile.protocol ?? 'ssh'))
       throw new Error('USE_PROTOCOL_PAIRING_WORKFLOW');
     if (input.action === 'probe') {
       const revision = this.store.connectionRevision(profile.id),
@@ -270,7 +277,12 @@ export class ConnectionManagement {
     });
     guard(profile);
     guard(next);
-    await this.store.saveConnection(
+    const previous=pairedUpdate?this.paired!.get(profile.id):undefined;
+    if(previous){
+      if(this.store.connectionRevision(profile.id)!==(input as {revision:string}).revision)throw Error('CONNECTION_CHANGED');
+      await this.paired!.update(profile.id,{host:next.host,port:next.port});
+    }
+    try {await this.store.saveConnection(
       next,
       input.action === 'create' ? this.store.connectionRevision(profile.id) : input.revision,
       () => {
@@ -279,6 +291,11 @@ export class ConnectionManagement {
       },
       secret,
     );
+    }catch(error){
+      const current=this.paired?.get(profile.id);
+      if(previous&&current?.host===next.host&&current.port===next.port)await this.paired!.update(profile.id,previous).catch(()=>{});
+      throw error;
+    }
     return this.result(next);
   }
 }

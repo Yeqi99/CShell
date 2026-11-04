@@ -724,6 +724,7 @@ else
         },
         {
           manager: connections,
+          pairedEndpoints:{get:id=>clientProvider.list().find(d=>d.deviceId===id),update:(id,endpoint)=>clientProvider.updateEndpoint(id,endpoint)},
           fileTransferAddress:sessionId=>{const target=connections!.tools.describe(sessionId);const device=clientProvider.list().find(d=>d.deviceId===target.resourceId);return device?{host:device.host,port:device.port}:undefined;},
           fileTransferEndpoint:async(sessionId,signal)=>providerFileCall({sessionId,...(connections!.tools.describe(sessionId).providerId==='cshell.ssh'?{sftp:await ssh.sftp(sessionId)}:{ftp})},signal),
           accountContext:()=>({key:`${accountProfiles?.current()??'local'}:${accountContextEpoch}`,transitioning:accountTransition}),
