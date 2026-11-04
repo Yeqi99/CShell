@@ -40,3 +40,19 @@ test('unsupported platform shutdown is inert even after a rejected enable reques
  assert.equal(touched,0);
  assert.deepEqual(proxy.status(),{supported:false,enabled:false,error:''});
 });
+
+test('system proxy listener forwards real HTTP and fails closed when exit disappears',async()=>{
+ const {createServer}=await import('node:http');const {connect}=await import('node:net');const {request}=await import('node:http');
+ const origin=createServer((_req,res)=>res.end('chosen-egress'));
+ await new Promise<void>(r=>origin.listen(0,'127.0.0.1',r));const originPort=(origin.address() as any).port;
+ const dir=await mkdtemp(join(tmpdir(),'system-proxy-stream-'));let current={...previous},online=true;
+ const run=async(script:string)=>{if(script.includes('Get-ItemProperty'))return JSON.stringify(current);const encoded=script.match(/FromBase64String\('([^']+)'\)/)![1];current=JSON.parse(Buffer.from(encoded,'base64').toString());return '';};
+ const codec={encryptPrivate:async(s:string)=>s,decryptPrivate:async(s:string)=>s};
+ const proxy=new WindowsSystemProxy(dir,codec,async(host,port)=>{assert.equal(host,'chosen-exit.test');assert.equal(port,80);if(!online)throw Error('exit offline');return connect({host:'127.0.0.1',port:originPort});},async()=>{},'win32',run);
+ try{
+  await proxy.set(true);const port=Number(current.ProxyServer.match(/http=127.0.0.1:(\d+)/)![1]);
+  const get=()=>new Promise<{code:number,text:string}>((resolve,reject)=>{const req=request({host:'127.0.0.1',port,path:'http://chosen-exit.test/',headers:{Host:'chosen-exit.test',Connection:'close'}},res=>{let text='';res.on('data',b=>text+=b);res.on('end',()=>resolve({code:res.statusCode!,text}));});req.on('error',reject);req.end();});
+  assert.deepEqual(await get(),{code:200,text:'chosen-egress'});online=false;
+  assert.equal((await get()).code,502);assert.equal(proxy.status().enabled,true);
+ }finally{await proxy.close();await new Promise<void>(r=>origin.close(()=>r()));await rm(dir,{recursive:true,force:true});}
+});

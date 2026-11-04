@@ -52,6 +52,6 @@ export function NetworkSettings() {
       <div className="network-actions"><span role="status">{saved ? '已应用，后续请求使用新出口' : ''}</span><button className="primary" type="button" onClick={() => void apply()} disabled={mode === 'proxy' && !url || mode === 'machine' && !machine}>{busy ? '正在应用…' : '应用网络设置'}</button></div>
     </fieldset>}
     {window.cshell.networkSystemStatus&&<SystemMachineProxy machineReady={status?.route.mode==='machine'}/>}
-    <MachineNetworkRules/>{window.cshell.networkDiagnostics && <NetworkDiagnostics/>}
+    <MachineNetworkRules onChanged={()=>{void window.cshell.networkStatus?.().then(setStatus).catch(e=>setError(String(e)));}}/>{window.cshell.networkDiagnostics && <NetworkDiagnostics/>}
   </section>;
 }

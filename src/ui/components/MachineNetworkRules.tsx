@@ -6,7 +6,7 @@ import {identityKey,validateIdentityRules,type IdentityEndpoint,type IdentityNet
 
 const kindName=(endpoint:IdentityEndpoint)=>endpoint.kind==='local'?'本机':endpoint.kind==='ssh'?'SSH':'CAgent';
 const EndpointIcon=({endpoint}:{endpoint:IdentityEndpoint})=>endpoint.kind==='local'?<Monitor size={15}/>:endpoint.kind==='ssh'?<Terminal size={15}/>:<Server size={15}/>;
-export function MachineNetworkRules(){
+export function MachineNetworkRules({onChanged}:{onChanged?:()=>void}={}){
   const [state,setState]=useState<IdentityNetworkStatus>(),[source,setSource]=useState(''),[target,setTarget]=useState('');
   const [originalSource,setOriginalSource]=useState('');
   const [editing,setEditing]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
@@ -14,7 +14,7 @@ export function MachineNetworkRules(){
     setBusy(true);setError('');setNotice('');
     try{
       const result=await window.cshell.identityNetwork(command);setState(result);
-      if(command.action!=='list'){setEditing(false);setSource('');setTarget('');setNotice(command.action==='remove'?(result.pendingRemovals?.some(item=>identityKey(item.source)===identityKey(command.source))?'撤销已排队，等待来源机器恢复':'已撤销此规则'):'已保存，状态以实际连接结果为准');}
+      if(command.action!=='list'){onChanged?.();setEditing(false);setSource('');setTarget('');setNotice(command.action==='remove'?(result.pendingRemovals?.some(item=>identityKey(item.source)===identityKey(command.source))?'撤销已排队，等待来源机器恢复':'已撤销此规则'):'已保存，状态以实际连接结果为准');}
     }catch(e){setError(String(e));}finally{setBusy(false);}
   };
   const endpoints=state?.endpoints??[];
