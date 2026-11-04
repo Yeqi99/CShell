@@ -123,7 +123,12 @@ const hosting = z
 const shells = z.array(
   z.object({ shell: z.string(), label: z.string(), distribution: z.string().optional() }).strict(),
 );
+const updateStatus=z.object({phase:z.string(),version:z.string().optional(),bytes:z.number().optional(),total:z.number().optional(),attempt:z.number().optional(),retryAt:z.number().optional(),error:z.string().optional(),automatic:z.boolean().optional(),progressText:z.string().optional(),coordination:z.object({phase:z.string(),blocking:z.array(z.string()).optional(),error:z.string().optional(),protocol:z.literal(1),activity:z.record(z.string(),z.number())}).strict().optional()}).strict();
 export const agentMethodOutputs: Record<string, z.ZodType> = {
+  'update.check': z.object({current:z.string(),available:z.boolean(),version:z.string().optional()}).strict(),
+  'update.download': updateStatus,
+  'update.status': updateStatus,
+  'update.install': z.object({queued:z.boolean(),installing:z.boolean(),protocol:z.literal(1),message:z.string()}).strict(),
   // Only methods in the API input allowlist; trusted-only RPC exclusions live in agent-exposure.ts.
   'applications.list': appCatalogSchema,
   'applications.plan': appTaskSchema,
