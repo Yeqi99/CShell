@@ -1,6 +1,6 @@
 import {Client,type FileInfo} from 'basic-ftp';
 import {z} from 'zod';
-import {randomUUID} from 'node:crypto';
+import {randomUUID,createHash} from 'node:crypto';
 import {isIP} from 'node:net';
 import {posix} from 'node:path';
 import {lstat,copyFile,rm} from 'node:fs/promises';
@@ -86,11 +86,17 @@ export class FtpService {
    else{if(p.directory)throw Error('目标类型已改变');guard?.();await client.remove(path);}
   },true);
  }
- private async put(client:Client,path:string,source:string|Readable,total:number,signal:AbortSignal|undefined,progress:Progress,guard?:()=>void){
+ private async put(client:Client,path:string,source:string|Readable,total:number,signal:AbortSignal|undefined,progress:Progress,guard?:()=>void,expectedDigest?:()=>string){
   if(await this.find(client,path))throw Error('目标已存在，原文件已保留；请选择其他名称');
   const temporary=path+'.cshell-'+randomUUID()+'.part';let finished=false;
   try{
    client.trackProgress(info=>progress(info.bytes,total));guard?.();await client.uploadFrom(source,temporary);signal?.throwIfAborted();
+   if(expectedDigest){
+    const digest=expectedDigest();if(!/^[a-f0-9]{64}$/.test(digest))throw Error('Missing destination checksum');
+    const hash=createHash('sha256');let received=0;
+    const sink=new Writable({highWaterMark:65536,write(chunk,_encoding,done){received+=chunk.length;if(received>total){done(Error('Destination size changed'));return;}hash.update(chunk);done();}});
+    try{await client.downloadTo(sink,temporary);signal?.throwIfAborted();if(received!==total||hash.digest('hex')!==digest)throw Error('Destination checksum mismatch');}finally{sink.destroy();}
+   }
    // FTP has no exclusive rename primitive. This is a checked, non-atomic
    // publish; external writers can race it. It is never retried automatically.
    if(await this.find(client,path))throw Error('上传期间目标已出现，原文件已保留');guard?.();await client.rename(temporary,path);finished=true;progress(total,total);
@@ -99,8 +105,8 @@ export class FtpService {
  upload(id:string,localPath:string,remotePath:string,signal?:AbortSignal,progress:Progress=()=>{}){
   return this.run(id,signal,async(client,s)=>{const file=await lstat(localPath);if(!file.isFile()||file.isSymbolicLink())throw Error('请选择一个普通文件，目录和链接不能作为单文件上传');await this.put(client,checkedPath(s.home,remotePath),localPath,file.size,signal,progress);},true);
  }
- streamUpload(id:string,path:string,source:Readable,size:number,signal:AbortSignal){
-  return this.run(id,signal,(client,s)=>this.put(client,checkedPath(s.home,path),source,size,signal,()=>{}),true);
+ streamUpload(id:string,path:string,source:Readable,size:number,signal:AbortSignal,expectedDigest?:()=>string){
+  return this.run(id,signal,(client,s)=>this.put(client,checkedPath(s.home,path),source,size,signal,()=>{},undefined,expectedDigest),true);
  }
  streamDownload(id:string,path:string,destination:Writable,signal:AbortSignal){
   return this.run(id,signal,async(client,s)=>{const full=checkedPath(s.home,path),file=await this.find(client,full);if(!file||file.directory||file.symlink)throw Error('请选择普通文件');await client.downloadTo(destination,full);});

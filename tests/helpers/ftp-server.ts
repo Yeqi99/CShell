@@ -7,7 +7,7 @@ import {posix} from 'node:path';
 export async function ftpFixture(certificate?:{cert:string;key:string}){
  const files=new Map<string,Buffer>([['/hello.txt',Buffer.from('hello 中文\n')],['/docs/note.txt',Buffer.from('note')]]),dirs=new Set(['/','/docs']);
  const commands:string[]=[],sockets=new Set<Socket>(),passiveServers=new Set<ReturnType<typeof createServer>>();
- const state={dropRename:false,slowDownload:false,tlsDataConnections:0,redirectPassive:false};
+ const state={dropRename:false,slowDownload:false,tlsDataConnections:0,redirectPassive:false,corruptUpload:false};
  const server=createServer(raw=>{
   let control:Socket=raw,buffer='',secure=false,privateData=false,renameFrom='';let pending:Promise<Socket>|undefined;
   sockets.add(raw);raw.on('close',()=>sockets.delete(raw));raw.on('error',()=>{});
@@ -44,7 +44,7 @@ export async function ftpFixture(certificate?:{cert:string;key:string}){
     await transfer(Buffer.from(children.join('\r\n')+'\r\n'));return;
    }
    if(name==='RETR'){const file=files.get(arg);if(!file){reply('550 File missing');return;}await transfer(file);return;}
-   if(name==='STOR'){reply('150 Ready to receive');const socket=await pending!,chunks:Buffer[]=[];socket.on('data',b=>chunks.push(Buffer.from(b)));socket.on('end',()=>{files.set(arg,Buffer.concat(chunks));socket.end();reply('226 Stored');});return;}
+   if(name==='STOR'){reply('150 Ready to receive');const socket=await pending!,chunks:Buffer[]=[];socket.on('data',b=>chunks.push(Buffer.from(b)));socket.on('end',()=>{const content=Buffer.concat(chunks);if(state.corruptUpload&&content.length)content[0]^=255;files.set(arg,content);socket.end();reply('226 Stored');});return;}
    if(name==='MKD'){if(dirs.has(arg)||files.has(arg)){reply('550 Exists');return;}dirs.add(arg);reply('257 Created');return;}
    if(name==='RMD'){if([...dirs,...files.keys()].some(p=>p!==arg&&p.startsWith(arg+'/'))){reply('550 Not empty');return;}dirs.delete(arg);reply('250 Removed');return;}
    if(name==='DELE'){if(!files.delete(arg)){reply('550 Missing');return;}reply('250 Deleted');return;}

@@ -15,7 +15,7 @@
 | P1 | `src/desktop/identity-network.ts` 明确返回 `scope: applications`；Windows 是 WinINET，SSH 是新进程环境变量 | 不可把它宣传成任意进程的整机网络代偿。若 1.0 要承诺整机覆盖，需要对应系统级路由实现及 TCP/UDP/失败断路测试；现有 HTTP/应用范围需明确展示。 |
 | P1 | Android VpnService 排除 CShell 自身；`AppUpdates.java` 等仍用普通 `URL.openConnection()`，`AndroidNetworkStreams` 才消费选中机器出口 | 保留账号/中继控制链路排除以免递归，但模型/应用下载等数据请求是否经选中出口需独立接线与测试。不能声称手机所有应用全部已走指定机器。UDP/QUIC 不在当前 VPN 支持范围。 |
 | P1 | 后端 profile 没有中继/MCP 月额度与剩余量；`CloudSettings.tsx` 只有同步存储用量 | 补账号侧已用/上限/在途预留/剩余额度查询与 UI，保证限额提示可解释。管理员当前可以配置，用户仍不能主动看到自己的流量余额。未要求本轮制定价格。 |
-| P1 | `src/core/provider-file-call.ts` 的 SFTP/FTP uploadFinish 没有目标独立摘要返回；Agent 直传有目标摘要 | 如承诺全路径端到端内容校验，SFTP/FTP 需有界目标回读核验或服务器支持的摘要；否则文档明确仅流经控制端的数据摘要。不可把这一点记成已完成目标验真。 |
+| 已修复 | `src/core/provider-file-call.ts` 与 FTP put 在临时文件上独立流式回读 SHA-256，匹配后才发布目标 | 真实 SFTP/FTP 等长损坏负向测试与双向传输通过。断线无法发送删除时可能留下 part，保留未知状态、不重连重放；不宣称敌对服务器或外部写入者并发修改可由校验完全防止。 |
 | P1 | `docs/CAGENT-WECHAT-ROLLOUT.md` 明确 4.2 包仅声明部分文本/事件能力 | 单市场入口不等于所有微信版本业务能力对齐。保持精确版本能力表；未适配的历史/媒体/朋友圈等不显示可用。用户早先“两个版本对齐”尚不能按全能力宣告完成。 |
 | P1 | MCP 现有工具目录有实际已注册能力，但未找到逐项 GUI 操作→工具→权限→测试的完整对照 | 发布前补操作覆盖表，特别是安装/权限/连接凭据/主机指纹/任务恢复/Android 文件与应用；不能仅以工具数量或既有工具测试通过证明“所有 CShell 操作”。 |
 
@@ -35,3 +35,5 @@
 - `ROAD-TO-1.0.md` 的 0.8.13 基线、`RELEASE-1.0-REMAINING.md` 的未提交桥接描述，以及 ACCEPTANCE 中历史 Android 分块/德威云黑屏状态均有后续实现覆盖，应保留历史时间或指向最新证据，不能混为当前缺口。
 - UI 跨窗口宽度、权限节点、原生 CAgent、Android、语言切换应在最终候选而非多轮旧包各截一张图；覆盖加载/断线/错误/空态/草稿恢复。只做静态无横向溢出检查不足以说明全部 UI 完成。
 - 当前审计未变动生产、用户配置或真实权限；没有重新执行被拒绝的模拟器动作。
+
+补充验证：SFTP/FTP 目标读回 64 KiB 缓冲；provider-file-copy 3 项、ftp/machine-file-copy 8 项、TypeScript 全量检查通过。既有同名目标保护保持；FTP 协议缺少独占 rename，并发外部写入边界不变。
