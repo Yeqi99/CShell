@@ -394,7 +394,7 @@ export async function createAgentRuntime(
         try{return await packages.invoke(params,owner,AbortSignal.any([signal,controller.signal]));}finally{clearInterval(guard);}
       }
       if(!admin)throw new Error('未授权管理能力包');
-      if(method==='packages.install'){const id=z.object({id:z.string()}).parse(params).id;if(id.startsWith('cagent.wechat.v'))requireWechatVersion(id,await runningWechatVersions());const result=await packages.install(params,signal);await account.setCapabilitySelection(id,true);return result;}
+      if(method==='packages.install'){const id=z.object({id:z.string()}).parse(params).id;if(id==='cagent.wechat'||id.startsWith('cagent.wechat.v'))requireWechatVersion(id,await runningWechatVersions());const result=await packages.install(params,signal);await account.setCapabilitySelection(id,true);return result;}
       if(method==='packages.grant')return packages.grant(params);
       if(method==='packages.uninstall'){const result=await packages.uninstall(params);await account.setCapabilitySelection(z.object({id:z.string()}).parse(params).id,false);return result;}
       if(method==='packages.refresh')return packages.refresh(params);

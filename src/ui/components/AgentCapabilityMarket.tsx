@@ -29,6 +29,7 @@ const catalogSchema = z.array(
     installed: z.boolean(),
     status: stateSchema,
     reason: z.string().optional(),
+    wechatSupport: z.object({installable:z.boolean(),reason:z.string(),capabilities:z.array(z.string()),unavailable:z.array(z.string())}).optional(),
   }),
 );
 const installedSchema = z.array(
@@ -177,14 +178,16 @@ export function AgentCapabilityMarket({ target, call }: { target: AgentTarget; c
             {record&&record.status==='not-installed'?'已安装 · 需要修复':states[(record ?? item).status]}
           </small>
           {(record?.reason ?? item.reason) && <p>{record?.reason ?? item.reason}</p>}
+          {item.wechatSupport && <section aria-label="微信能力范围"><h3>此版本的能力</h3><p>{item.wechatSupport.reason}</p><ul>{item.wechatSupport.capabilities.map(label=><li key={label}>{label}</li>)}</ul><details><summary>尚未支持</summary><ul>{item.wechatSupport.unavailable.map(label=><li key={label}>{label}</li>)}</ul></details></section>}
           {!record ? (
             true ? (
               <>
                 <p>安装后按应用要求完成配置，可在这里调整工具权限。</p>
                 <button
-                  disabled={busy}
+                  disabled={busy || item.wechatSupport?.installable === false}
                   onClick={() =>
                     void run(async () => {
+                      if(item.wechatSupport?.installable===false)return;
                       await update('packages.install', { id: item.id, confirm: true });
                       setGrants([]);
                     })
@@ -198,7 +201,7 @@ export function AgentCapabilityMarket({ target, call }: { target: AgentTarget; c
             )
           ) : (
             <>
-              <p>{record.registered ? '已就绪' : '尚未就绪'}</p>{['not-installed','fault','incompatible'].includes(record.status)&&<button disabled={busy} onClick={()=>void run(()=>update('packages.install',{id:item.id,confirm:true}))}>修复安装</button>}
+              <p>{record.registered ? '已就绪' : '尚未就绪'}</p>{['not-installed','fault','incompatible'].includes(record.status)&&<button disabled={busy || item.wechatSupport?.installable === false} onClick={()=>void run(()=>update('packages.install',{id:item.id,confirm:true}))}>修复安装</button>}
               {true ? (
                 <>
                   <fieldset disabled={busy}>

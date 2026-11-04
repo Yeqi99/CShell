@@ -15,7 +15,14 @@ test('legacy and version-pinned packages still render one WeChat app without cha
   assert.equal(result.filter(x=>x.id.startsWith('cagent.wechat')).length,1);
   assert.equal(all.length,4);
  }
- const legacy=selectWechatMarket(all,['4.1.15.50']).find(x=>x.id==='cagent.wechat')!;
- assert.deepEqual(legacy.grants,['legacy-only']);assert.match(legacy.description,/4\.1\.15\.50/);
+ const legacy=selectWechatMarket(all,['4.1.15.50']).at(-1)!;
+ assert.equal(legacy.wechatSupport?.installable,false);assert.throws(()=>requireWechatVersion('cagent.wechat',['4.1.15.50']));assert.match(legacy.description,/4\.1\.15\.50/);
  assert.equal(selectWechatMarket(all,['4.2.0.12']).at(-1)?.id,'cagent.wechat.v42012');
+});
+
+test('both supported adapters expose identical validated chat scope; unknown and quarantined versions never install',()=>{
+ const a=selectWechatMarket(entries,['4.1.15.56']).at(-1)!.wechatSupport!;
+ const b=selectWechatMarket(entries,['4.2.0.12']).at(-1)!.wechatSupport!;
+ assert.deepEqual(a.capabilities,b.capabilities);assert.equal(a.installable,true);
+ for(const v of ['4.1.15.50','4.3.0.0']){assert.equal(selectWechatMarket(entries,[v]).at(-1)?.wechatSupport?.installable,false);assert.throws(()=>requireWechatVersion('cagent.wechat.v'+v.replaceAll('.',''),[v]));}
 });
