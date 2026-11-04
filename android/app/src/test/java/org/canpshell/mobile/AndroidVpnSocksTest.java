@@ -14,6 +14,11 @@ public final class AndroidVpnSocksTest {
    try(Socket s=connect(socks)){request(s,"bad\r\nhost");require(AndroidVpnSocks.read(s.getInputStream(),10)[1]!=0);}require(calls.get()==1);
   }finally{worker.shutdownNow();}
   try(AndroidVpnSocks socks=new AndroidVpnSocks(()->{throw new IOException("lease expired");});Socket s=connect(socks)){request(s,"example.com");require(AndroidVpnSocks.read(s.getInputStream(),10)[1]!=0);}
-  System.out.println("VPN SOCKS: TCP roundtrip, remote DNS, UDP rejection, injection rejection, expired-exit fail-closed passed");
+  try(ServerSocket exit=new ServerSocket(0,4,InetAddress.getLoopbackAddress());AndroidVpnSocks socks=new AndroidVpnSocks(exit::getLocalPort)){
+   Thread reset=new Thread(()->{try(Socket s=exit.accept()){s.setSoTimeout(3000);StringBuilder h=new StringBuilder();while(!h.toString().endsWith("\r\n\r\n"))h.append((char)s.getInputStream().read());s.getOutputStream().write("HTTP/1.1 200 OK\r\n\r\n".getBytes());AndroidVpnSocks.read(s.getInputStream(),4);s.setSoLinger(true,0);}catch(Exception e){throw new RuntimeException(e);}});reset.start();
+   try(Socket s=connect(socks)){request(s,"reset.invalid");require(AndroidVpnSocks.read(s.getInputStream(),10)[1]==0);s.getOutputStream().write("test".getBytes());int next;try{next=s.getInputStream().read();}catch(SocketException expected){next=-1;}require(next==-1);}
+   reset.join(4000);require(!reset.isAlive());
+  }
+  System.out.println("VPN SOCKS: TCP roundtrip, remote DNS, UDP rejection, injection rejection, expired-exit fail-closed, post-handshake reset without injected bytes passed");
  }
 }
