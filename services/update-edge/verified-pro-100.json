@@ -1,0 +1,136 @@
+{
+  "status": "candidate-not-published",
+  "edition": "pro",
+  "version": "1.0.0",
+  "sha": "8c9cbf32d91037ccd4dc11b7113e8d230f1f0fdd",
+  "tag": "pro-v1.0.0",
+  "expectedAssets": [
+    "CAgent-1.0.0-linux-arm64.tar.gz",
+    "CAgent-1.0.0-linux-x64.tar.gz",
+    "CAgent-1.0.0-mac-arm64.tar.gz",
+    "CAgent-1.0.0-mac-x64.tar.gz",
+    "CAgent-Setup-1.0.0-win-x64.exe",
+    "CShell-Pro-1.0.0-android.apk",
+    "CShell-Pro-1.0.0-linux-amd64.deb",
+    "CShell-Pro-1.0.0-linux-arm64.AppImage",
+    "CShell-Pro-1.0.0-linux-arm64.deb",
+    "CShell-Pro-1.0.0-linux-x86_64.AppImage",
+    "CShell-Pro-1.0.0-mac-arm64.dmg",
+    "CShell-Pro-1.0.0-mac-x64.dmg",
+    "CShell-Pro-1.0.0-win-x64.exe",
+    "SHA256SUMS.txt"
+  ],
+  "assets": [
+    {
+      "name": "CAgent-1.0.0-linux-arm64.tar.gz",
+      "sha256": "3983406c757d223998fe997f8c7d97cde3cf0437b0e20af60f09b186b968fa00",
+      "size": 44570757,
+      "sourceSha": "9f8ce21414fda60e447876a734c7504c7b32a8a8",
+      "runId": 41820873305,
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-020-model-market\\CShell\\.local\\release-100-publish\\pro\\CAgent-1.0.0-linux-arm64.tar.gz"
+    },
+    {
+      "name": "CAgent-1.0.0-linux-x64.tar.gz",
+      "sha256": "55d1ddb3deb0983f587066cb3854927b9e7af19f2c926f3a479a159402ddd906",
+      "size": 44884455,
+      "sourceSha": "9f8ce21414fda60e447876a734c7504c7b32a8a8",
+      "runId": 41820873305,
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-020-model-market\\CShell\\.local\\release-100-publish\\pro\\CAgent-1.0.0-linux-x64.tar.gz"
+    },
+    {
+      "name": "CAgent-1.0.0-mac-arm64.tar.gz",
+      "sha256": "a6bcf45900db5add0964dc231d14fc7cdce93d2a0110e0e699aab4c921b2c2bb",
+      "size": 39563988,
+      "sourceSha": "9f8ce21414fda60e447876a734c7504c7b32a8a8",
+      "runId": 41820873305,
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-020-model-market\\CShell\\.local\\release-100-publish\\pro\\CAgent-1.0.0-mac-arm64.tar.gz"
+    },
+    {
+      "name": "CAgent-1.0.0-mac-x64.tar.gz",
+      "sha256": "cd7ecb64b3ddad2a2fac55162a0e9eef76f35bb579fa6a40551e2f9a00aab961",
+      "size": 40795344,
+      "sourceSha": "9f8ce21414fda60e447876a734c7504c7b32a8a8",
+      "runId": 41820873305,
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-020-model-market\\CShell\\.local\\release-100-publish\\pro\\CAgent-1.0.0-mac-x64.tar.gz"
+    },
+    {
+      "name": "CAgent-Setup-1.0.0-win-x64.exe",
+      "sha256": "4bcd1425a84159ed6a1575fc257c187f8e32c9c7bd34aa951df76db04cd0522f",
+      "size": 25924205,
+      "sourceSha": "9f8ce21414fda60e447876a734c7504c7b32a8a8",
+      "runId": 41820873305,
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-020-model-market\\CShell\\.local\\release-100-publish\\pro\\CAgent-Setup-1.0.0-win-x64.exe"
+    },
+    {
+      "name": "CShell-Pro-1.0.0-android.apk",
+      "sha256": "e9c67d20a4f843f15d5671f391fda0b389c2a998505ea2aea4f581306e160911",
+      "size": 6326243,
+      "sourceSha": "8c9cbf32d91037ccd4dc11b7113e8d230f1f0fdd",
+      "runId": 41824491011,
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-020-model-market\\CShell\\.local\\release-100-publish\\pro\\CShell-Pro-1.0.0-android.apk"
+    },
+    {
+      "name": "CShell-Pro-1.0.0-linux-amd64.deb",
+      "sha256": "f63a421237a265f2fb3469b5ff692ff20ae737df3c5a2f642d3b216a871c916d",
+      "size": 107884968,
+      "sourceSha": "776c7067e5a85660ea1743c0f67afd8b9a188952",
+      "runId": 41823420346,
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-020-model-market\\CShell\\.local\\release-100-publish\\pro\\CShell-Pro-1.0.0-linux-amd64.deb"
+    },
+    {
+      "name": "CShell-Pro-1.0.0-linux-arm64.AppImage",
+      "sha256": "96ab04a1d27c9c036b48a870b502620e8fcdd86ececbec80027eee0ed6dcbb36",
+      "size": 141088169,
+      "sourceSha": "776c7067e5a85660ea1743c0f67afd8b9a188952",
+      "runId": 41823420346,
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-020-model-market\\CShell\\.local\\release-100-publish\\pro\\CShell-Pro-1.0.0-linux-arm64.AppImage"
+    },
+    {
+      "name": "CShell-Pro-1.0.0-linux-arm64.deb",
+      "sha256": "2e9cae4a7fca3c73dc6adf82275ed701cba5c594172a96b0461866fb5d46ecf5",
+      "size": 103383112,
+      "sourceSha": "776c7067e5a85660ea1743c0f67afd8b9a188952",
+      "runId": 41823420346,
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-020-model-market\\CShell\\.local\\release-100-publish\\pro\\CShell-Pro-1.0.0-linux-arm64.deb"
+    },
+    {
+      "name": "CShell-Pro-1.0.0-linux-x86_64.AppImage",
+      "sha256": "1cab01b3764d2fc94ad0bc0646cdfadd179f8912544cb822114886e1cd7a0f52",
+      "size": 139832991,
+      "sourceSha": "776c7067e5a85660ea1743c0f67afd8b9a188952",
+      "runId": 41823420346,
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-020-model-market\\CShell\\.local\\release-100-publish\\pro\\CShell-Pro-1.0.0-linux-x86_64.AppImage"
+    },
+    {
+      "name": "CShell-Pro-1.0.0-mac-arm64.dmg",
+      "sha256": "235fcf405dcb54e3ebe2f55bdef148d54227b85ae93d30a58118f0dc9a16971d",
+      "size": 142742382,
+      "sourceSha": "776c7067e5a85660ea1743c0f67afd8b9a188952",
+      "runId": 41823420346,
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-020-model-market\\CShell\\.local\\release-100-publish\\pro\\CShell-Pro-1.0.0-mac-arm64.dmg"
+    },
+    {
+      "name": "CShell-Pro-1.0.0-mac-x64.dmg",
+      "sha256": "c0f44b5ccfe9886c196d657d02614755e672de2890092df3a309d17fb55db984",
+      "size": 146573602,
+      "sourceSha": "776c7067e5a85660ea1743c0f67afd8b9a188952",
+      "runId": 41823420346,
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-020-model-market\\CShell\\.local\\release-100-publish\\pro\\CShell-Pro-1.0.0-mac-x64.dmg"
+    },
+    {
+      "name": "CShell-Pro-1.0.0-win-x64.exe",
+      "sha256": "2ea5cfa8bd967e4597ef902edd7bc1b9665982ae3b6084f10323155481223ec2",
+      "size": 124002412,
+      "sourceSha": "776c7067e5a85660ea1743c0f67afd8b9a188952",
+      "runId": 41823420346,
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-020-model-market\\CShell\\.local\\release-100-publish\\pro\\CShell-Pro-1.0.0-win-x64.exe"
+    },
+    {
+      "name": "SHA256SUMS.txt",
+      "sha256": "9a0ac90f5967d0e2d7a9319232dfc90e3011097cc30f8618a2151d40c6320261",
+      "size": 1270,
+      "sourceSha": "8c9cbf32d91037ccd4dc11b7113e8d230f1f0fdd",
+      "path": "C:\\Users\\35097\\.codex\\worktrees\\pro-020-model-market\\CShell\\.local\\release-100-publish\\pro\\SHA256SUMS.txt"
+    }
+  ]
+}
