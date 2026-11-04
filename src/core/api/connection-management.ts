@@ -143,7 +143,12 @@ export class ConnectionManagement {
       credentialConfigured: this.store.credentialConfigured(profile.id),
     };
   }
-  async call(raw: unknown, context: ConnectionManagementContext) {
+  private mutations:Promise<unknown>=Promise.resolve();
+  call(raw: unknown, context: ConnectionManagementContext) {
+    const result=this.mutations.catch(()=>{}).then(()=>this.runCall(raw,context));
+    this.mutations=result;return result;
+  }
+  private async runCall(raw: unknown, context: ConnectionManagementContext) {
     const input = connectionManagementSchema.parse(raw);
     const guard = (profile?: Profile) => {
       if (context.signal?.aborted) throw new Error('CANCELLED');
