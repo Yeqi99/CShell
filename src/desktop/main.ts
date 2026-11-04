@@ -459,7 +459,7 @@ else
       handle('client:probe', (endpoint) => clientProvider.probe(endpoint));
       handle('client:password-pair', async (info, password) => {
         const device = await clientProvider.pairPassword(info, password);
-        await syncClientProfiles(store, [device]);
+        await syncClientProfiles(store, [device], true);
         return device;
       });
       handle('connection:rdp-save', async (value,password,clearPassword) => {
@@ -491,7 +491,7 @@ else
       handle('client:devices', () => clientProvider.list());
       handle('client:pair', async (text) => {
         const device = await clientProvider.pair(z.string().max(16384).parse(text));
-        await syncClientProfiles(store, [device]);
+        await syncClientProfiles(store, [device], true);
         return device;
       });
       handle('client:forget', (id) => clientProvider.forget(idSchema.parse(id)));
@@ -928,6 +928,8 @@ else
           const device = clientProvider.list().find((d) => d.deviceId === profile.id);
           if (!device) throw new Error('Client identity missing');
           await clientProvider.updateEndpoint(profile.id,{host:profile.host,port:profile.port});
+          try {return await store.saveProfile(profile);}
+          catch(error){await clientProvider.updateEndpoint(profile.id,{host:device.host,port:device.port}).catch(()=>{});throw error;}
         }
         return store.saveProfile(profile);
       });
