@@ -26,7 +26,7 @@
 ## 1.0 下载发布前置核对（尚未切换）
 
 - 官方 Cloudflare MCP 只读确认两条通用路由 `shell.canp.ai/downloads/opensource/v*`、`shell.canp.ai/downloads/pro/v*` 已存在，覆盖 1.0，无需新增版本路由。两条精确 `releases.json` 路由也存在。
-- 生产 Worker 内嵌清单为 0.8.22，共 74 个白名单文件；Pro 当前 v0.8.22、开源当前 v0.8.21。已备份精确生产清单至 `.local/edge-live-pre-100.json`。工作树旧 manifest 为 0.8.21，不能误作生产基线。
+- 生产 Worker 内嵌清单为 0.8.22，共 189 个白名单文件（使用官方 MCP truncate:false 完整读取）；Pro 当前 v0.8.22、开源当前 v0.8.21。已备份精确生产清单至 `.local/edge-live-pre-100.json`。工作树旧 manifest 为 0.8.21，不能误作生产基线。
 - Worker 不自动从香港读取清单；未列入白名单的 1.0 下载地址返回 404。需生成并一次部署经过校验的完整新 Worker，不能只上传香港文件。
 - 香港剩余 32,181,637,120 bytes（约 30 GiB），使用率 77%；尚无 v1* 目录。同步、中继、MCP 服务均 active。部署所需临时副本与正式包空间仍应按最终资产总和复核，不清理现存版本来掩盖不足。
 - 新附件路径为 `/opt/cshell-downloads/{opensource,pro}/v1.0.0/<asset>`，公开路径为 `/downloads/{opensource,pro}/v1.0.0/<asset>`。先上传临时目录，逐文件核对大小及 SHA256，完成后同文件系统 rename 为正式不可变目录；不存在的架构不能加入目录或清单。
@@ -35,6 +35,14 @@
 - Cloudflare Worker 更新使用官方 MCP 单次脚本版本部署，保留通用路由。检查最终裸 URL 两个 catalog、各附件 Range/完整摘要、实际客户端更新检查；回滚恢复旧 Worker 与旧 catalog，不移动旧标签。
 - 本轮未发布 1.0 附件、未把候选标为发布、未切换任何更新清单。
 
+## 香港附件暂存完成
+
+- 两频道各 14 项、合计 28 项附件已上传到 `.incoming-1.0/{opensource,pro}`，总计 2,212,875,014 bytes。暂存根目录 0700，不作为公开下载入口。
+- 每项先在本机独立核对 SHA256/size，再上传 `.part`、远端核对 SHA256/size，成功后改为暂存正式文件名；最终在服务器分别执行完整 `sha256sum -c SHA256SUMS.txt`，26 个二进制全部 OK。两份 SHA256SUMS 本身也已核对摘要。
+- 逐包来源提交、路径、大小与摘要记录在 `HK-1.0-STAGED-20261104.json`。一次 SSH 新连接失败后从已核验 receipt 恢复，没有重复上传或跳过校验。
+- 两份旧香港 catalog 已备份至 `.incoming-1.0/catalog-backup`；完整线上 Worker 模块备份 `.local/edge-live-worker-before-100.mjs`，语法检查通过。当前磁盘约 28 GiB 可用、78% 使用率。
+- 等待统一发布确认后才将完整目录移到各 `v1.0.0` 路径；未修改现有 releases.json 或 Worker。
+
 ## 尚待验收
 
 - HTTPS SDK 会话及撤销已验证；长时间负载、跨月计量及实际安装版账号桥接配置仍需后续验证。
@@ -42,3 +50,4 @@
 - 服务启动及本机健康验证不能代替实际用户中继流量验收；应继续真实连接测试。
 
 不自动回滚数据库，避免覆盖部署后的合法新写入。
+

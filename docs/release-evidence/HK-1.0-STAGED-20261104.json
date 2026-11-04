@@ -1,0 +1,302 @@
+{
+  "status": "verified-staging-not-published",
+  "verifiedAt": "2026-11-04T12:19:16.332Z",
+  "totalBytes": 2212875014,
+  "packages": [
+    {
+      "edition": "pro",
+      "name": "CAgent-1.0.0-mac-x64.tar.gz",
+      "size": 40795344,
+      "sha256": "cd7ecb64b3ddad2a2fac55162a0e9eef76f35bb579fa6a40551e2f9a00aab961",
+      "source": "9f8ce21414fda60e447876a734c7504c7b32a8a8",
+      "run": 41820873305,
+      "stagingPath": "/opt/cshell-downloads/.incoming-1.0/pro/CAgent-1.0.0-mac-x64.tar.gz",
+      "verifiedAt": "2026-11-04T11:56:07.315Z",
+      "published": false
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-1.0.0-mac-arm64.tar.gz",
+      "size": 39563988,
+      "sha256": "a6bcf45900db5add0964dc231d14fc7cdce93d2a0110e0e699aab4c921b2c2bb",
+      "source": "9f8ce21414fda60e447876a734c7504c7b32a8a8",
+      "run": 41820873305,
+      "stagingPath": "/opt/cshell-downloads/.incoming-1.0/pro/CAgent-1.0.0-mac-arm64.tar.gz",
+      "verifiedAt": "2026-11-04T11:56:45.581Z",
+      "published": false
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-1.0.0-linux-x64.tar.gz",
+      "size": 44884455,
+      "sha256": "55d1ddb3deb0983f587066cb3854927b9e7af19f2c926f3a479a159402ddd906",
+      "source": "9f8ce21414fda60e447876a734c7504c7b32a8a8",
+      "run": 41820873305,
+      "stagingPath": "/opt/cshell-downloads/.incoming-1.0/pro/CAgent-1.0.0-linux-x64.tar.gz",
+      "verifiedAt": "2026-11-04T11:57:49.452Z",
+      "published": false
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-1.0.0-linux-arm64.tar.gz",
+      "size": 44570757,
+      "sha256": "3983406c757d223998fe997f8c7d97cde3cf0437b0e20af60f09b186b968fa00",
+      "source": "9f8ce21414fda60e447876a734c7504c7b32a8a8",
+      "run": 41820873305,
+      "stagingPath": "/opt/cshell-downloads/.incoming-1.0/pro/CAgent-1.0.0-linux-arm64.tar.gz",
+      "verifiedAt": "2026-11-04T11:58:51.295Z",
+      "published": false
+    },
+    {
+      "edition": "pro",
+      "name": "CAgent-Setup-1.0.0-win-x64.exe",
+      "size": 25924205,
+      "sha256": "4bcd1425a84159ed6a1575fc257c187f8e32c9c7bd34aa951df76db04cd0522f",
+      "source": "9f8ce21414fda60e447876a734c7504c7b32a8a8",
+      "run": 41820873305,
+      "stagingPath": "/opt/cshell-downloads/.incoming-1.0/pro/CAgent-Setup-1.0.0-win-x64.exe",
+      "verifiedAt": "2026-11-04T11:59:11.914Z",
+      "published": false
+    },
+    {
+      "edition": "opensource",
+      "name": "CAgent-Setup-1.0.0-win-x64.exe",
+      "size": 25894652,
+      "sha256": "f546fc7114fe80c3b4bb106313b96d604d68587e46457eae47c53368cb33d379",
+      "source": "cc19c42595fef394ff79e681a827b548e7610ca8",
+      "run": 41820883532,
+      "stagingPath": "/opt/cshell-downloads/.incoming-1.0/opensource/CAgent-Setup-1.0.0-win-x64.exe",
+      "verifiedAt": "2026-11-04T11:59:29.454Z",
+      "published": false
+    },
+    {
+      "edition": "opensource",
+      "name": "CAgent-1.0.0-linux-arm64.tar.gz",
+      "size": 44515842,
+      "sha256": "a82451c70a53514d14f01cf35f66261bf7429a391f56192a67479f170766df19",
+      "source": "cc19c42595fef394ff79e681a827b548e7610ca8",
+      "run": 41820883532,
+      "stagingPath": "/opt/cshell-downloads/.incoming-1.0/opensource/CAgent-1.0.0-linux-arm64.tar.gz",
+      "verifiedAt": "2026-11-04T11:59:55.855Z",
+      "published": false
+    },
+    {
+      "edition": "opensource",
+      "name": "CAgent-1.0.0-mac-x64.tar.gz",
+      "size": 40749416,
+      "sha256": "40fb0d29c37edcc550f9dca71c07ec1766f77e229b7d9afaf79e8440d52feae1",
+      "source": "cc19c42595fef394ff79e681a827b548e7610ca8",
+      "run": 41820883532,
+      "stagingPath": "/opt/cshell-downloads/.incoming-1.0/opensource/CAgent-1.0.0-mac-x64.tar.gz",
+      "verifiedAt": "2026-11-04T12:00:20.902Z",
+      "published": false
+    },
+    {
+      "edition": "opensource",
+      "name": "CAgent-1.0.0-linux-x64.tar.gz",
+      "size": 44829213,
+      "sha256": "0dd30f678532fc1da618a8fe019f941fba9c341f2825b089986efca183505011",
+      "source": "cc19c42595fef394ff79e681a827b548e7610ca8",
+      "run": 41820883532,
+      "stagingPath": "/opt/cshell-downloads/.incoming-1.0/opensource/CAgent-1.0.0-linux-x64.tar.gz",
+      "verifiedAt": "2026-11-04T12:00:46.918Z",
+      "published": false
+    },
+    {
+      "edition": "opensource",
+      "name": "CAgent-1.0.0-mac-arm64.tar.gz",
+      "size": 39509345,
+      "sha256": "83267bf966e458dd21f6487c4fe944b56bfc86e000fa65f3b9bb5c0171098b8b",
+      "source": "cc19c42595fef394ff79e681a827b548e7610ca8",
+      "run": 41820883532,
+      "stagingPath": "/opt/cshell-downloads/.incoming-1.0/opensource/CAgent-1.0.0-mac-arm64.tar.gz",
+      "verifiedAt": "2026-11-04T12:01:09.732Z",
+      "published": false
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-1.0.0-android.apk",
+      "size": 6292819,
+      "sha256": "8c408015c7d6cef544ef7fe6c03a34f4d3c75b4ad216598b9800033c231fd9be",
+      "source": "c3d57ae8b4d4815a3b20817cad8190129e7e170b",
+      "stagingPath": "/opt/cshell-downloads/.incoming-1.0/opensource/CShell-1.0.0-android.apk",
+      "verifiedAt": "2026-11-04T12:02:32.166Z",
+      "published": false
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-1.0.0-linux-amd64.deb",
+      "size": 107614680,
+      "sha256": "bf4a04ab5a7a966024757ce5b18145eca70008440a53db0c6a1fec492cd79825",
+      "source": "c3d57ae8b4d4815a3b20817cad8190129e7e170b",
+      "stagingPath": "/opt/cshell-downloads/.incoming-1.0/opensource/CShell-1.0.0-linux-amd64.deb",
+      "verifiedAt": "2026-11-04T12:03:05.668Z",
+      "published": false
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-1.0.0-linux-arm64.AppImage",
+      "size": 140817711,
+      "sha256": "b037eee63b2d879aba02ecf367095f3aecd52866ebc7ab6b40991abc9d2c3869",
+      "source": "c3d57ae8b4d4815a3b20817cad8190129e7e170b",
+      "stagingPath": "/opt/cshell-downloads/.incoming-1.0/opensource/CShell-1.0.0-linux-arm64.AppImage",
+      "verifiedAt": "2026-11-04T12:04:22.272Z",
+      "published": false
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-1.0.0-linux-arm64.deb",
+      "size": 103110980,
+      "sha256": "0f17eab098aee8a8f6c21ac33cd922c74de0b84657a8cb392aa235f4870504a0",
+      "source": "c3d57ae8b4d4815a3b20817cad8190129e7e170b",
+      "stagingPath": "/opt/cshell-downloads/.incoming-1.0/opensource/CShell-1.0.0-linux-arm64.deb",
+      "verifiedAt": "2026-11-04T12:04:56.132Z",
+      "published": false
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-1.0.0-linux-x86_64.AppImage",
+      "size": 139562493,
+      "sha256": "049f0257156b3d343138ee443b029896070b6edcbacac3f8753024c94822d938",
+      "source": "c3d57ae8b4d4815a3b20817cad8190129e7e170b",
+      "stagingPath": "/opt/cshell-downloads/.incoming-1.0/opensource/CShell-1.0.0-linux-x86_64.AppImage",
+      "verifiedAt": "2026-11-04T12:05:56.571Z",
+      "published": false
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-1.0.0-mac-arm64.dmg",
+      "size": 142415844,
+      "sha256": "9742e2239143618729e76bfa76d3d8f5bc4f4f0ea6f5400845efbab1bdcd0be9",
+      "source": "c3d57ae8b4d4815a3b20817cad8190129e7e170b",
+      "stagingPath": "/opt/cshell-downloads/.incoming-1.0/opensource/CShell-1.0.0-mac-arm64.dmg",
+      "verifiedAt": "2026-11-04T12:06:40.830Z",
+      "published": false
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-1.0.0-mac-x64.dmg",
+      "size": 146229776,
+      "sha256": "106a92bce57d67c81e3c81badaf8b6057ac10fe358032ad656b6619734a357a4",
+      "source": "c3d57ae8b4d4815a3b20817cad8190129e7e170b",
+      "stagingPath": "/opt/cshell-downloads/.incoming-1.0/opensource/CShell-1.0.0-mac-x64.dmg",
+      "verifiedAt": "2026-11-04T12:07:30.426Z",
+      "published": false
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-1.0.0-win-x64.exe",
+      "size": 123757107,
+      "sha256": "b96d5f5d028a7c9910040c68614a240550af79b1254c68833194c818c2afb4f8",
+      "source": "c3d57ae8b4d4815a3b20817cad8190129e7e170b",
+      "stagingPath": "/opt/cshell-downloads/.incoming-1.0/opensource/CShell-1.0.0-win-x64.exe",
+      "verifiedAt": "2026-11-04T12:08:06.560Z",
+      "published": false
+    },
+    {
+      "edition": "opensource",
+      "name": "SHA256SUMS.txt",
+      "size": 1238,
+      "sha256": "87fb4c0753a7c4b8f5d1569add9f08cd9514908c47907ebbfa6fd840281856c4",
+      "source": "c3d57ae8b4d4815a3b20817cad8190129e7e170b",
+      "stagingPath": "/opt/cshell-downloads/.incoming-1.0/opensource/SHA256SUMS.txt",
+      "verifiedAt": "2026-11-04T12:11:08.898Z",
+      "published": false
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-1.0.0-android.apk",
+      "size": 6326243,
+      "sha256": "e9c67d20a4f843f15d5671f391fda0b389c2a998505ea2aea4f581306e160911",
+      "source": "8c9cbf32d91037ccd4dc11b7113e8d230f1f0fdd",
+      "stagingPath": "/opt/cshell-downloads/.incoming-1.0/pro/CShell-Pro-1.0.0-android.apk",
+      "verifiedAt": "2026-11-04T12:11:20.565Z",
+      "published": false
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-1.0.0-linux-amd64.deb",
+      "size": 107884968,
+      "sha256": "f63a421237a265f2fb3469b5ff692ff20ae737df3c5a2f642d3b216a871c916d",
+      "source": "8c9cbf32d91037ccd4dc11b7113e8d230f1f0fdd",
+      "stagingPath": "/opt/cshell-downloads/.incoming-1.0/pro/CShell-Pro-1.0.0-linux-amd64.deb",
+      "verifiedAt": "2026-11-04T12:11:55.151Z",
+      "published": false
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-1.0.0-linux-arm64.AppImage",
+      "size": 141088169,
+      "sha256": "96ab04a1d27c9c036b48a870b502620e8fcdd86ececbec80027eee0ed6dcbb36",
+      "source": "8c9cbf32d91037ccd4dc11b7113e8d230f1f0fdd",
+      "stagingPath": "/opt/cshell-downloads/.incoming-1.0/pro/CShell-Pro-1.0.0-linux-arm64.AppImage",
+      "verifiedAt": "2026-11-04T12:12:34.731Z",
+      "published": false
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-1.0.0-linux-arm64.deb",
+      "size": 103383112,
+      "sha256": "2e9cae4a7fca3c73dc6adf82275ed701cba5c594172a96b0461866fb5d46ecf5",
+      "source": "8c9cbf32d91037ccd4dc11b7113e8d230f1f0fdd",
+      "stagingPath": "/opt/cshell-downloads/.incoming-1.0/pro/CShell-Pro-1.0.0-linux-arm64.deb",
+      "verifiedAt": "2026-11-04T12:13:10.635Z",
+      "published": false
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-1.0.0-linux-x86_64.AppImage",
+      "size": 139832991,
+      "sha256": "1cab01b3764d2fc94ad0bc0646cdfadd179f8912544cb822114886e1cd7a0f52",
+      "source": "8c9cbf32d91037ccd4dc11b7113e8d230f1f0fdd",
+      "stagingPath": "/opt/cshell-downloads/.incoming-1.0/pro/CShell-Pro-1.0.0-linux-x86_64.AppImage",
+      "verifiedAt": "2026-11-04T12:13:48.466Z",
+      "published": false
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-1.0.0-mac-arm64.dmg",
+      "size": 142742382,
+      "sha256": "235fcf405dcb54e3ebe2f55bdef148d54227b85ae93d30a58118f0dc9a16971d",
+      "source": "8c9cbf32d91037ccd4dc11b7113e8d230f1f0fdd",
+      "stagingPath": "/opt/cshell-downloads/.incoming-1.0/pro/CShell-Pro-1.0.0-mac-arm64.dmg",
+      "verifiedAt": "2026-11-04T12:14:50.770Z",
+      "published": false
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-1.0.0-mac-x64.dmg",
+      "size": 146573602,
+      "sha256": "c0f44b5ccfe9886c196d657d02614755e672de2890092df3a309d17fb55db984",
+      "source": "8c9cbf32d91037ccd4dc11b7113e8d230f1f0fdd",
+      "stagingPath": "/opt/cshell-downloads/.incoming-1.0/pro/CShell-Pro-1.0.0-mac-x64.dmg",
+      "verifiedAt": "2026-11-04T12:15:41.086Z",
+      "published": false
+    },
+    {
+      "edition": "pro",
+      "name": "CShell-Pro-1.0.0-win-x64.exe",
+      "size": 124002412,
+      "sha256": "2ea5cfa8bd967e4597ef902edd7bc1b9665982ae3b6084f10323155481223ec2",
+      "source": "8c9cbf32d91037ccd4dc11b7113e8d230f1f0fdd",
+      "stagingPath": "/opt/cshell-downloads/.incoming-1.0/pro/CShell-Pro-1.0.0-win-x64.exe",
+      "verifiedAt": "2026-11-04T12:16:23.542Z",
+      "published": false
+    },
+    {
+      "edition": "pro",
+      "name": "SHA256SUMS.txt",
+      "size": 1270,
+      "sha256": "9a0ac90f5967d0e2d7a9319232dfc90e3011097cc30f8618a2151d40c6320261",
+      "source": "8c9cbf32d91037ccd4dc11b7113e8d230f1f0fdd",
+      "stagingPath": "/opt/cshell-downloads/.incoming-1.0/pro/SHA256SUMS.txt",
+      "verifiedAt": "2026-11-04T12:16:36.691Z",
+      "published": false
+    }
+  ],
+  "rollback": {
+    "catalogBackup": "/opt/cshell-downloads/.incoming-1.0/catalog-backup",
+    "workerBackup": ".local/edge-live-worker-before-100.mjs",
+    "workerBackupSha256": "e9fe891a18bd17f8b6f4d4ab3065ba2e103382f8a57e1b2ef0aa363150c733db"
+  }
+}
