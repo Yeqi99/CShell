@@ -2,7 +2,7 @@ import {z} from 'zod';
 import {createHash} from 'node:crypto';
 import {preferencesSchema,type Preferences} from '../shared/contracts';
 import type {ConnectionTool} from './connections/contracts';
-const view=preferencesSchema.pick({layout:true,defaultConnectionView:true,workbenchView:true,locale:true,theme:true,uiFont:true,uiFontSize:true,sidebarFontSize:true,sidebarGroupSize:true,sidebarDetailSize:true,sidebarDensity:true,sidebarPingIntervalSeconds:true,terminalFont:true,fontSize:true,lineHeight:true,terminalClipboardKeys:true,terminalSemanticColors:true,backgroundOpacity:true,backgroundBlur:true,backgroundFit:true,showAiExecution:true});
+const view=z.object(preferencesSchema.shape).strict().pick({layout:true,defaultConnectionView:true,workbenchView:true,locale:true,theme:true,uiFont:true,uiFontSize:true,sidebarFontSize:true,sidebarGroupSize:true,sidebarDetailSize:true,sidebarDensity:true,sidebarPingIntervalSeconds:true,terminalFont:true,fontSize:true,lineHeight:true,terminalClipboardKeys:true,terminalSemanticColors:true,backgroundOpacity:true,backgroundBlur:true,backgroundFit:true,showAiExecution:true});
 const input=z.discriminatedUnion('action',[z.object({action:z.literal('read')}).strict(),z.object({action:z.literal('patch'),revision:z.string().regex(/^[a-f0-9]{64}$/),changes:view.partial().strict()}).strict()]);
 export function preferencesTool(host:{read:()=>Preferences;save:(value:Preferences)=>Promise<void>}):ConnectionTool {
  let pending=Promise.resolve();
