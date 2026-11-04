@@ -30,7 +30,11 @@ export function validatePlans(plans, expectedVersion = version) {
     assert.equal(p.status, 'candidate-not-published');
     assert.equal(p.version, expectedVersion);
     assert.match(p.sha, /^[a-f0-9]{40}$/);
-    assert.equal(p.assets.length, p.edition === 'pro' ? 14 : 16);
+    if (expectedVersion === '1.0.0') {
+      assert(Array.isArray(p.expectedAssets) && p.expectedAssets.length > 1,'1.0 needs an explicit reviewed platform asset inventory');
+      assert.equal(new Set(p.expectedAssets).size,p.expectedAssets.length);
+      assert.deepEqual(p.assets.map(a=>a.name).sort(),[...p.expectedAssets].sort(),'Missing or undeclared platform asset');
+    } else assert.equal(p.assets.length, p.edition === 'pro' ? 14 : 16);
     assert.equal(new Set(p.assets.map(a => a.name)).size, p.assets.length);
     for (const a of p.assets) {
       assert.match(a.name, /^(?:CAgent[-\w.]+\.(?:exe|tar\.gz)|CShell[-\w.]+\.(?:exe|dmg|zip|deb|AppImage|apk)|SHA256SUMS\.txt)$/);
@@ -89,6 +93,7 @@ export function boundedPayload(size) {
 export async function main() {
   // No mutation, downloads or credentials unless explicitly requested by the release job.
   const requested = process.argv[2] || '--check', market = requested.startsWith('--market-');
+  if (!market) assert(process.env.CSHELL_RELEASE_VERSION,'Set CSHELL_RELEASE_VERSION explicitly; never publish an implicit old version');
   const plans = market ? [JSON.parse(await readFile('services/update-edge/verified-wechat-012.json','utf8'))] : await Promise.all(['opensource', 'pro'].map(async edition => JSON.parse(await readFile(`services/update-edge/verified-${edition}-${version.replaceAll('.','')}.json`, 'utf8'))));
   if (market) validateMarketPlan(plans[0]); else validatePlans(plans);
   const mode = market ? requested.replace('--market-', '--') : requested;

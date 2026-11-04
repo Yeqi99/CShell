@@ -16,6 +16,13 @@ test('failed payload stops new work and waits for outstanding verification befor
 });
 const fixture = () => ['opensource','pro'].map(edition => ({ edition, status:'candidate-not-published', version:'0.8.20', sha:'a'.repeat(40), assets:[...Array.from({length:edition==='pro'?13:15},(_,i)=>({name:`CAgent-0.8.20-test-${i}.exe`,size:100,sha256:'b'.repeat(64)})),{name:'SHA256SUMS.txt',size:10,sha256:'c'.repeat(64)}] }));
 test('complete distinct channels allowed without publication',()=>validatePlans(fixture()));
+test('1.0 publishes exactly its reviewed platform inventory without inventing missing builds',()=>{
+ const plans=fixture().map(p=>({...p,version:'1.0.0',assets:[{name:`CShell-${p.edition==='pro'?'Pro-':''}1.0.0-win-x64.exe`,size:100,sha256:'b'.repeat(64)},{name:'SHA256SUMS.txt',size:10,sha256:'c'.repeat(64)}]}));
+ for(const p of plans)p.expectedAssets=p.assets.map(a=>a.name);
+ validatePlans(plans,'1.0.0');
+ const missing=structuredClone(plans);missing[0].assets.pop();assert.throws(()=>validatePlans(missing,'1.0.0'));
+ const undeclared=structuredClone(plans);undeclared[0].expectedAssets.push('CShell-1.0.0-mac-arm64.dmg');assert.throws(()=>validatePlans(undeclared,'1.0.0'));
+});
 test('0.8.20 publisher refuses an older inventory by default',()=>{
   const plans=fixture();for(const plan of plans)plan.version='0.8.18';
   assert.throws(()=>validatePlans(plans));
