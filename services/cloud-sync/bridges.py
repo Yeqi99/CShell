@@ -10,10 +10,12 @@ import secrets
 import threading
 import time
 import uuid
+from metering import TrafficLimitExceeded
 
 
 class Bridges:
     METHODS = frozenset(('list_servers_page', 'connect', 'describe_connection', 'invoke_connection', 'disconnect'))
+    MEMBER_METHODS = METHODS | frozenset(('list_application_tools','describe_application_tool','invoke_application_tool'))
 
     def __init__(self, service, Failure):
         self.s, self.F = service, Failure
@@ -103,12 +105,12 @@ class Bridges:
             task['event'].set()
         return {'ok': True}
 
-    def invoke(self, account, consumer, body, timeout=25):
+    def invoke(self, account, consumer, body, timeout=25, member=False):
         bridge, name, arguments = body.get('bridgeId'), body.get('name'), body.get('arguments', {})
         row = self._owned(account, bridge)
         if row[1] <= time.time() - 15:
             raise self.F(409, 'CShell 当前离线')
-        if name not in self.METHODS or not isinstance(arguments, dict) or len(json.dumps(arguments).encode()) > 65536:
+        if name not in (self.MEMBER_METHODS if member else self.METHODS) or not isinstance(arguments, dict) or len(json.dumps(arguments).encode()) > 65536:
             raise self.F(400, '请求格式不正确')
         self.s.limit('bridge-invoke:' + account, 120, 60)
         if not self.calls.acquire(blocking=False):
@@ -120,16 +122,26 @@ class Bridges:
 
     def _wait(self, account, consumer, bridge, name, arguments, timeout):
         task_id = secrets.token_hex(24)
+        # Application payload bytes, not TLS/IP bytes. One stable stream per
+        # dispatched call; never count the polling/reply wrappers twice.
+        meter=getattr(self.s,'metering',None)
+        request_bytes=len(json.dumps({'name':name,'arguments':arguments},ensure_ascii=False,separators=(',',':')).encode())
         task = dict(account=account, bridge=bridge, consumer=consumer, name=name, arguments=arguments,
                     expires=time.time() + timeout, delivered=False, event=threading.Event())
         with self.lock:
             self._prune()
             if len(self.pending) >= 256 or sum(t['account'] == account for t in self.pending.values()) >= 16:
                 raise self.F(429, '待处理操作过多')
+            if meter:
+                try:meter.reserve(account,'bridge:'+task_id,'mcp',request_bytes+8*1024*1024)
+                except TrafficLimitExceeded:raise self.F(429,'本月 MCP 流量额度已用完，请扩容后继续')
             self.pending[task_id] = task
         task['event'].wait(timeout)
         with self.lock:
             self.pending.pop(task_id, None)
+            if meter:
+                result_bytes=len(json.dumps(task['result'],ensure_ascii=False,separators=(',',':')).encode()) if 'result' in task else 0
+                meter.settle(account,'bridge:'+task_id,request_bytes if task['delivered'] else 0,result_bytes)
             if 'result' not in task:
                 raise self.F(504, '操作结果未确认，请检查 CShell；不要自动重试写入操作')
             return task['result']

@@ -1,6 +1,7 @@
 import { AgentRelayService } from '../../src/agent/relay';
 import { ClientVault, fingerprint } from '../../src/core/client/identity';
 import { agentCodec } from '../../src/agent/storage';
+import {RelayTrafficBudget} from './traffic-budget';
 
 // Dedicated service, identity and encrypted state; no terminal or agent runtime loaded.
 async function main(){
@@ -9,10 +10,15 @@ const vault = new ClientVault(directory, await agentCodec(directory));
 const identity = await vault.identity();
 const secret = process.env.RELAY_AUTH_TOKEN;
 if (!secret) throw Error('Missing local authorization credential');
-const relay = new AgentRelayService({
-  vault,
-  identity,
-  authorize: async (input) => {
+const budget=new RelayTrafficBudget(async(action,input)=>{
+ const response=await fetch('http://127.0.0.1:8789/v1/admin/relay/traffic',{
+  method:'POST',headers:{'Content-Type':'application/json','X-Relay-Token':secret},
+  body:JSON.stringify({...input,action}),signal:AbortSignal.timeout(5000),redirect:'error',
+ });
+ if(!response.ok){await response.body?.cancel();throw Error('Relay traffic authorization unavailable');}
+ await response.body?.cancel();
+});
+const relay = new AgentRelayService({vault,identity,accountTraffic:input=>budget.consume(input),trafficClosed:id=>budget.close(id),  authorize: async (input) => {
     const response = await fetch('http://127.0.0.1:8789/v1/admin/relay/authorize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Relay-Token': secret },

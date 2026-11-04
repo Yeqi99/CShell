@@ -4,9 +4,11 @@ import { mkdir, readFile, rename, writeFile, readdir, unlink } from 'node:fs/pro
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { SecretCodec } from './store';
-import { decryptVault, encryptVault, newRecoveryKey, vaultDigest, unwrapRecoveryKey, wrapRecoveryKey } from './cloud-crypto';
+import { decryptVault, encryptVault, newRecoveryKey, vaultDigest, unwrapRecoveryKey, wrapRecoveryKey,MAX_VAULT_BYTES } from './cloud-crypto';
 import type { CloudEnvelope, CloudSession, CloudStatus, CloudRevision } from '../shared/cloud-sync';
 import { mergeCloud } from './cloud-merge';
+import {chunkVault} from './cloud-chunks';
+import {memberDomainCommandSchema,memberDomainStateSchema,type MemberDomainCommand} from '../shared/member-domains';
 
 interface LocalState {
   session?: CloudSession;
@@ -149,7 +151,16 @@ export class CloudSync {
       }
     }
   }
-  private async api(path: string, body?: unknown, schema?: number): Promise<any> {
+  private async api(path: string, body?: unknown, schema?: number, signal?:AbortSignal): Promise<any> {
+    if(path==='/v1/vault'&&this.data.session){
+      const snapshot=body!==undefined&&this.data.key?decryptVault((body as any).envelope,this.data.key,this.data.session.accountId):undefined;
+      try{return await chunkVault(part=>this.apiRaw('/v1/vault/chunks',part,schema??vaultWriteSchema(snapshot)),join(this.directory,'cloud-transfer',this.data.session.accountId),body as any);}
+      catch(error){if(!(error as {unsupportedChunkTransport?:boolean}).unsupportedChunkTransport)throw error;}
+    }
+    return this.apiRaw(path,body,schema,signal);
+  }
+  private async apiRaw(path: string, body?: unknown, schema?: number, signal?:AbortSignal): Promise<any> {
+    signal?.throwIfAborted();
     const snapshot = path === '/v1/vault' && body !== undefined && this.data.key && this.data.session ? decryptVault((body as any).envelope,this.data.key,this.data.session.accountId) : undefined;
     const writeSchema = String(schema ?? vaultWriteSchema(snapshot));
     const response = await this.request(this.endpoint + path, {
@@ -157,13 +168,15 @@ export class CloudSync {
       headers: {
         'Content-Type': 'application/json',
         'X-CShell-Vault-Schema': '4',
+        'X-CShell-Vault-Max-Bytes': String(MAX_VAULT_BYTES),
+        'X-CShell-Vault-Transport':'1',
         ...(body !== undefined ? {'X-CShell-Vault-Write-Schema': writeSchema} : {}),
         ...(this.data.session ? { Authorization: 'Bearer ' + this.data.session.token } : {}),
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      signal: AbortSignal.timeout(30000),
+      signal: signal?AbortSignal.any([signal,AbortSignal.timeout(30000)]):AbortSignal.timeout(30000),
       redirect: 'error',
-    }).catch(() => { throw new Error('暂时无法连接云端，网络恢复后会自动继续同步'); });
+    }).catch(() => { signal?.throwIfAborted();throw new Error('暂时无法连接云端，网络恢复后会自动继续同步'); });
     const reader = response.body?.getReader();
     if (!reader) throw new Error('云端响应为空');
     const chunks: Uint8Array[] = [];
@@ -173,7 +186,7 @@ export class CloudSync {
         const r = await reader.read();
         if (r.done) break;
         bytes += r.value.length;
-        if (bytes > 90 * 1024 * 1024) throw new Error('云端响应超过上限');
+        if (bytes > (path==='/v1/vault/chunks'?1024*1024+4096:90*1024*1024)) throw new Error('云端响应超过上限');
         chunks.push(r.value);
       }
     } finally {
@@ -183,7 +196,7 @@ export class CloudSync {
     try { value = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { throw new Error('云服务暂时不可用，稍后自动重试'); }
     if (!response.ok) {
       if (response.status === 409) this.state = 'conflict';
-      throw new Error(typeof value.error === 'string' ? value.error.slice(0, 300) : '云端请求失败');
+      throw Object.assign(new Error(typeof value.error === 'string' ? value.error.slice(0, 300) : '云端请求失败'),{status:response.status});
     }
     return value;
   }
@@ -197,7 +210,11 @@ export class CloudSync {
       this.busy = false;
     }
   }
-  async accountRequest(path:string,body?:unknown){if(this.handedOff)throw Error('正在打开账号工作区，请稍候');if(!this.data.session)throw Error('请先登录');return this.api(path,body);}
+  async accountRequest(path:string,body?:unknown,signal?:AbortSignal){if(this.handedOff)throw Error('正在打开账号工作区，请稍候');if(!this.data.session)throw Error('请先登录');return this.api(path,body,undefined,signal);}
+  async domains(input?:MemberDomainCommand,signal?:AbortSignal){
+    if(input!==undefined){const {action,...body}=memberDomainCommandSchema.parse(input);const route={claim:'claim',rename:'rename',create:'records',update:'records/update',delete:'records/delete'}[action];await this.accountRequest('/v1/domains/'+route,body,signal);}
+    return memberDomainStateSchema.parse(await this.accountRequest('/v1/domains',undefined,signal));
+  }
   accountId(){return this.data.session?.accountId;}
   sessionCredential(){if(!this.data.session)throw Error('请先登录');return this.data.session.token;}
   async requestCode(email: string) {

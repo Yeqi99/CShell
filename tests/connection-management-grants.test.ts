@@ -12,5 +12,5 @@ test('legacy explicit grants are not expanded; explicit select all includes conn
  for(const p of ['connections.manage','credentials.manage','identity.trust'])assert(all.applicationCapabilities?.includes(p as any));
  assert.equal(all.enabled,false);assert.deepEqual(all.allowedProfiles,[]);
  const client=apiClientSchema.parse({id:crypto.randomUUID(),name:'test',enabled:true,allowedProfiles:[],allowCommands:false,capabilities:[],review:'always',disclosure:{mode:'full',level:'contract',budgetBytes:8192},applicationCapabilities:[...apiApplicationCapabilities]});
- assert.equal(client.applicationCapabilities?.length,7);
+ assert.equal(client.applicationCapabilities?.length,apiApplicationCapabilities.length);
 });

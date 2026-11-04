@@ -39,7 +39,7 @@ test('ordinary import failures roll back changed modules before rethrowing',asyn
 test('rollback conflicts pause automatic sync across a restart',async()=>{
  const dir=await mkdtemp(join(tmpdir(),'import-conflict-')),key=newRecoveryKey(),accountId='a'.repeat(32),local={value:'local'};let calls=0;
  const codec={encrypt:async(v:string)=>v,decrypt:async(v:string)=>v};
- const request:typeof fetch=async()=>{calls++;return Response.json({revision:2,envelope:encryptVault({value:'remote'},key,accountId)});};
+ const request:typeof fetch=async(url)=>{if(String(url).endsWith('/vault/chunks'))return Response.json({error:'legacy fixture'},{status:404});calls++;return Response.json({revision:2,envelope:encryptVault({value:'remote'},key,accountId)});};
  const make=()=>new CloudSync(dir,codec,{export:async()=>local,validate:()=>{},import:async()=>{throw new CloudImportConflict();}},'https://fixture.invalid',request);
  try{await writeFile(join(dir,'cloud-sync.enc'),JSON.stringify({session:{accountId,email:'fixture@example.com',token:'fixture'},key,revision:1,digest:vaultDigest(local)}));const cloud=make();await cloud.load();await assert.rejects(cloud.sync('download'),CloudImportConflict);assert.equal(cloud.status().state,'conflict');const restarted=make();await restarted.load();assert.equal(restarted.status().state,'conflict');const previous=calls;await restarted.autoSync();assert.equal(calls,previous);await assert.rejects(restarted.sync(),CloudImportConflict);}finally{await rm(dir,{recursive:true,force:true});}
 });
@@ -68,7 +68,7 @@ test('a failed import write restores its preferences and preserves a concurrent 
 test('account-source imports back up local data and retain conflict pause after restarting',async()=>{
  const dir=await mkdtemp(join(tmpdir(),'source-import-conflict-')),key=newRecoveryKey(),accountId='a'.repeat(32),local={value:'local'};let calls=0;
  const codec={encrypt:async(v:string)=>v,decrypt:async(v:string)=>v};
- const request:typeof fetch=async()=>{calls++;return Response.json({revision:2,envelope:encryptVault({value:'remote'},key,accountId)});};
+ const request:typeof fetch=async(url)=>{if(String(url).endsWith('/vault/chunks'))return Response.json({error:'legacy fixture'},{status:404});calls++;return Response.json({revision:2,envelope:encryptVault({value:'remote'},key,accountId)});};
  const make=()=>new CloudSync(dir,codec,{export:async()=>local,validate:()=>{},import:async()=>{throw new CloudImportConflict();}},'https://fixture.invalid',request);
  try{await writeFile(join(dir,'cloud-sync.enc'),JSON.stringify({session:{accountId,email:'fixture@example.com',token:'fixture'},key,revision:1,digest:vaultDigest(local)}));const cloud=make();await cloud.load();await assert.rejects(cloud.importLocal(accountId,async()=>({value:'source'})),CloudImportConflict);assert.equal(cloud.status().state,'conflict');const {readdir}=await import('node:fs/promises');const backups=await readdir(join(dir,'cloud-backups'));assert.equal(backups.length,1);assert.match(backups[0],/local-import/);assert.deepEqual(JSON.parse(await readFile(join(dir,'cloud-backups',backups[0]),'utf8')),local);const restarted=make();await restarted.load();assert.equal(restarted.status().state,'conflict');await restarted.autoSync();assert.equal(calls,0);}finally{await rm(dir,{recursive:true,force:true});}
 });

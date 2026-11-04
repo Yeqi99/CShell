@@ -87,7 +87,8 @@ class Devices:
     lease=db.execute('SELECT account,device,expires,loan FROM relay_leases WHERE digest=?',(self.s.digest(token),)).fetchone()
     valid=bool(lease and lease[1]==device and lease[2]>time.time() and ((lease[3] is None and lease[0]==row[0]) or (lease[3] and self.lending.valid(db,lease[0],device,lease[3]))))
    else:valid=op in ('register','channel') and hmac.compare_digest(row[1],token)
-  return {'allowed':bool(valid and self.s.profile(row[0])['membership']['active'])}
+  allowed=bool(valid and self.s.profile(row[0])['membership']['active'])
+  return {'allowed':allowed,**({'account':row[0]} if allowed else {})}
  def delegate(self,account,body):
   self.s.limit('device-delegate:'+account,120,60)
   device=body.get('deviceId');fp=body.get('fingerprint')

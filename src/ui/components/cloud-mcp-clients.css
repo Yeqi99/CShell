@@ -1,0 +1,15 @@
+.cloud-mcp-clients{margin:16px 0;padding:14px 16px;border:1px solid var(--border);border-radius:12px;min-width:0}
+.cloud-mcp-clients summary{font-weight:600;cursor:pointer;padding:4px 0}
+.cloud-mcp-clients .muted{line-height:1.65;margin:12px 0}
+.cloud-mcp-clients .settings-row{display:flex;align-items:end;flex-wrap:wrap;gap:12px;padding:12px 0;border-top:1px solid var(--border)}
+.cloud-mcp-clients label{display:grid;gap:8px;flex:1 1 160px;min-width:0}
+.cloud-mcp-clients input,.cloud-mcp-clients select{min-width:0;max-width:100%;width:100%;box-sizing:border-box}
+.cloud-mcp-clients input,.cloud-mcp-clients select,.cloud-mcp-clients button{font:inherit;font-size:13px;min-height:34px;border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:inherit;background:var(--surface,transparent)}
+.cloud-mcp-clients button{cursor:pointer;white-space:nowrap}
+.cloud-mcp-clients button:hover:not(:disabled){background:color-mix(in srgb,var(--accent,#2563eb) 12%,transparent)}
+.cloud-mcp-clients :is(input,select,button):focus-visible{outline:2px solid var(--accent,#2563eb);outline-offset:2px}
+.cloud-mcp-clients button:disabled{opacity:.5;cursor:default}
+.cloud-mcp-clients .settings-row>span:first-child{flex:1 1 180px;overflow-wrap:anywhere;align-self:center}
+.cloud-mcp-clients .settings-card{display:flex;gap:10px;flex-wrap:wrap;padding:14px 0}
+.cloud-mcp-clients .settings-card strong{width:100%}
+.cloud-mcp-clients code{overflow-wrap:anywhere}

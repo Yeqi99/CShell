@@ -1,4 +1,4 @@
-import { randomBytes, timingSafeEqual, X509Certificate } from 'node:crypto';
+import { randomBytes, randomUUID, timingSafeEqual, X509Certificate } from 'node:crypto';
 import { connect as tcpConnect, type Socket } from 'node:net';
 import { connect as tlsConnect, createServer, type TLSSocket, type Server } from 'node:tls';
 import { Transform } from 'node:stream';
@@ -83,6 +83,8 @@ export function writeRelayControl(socket: TLSSocket, value: unknown) {
 
 export interface AgentRelayOptions {
   authorize?:(input:{targetId:string;credential:string;operation:string;continuation?:boolean})=>Promise<boolean>;
+  trafficClosed?:(tunnelId:string)=>Promise<void>;
+  accountTraffic?:(input:{targetId:string;credential:string;operation:string;direction:'ingress'|'egress';bytes:number;tunnelId:string})=>Promise<void>;
   vault: ClientVault;
   identity: ClientIdentity;
   audit?: (event: {
@@ -351,6 +353,7 @@ export class AgentRelayService {
     });
   }
   private async accept(socket: TLSSocket) {
+    const tunnelId=randomUUID();
     socket.on('error', () => {});
     let target: Socket | undefined;
     let targetId: string | undefined;
@@ -362,6 +365,7 @@ export class AgentRelayService {
       if (finished) return;
       finished = true;
       abort.abort();
+      void this.options.trafficClosed?.(tunnelId).catch(()=>{});
       socket.destroy();
       target?.destroy();
       this.tunnels.delete(close);
@@ -437,7 +441,7 @@ export class AgentRelayService {
       target.setTimeout(this.config.idleTimeoutMs, close);
       let tokens = this.config.bytesPerSecond;
       let previous = performance.now();
-      const meter = () => {
+      const meter = (direction:'ingress'|'egress') => {
         const stream = new Transform({
           transform: (chunk: Buffer, _encoding, callback) => {
             const now = performance.now();
@@ -459,14 +463,18 @@ export class AgentRelayService {
             tokens -= chunk.length;
             bytes += chunk.length;
             this.bytesForwarded += chunk.length;
-            callback(null, chunk);
+            if(this.options.accountTraffic) {
+              void this.options.accountTraffic({...input,direction,bytes:chunk.length,tunnelId}).then(()=>{
+                if(finished)callback(new Error('Relay closed'));else callback(null,chunk);
+              },error=>{close();callback(error instanceof Error?error:new Error('Relay traffic unavailable'));});
+            } else callback(null, chunk);
           },
         });
         stream.on('error', close);
         return stream;
       };
-      socket.pipe(meter()).pipe(target);
-      target.pipe(meter()).pipe(socket);
+      socket.pipe(meter('ingress')).pipe(target);
+      target.pipe(meter('egress')).pipe(socket);
     } catch (error) {
       this.report({
         action: 'relay.reject',

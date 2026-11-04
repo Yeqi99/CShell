@@ -1,4 +1,6 @@
 import { createCipheriv, createDecipheriv, randomBytes, createHash, pbkdf2Sync } from 'node:crypto';
+import {freemem} from 'node:os';
+export const MAX_VAULT_BYTES=Math.max(2*1024*1024,Math.min(256*1024*1024,Math.floor(freemem()/24)));
 import type { CloudEnvelope } from '../shared/cloud-sync';
 
 export function newRecoveryKey() {
@@ -30,7 +32,7 @@ export function encryptVault(value: unknown, key: string, accountId: string): Cl
   const cipher = createCipheriv('aes-256-gcm', keyBytes(key), nonce);
   cipher.setAAD(aad(accountId));
   const bytes = Buffer.from(JSON.stringify(value));
-  if (bytes.length > 64 * 1024 * 1024) throw new Error('同步数据超过 64 MiB 上限');
+  if (bytes.length > MAX_VAULT_BYTES) throw new Error('同步数据超过本设备安全内存容量，原数据保留');
   const encrypted = Buffer.concat([cipher.update(bytes), cipher.final(), cipher.getAuthTag()]);
   return { format: 1, nonce: nonce.toString('base64'), ciphertext: encrypted.toString('base64') };
 }
@@ -39,7 +41,7 @@ export function decryptVault(envelope: CloudEnvelope, key: string, accountId: st
     envelope?.format !== 1 ||
     typeof envelope.nonce !== 'string' ||
     typeof envelope.ciphertext !== 'string' ||
-    envelope.ciphertext.length > 90 * 1024 * 1024
+    envelope.ciphertext.length > Math.ceil((MAX_VAULT_BYTES + 16) / 3) * 4
   )
     throw new Error('不支持的云端数据格式');
   const nonce = Buffer.from(envelope.nonce, 'base64'),

@@ -46,6 +46,7 @@ test('desktop authentication hands off before sync; guest data never enters the 
  const codec={encrypt:async(s:string)=>Buffer.from(s).toString('base64'),decrypt:async(s:string)=>Buffer.from(s,'base64').toString()};
  let imported=0,exported=0,vaultRequests=0;
  const request:typeof fetch=async(url)=>{
+  if(String(url).endsWith('/vault/chunks'))return Response.json({error:'legacy fixture'},{status:404});
   if(String(url).endsWith('password-login'))return Response.json({accountId,email:'fixture@example.com',token:'x'.repeat(43),keybox:wrapRecoveryKey(key,'fixture-password',accountId)});
   if(String(url).endsWith('/vault')){vaultRequests++;return Response.json({revision:1,envelope});}
   return Response.json({ok:true});

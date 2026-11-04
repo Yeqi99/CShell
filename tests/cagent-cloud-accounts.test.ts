@@ -30,6 +30,7 @@ test('CAgent keeps guest habits out of registration and restores isolated accoun
   const assistant=new CagentAssistant(vault,{shells:async()=>[],applications:async()=>[],execute:async()=>'',allowed:()=>false});
   const accounts=new Map<string,any>();let selected:any;
   const request:typeof fetch=async(url,options)=>{
+    if(String(url).endsWith('/vault/chunks'))return Response.json({error:'legacy fixture'},{status:404});
     const path=new URL(String(url)).pathname,body=options?.body?JSON.parse(String(options.body)):undefined;
     if(path.endsWith('/auth/register')){selected={...body,revision:1};accounts.set(body.email,selected);return Response.json({accountId:body.accountId,email:body.email,token:'x'.repeat(43)});}
     if(path.endsWith('/auth/password-login')){selected=accounts.get(body.email);return Response.json({accountId:selected.accountId,email:selected.email,token:'y'.repeat(43),keybox:selected.keybox});}
