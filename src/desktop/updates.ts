@@ -1,5 +1,8 @@
-import {agentDownloads,type AgentDownload} from '../shared/agent-downloads';
+import {applicationUpdateTool} from '../core/application-update-tool';
+import {UpdateReceipt} from './update-receipt';
 import { requestUpdateWithFallback } from '../shared/update-source-fallback';
+import {agentDownloads,type AgentDownload} from '../shared/agent-downloads';
+const isPro=false;
 import { app, shell, net, type BrowserWindow } from 'electron';
 import { mkdir, open, rename, rm, readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
@@ -19,9 +22,15 @@ import {
 
 // Only the main process resolves release assets. Renderer cannot supply a URL or path.
 export function registerUpdateHandlers(
-  handle: (name: string, fn: (...args: any[]) => any) => void,
+  register: (name: string, fn: (...args: any[]) => any) => void,
   window: BrowserWindow,
 ) {
+  const handlers=new Map<string,(...args:any[])=>any>();
+  const handle=(name:string,fn:(...args:any[])=>any)=>{handlers.set(name,fn);register(name,fn);};
+  const receipt=new UpdateReceipt(app.getPath('userData'),app.getVersion());
+  const receiptReady=receipt.load();
+  let operation: string|undefined;
+  let installAuthorization:(()=>void)|undefined;
   let state: UpdateState = { current: app.getVersion(), phase: 'idle', platform: process.platform, automatic:true };
   let release: UpdateRelease | undefined,
     file = '',
@@ -46,7 +55,7 @@ export function registerUpdateHandlers(
   };
   let agentPackages:AgentDownload[]=[];
   handle('agent:download-list',async()=>{
-    const channel='opensource' as const;const catalogs=[await(await request('https://shell.canp.ai/downloads/'+channel+'/releases.json')).json()];
+    const channel=isPro?'pro':'opensource';const catalogs=[await(await request('https://shell.canp.ai/downloads/'+channel+'/releases.json')).json()];
     agentPackages=agentDownloads(catalogs,channel);
     return agentPackages.map(({url,...item})=>item);
   });
@@ -58,7 +67,7 @@ export function registerUpdateHandlers(
   handle('update:state', () => state);
   handle('update:open-page', () => shell.openExternal(releasesPage));
   const check = async () => {
-    if (busy) return state;
+    if (busy || operation) return state;
     busy = true;
     release = undefined;
     file = '';
@@ -163,7 +172,7 @@ export function registerUpdateHandlers(
   // Keep checking for updates until the application actually exits.
   app.once('quit',()=>{clearTimeout(initial);clearInterval(repeat);});
   handle('update:install', async () => {
-    if (busy || state.phase !== 'ready' || !file)
+    if (busy || (operation && operation!=='install') || state.phase !== 'ready' || !file)
       throw new Error('Download and verify the update first');
     busy = true;
     try {
@@ -173,9 +182,11 @@ export function registerUpdateHandlers(
           .digest('hex') !== expected
       )
         throw new Error('Update file changed; download again');
+      installAuthorization?.();
       if (process.platform === 'win32') {
         // The normal window close guard protects sessions; will-quit flushes
         // histories before the installer is launched from the final quit event.
+        installAuthorization?.();
         const launch = () => {
           const installer = spawn(file, ['/S', '--force-run', '/D=' + dirname(app.getPath('exe'))], {
             detached: true, stdio: 'ignore', windowsHide: true, windowsVerbatimArguments: true,
@@ -186,12 +197,14 @@ export function registerUpdateHandlers(
         app.once('quit', launch);
         queued = true;
         (window as EventEmitter).once('update-close-cancelled', () => { app.removeListener('quit', launch); queued = false; busy = false; });
+        if(operation==='install')window.emit('update-mcp-approved');
         app.quit();
         return;
       }
       if (process.platform === 'linux') {
         const target = process.env.APPIMAGE || '';
         const staged = await prepareAppImageUpdate(file, target);
+        installAuthorization?.();
         const launch = () => {
           try {
             staged.commit();
@@ -208,6 +221,7 @@ export function registerUpdateHandlers(
       }
       if (process.platform === 'darwin') {
         const staged = await prepareMacUpdate(file, app.getPath('exe'), release!.version);
+        installAuthorization?.();
         const launch = () => {
           try {
             staged.commit();
@@ -228,5 +242,29 @@ export function registerUpdateHandlers(
       busy = queued;
     }
   });
+  return applicationUpdateTool({
+    ready:()=>receiptReady,
+    state:()=>({update:state,operation,receipt:receipt.status()}),
+    run:async(action,authorize)=>{
+      await receiptReady;authorize();
+      if(operation||busy)throw Error('An update operation is already running; poll status');
+      if(action==='install'){
+        if(state.phase!=='ready'||!file||!release)throw Error('Download and verify the update first');
+        operation='install';
+        try {
+        if(createHash('sha256').update(await readFile(file)).digest('hex')!==expected)throw Error('Update file changed; download again');
+        authorize();
+        await receipt.save({targetVersion:release.version,previousVersion:app.getVersion(),channel:isPro?'pro':'opensource',requestedAt:Date.now(),phase:'scheduled'});
+        authorize();installAuthorization=authorize;operation='install';
+        setTimeout(()=>{void (async()=>{try{authorize();await handlers.get('update:install')!();}catch(e){operation=undefined;installAuthorization=undefined;await receipt.save({targetVersion:release?.version,phase:'failed',error:String(e)});}})().catch(e=>console.error('Update handoff receipt failed',e));},1500);
+        return;
+        } catch(e){operation=undefined;throw e;}
+      }
+      const pending=handlers.get('update:'+action)!();operation=action;
+      void Promise.resolve(pending).catch(e=>fail(e,action)).finally(()=>{operation=undefined;});
+    },
+  });
+
 }
+
 

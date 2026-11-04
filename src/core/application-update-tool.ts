@@ -1,0 +1,6 @@
+import {z} from 'zod';
+import type {ConnectionTool} from './connections/contracts';
+export function applicationUpdateTool(host:{state:()=>unknown;ready?:()=>Promise<unknown>;run:(action:'check'|'download'|'install',authorize:()=>void)=>Promise<void>}):ConnectionTool {
+ const input=z.object({action:z.enum(['status','check','download','install']),acknowledgeRestart:z.literal(true).optional()}).strict();
+ return {name:'application_update',capability:'updates.manage',description:'Update this CShell application using its verified edition-specific official channel. Start check or download, poll status, then install with acknowledgeRestart=true. Installation closes sessions and restarts this MCP endpoint. Reconnect and poll status to verify the durable receipt against the running version. Never accepts URLs, files or version overrides.',input,needsReview:raw=>input.parse(raw).action==='install',invoke:async(raw,signal,_out,guard)=>{const args=input.parse(raw);const authorize=()=>{signal.throwIfAborted();guard?.();};await host.ready?.();authorize();if(args.action==='install'&&!args.acknowledgeRestart)throw Error('Set acknowledgeRestart=true to explicitly close sessions and restart CShell');if(args.action!=='status')await host.run(args.action,()=>guard?.());return JSON.stringify(host.state());}};
+}

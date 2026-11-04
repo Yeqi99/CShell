@@ -2241,7 +2241,8 @@ export class McpService {
                 'Application capability was revoked.',
                 'Review application-level grants.',
               );
-            return JSON.parse(await tool.invoke(args, signal,undefined,()=>{if(!authorized(args))throw Error('Application target authorization revoked');}));
+            const invocationAccount=this.accountKey();
+            return JSON.parse(await tool.invoke(args, signal,undefined,()=>{if(invocationAccount!==this.accountKey()||!authorized(args))throw Error('Application target authorization revoked');}));
           }),
       );
     }

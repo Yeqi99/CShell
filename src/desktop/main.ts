@@ -508,7 +508,7 @@ else
       handle('desktop-look:get',(id,legacy)=>desktopLooks.get(id,legacy));
       handle('desktop-look:save',(id,value)=>desktopLooks.save(id,value));
       registerAppearanceHandlers(handle, window, app.getPath('userData'), consume, text);
-      registerUpdateHandlers(handle, window);
+      const updateTool=registerUpdateHandlers(handle, window);
       registerFeedback(handle);
       registerUsage(handle, window);
       const classroomEnabled=()=>store.plugins().some(p=>p.manifest.id==='cshell.classroom'&&p.enabled);
@@ -706,7 +706,7 @@ else
           fileTransferAddress:sessionId=>{const target=connections!.tools.describe(sessionId);const device=clientProvider.list().find(d=>d.deviceId===target.resourceId);return device?{host:device.host,port:device.port}:undefined;},
           fileTransferEndpoint:async(sessionId,signal)=>providerFileCall({sessionId,...(connections!.tools.describe(sessionId).providerId==='cshell.ssh'?{sftp:await ssh.sftp(sessionId)}:{ftp})},signal),
           http,
-          applicationTools: [...extensionServices.applicationTools,...(identityNetwork?.tools()??[])],
+          applicationTools: [updateTool,...extensionServices.applicationTools,...(identityNetwork?.tools()??[])],
           connectEnvironment: async (parent, conda, prefix, signal, ready) => {
             let child: string | undefined;
             try {
@@ -1120,6 +1120,8 @@ else
       registerFileHandlers(handle, window, ssh, transfers, text);
       let closing = false,
         closePrompt = false;
+      (window as import('node:events').EventEmitter).on('update-mcp-approved',()=>{closing=true;});
+      (window as import('node:events').EventEmitter).on('update-mcp-cancelled',()=>{closing=false;});
       window.on('close', (event) => {
         if (
           closing ||
