@@ -16,18 +16,24 @@ public final class FeedbackActivity extends Activity {
   private EditText message,contact; private TextView status; private Button send;
   private String identity="", pending=""; private boolean busy;
   private android.content.SharedPreferences prefs;
+  private android.window.OnBackInvokedCallback backCallback;
   public void onCreate(Bundle state){super.onCreate(state);prefs=getSharedPreferences("feedback-draft",MODE_PRIVATE);
-    ScrollView scroll=new ScrollView(this);LinearLayout body=new LinearLayout(this);body.setOrientation(1);int pad=(int)(24*getResources().getDisplayMetrics().density);body.setPadding(pad,pad,pad,pad);scroll.addView(body);setContentView(scroll);
-    Button back=new Button(this);back.setText("返回设置");back.setOnClickListener(v->onBackPressed());body.addView(back);
+    ScrollView scroll=new ScrollView(this);LinearLayout body=new LinearLayout(this);body.setOrientation(LinearLayout.VERTICAL);int pad=(int)(24*getResources().getDisplayMetrics().density);body.setPadding(pad,pad,pad,pad);scroll.addView(body);setContentView(scroll);
+    Button back=new Button(this);back.setText("返回设置");back.setOnClickListener(v->requestBack());body.addView(back);
     TextView title=new TextView(this);title.setText("意见与问题反馈");title.setTextSize(24);body.addView(title);
     TextView note=new TextView(this);note.setText("只发送你填写的内容、应用版本和 Android 平台。不会附带日志、截图、账号或设备标识。提交前可查看完整内容。");note.setPadding(0,pad,0,pad);body.addView(note);
     message=new EditText(this);message.setHint("描述遇到的问题或建议");message.setMinLines(5);message.setGravity(android.view.Gravity.TOP);message.setInputType(131073);message.setFilters(new InputFilter[]{new InputFilter.LengthFilter(6000)});body.addView(message);
     contact=new EditText(this);contact.setHint("联系方式（选填）");contact.setSingleLine();contact.setFilters(new InputFilter[]{new InputFilter.LengthFilter(254)});body.addView(contact);
     message.setText(prefs.getString("message",""));contact.setText(prefs.getString("contact",""));identity=prefs.getString("id","");pending=prefs.getString("pending","");
     send=new Button(this);send.setText("预览并提交");body.addView(send);status=new TextView(this);body.addView(status);send.setOnClickListener(v->preview());
+    if(android.os.Build.VERSION.SDK_INT>=33){backCallback=this::requestBack;getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,backCallback);}
   }
   static String redact(String value){return FeedbackPrivacy.redact(value); }
-  @Override public void onBackPressed(){if(busy){status.setText("正在提交，请稍候");return;}super.onBackPressed();}
+  private void requestBack(){if(busy){status.setText("正在提交，请稍候");return;}finish();}
+  // API 26–32 fallback. API 33+ uses the registered gesture callback above.
+  @android.annotation.SuppressLint("GestureBackNavigation")
+  @Override public void onBackPressed(){requestBack();}
+  @Override protected void onDestroy(){if(android.os.Build.VERSION.SDK_INT>=33&&backCallback!=null)getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(backCallback);super.onDestroy();}
   private void save(){prefs.edit().putString("message",message.getText().toString()).putString("contact",contact.getText().toString()).putString("id",identity).putString("pending",pending).apply();}
   @Override protected void onPause(){save();super.onPause();}
   private void preview(){if(busy)return;try{
