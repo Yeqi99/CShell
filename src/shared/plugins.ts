@@ -28,6 +28,7 @@ export const pluginManifestSchema = z
       'wechat',
       'opencode',
       'tavily',
+      'cloudflare',
       'classroom',
       'process',
     ]),
@@ -85,6 +86,7 @@ const builtin = (
   commands: [],
 });
 export const builtinPlugins = [
+  { ...builtin('cloudflare', 'Cloudflare', '授权 Cloudflare，让智能体管理站点、Workers、DNS 与存储。', 'cloudflare', []), descriptionEn: 'Authorize Cloudflare to let your agent manage sites, Workers, DNS and storage.' },
   builtin('classroom', '机房', '局域网屏幕共享、设备发现与已认证学生机的集中管理。', 'classroom', []),
   builtin('tavily', 'Tavily 搜索', '多 Key 用量管理，为智能体提供带来源的网络搜索。', 'tavily', []),
   builtin('opencode', 'OpenCode', '接入 Go 套餐或按量计费模型，选择模型并查看官方用量。', 'opencode', []),
@@ -272,6 +274,7 @@ export interface ExtensionBridge {
     revision: string,
   ): Promise<{ revision: string }>;
   plugins(): Promise<InstalledPlugin[]>;
+  pluginsRestorePending():Promise<(InstalledPlugin & {reason:string})[]>;
   pluginInstall(id: string): Promise<void>;
   pluginToggle(id: string, enabled: boolean): Promise<void>;
   pluginRemove(id: string): Promise<void>;

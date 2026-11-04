@@ -48,7 +48,7 @@ export class LocalFiles {
       check();
       // A protected or disappearing child must not hide its entire parent.
       const stat = await lstat(join(target, name)).catch((error: NodeJS.ErrnoException) => {
-        if (['EACCES', 'EPERM', 'ENOENT', 'EBUSY'].includes(error.code ?? '')) return null;
+        if (['EACCES', 'EPERM', 'ENOENT', 'EBUSY'].includes(error.code ?? '') || (process.platform === 'win32' && error.code === 'EINVAL')) return null;
         throw error;
       });
       if (!stat) continue;
@@ -141,3 +141,4 @@ export async function exists(path: string) {
     },
   );
 }
+

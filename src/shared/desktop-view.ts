@@ -49,6 +49,7 @@ export type DesktopViewEvent = { id: string; generation?: number } & (
   | { type: 'error'; message: string; recoverable?: boolean; resumed?: boolean }
 );
 export interface DesktopViewBridge {
+  desktopViewClipboard(id:string,input:Omit<import('./desktop-clipboard').DesktopClipboardRequest,'id'>,generation?:number):Promise<any>;
   desktopViewStart(
     input: z.infer<typeof desktopViewStartSchema>,
   ): Promise<{ id: string; control: boolean; generation?: number }>;

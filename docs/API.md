@@ -224,3 +224,16 @@ local_file_task_start 新增独立 renameDirectory 授权，旧 rename 文件授
 目录树复制可以通过现有稳定 API 组合：先分页列举源树，拒绝 symlink，选择与源不重叠的目标；按父先子后调用 mkdir，普通文件以 local_file_read 分块读取，首次 create，后续每次 stat 获取目标 revision 后 write（最多 32 KiB），完成一项再释放其任务结果。源读取持续携带初次 revision，变化则停止并报告已复制项；空文件用空 bodyBase64 创建。跨根复制须分别具备源读取和目标 mkdir/create/write 授权。每次副作用用独立且可追踪的幂等键，不能把一次递归流程伪装成单个原子任务；无回滚、无一致性快照、无自动断点恢复，调用方负责保存清单并对照实际文件决定如何继续。
 
 中继 API 保存流程：先 agent_relay 调用 relay.status 或 relay.reverse.status，再把其 revision 作为对应 configure 的 params.expectedRevision，和完整配置一并提交。字段验证和后端事务均检查该条件；配置已变则重新读取并由调用方重新决定，不去掉条件强制保存。未返回 revision 的旧 Agent 只支持旧行为，需先更新 Agent 才能使用新的 API 条件配置出口；不静默降级。版本只存在于该 Agent 进程，重启使草稿失效，版本内容不包含凭据。
+
+
+## 0.8.20：连接管理、预检与任务找回
+
+完整参数见 [MCP 连接管理契约](MCP-CONNECTION-MANAGEMENT-0.8.20.md)；CLI 用法见 [连接配置与凭据管理](CLI.md#连接配置与凭据管理0820)。
+
+- `connection_list/create/update/credentials` 管理保存连接，凭据只写不读；新建连接不自动进入调用方允许访问的机器范围。
+- `connection_probe/accept` 完成真实 SSH 指纹观察与显式接受；不把未知指纹默认为可信，不覆盖已变化的主机密钥。
+- `connection_preflight` 默认检查配置；`probe:true` 对已授权直接 SSH/SFTP 进行有界网络、指纹与认证预检，不执行命令，不自动重试密码。
+- `permission_diagnostics` 返回当前调用方的权限诊断；`session_list` 和分页 `task_list` 仅列出仍获授权的本调用方记录。任务恢复限当前 CShell 进程，未知结果不得直接重放。
+- SSH 命令分别提供 `stdout`、`stderr`、真实 `exitCode` 和截断标记；每个输出流保留有界尾段，旧 `output` 字段保留 stdout 兼容语义。
+
+应用级连接修改、凭据写入、主机信任使用独立授权，已有授权不会因升级自动扩大。任何入口都不返回密码、私钥或口令；请求秘密不进入审计与审核摘要。

@@ -309,9 +309,10 @@ export function AiConversation({
         <div className="agent-composer-tools">
           <div className="agent-model">
             <Cpu size={13} />
-            <AiModelMenu providers={snapshot.providers} providerId={thread?.providerId??providerId} model={thread?.extensionModel??chosenModel} disabled={busy} configure={configure} onSelect={async(next,reference)=>{
+            <AiModelMenu providers={snapshot.providers} providerId={thread?.providerId??providerId} model={thread?.extensionModel??chosenModel} disabled={busy || active} configure={configure} onSelect={async(next,reference)=>{
               await run(async()=>{
-                const created=await window.cshell.aiThreadCreate(thread?.location??location,next,thread?.mode??mode,thread?.sessionId??sessionId,reference);
+                if(thread){await window.cshell.aiThreadProvider(thread.id,next,reference);setProviderId(next);return;}
+                const created=await window.cshell.aiThreadCreate(location,next,mode,sessionId,reference);
                 setDrafts(previous=>({...previous,[created.id]:text}));setProviderId(next);openThread(created.id);
               });
             }}/>

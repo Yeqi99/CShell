@@ -53,11 +53,15 @@ export const aiPolicySchema = z
     application: z.array(
       z.enum([
         'connections.read',
+        'connections.manage',
+        'credentials.manage',
+        'identity.trust',
         'connections.open',
         'agents.manage',
         'goals.manage',
         'events.manage',
         'web.search',
+        'cloudflare.manage',
         'http.use',
         'ai.providers.manage',
         'wechat.read',
@@ -87,6 +91,13 @@ export const emptyAiPolicy = (): AiPolicy => ({
   groups: [],
   capabilities: [],
   overrides: [],
+});
+/** Only explicit first-install initialization may use this; never a parse/recovery fallback. */
+export const newInstallationAiPolicy = (): AiPolicy => ({
+  ...emptyAiPolicy(),
+  application: [...aiPolicySchema.shape.application.element.options],
+  allMachines: true,
+  capabilities: [...aiCapabilities],
 });
 export type AiPermission = z.infer<typeof aiPermissionSchema>;
 export type AiLocation = (typeof aiLocations)[number];
@@ -155,7 +166,7 @@ export interface AiBridge {
   aiText(input: import('./ai-text').TextRequest): Promise<import('./ai-text').TextResult>;
   aiTextProviderSave(kind: 'translate' | 'compose', id: string | null): Promise<void>;
   onAiConnection(
-    listener: (value: { sessionId: string; profile: import('./contracts').Profile }) => void,
+    listener: (value: { sessionId: string; profile: import('./contracts').Profile; managementOnly?:boolean }) => void,
   ): () => void;
   onMinimalHover(listener: (hovered: boolean) => void): () => void;
   aiExtractConnection(
@@ -181,4 +192,5 @@ export interface AiBridge {
   aiApprove(id: string, requestId: string, allow: boolean): Promise<void>;
   aiStop(id: string): Promise<void>;
   aiMode(id: string, mode: AiMode): Promise<void>;
+  aiThreadProvider(id: string, providerId: string, extensionModel?: string): Promise<void>;
 }

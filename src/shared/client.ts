@@ -77,7 +77,7 @@ export interface ClientBridge {
     relay?: AgentRelayConnection;
   }): Promise<ClientInfo>;
   clientPasswordPair(info: ClientInfo, password: string): Promise<ClientDevice>;
-  openRdp(profileId: string): Promise<unknown>;
+  openRdp(profileId: string, sessionId?: string): Promise<unknown>;
   rdpStatus(id:string):Promise<{state:string;message:string}>;
   rdpClose(id:string):Promise<void>;
   rdpBounds(id:string,bounds:{x:number;y:number;width:number;height:number;visible:boolean}):Promise<void>;
@@ -108,7 +108,7 @@ export const clientPasswordSchema = z.string().min(1).max(128);
 export const clientAccessSchema = z
   .object({
     password: clientPasswordSchema,
-    shells: z.array(clientShellSchema).min(1).max(6),
+    shells: z.array(clientShellSchema).max(6),
       allowHttp: z.boolean().default(true),
       allowManage: z.boolean().default(true),
       allowHosting: z.boolean().default(true),

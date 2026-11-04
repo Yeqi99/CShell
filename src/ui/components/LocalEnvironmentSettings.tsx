@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { useEffect, useState } from 'react';
 import { Plus, Trash2, Save, RefreshCw, Search } from 'lucide-react';
 import type { LocalEnvironment } from '../../shared/local-terminal';
@@ -32,9 +33,7 @@ export function LocalEnvironmentSettings() {
         </div>
       </header>
       {error && (
-        <p role="alert" className="form-error">
-          {error}
-        </p>
+        <ErrorNotice title="操作未完成" error={error}/>
       )}
       <div className="local-env-heading">
         <h3>CShell 覆盖配置</h3>

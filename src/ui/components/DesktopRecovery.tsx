@@ -139,7 +139,7 @@ export function DesktopRecovery({
                 连接；此操作不会解锁或自动登录。
               </p>
               {!plan.canAttempt ? (
-                <p>{reasons[plan.reason] || '此状态暂不支持转换。'}</p>
+                <p role="status">{plan.sourceState === 4 ? 'CAgent 所属用户会话已断开，不能自动迁移或解锁。请在目标机器恢复原用户会话后重新检查；仅安装虚拟显示不会恢复已断开的用户会话。' : reasons[plan.reason] || '此状态暂不支持转换。'}</p>
               ) : (
                 <>
                   <p>

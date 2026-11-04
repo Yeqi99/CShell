@@ -11,8 +11,51 @@ import org.json.JSONObject;
 
 /** Explicitly enabled Android accessibility controls; not a privileged input injector. */
 public final class AndroidControlService extends AccessibilityService {
+  /** Bounded semantic view of the current window. Password values never leave Android. */
+  static org.json.JSONObject snapshot() throws Exception {
+    AndroidControlService service=instance;
+    if(service==null)throw new IllegalStateException("请先在手机系统设置中启用 CAgent 辅助控制");
+    java.util.concurrent.CompletableFuture<org.json.JSONObject> result=new java.util.concurrent.CompletableFuture<>();
+    new Handler(android.os.Looper.getMainLooper()).post(()->{
+      if(result.isDone())return;
+      AccessibilityNodeInfo root=null;
+      try {
+        // A semantic read must describe the current UI, not cached virtual
+        // WebView nodes from a previous in-app page. No grants are changed.
+        if(android.os.Build.VERSION.SDK_INT>=33)service.clearCache();
+        root=service.getRootInActiveWindow();
+        org.json.JSONArray nodes=new org.json.JSONArray();
+        if(root!=null)describe(root,nodes,0);
+        android.util.DisplayMetrics metrics=new android.util.DisplayMetrics();
+        ((android.view.WindowManager)service.getSystemService(WINDOW_SERVICE)).getDefaultDisplay().getRealMetrics(metrics);
+        result.complete(new org.json.JSONObject().put("nodes",nodes).put("available",root!=null).put("truncated",nodes.length()>=300)
+          .put("input",new org.json.JSONObject().put("width",metrics.widthPixels).put("height",metrics.heightPixels)
+            .put("processed",service.processed).put("phase",service.phase).put("gesture",service.gestureState)
+            .put("editing",service.editBusy).put("editState",lastEditState)));
+      }catch(Exception error){result.completeExceptionally(error);}finally{if(root!=null)root.recycle();}
+    });
+    try{return result.get(3,java.util.concurrent.TimeUnit.SECONDS);}
+    catch(java.util.concurrent.TimeoutException error){result.cancel(false);throw error;}
+  }
+  private static void describe(AccessibilityNodeInfo node,org.json.JSONArray nodes,int depth)throws Exception {
+    if(depth>24||nodes.length()>=300||!node.isVisibleToUser())return;
+    android.graphics.Rect bounds=new android.graphics.Rect();node.getBoundsInScreen(bounds);
+    org.json.JSONObject value=new org.json.JSONObject().put("class",String.valueOf(node.getClassName()))
+      .put("clickable",node.isClickable()).put("editable",node.isEditable()).put("enabled",node.isEnabled())
+      .put("password",node.isPassword()).put("bounds",new org.json.JSONArray().put(bounds.left).put(bounds.top).put(bounds.right).put(bounds.bottom));
+    if(!node.isPassword()){
+      if(node.getText()!=null)value.put("text",bounded(node.getText()));
+      if(node.getContentDescription()!=null)value.put("description",bounded(node.getContentDescription()));
+    }
+    nodes.put(value);
+    if(node.isPassword())return;
+    for(int i=0;i<node.getChildCount()&&nodes.length()<300;i++){
+      AccessibilityNodeInfo child=node.getChild(i);if(child==null)continue;
+      try{describe(child,nodes,depth+1);}finally{child.recycle();}
+    }
+  }
+  private static String bounded(CharSequence text){String value=text.toString();return value.substring(0,Math.min(2000,value.length()));}
   private static volatile AndroidControlService instance;
-  private android.os.HandlerThread inputThread;
   private Handler inputHandler;
   private float x=.5f,y=.5f;
   private Path drag;
@@ -22,18 +65,29 @@ public final class AndroidControlService extends AccessibilityService {
   private boolean pending;
   private volatile boolean gestureBusy;
   private volatile String gestureState="idle";
-  private long gestureSequence;
+  private long gestureSequence, lastGestureCompleted, focusWaitSequence;
   private volatile boolean editBusy;
   private boolean shiftLeft,shiftRight,control,alt,caps;
   private static volatile String lastEditState="none";
   private volatile long processed;
   private volatile String phase="idle";
+  private final java.util.concurrent.atomic.AtomicLong editRevision=new java.util.concurrent.atomic.AtomicLong();
   static String editState(){AndroidControlService s=instance;return lastEditState+(s==null?", disconnected":", processed="+s.processed+", phase="+s.phase+", editing="+s.editBusy+", gesture="+s.gestureState);}
   static boolean isEditing(){AndroidControlService s=instance;return s!=null&&s.editBusy;}
-  @Override protected void onServiceConnected(){inputThread=new android.os.HandlerThread("cagent-accessibility-input");inputThread.start();inputHandler=new Handler(inputThread.getLooper());instance=this;AndroidAgentService.changed(this);}
-  @Override public void onAccessibilityEvent(AccessibilityEvent event){}
+  @Override protected void onServiceConnected(){
+    // Android's accessibility cache refreshes nodes while processing events on
+    // this looper. Concurrent same-process edits from a worker can wait on that
+    // cache while the UI awaits the interaction reply (five-second timeout).
+    // Keep OS actions, events and their bounded continuation queue on one looper.
+    inputHandler=new Handler(getMainLooper());instance=this;AndroidAgentService.changed(this);
+  }
+  @Override public void onAccessibilityEvent(AccessibilityEvent event){
+    int type=event.getEventType();
+    if(type==AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED||type==AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED
+      ||type==AccessibilityEvent.TYPE_VIEW_FOCUSED)editRevision.incrementAndGet();
+  }
   @Override public void onInterrupt(){releaseAll();}
-  @Override public void onDestroy(){if(instance==this)instance=null;synchronized(this){queue.clear();}if(inputThread!=null)inputThread.quitSafely();AndroidAgentService.changed(this);super.onDestroy();}
+  @Override public void onDestroy(){if(instance==this)instance=null;synchronized(this){queue.clear();}if(inputHandler!=null)inputHandler.removeCallbacksAndMessages(null);AndroidAgentService.changed(this);super.onDestroy();}
   static boolean isAvailable(){return instance!=null;}
   /** Returns queued, not proof that a target application accepted the action. */
   static boolean dispatch(JSONObject event){
@@ -57,7 +111,7 @@ public final class AndroidControlService extends AccessibilityService {
   }
   static void releaseAll(){AndroidControlService s=instance;if(s!=null){synchronized(s){s.queue.clear();}s.inputHandler.post(s::reset);}}
   private void resetPointer(){drag=null;points=0;downAt=0;}
-  private void reset(){resetPointer();shiftLeft=false;shiftRight=false;control=false;alt=false;}
+  private void reset(){focusWaitSequence++;resetPointer();shiftLeft=false;shiftRight=false;control=false;alt=false;}
   private float px(float value,boolean horizontal){
     android.util.DisplayMetrics dm=new android.util.DisplayMetrics();
     ((android.view.WindowManager)getSystemService(WINDOW_SERVICE)).getDefaultDisplay().getRealMetrics(dm);
@@ -164,7 +218,7 @@ public final class AndroidControlService extends AccessibilityService {
   }
   private void finishGesture(long sequence,String outcome){
     if(sequence!=gestureSequence||!gestureBusy)return;
-    gestureState=outcome;gestureBusy=false;
+    gestureState=outcome;gestureBusy=false;if(outcome.equals("completed"))lastGestureCompleted=android.os.SystemClock.uptimeMillis();
     // A failed focus-changing gesture invalidates the dependent input sequence.
     // In particular, do not type queued text into the previously focused field.
     if(!outcome.equals("completed")){
@@ -173,29 +227,86 @@ public final class AndroidControlService extends AccessibilityService {
     }
   }
   private AccessibilityNodeInfo focused(){
+    // WebView focus and caret snapshots can remain stale after a real gesture
+    // or ACTION_SET_TEXT. Input must not depend on a later semantic read to
+    // invalidate that cache; obtain current OS focus for every edit/settle step.
+    if(android.os.Build.VERSION.SDK_INT>=33)clearCache();
     // Android 10 can temporarily return no global input focus while the IME
-    // updates. Only fall back to a focused application window's actual input
+    // updates. The active application can temporarily lose window focus to the IME.
+    // Only use its actual focused editor (never the IME's editable node).
+    // Fall back to a focused or active application window's actual input
     // focus, never an arbitrary editable field or a remembered node.
-    for(int attempt=0;attempt<4;attempt++){
+    {
       AccessibilityNodeInfo node=findFocus(AccessibilityNodeInfo.FOCUS_INPUT);
-      if(node!=null){if(node.refresh()&&node.isFocused())return node;node.recycle();}
-      for(android.view.accessibility.AccessibilityWindowInfo window:getWindows()){
-        try{
-          if(window.getType()!=android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION||!window.isFocused())continue;
+      if(node!=null){if(node.isFocused()&&node.isEditable())return node;node.recycle();}
+      java.util.List<android.view.accessibility.AccessibilityWindowInfo> windows=getWindows();
+      try{for(android.view.accessibility.AccessibilityWindowInfo window:windows){
+          if(window.getType()!=android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION||(!window.isFocused()&&!window.isActive()))continue;
           AccessibilityNodeInfo root=window.getRoot();if(root==null)continue;
-          try{node=root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);if(node!=null){if(node.refresh()&&node.isFocused())return node;node.recycle();}}finally{root.recycle();}
-        }finally{window.recycle();}
-      }
-      android.os.SystemClock.sleep(24);
+          try{node=root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);if(node!=null){if(node.isFocused()&&node.isEditable())return node;node.recycle();}node=focusedDescendant(root);if(node!=null)return node;}finally{root.recycle();}
+      }}finally{for(android.view.accessibility.AccessibilityWindowInfo window:windows)window.recycle();}
     }
     return null;
   }
+  // Embedded virtual editors may not implement findFocus, despite reporting
+  // actual input focus on their child. Require one visible focused editor in
+  // the currently focused application window; never choose an arbitrary field.
+  private AccessibilityNodeInfo focusedDescendant(AccessibilityNodeInfo root){
+    java.util.ArrayList<AccessibilityNodeInfo> matches=new java.util.ArrayList<>();
+    int[] remaining={300};collectFocused(root,0,remaining,matches);
+    if(matches.size()==1&&remaining[0]>0)return matches.get(0);
+    for(AccessibilityNodeInfo node:matches)node.recycle();return null;
+  }
+  private void collectFocused(AccessibilityNodeInfo node,int depth,int[] remaining,java.util.ArrayList<AccessibilityNodeInfo> matches){
+    if(depth>24){remaining[0]=0;return;}if(remaining[0]--<=0||matches.size()>1||!node.isVisibleToUser())return;
+    if(node.isFocused()&&node.isEditable())matches.add(AccessibilityNodeInfo.obtain(node));
+    if(node.isPassword())return;
+    for(int i=0;i<node.getChildCount()&&remaining[0]>0&&matches.size()<2;i++){
+      AccessibilityNodeInfo child=node.getChild(i);if(child==null)continue;
+      try{collectFocused(child,depth+1,remaining,matches);}finally{child.recycle();}
+    }
+  }
   private void insert(String text){
-    if(text.length()>4096)return;AccessibilityNodeInfo node=focused();if(node==null)return;
-    try{if(!node.isEditable()||node.isPassword())return;String old=node.isShowingHintText()||node.getText()==null?"":node.getText().toString();if(old.length()>1_000_000)return;
-      int start=node.getTextSelectionStart(),end=node.getTextSelectionEnd();if(start<0||end<0){start=old.length();end=start;}int lo=Math.min(start,end),hi=Math.max(start,end);if(hi>old.length())return;
+    if(text.length()>4096)return;AccessibilityNodeInfo node=focused();
+    if(node==null){
+      if(lastGestureCompleted>0&&android.os.SystemClock.uptimeMillis()-lastGestureCompleted<1500)awaitInputFocus(text);
+      else lastEditState="text:no-input-focus";
+      return;
+    }
+    insertFocused(text,node);
+  }
+  // Motion completion precedes WebView's asynchronous virtual focus publication.
+  // Hold ordered input briefly; no edit is sent until OS input focus exists, and
+  // never retry an edit after ACTION_SET_TEXT has been attempted.
+  private void awaitInputFocus(String text){
+    final long wait=++focusWaitSequence,gesture=gestureSequence,deadline=android.os.SystemClock.uptimeMillis()+1000;
+    final int window=activeApplicationWindow();editBusy=true;lastEditState="text:focus-pending";
+    inputHandler.postDelayed(new Runnable(){public void run(){
+      if(instance!=AndroidControlService.this||wait!=focusWaitSequence||gesture!=gestureSequence){editBusy=false;return;}
+      int current=activeApplicationWindow();
+      if(window>=0&&current>=0&&current!=window){editBusy=false;lastEditState="text:window-changed";synchronized(AndroidControlService.this){queue.clear();}return;}
+      AccessibilityNodeInfo node=focused();
+      if(node!=null){
+        if(window>=0&&node.getWindowId()!=window){node.recycle();editBusy=false;lastEditState="text:window-changed";synchronized(AndroidControlService.this){queue.clear();}return;}
+        editBusy=false;try{insertFocused(text,node);}catch(RuntimeException error){lastEditState="input-error:"+error.getClass().getSimpleName();reset();}return;
+      }
+      if(android.os.SystemClock.uptimeMillis()<deadline){inputHandler.postDelayed(this,32);return;}
+      editBusy=false;lastEditState="text:no-input-focus";synchronized(AndroidControlService.this){queue.clear();}
+    }},32);
+  }
+  private int activeApplicationWindow(){
+    java.util.List<android.view.accessibility.AccessibilityWindowInfo> windows=getWindows();
+    try{for(android.view.accessibility.AccessibilityWindowInfo window:windows)
+      if(window.getType()==android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION&&window.isActive())return window.getId();
+    }finally{for(android.view.accessibility.AccessibilityWindowInfo window:windows)window.recycle();}
+    return -1;
+  }
+  private void insertFocused(String text,AccessibilityNodeInfo node){
+    try{if(!node.isEditable()||node.isPassword()){lastEditState="text:target-unavailable:editable="+node.isEditable()+",password="+node.isPassword()+",class="+node.getClassName();return;}String old=node.isShowingHintText()||node.getText()==null?"":node.getText().toString();if(old.length()>1_000_000)return;
+      int start=node.getTextSelectionStart(),end=node.getTextSelectionEnd();if(start<0||end<0){start=old.length();end=start;}int lo=Math.min(start,end),hi=Math.max(start,end);if(hi>old.length()){lastEditState="text:invalid-selection";return;}
       Bundle args=new Bundle();args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,old.substring(0,lo)+text+old.substring(hi));
       if(node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT,args))settleEdit(node,old.substring(0,lo)+text+old.substring(hi),lo+text.length());
+      else lastEditState="text:rejected";
     }finally{node.recycle();}
   }
   private void backspace(){AccessibilityNodeInfo node=focused();if(node==null){lastEditState="backspace:no-input-focus";return;}
@@ -216,20 +327,58 @@ public final class AndroidControlService extends AccessibilityService {
   // Android releases. Do not consume the next input until this edit's caret is
   // confirmed on the same node; never move focus or overwrite a newer edit.
   private void settleEdit(AccessibilityNodeInfo original,String expected,int caret){
-    editBusy=true;AccessibilityNodeInfo node=AccessibilityNodeInfo.obtain(original);
-    inputHandler.post(new Runnable(){int attempts;
+    editBusy=true;
+    inputHandler.post(new Runnable(){
+      AccessibilityNodeInfo node=AccessibilityNodeInfo.obtain(original);
+      final long started=android.os.SystemClock.uptimeMillis(),deadline=started+1500;
+      long revision=-1,refreshMillis;int stableText,stableCaret,rounds,revisionChanges;boolean textSeen,selectionSent;
       public void run(){
         boolean retry=false,confirmed=false;
         try{
-          if(instance!=AndroidControlService.this||!node.refresh()||!node.isFocused()){lastEditState="edit:focus-lost";return;}
-          String actual=node.getText()==null?"":node.getText().toString();
-          if(actual.equals(expected)){
-            if(node.getTextSelectionStart()==caret&&node.getTextSelectionEnd()==caret){confirmed=true;lastEditState="edit:applied";return;}
-            Bundle selection=new Bundle();selection.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT,caret);selection.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT,caret);
-            node.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION,selection);
+          if(instance!=AndroidControlService.this){lastEditState="edit:service-changed";return;}
+          rounds++;long refreshStarted=android.os.SystemClock.uptimeMillis();
+          // Refreshing a pre-edit node can block for Android's five-second
+          // accessibility timeout. Query actual current focus instead; never
+          // infer the target from a remembered editable node.
+          AccessibilityNodeInfo fresh=focused();
+          refreshMillis+=android.os.SystemClock.uptimeMillis()-refreshStarted;
+          {
+            if(fresh==null){
+              retry=android.os.SystemClock.uptimeMillis()<deadline;
+              lastEditState=retry?"edit:focus-pending":"edit:focus-unconfirmed";return;
+            }
+            if(!fresh.equals(node)){fresh.recycle();lastEditState="edit:focus-changed";return;}
+            if(!fresh.isEditable()||fresh.isPassword()){fresh.recycle();lastEditState="edit:target-unavailable";return;}
+            // Replacing a stale snapshot is not a new editor or a content event.
+            // Keep stability samples; the actual values/revision below decide
+            // whether the operation settled.
+            node.recycle();node=fresh;
           }
-          retry=++attempts<8;
-          if(!retry)lastEditState="edit:caret-unconfirmed";
+          String actual=node.getText()==null?"":node.getText().toString();
+          long currentRevision=editRevision.get();
+          if(currentRevision!=revision){stableText=0;stableCaret=0;revision=currentRevision;revisionChanges++;}
+          if(actual.equals(expected)){
+            textSeen=true;
+            // ACTION_SET_TEXT and its posted native selection update can finish
+            // separately (notably on API 29). Observe stable text first, then
+            // request the intended caret once. Never replay the text operation.
+            if(!selectionSent&&++stableText>=3){
+              Bundle selection=new Bundle();selection.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT,caret);selection.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT,caret);
+              if(!node.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION,selection)){lastEditState="edit:selection-rejected";return;}
+              selectionSent=true;stableCaret=0;
+            }else if(selectionSent){
+              if(node.getTextSelectionStart()==caret&&node.getTextSelectionEnd()==caret){
+                if(++stableCaret>=3){confirmed=true;lastEditState="edit:applied";return;}
+              }else stableCaret=0;
+            }
+          }else{
+            stableText=0;stableCaret=0;
+            // Once our result was observed, another edit belongs to the app or
+            // user. Do not restore old text or move its caret.
+            if(textSeen){lastEditState="edit:content-changed";return;}
+          }
+          retry=android.os.SystemClock.uptimeMillis()<deadline;
+          if(!retry)lastEditState="edit:caret-unconfirmed:text="+stableText+",selectionSent="+selectionSent+",caret="+stableCaret+",rounds="+rounds+",revisions="+revisionChanges+",refreshMs="+refreshMillis+",elapsedMs="+(android.os.SystemClock.uptimeMillis()-started);
         }finally{if(retry)inputHandler.postDelayed(this,32);else{
           node.recycle();
           // Later keystrokes depend on this edit's caret. If it was not

@@ -30,19 +30,20 @@ public class CagentWindow : Window {
   readonly Button modelChip=new Button(); readonly StackPanel welcome=new StackPanel();
   readonly SolidColorBrush ink=new SolidColorBrush(Color.FromRgb(35,49,68));
   readonly SolidColorBrush blue=new SolidColorBrush(Color.FromRgb(37,99,235));
+  Task reconnectTask; int hostLaunchCount; DateTime reconnectAfter=DateTime.MinValue;
   Process host; string origin,token,selected,lastRender="",requestId,requestPrompt; bool polling,busy,fixture,connected,exiting;
   Dictionary<string,object> current; DispatcherTimer timer; string screenshot;
   System.Windows.Forms.NotifyIcon tray; bool verification;
   readonly Dictionary<string,string> drafts=new Dictionary<string,string>();bool initialTaskLoaded;
   TextBlock panelStatus;
-  Border panelError; TextBlock panelErrorMessage,panelErrorDetails;
+  Border panelError; TextBlock panelErrorMessage,panelErrorDetails,panelErrorTitle;
   bool updateLaunched;
   public CagentWindow(string[] args){
     verification=args.Length>0&&args[0].StartsWith("--verify-");fixture=args.Length>0&&args[0]=="--fixture";if(fixture&&args.Length>1)screenshot=args[1];
     Title="CAgent";Width=428;Height=600;MinWidth=340;MinHeight=400;WindowStartupLocation=WindowStartupLocation.CenterScreen;
     WindowStyle=WindowStyle.None;WindowChrome.SetWindowChrome(this,new WindowChrome{CaptionHeight=56,ResizeBorderThickness=new Thickness(6),GlassFrameThickness=new Thickness(0),CornerRadius=new CornerRadius(16)});
     FontFamily=new FontFamily("Segoe UI, Microsoft YaHei UI");FontSize=13;Foreground=ink;Background=Brush("#F7F8FA");
-    InstallStyles();root.Margin=new Thickness(22,14,22,18);root.RowDefinitions.Add(new RowDefinition{Height=GridLength.Auto});root.RowDefinitions.Add(new RowDefinition());Content=root;
+    InstallStyles();Resources[SystemParameters.VerticalScrollBarWidthKey]=8.0;Resources[SystemParameters.HorizontalScrollBarHeightKey]=8.0;root.Margin=new Thickness(22,14,22,18);root.RowDefinitions.Add(new RowDefinition{Height=GridLength.Auto});root.RowDefinitions.Add(new RowDefinition());Content=root;
     var bar=new DockPanel{Margin=new Thickness(0,0,0,14),Height=32};
     var menu=Button("","会话、应用与设置");menu.Content=Glyph("M4,12 L4.1,12 M12,12 L12.1,12 M20,12 L20.1,12",2.8);
     var pin=Button("","置顶窗口");pin.Content=Glyph("M9,3 L15,3 M10,3 L10,10 L6,14 L18,14 L14,10 L14,3 M12,14 L12,21",1.4);
@@ -53,7 +54,7 @@ public class CagentWindow : Window {
     pin.Opacity=.35;close.Opacity=.35;bar.MouseEnter+=(s,e)=>{Fade(pin,1);Fade(close,1);};bar.MouseLeave+=(s,e)=>{Fade(pin,Topmost?1:.35);Fade(close,.35);};
     pin.Click+=(s,e)=>{Topmost=!Topmost;pin.Background=Topmost?Brush("#DDF2ED"):Brushes.Transparent;pin.ToolTip=Topmost?"取消置顶":"置顶窗口";AutomationProperties.SetName(pin,Convert.ToString(pin.ToolTip));};
     var context=new ContextMenu();AddMenu(context,"新任务",NewTask);
-    AddAsyncMenu(context,"会话记录",History);AddAsyncMenu(context,"应用市场",Apps);AddAsyncMenu(context,"模型与权限",Settings);AddAsyncMenu(context,"远程连接",Remote);AddAsyncMenu(context,"检查更新",Updates);AddMenu(context,"返回对话",ShowChat);AddAsyncMenu(context,"退出 CAgent",ExitApp);
+    AddAsyncMenu(context,"会话记录",History);AddAsyncMenu(context,"应用市场",Apps);AddAsyncMenu(context,"模型与权限",Settings);AddAsyncMenu(context,"目标与事件",AutomationRules);AddAsyncMenu(context,"远程连接",Remote);AddAsyncMenu(context,"检查更新",Updates);AddMenu(context,"返回对话",ShowChat);AddAsyncMenu(context,"退出 CAgent",ExitApp);
     menu.Click+=(s,e)=>{context.PlacementTarget=menu;context.IsOpen=true;};
     Grid.SetRow(chat,1);root.Children.Add(chat);chat.RowDefinitions.Add(new RowDefinition());chat.RowDefinitions.Add(new RowDefinition{Height=GridLength.Auto});
     scroll.Focusable=false;scroll.FocusVisualStyle=null;scroll.Content=messages;scroll.VerticalScrollBarVisibility=ScrollBarVisibility.Auto;scroll.HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled;scroll.Padding=new Thickness(0,10,2,12);chat.Children.Add(scroll);
@@ -74,7 +75,7 @@ public class CagentWindow : Window {
     status.FontSize=10;status.Foreground=Brush("#8C98A2");status.Text="正在连接本机运行时…";status.Margin=new Thickness(6,10,6,0);status.TextAlignment=TextAlignment.Center;status.TextWrapping=TextWrapping.Wrap;composer.Children.Add(status);
     send.Click+=async(s,e)=>await Guard(Send);stop.Click+=async(s,e)=>await Guard(async()=>{if(selected!=null)await Api("assistant.cancel",Obj("id",selected));await Poll();});
     Grid.SetRow(overlay,1);overlay.Visibility=Visibility.Collapsed;root.Children.Add(overlay);
-    Loaded+=async(s,e)=>{if(fixture){if(args.Length>2&&args[2]=="narrow"){Width=340;Height=400;}if(args.Length<3||args[2]!="empty")Render(Obj("id","fixture","prompt","帮我检查一下这台电脑的运行环境","answer","已检查。\n\nPowerShell 和 CMD 都已就绪。你可以继续让我整理文件，或安装需要的应用。","state","completed","events",new object[0]));modelChip.Content="本地模型  ⌄";status.Text="本机 · 准备就绪";input.Text="";await Task.Delay(350);if(args.Length>2&&args[2]=="verify"){VerifyInteractions();await Task.Delay(250);}if(args.Length>2&&args[2]=="wechat"){RenderWechatSettings(Obj("config",Obj("enabled",false,"experimental",false),"processes",new[]{Obj("pid",1234,"version","4.1.15.50")}));await Task.Delay(250);}if(args.Length>2&&args[2]=="market"){VerifyMarket();await Task.Delay(250);}if(args.Length>2&&args[2]=="desktop"){VerifyDesktopSettings();await Task.Delay(250);}if(args.Length>2&&(args[2]=="desktop-system"||args[2]=="desktop-virtual")){VerifySystemDesktopSettings(args[2]=="desktop-virtual");await Task.Delay(250);}if(args.Length>2&&args[2]=="error"){Panel("连接与启动");await Guard(()=>{throw new Exception("password: Too small: expected string to have >=1 characters");});await Task.Delay(250);}if(screenshot!=null){SaveImage(screenshot);Close();}return;}await Guard(()=>Start());if(args.Length>1&&args[0]=="--verify-remote-recovery"){string phase="initial remote";try{await Remote();string initialError=panelStatus.Text;bool visible=panelStatus.Text.Contains("后台仍是旧版");await Task.Delay(1500);bool persistent=visible&&panelStatus.Text.Contains("后台仍是旧版");phase="restart";await RestartRemote();phase="receipt";File.WriteAllText(args[1],json.Serialize(Obj("initialError",initialError,"legacyErrorVisible",visible,"errorPersistent",persistent,"settingsOpened",overlay.Visibility==Visibility.Visible&&panelStatus.Text=="","connected",connected)),Encoding.UTF8);}catch(Exception error){File.WriteAllText(args[1],json.Serialize(Obj("failure",error.ToString(),"phase",phase)),Encoding.UTF8);}Close();return;}if(args.Length>1&&args[0]=="--verify-tray"){try{if(!connected)throw new Exception(status.Text);input.Text="tray draft";verification=false;Close();bool hidden=!IsVisible&&tray.Visible;await Api("client.status");RestoreWindow();bool restored=IsVisible&&input.Text=="tray draft";File.WriteAllText(args[1],json.Serialize(Obj("connected",connected,"hiddenWithTray",hidden,"backendAliveWhileHidden",true,"restoredWithDraft",restored)),Encoding.UTF8);await ExitApp();}catch(Exception error){File.WriteAllText(args[1],json.Serialize(Obj("failure",error.ToString())),Encoding.UTF8);exiting=true;Close();}return;}if(args.Length>1&&args[0]=="--verify-runtime"){await Task.Delay(150);File.WriteAllText(args[1],json.Serialize(Obj("connected",connected,"status",status.Text,"browser",false,"window",true)),Encoding.UTF8);Close();}};
+    Loaded+=async(s,e)=>{if(fixture){if(args.Length>2&&args[2]=="narrow"){Width=340;Height=400;}if(args.Length<3||args[2]!="empty")Render(Obj("id","fixture","prompt","帮我检查一下这台电脑的运行环境","answer","已检查。\n\nPowerShell 和 CMD 都已就绪。你可以继续让我整理文件，或安装需要的应用。","state","completed","events",new object[0]));modelChip.Content="本地模型  ⌄";status.Text="本机 · 准备就绪";input.Text="";await Task.Delay(350);if(args.Length>2&&args[2]=="verify"){VerifyInteractions();await Task.Delay(250);}if(args.Length>2&&args[2]=="wechat"){RenderWechatSettings(Obj("config",Obj("enabled",false,"experimental",false),"processes",new[]{Obj("pid",1234,"version","4.1.15.50")}));await Task.Delay(250);}if(args.Length>2&&args[2]=="market"){VerifyMarket();await Task.Delay(250);}if(args.Length>2&&args[2]=="desktop"){VerifyDesktopSettings();await Task.Delay(250);}if(args.Length>2&&(args[2]=="desktop-system"||args[2]=="desktop-virtual")){VerifySystemDesktopSettings(args[2]=="desktop-virtual");await Task.Delay(250);}if(args.Length>2&&args[2]=="error"){Panel("连接与启动");await Guard(()=>{throw new Exception("password: Too small: expected string to have >=1 characters");});await Task.Delay(250);}if(screenshot!=null){SaveImage(screenshot);Close();}return;}await Guard(()=>Start());if(args.Length>1&&args[0]=="--verify-host-reconnect"){await VerifyHostReconnect(args[1]);return;}if(args.Length>1&&args[0]=="--verify-remote-recovery"){string phase="initial remote";try{await Remote();string initialError=panelStatus.Text;bool visible=panelStatus.Text.Contains("后台仍是旧版");await Task.Delay(1500);bool persistent=visible&&panelStatus.Text.Contains("后台仍是旧版");phase="restart";await RestartRemote();phase="receipt";File.WriteAllText(args[1],json.Serialize(Obj("initialError",initialError,"legacyErrorVisible",visible,"errorPersistent",persistent,"settingsOpened",overlay.Visibility==Visibility.Visible&&panelStatus.Text=="","connected",connected)),Encoding.UTF8);}catch(Exception error){File.WriteAllText(args[1],json.Serialize(Obj("failure",error.ToString(),"phase",phase)),Encoding.UTF8);}Close();return;}if(args.Length>1&&args[0]=="--verify-tray"){try{if(!connected)throw new Exception(status.Text);input.Text="tray draft";verification=false;Close();bool hidden=!IsVisible&&tray.Visible;await Api("client.status");RestoreWindow();bool restored=IsVisible&&input.Text=="tray draft";File.WriteAllText(args[1],json.Serialize(Obj("connected",connected,"hiddenWithTray",hidden,"backendAliveWhileHidden",true,"restoredWithDraft",restored)),Encoding.UTF8);await ExitApp();}catch(Exception error){File.WriteAllText(args[1],json.Serialize(Obj("failure",error.ToString())),Encoding.UTF8);exiting=true;Close();}return;}if(args.Length>1&&args[0]=="--verify-runtime"){await Task.Delay(150);File.WriteAllText(args[1],json.Serialize(Obj("connected",connected,"status",status.Text,"browser",false,"window",true)),Encoding.UTF8);Close();}};
     if(!fixture)CreateTray();
     Closing+=(s,e)=>{if(!fixture&&!verification&&!exiting){e.Cancel=true;Hide();return;}if(timer!=null)timer.Stop();if(tray!=null){tray.Visible=false;tray.Dispose();}try{if(host!=null&&!host.HasExited)host.StandardInput.Close();}catch{}};
     PreviewKeyDown+=(s,e)=>{if(e.Key==Key.Escape&&overlay.Visibility==Visibility.Visible){e.Handled=true;ShowChat();input.Focus();}if(e.Key==Key.N&&(Keyboard.Modifiers&ModifierKeys.Control)!=0){e.Handled=true;NewTask();input.Focus();}};
@@ -94,7 +95,7 @@ public class CagentWindow : Window {
     var info=D(await Api("update.check"));panelStatus.Text="";p.Children.Add(Text("当前版本 "+S(info,"current")));
     if(!B(info,"available")){p.Children.Add(Text("暂无可安装的新版 Windows 安装包。"));ActionButton(p,"重新检查",Updates);return;}
     p.Children.Add(Text("可用版本 "+S(info,"version")));p.Children.Add(Text("下载校验后自动安装并重新打开 CAgent。安装会结束当前连接与任务，请先保存工作。",12));
-    bool downloading=false;ActionButton(p,"下载并安装",async()=>{if(downloading)return;downloading=true;try{await Api("update.download");Dictionary<string,object> d;do{d=D(await Api("update.status"));panelStatus.Text="下载中："+S(d,"bytes")+" / "+S(d,"total")+" 字节";if(S(d,"phase")=="downloading")await Task.Delay(750);}while(S(d,"phase")=="downloading");if(S(d,"phase")!="ready")throw new Exception(S(d,"error"));d=D(await Api("update.verify"));panelStatus.Text="校验通过，正在保存并更新…";await Api("agent.shutdown",Obj("confirm",true));Process.Start(new ProcessStartInfo(S(d,"path"),"/S /RESTART /D="+InstallationRoot()){UseShellExecute=true});updateLaunched=true;exiting=true;Close();}finally{downloading=false;}});
+    bool downloading=false;ActionButton(p,"下载并安装",async()=>{if(downloading)return;downloading=true;try{await Api("update.download");Dictionary<string,object> d;do{d=D(await Api("update.status"));panelStatus.Text="下载中："+(String.IsNullOrEmpty(S(d,"progressText"))?"正在读取下载进度…":S(d,"progressText"));if(S(d,"phase")=="downloading")await Task.Delay(750);}while(S(d,"phase")=="downloading");if(S(d,"phase")!="ready")throw new Exception(S(d,"error"));d=D(await Api("update.verify"));panelStatus.Text="校验通过，正在保存并更新…";await Api("agent.shutdown",Obj("confirm",true));Process.Start(new ProcessStartInfo(S(d,"path"),"/S /RESTART /D="+InstallationRoot()){UseShellExecute=true});updateLaunched=true;exiting=true;Close();}finally{downloading=false;}});
   }
   string InstallationRoot(){var current=new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);return current.Parent!=null&&current.Parent.Name=="versions"&&current.Parent.Parent!=null?current.Parent.Parent.FullName:current.FullName.TrimEnd(Path.DirectorySeparatorChar);}
   bool OwnedHostExited(){if(host==null)return false;try{return host.HasExited;}catch(InvalidOperationException){return false;}}
@@ -152,25 +153,73 @@ public class CagentWindow : Window {
   void AddMenu(ContextMenu m,string title,Action fn){var item=new MenuItem{Header=title};item.Click+=async(s,e)=>await Guard(async()=>{fn();await Task.Yield();});m.Items.Add(item);}
   void AddAsyncMenu(ContextMenu m,string title,Func<Task> fn){var item=new MenuItem{Header=title};item.Click+=async(s,e)=>await Guard(fn);m.Items.Add(item);}
   string FriendlyError(string detail){if(detail.Contains("password")||detail.Contains("密码"))return "连接密码未填写或不正确，请检查连接设置。";if(detail.Contains("503")||detail.Contains("502"))return "服务暂时无法响应，请稍后重试。";if(detail.Contains("权限")||detail.Contains("denied"))return "当前操作缺少授权，请检查设置与权限。";if(detail.Contains("too_small")||detail.Contains("TypeError")||detail.StartsWith("["))return "配置未通过检查，请检查必填项后重试。";return detail.Length<180?detail:"操作未完成，请展开诊断详情查看原因。";}
-  async Task Guard(Func<Task> action){try{if(panelStatus!=null)panelStatus.Text="";if(panelError!=null)panelError.Visibility=Visibility.Collapsed;await action();}catch(Exception e){if(overlay.Visibility==Visibility.Visible&&panelError!=null){panelErrorMessage.Text=FriendlyError(e.Message);panelErrorDetails.Text=e.Message;panelError.Visibility=Visibility.Visible;}else{status.Text=FriendlyError(e.Message);status.ToolTip=e.Message;}}}
-  async Task Start(string hostMode="app-host"){
+  async Task Guard(Func<Task> action){try{if(panelStatus!=null)panelStatus.Text="";if(panelError!=null)panelError.Visibility=Visibility.Collapsed;await action();}catch(Exception e){if(overlay.Visibility==Visibility.Visible&&panelError!=null){string detail=System.Text.RegularExpressions.Regex.Replace(e.Message,@"(Bearer\s+)[^\s]+","$1[已隐藏]",System.Text.RegularExpressions.RegexOptions.IgnoreCase);bool membership=detail.Contains("会员")||detail.Contains("membership.required");bool notice=membership||detail.Contains("权限")||detail.Contains("未启用")||detail.Contains("未就绪")||detail.Contains("未开放");panelErrorTitle.Text=membership?"会员功能":notice?"操作提示":"操作未完成";panelError.Background=Brush(notice?"#FFF9EB":"#FFF5F3");panelError.BorderBrush=Brush(notice?"#E7D9AE":"#E9C9C4");panelErrorMessage.Text=membership?"此功能需要有效的 Pro 会员，请在账号中查看当前方案。":FriendlyError(detail);panelErrorDetails.Text=detail;panelError.Visibility=Visibility.Visible;}else{status.Text=FriendlyError(e.Message);status.ToolTip=e.Message;}}}
+  async Task LaunchHost(string hostMode="app-host"){
     string dir=AppDomain.CurrentDomain.BaseDirectory;
     var start=new ProcessStartInfo(Path.Combine(dir,"node.exe"),"\""+Path.Combine(dir,"agent.cjs")+"\" "+hostMode){UseShellExecute=false,CreateNoWindow=true,RedirectStandardOutput=true,RedirectStandardInput=true,RedirectStandardError=true};
-    string startupError="";host=Process.Start(start);host.ErrorDataReceived+=(s,e)=>{if(!string.IsNullOrWhiteSpace(e.Data))startupError=e.Data;};host.BeginErrorReadLine();
+    string startupError="";var launched=Process.Start(start);host=launched;hostLaunchCount++;bool accepted=false;try{host.ErrorDataReceived+=(s,e)=>{if(!string.IsNullOrWhiteSpace(e.Data))startupError=e.Data;};host.BeginErrorReadLine();
     var line=host.StandardOutput.ReadLineAsync();if(await Task.WhenAny(line,Task.Delay(30000))!=line)throw new Exception("本机运行时启动超时");
     string firstLine=await line;if(firstLine==null)throw new Exception("本机运行时启动失败："+startupError);var result=D(json.DeserializeObject(firstLine));string url=S(result,"url");Uri u;
     if(!Uri.TryCreate(url,UriKind.Absolute,out u)||u.Host!="127.0.0.1"||u.Scheme!="http"||u.Fragment.Length!=65)throw new Exception("本机运行时未返回有效界面连接");
-    origin=u.GetLeftPart(UriPartial.Authority);token=u.Fragment.Substring(1);
+    origin=u.GetLeftPart(UriPartial.Authority);token=u.Fragment.Substring(1);accepted=true;
+    }finally{if(!accepted){try{launched.StandardInput.Close();}catch{}launched.Dispose();}}
+  }
+  async Task Start(string hostMode="app-host"){
+    await LaunchHost(hostMode);
     await Poll();var settings=D(await Api("assistant.settings"));ModelLabel(S(settings,"model"));connected=true;if(current==null)status.Text="本机 · 准备就绪";timer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(1000)};timer.Tick+=async(s,e)=>{if(polling)return;polling=true;try{await Poll();}catch(Exception ex){status.Text=ex.Message;}finally{polling=false;}};timer.Start();
   }
+  async Task VerifyHostReconnect(string report){
+    try{
+      if(!IsIsolatedAcceptanceData())throw new Exception("Isolated data required");if(timer!=null)timer.Stop();
+      var before=D(await Api("connection.settings"));var settings=D(await Api("assistant.settings"));
+      await Api("agent.shutdown",Obj("confirm",true));for(int i=0;i<100&&!OwnedHostExited();i++)await Task.Delay(100);
+      bool refused=false;try{await Api("assistant.configure",Obj("model","must-not-replay"));}catch(Exception error){refused=error.Message.Contains("结果尚未确认");}
+      if(!refused)throw new Exception("Mutation was not refused");
+      var after=D(await Api("assistant.settings"));if(S(after,"model")=="must-not-replay")throw new Exception("Mutation replayed");
+      var connectionAfter=D(await Api("connection.settings"));foreach(string key in new[]{"deviceId","password","bind","port","allowManage","allowHttp","allowHosting","allowRelay","shells"})if(json.Serialize(V(before,key))!=json.Serialize(V(connectionAfter,key)))throw new Exception("Connection setting changed: "+key);
+      var sharedHost=host;sharedHost.StandardInput.Close();await Task.Delay(500);int launches=hostLaunchCount;
+      await Task.WhenAll(Api("update.check"),Api("update.status"),Api("assistant.settings"));
+      if(hostLaunchCount!=launches+1)throw new Exception("Concurrent requests launched duplicate hosts");
+      if(sharedHost.HasExited)throw new Exception("Shared runtime was stopped");
+      string validToken=token;int beforeUnauthorized=hostLaunchCount;token=new string('0',64);bool rejected=false;try{await Api("update.status");}catch{rejected=true;}finally{token=validToken;}
+      if(!rejected||hostLaunchCount!=beforeUnauthorized)throw new Exception("Unauthorized response recovered incorrectly");
+      File.WriteAllText(report,json.Serialize(Obj("readReconnected",connected,"mutationNotReplayed",refused,"connectionSettingsPreserved",true,"concurrentReads",true,"singleReplacement",true,"sharedRuntimePreserved",true,"unauthorizedNotRetried",true)),Encoding.UTF8);
+    }catch(Exception error){File.WriteAllText(report,json.Serialize(Obj("failure",error.ToString())),Encoding.UTF8);}
+    if(IsIsolatedAcceptanceData()){try{await Api("agent.shutdown",Obj("confirm",true));}catch{}}exiting=true;Close();
+  }
+  static bool ReplayableRead(string method){return new HashSet<string>{"update.status","update.check","assistant.tasks","assistant.task","assistant.settings","account.status","account.models","account.appearance","connection.settings","client.status","agent.shells","automation.list","packages.list","packages.catalog"}.Contains(method);}
+  async Task ReconnectLocalHost(string failedOrigin){
+    if(origin!=failedOrigin)return;
+    if(reconnectTask!=null){await reconnectTask;return;}
+    if(DateTime.UtcNow<reconnectAfter)throw new Exception("本机服务正在恢复，请稍后重试。");
+    reconnectAfter=DateTime.UtcNow.AddSeconds(15);
+    reconnectTask=LaunchReplacement();try{await reconnectTask;reconnectAfter=DateTime.MinValue;}finally{reconnectTask=null;}
+  }
+  async Task LaunchReplacement(){
+    connected=false;
+    // Close only this window's app-host pipe. Never shut down the shared agent.
+    try{if(host!=null&&!host.HasExited)host.StandardInput.Close();}catch{}
+    await LaunchHost();connected=true;
+  }
   async Task<object> Api(string method,object parameters=null){
+    string failedOrigin=origin;
+    WebException failure=null;
+    try{return await ApiOnce(method,parameters);}catch(WebException error){
+      if(error.Status!=WebExceptionStatus.ConnectFailure&&error.Status!=WebExceptionStatus.ConnectionClosed&&error.Status!=WebExceptionStatus.ReceiveFailure&&error.Status!=WebExceptionStatus.SendFailure)throw;
+      if(exiting)throw;failure=error;
+    }
+    await ReconnectLocalHost(failedOrigin);
+    if(!ReplayableRead(method))throw new Exception("本机服务连接已恢复。上次操作结果尚未确认，请先查看状态，再决定是否重新操作。",failure);
+    return await ApiOnce(method,parameters);
+  }
+  async Task<object> ApiOnce(string method,object parameters=null){
     if(fixture)throw new Exception("界面夹具不调用真实服务");
-    string body=json.Serialize(Obj("method",method,"params",parameters));
+    string body=json.Serialize(Obj("method",method,"params",parameters));string requestOrigin=origin,requestToken=token;
     string response=await Task.Run(()=>{
-      var req=(HttpWebRequest)WebRequest.Create(origin+"/api");req.Method="POST";req.ContentType="application/json";req.Headers["Origin"]=origin;req.Headers["X-Cagent-Token"]=token;req.Timeout=method.StartsWith("desktop.virtual-display.")?240000:65000;req.ReadWriteTimeout=req.Timeout;req.Proxy=null;
+      var req=(HttpWebRequest)WebRequest.Create(requestOrigin+"/api");req.Method="POST";req.ContentType="application/json";req.Headers["Origin"]=requestOrigin;req.Headers["X-Cagent-Token"]=requestToken;req.Timeout=method.StartsWith("desktop.virtual-display.")?240000:65000;req.ReadWriteTimeout=req.Timeout;req.Proxy=null;
       byte[] bytes=Encoding.UTF8.GetBytes(body);req.ContentLength=bytes.Length;using(var stream=req.GetRequestStream())stream.Write(bytes,0,bytes.Length);
       try{using(var r=req.GetResponse())using(var reader=new StreamReader(r.GetResponseStream()))return reader.ReadToEnd();}
-      catch(WebException ex){if(ex.Response==null)throw;using(var r=ex.Response)using(var reader=new StreamReader(r.GetResponseStream()))return reader.ReadToEnd();}
+      catch(WebException ex){if(ex.Response==null)throw;using(var r=ex.Response){var http=r as HttpWebResponse;if(http!=null&&(http.StatusCode==HttpStatusCode.Unauthorized||http.StatusCode==HttpStatusCode.Forbidden))throw new InvalidOperationException("本机界面认证失效，请重新打开 CAgent。");using(var reader=new StreamReader(r.GetResponseStream()))return reader.ReadToEnd();}}
     });
     var value=D(json.DeserializeObject(response));if(value.ContainsKey("error"))throw new Exception(S(value,"error"));return V(value,"result");
   }
@@ -188,6 +237,16 @@ public class CagentWindow : Window {
     messages.Children.Clear();var q=Text(S(t,"prompt"));q.Foreground=Brush("#3F5559");var bubble=new Border{Background=Brush("#E8EFED"),CornerRadius=new CornerRadius(16,16,5,16),Padding=new Thickness(13,6,13,6),Margin=new Thickness(36,6,0,23),HorizontalAlignment=HorizontalAlignment.Right,Child=q};messages.Children.Add(bubble);
     var answerHeader=new StackPanel{Orientation=Orientation.Horizontal,Margin=new Thickness(2,0,0,9)};answerHeader.Children.Add(Mark(20));answerHeader.Children.Add(new TextBlock{Text="CAgent",FontSize=11,Foreground=Brush("#819195"),Margin=new Thickness(8,2,0,0)});messages.Children.Add(answerHeader);
     var answer=Text(S(t,"answer"),14);answer.LineHeight=24;answer.Margin=new Thickness(2,0,8,14);messages.Children.Add(answer);Reveal(answer);
+    if(state=="running"){
+      var activity=new StackPanel{Orientation=Orientation.Horizontal,Margin=new Thickness(2,4,0,14)};
+      activity.Children.Add(Text(S(t,"answer")==""?"思考中":"正在处理",12));
+      for(int i=0;i<3;i++){
+        var dot=new Border{Width=4,Height=4,CornerRadius=new CornerRadius(2),Background=Brush("#526E70"),Margin=new Thickness(4,0,0,0),VerticalAlignment=VerticalAlignment.Center};
+        if(SystemParameters.ClientAreaAnimation){var pulse=new DoubleAnimation(.25,1,TimeSpan.FromMilliseconds(600)){AutoReverse=true,RepeatBehavior=RepeatBehavior.Forever,BeginTime=TimeSpan.FromMilliseconds(i*180)};dot.BeginAnimation(UIElement.OpacityProperty,pulse);}
+        activity.Children.Add(dot);
+      }
+      AutomationProperties.SetName(activity,"智能体正在处理任务");messages.Children.Add(activity);
+    }
     foreach(var item in A(V(t,"events"))){var ev=D(item);var content=new StackPanel();content.Children.Add(Text(json.Serialize(V(ev,"input"))));content.Children.Add(Text(S(ev,"output")));messages.Children.Add(new Expander{Header=S(ev,"tool"),Content=content,Margin=new Thickness(0,6,0,6)});}
     if(state=="approval"){
       messages.Children.Add(Text("允许执行上面的本机命令？"));var buttons=new StackPanel{Orientation=Orientation.Horizontal};
@@ -196,16 +255,38 @@ public class CagentWindow : Window {
     if(S(t,"error")!=""){var e=Text(S(t,"error"));e.Foreground=Brushes.Firebrick;messages.Children.Add(e);}if(bottom)scroll.ScrollToEnd();
   }
   void ShowChat(){overlay.Visibility=Visibility.Collapsed;chat.Visibility=Visibility.Visible;Reveal(chat);}
-  StackPanel Panel(string title){chat.Visibility=Visibility.Collapsed;overlay.Visibility=Visibility.Visible;overlay.Children.Clear();overlay.RowDefinitions.Clear();overlay.RowDefinitions.Add(new RowDefinition{Height=GridLength.Auto});overlay.RowDefinitions.Add(new RowDefinition());var top=new DockPanel{Margin=new Thickness(0,0,0,10)};var back=Button("‹","返回对话，保留草稿");back.Click+=(s,e)=>ShowChat();top.Children.Add(back);top.Children.Add(new TextBlock{Text=title,FontSize=16,Margin=new Thickness(12,3,0,0)});overlay.Children.Add(top);var p=new StackPanel();panelStatus=Text("",11);panelStatus.Foreground=Brushes.Firebrick;AutomationProperties.SetName(panelStatus,"当前操作反馈");p.Children.Add(panelStatus);var feedback=new StackPanel();feedback.Children.Add(new TextBlock{Text="操作未完成",FontWeight=FontWeights.SemiBold,FontSize=14});panelErrorMessage=Text("",12);feedback.Children.Add(panelErrorMessage);panelErrorDetails=Text("",11);var diagnostic=new StackPanel();diagnostic.Children.Add(panelErrorDetails);var copyError=Button("复制详情","复制诊断信息");copyError.Click+=(sender,e)=>{try{Clipboard.SetText(panelErrorDetails.Text);}catch{}};diagnostic.Children.Add(copyError);feedback.Children.Add(new Expander{Header="诊断详情",Content=diagnostic});panelError=new Border{Child=feedback,Background=Brush("#FFF5F3"),BorderBrush=Brush("#E9C9C4"),BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(10),Padding=new Thickness(12),Margin=new Thickness(0,0,0,12),Visibility=Visibility.Collapsed};p.Children.Add(panelError);var viewer=new ScrollViewer{Content=p,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};Grid.SetRow(viewer,1);overlay.Children.Add(viewer);return p;}
-  TextBox Field(StackPanel p,string label,string value,bool multiline=false,string help=null){var heading=new StackPanel{Orientation=Orientation.Horizontal};heading.Children.Add(Text(label));if(help!=null){var hint=Button("ⓘ",help);hint.ToolTip=help;hint.Padding=new Thickness(3,0,3,0);hint.Margin=new Thickness(6,0,0,0);heading.Children.Add(hint);}p.Children.Add(heading);var t=new TextBox{Text=value,Padding=new Thickness(8),Margin=new Thickness(0,0,0,10),AcceptsReturn=multiline,TextWrapping=multiline?TextWrapping.Wrap:TextWrapping.NoWrap,MinHeight=multiline?65:32};AutomationProperties.SetName(t,label);p.Children.Add(t);return t;}
-  CheckBox Check(StackPanel p,string label,bool value){var c=new CheckBox{Content=label,IsChecked=value,Margin=new Thickness(0,8,0,8)};p.Children.Add(c);return c;}
+  StackPanel Panel(string title){chat.Visibility=Visibility.Collapsed;overlay.Visibility=Visibility.Visible;overlay.Children.Clear();overlay.RowDefinitions.Clear();overlay.RowDefinitions.Add(new RowDefinition{Height=GridLength.Auto});overlay.RowDefinitions.Add(new RowDefinition());var top=new DockPanel{Margin=new Thickness(0,0,0,10)};var back=Button("‹","返回对话，保留草稿");back.Click+=(s,e)=>ShowChat();top.Children.Add(back);top.Children.Add(new TextBlock{Text=title,FontSize=16,Margin=new Thickness(12,3,0,0)});overlay.Children.Add(top);var p=new StackPanel();panelStatus=Text("",11);panelStatus.Foreground=Brushes.Firebrick;AutomationProperties.SetName(panelStatus,"当前操作反馈");p.Children.Add(panelStatus);var feedback=new StackPanel();panelErrorTitle=new TextBlock{Text="操作未完成",FontWeight=FontWeights.SemiBold,FontSize=14};feedback.Children.Add(panelErrorTitle);panelErrorMessage=Text("",12);feedback.Children.Add(panelErrorMessage);panelErrorDetails=Text("",11);var diagnostic=new StackPanel();diagnostic.Children.Add(panelErrorDetails);var copyError=Button("复制详情","复制诊断信息");copyError.Click+=(sender,e)=>{try{Clipboard.SetText(panelErrorDetails.Text);}catch{}};diagnostic.Children.Add(copyError);feedback.Children.Add(new Expander{Header="诊断详情",Content=diagnostic});panelError=new Border{Child=feedback,Background=Brush("#FFF5F3"),BorderBrush=Brush("#E9C9C4"),BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(10),Padding=new Thickness(12),Margin=new Thickness(0,0,0,12),Visibility=Visibility.Collapsed};p.Children.Add(panelError);var viewer=new ScrollViewer{Content=p,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};Grid.SetRow(viewer,1);overlay.Children.Add(viewer);return p;}
+  TextBox Field(StackPanel p,string label,string value,bool multiline=false,string help=null){var heading=new StackPanel{Orientation=Orientation.Horizontal,Margin=new Thickness(0,5,0,3)};heading.Children.Add(Text(label));if(help!=null){var hint=Button("ⓘ",help);hint.ToolTip=help;hint.Padding=new Thickness(3,0,3,0);hint.Margin=new Thickness(6,0,0,0);heading.Children.Add(hint);}p.Children.Add(heading);var t=new TextBox{Text=value,Padding=new Thickness(8),Margin=new Thickness(0,0,0,10),AcceptsReturn=multiline,TextWrapping=multiline?TextWrapping.Wrap:TextWrapping.NoWrap,MinHeight=multiline?65:32};AutomationProperties.SetName(t,label);p.Children.Add(t);return t;}
+  CheckBox Check(StackPanel p,string label,bool value){var c=new CheckBox{Content=new TextBlock{Text=label,TextWrapping=TextWrapping.Wrap,LineHeight=19},IsChecked=value,Padding=new Thickness(5,2,4,2),Margin=new Thickness(0,6,0,6),HorizontalContentAlignment=HorizontalAlignment.Stretch};AutomationProperties.SetName(c,label);p.Children.Add(c);return c;}
   Button ActionButton(StackPanel p,string label,Func<Task> fn){var b=Button(label,label);b.Margin=new Thickness(0,8,0,8);b.Click+=async(s,e)=>{b.IsEnabled=false;try{await Guard(fn);}finally{b.IsEnabled=true;}};p.Children.Add(b);return b;}
+  async Task AutomationRules(){
+    var data=D(await Api("automation.list"));var p=Panel("目标与事件");var settings=D(await Api("assistant.settings"));
+    var grant=MarketCard(p,"智能体自动化","仅操作本机的目标与事件，不改变远程访问权限。");var enabled=Check(grant,"允许管理目标与事件订阅",B(settings,"automation"));ActionButton(grant,"保存授权",async()=>{settings.Remove("keyConfigured");settings["automation"]=enabled.IsChecked==true;await Api("assistant.configure",settings);await AutomationRules();});
+    ActionButton(p,"新建规则",async()=>{RenderAutomationCreate(data);await Task.Yield();});
+    int count=0;foreach(var raw in A(V(data,"rules"))){count++;var rule=D(raw);string id=S(rule,"id");var card=MarketCard(p,S(rule,"name"),B(rule,"enabled")?"运行中":"已暂停");var trigger=D(V(rule,"trigger"));card.Children.Add(Text(S(trigger,"kind")=="event"?S(trigger,"source")+" / "+S(trigger,"type"):S(trigger,"kind")=="interval"?"间隔 "+S(trigger,"everyMs")+" 毫秒":"单次任务",11));
+      var details=new StackPanel();card.Children.Add(new Expander{Header="任务与记忆",Content=details});var prompt=Field(details,"任务",S(rule,"prompt"),true);var memory=Field(details,"目标记忆",S(rule,"memory"),true);TextBox interval=null;if(S(trigger,"kind")=="interval")interval=Field(details,"检查间隔（秒）",Convert.ToString(Convert.ToDouble(V(trigger,"everyMs"))/1000));
+      ActionButton(details,"保存修改",async()=>{var patch=Obj("id",id,"action","update","prompt",prompt.Text,"memory",memory.Text);if(interval!=null)patch["everyMs"]=checked((long)(double.Parse(interval.Text)*1000));await Api("automation.change",patch);await AutomationRules();});
+      ActionButton(card,B(rule,"enabled")?"暂停":"启用",async()=>{await Api("automation.change",Obj("id",id,"action",B(rule,"enabled")?"pause":"enable"));await AutomationRules();});ActionButton(card,"停止当前执行",async()=>{await Api("automation.change",Obj("id",id,"action","cancel"));await AutomationRules();});var remove=new StackPanel();card.Children.Add(new Expander{Header="删除规则",Content=remove});ActionButton(remove,"确认删除并停止任务",async()=>{await Api("automation.change",Obj("id",id,"action","delete"));await AutomationRules();});
+    }if(count==0)p.Children.Add(Text("暂无规则，可手动创建或授权智能体创建。"));
+    var history=new StackPanel();p.Children.Add(new Expander{Header="最近执行",Content=history});foreach(var raw in A(V(data,"runs"))){var run=D(raw);history.Children.Add(Text(S(run,"state")+" · "+S(run,"ruleId")+(S(run,"error")==""?"":" · "+S(run,"error")),11));}
+  }
+  void RenderAutomationCreate(Dictionary<string,object> data){
+    var p=Panel("新建目标或事件规则");
+    var task=MarketCard(p,"任务内容","规则在后台执行，关闭此页面不会停止已启用的规则。");var name=Field(task,"名称","");var prompt=Field(task,"执行任务","",true);
+    var triggerCard=MarketCard(p,"触发方式","定时检查与事件触发分别设置。");triggerCard.Children.Add(Text("何时执行",12));var mode=new ComboBox{Margin=new Thickness(0,6,0,14),MinHeight=34};AutomationProperties.SetName(mode,"规则触发方式");mode.Items.Add("定时检查");mode.Items.Add("事件发生时");mode.SelectedIndex=0;triggerCard.Children.Add(mode);
+    var schedule=new StackPanel();triggerCard.Children.Add(schedule);var interval=Field(schedule,"检查间隔（秒，最少 1 秒）","60");
+    var eventSettings=new StackPanel{Visibility=Visibility.Collapsed};triggerCard.Children.Add(eventSettings);eventSettings.Children.Add(Text("事件来源（已安装且授权）",12));var source=new ComboBox{Margin=new Thickness(0,6,0,14),MinHeight=34};AutomationProperties.SetName(source,"事件来源");var sources=new List<Dictionary<string,object>>();foreach(var raw in A(V(data,"sources"))){var item=D(raw);sources.Add(item);source.Items.Add(S(item,"description")+" · "+S(item,"source")+" / "+S(item,"type"));}if(sources.Count>0)source.SelectedIndex=0;eventSettings.Children.Add(source);if(sources.Count==0)eventSettings.Children.Add(Text("暂无已授权事件来源。安装能力包并授权后可创建事件规则。",12));var filter=Field(eventSettings,"事件条件（JSON 等值条件）","{}",true,"例如 isSelf=false 可排除自己发送的消息");
+    var activation=MarketCard(p,"启用状态","可以先保存规则，再检查并启用。");var enabled=Check(activation,"创建后启用",false);
+    mode.SelectionChanged+=(sender,e)=>{bool eventMode=mode.SelectedIndex==1;eventSettings.Visibility=eventMode?Visibility.Visible:Visibility.Collapsed;schedule.Visibility=eventMode?Visibility.Collapsed:Visibility.Visible;};
+    ActionButton(p,"创建规则",async()=>{Dictionary<string,object> trigger;if(mode.SelectedIndex==0){double seconds;if(!double.TryParse(interval.Text,out seconds)||double.IsNaN(seconds)||double.IsInfinity(seconds)||seconds<1||seconds>604800)throw new Exception("请填写 1 至 604800 秒的检查间隔");trigger=Obj("kind","interval","everyMs",checked((long)(seconds*1000)));}else{if(source.SelectedIndex<0)throw new Exception("请先安装并授权事件来源");var selectedSource=sources[source.SelectedIndex];object conditions;try{conditions=json.DeserializeObject(filter.Text);}catch{throw new Exception("事件条件不是有效的 JSON 对象");}if(!(conditions is Dictionary<string,object>))throw new Exception("事件条件需要填写 JSON 对象");trigger=Obj("kind","event","source",S(selectedSource,"source"),"type",S(selectedSource,"type"),"filter",conditions);}await Api("automation.create",Obj("name",name.Text,"prompt",prompt.Text,"trigger",trigger,"enabled",enabled.IsChecked==true));await AutomationRules();});
+  }
   async Task History(){var list=new List<Dictionary<string,object>>();foreach(var t in A(await Api("assistant.tasks")))list.Add(D(t));list.Reverse();var p=Panel("会话记录");if(list.Count==0)p.Children.Add(Text("还没有任务记录"));foreach(var t in list){var item=t;ActionButton(p,S(t,"prompt"),async()=>{SelectTask(S(item,"id"));Render(item);ShowChat();await Task.Yield();});}}
-  async Task Settings(){
-    var s=D(await Api("assistant.settings"));var p=Panel("模型与权限");var endpoint=Field(p,"基座完整接口地址",S(s,"endpoint"));var model=Field(p,"模型",S(s,"model"));p.Children.Add(Text(B(s,"keyConfigured")?"API Key（已保存，留空保留）":"API Key"));var key=new PasswordBox{Padding=new Thickness(8),Margin=new Thickness(0,0,0,10)};p.Children.Add(key);
-    var commands=Check(p,"允许本机命令",B(s,"commands"));var review=Check(p,"执行前逐次确认",B(s,"review"));p.Children.Add(Text("命令以当前用户权限运行，不是权限沙箱。",11));var ds=new List<string>();foreach(var d in A(V(s,"delegates")))ds.Add(Convert.ToString(d));var delegates=Field(p,"允许委派的控制端指纹（每行一个）",string.Join("\n",ds.ToArray()),true);
-    var minutes=Field(p,"每轮时间预算（分钟，1–240）",S(s,"runMinutes"));var bytes=Field(p,"累计上下文预算（字节，非计费金额）",S(s,"contextBytes"));var repeated=Field(p,"重复无进展停止次数（2–20）",S(s,"noProgress"));
-    ActionButton(p,"保存",async()=>{var value=Obj("runMinutes",int.Parse(minutes.Text),"contextBytes",int.Parse(bytes.Text),"noProgress",int.Parse(repeated.Text),"endpoint",endpoint.Text,"model",model.Text,"commands",commands.IsChecked==true,"review",review.IsChecked==true,"delegates",delegates.Text.Split(new[]{'\r','\n'},StringSplitOptions.RemoveEmptyEntries));if(key.Password.Length>0)value["key"]=key.Password;await Api("assistant.configure",value);key.Clear();ModelLabel(model.Text);ShowChat();status.Text="设置已保存";});
+  async Task Settings(){RenderAssistantSettings(D(await Api("assistant.settings")));}
+  void RenderAssistantSettings(Dictionary<string,object> s){
+    var p=Panel("模型与权限");var models=MarketCard(p,"模型连接","接口与密钥仅用于此账号的智能体请求。");var endpoint=Field(models,"基座完整接口地址",S(s,"endpoint"));var model=Field(models,"模型",S(s,"model"));models.Children.Add(Text(B(s,"keyConfigured")?"API Key（已保存，留空保留）":"API Key"));var key=new PasswordBox{Padding=new Thickness(8),Margin=new Thickness(0,0,0,10)};AutomationProperties.SetName(key,"模型 API Key，留空保留已保存密钥");models.Children.Add(key);
+    var permissions=MarketCard(p,"执行与委派","明确选择允许的操作与控制端。");var commands=Check(permissions,"允许本机命令",B(s,"commands"));var review=Check(permissions,"执行前逐次确认",B(s,"review"));var automation=Check(permissions,"允许智能体管理目标与事件订阅",B(s,"automation"));permissions.Children.Add(Text("命令以当前用户权限运行，不是权限沙箱。",11));var ds=new List<string>();foreach(var d in A(V(s,"delegates")))ds.Add(Convert.ToString(d));var delegates=Field(permissions,"允许委派的控制端指纹（每行一个）",string.Join("\n",ds.ToArray()),true);
+    var budgets=MarketCard(p,"运行预算","限定任务时间、上下文与无进展重试。");var minutes=Field(budgets,"每轮时间预算（分钟，1–240）",S(s,"runMinutes"));var bytes=Field(budgets,"累计上下文预算（字节，非计费金额）",S(s,"contextBytes"));var repeated=Field(budgets,"重复无进展停止次数（2–20）",S(s,"noProgress"));
+    ActionButton(p,"保存",async()=>{var value=Obj("runMinutes",int.Parse(minutes.Text),"contextBytes",int.Parse(bytes.Text),"noProgress",int.Parse(repeated.Text),"endpoint",endpoint.Text,"model",model.Text,"commands",commands.IsChecked==true,"automation",automation.IsChecked==true,"review",review.IsChecked==true,"delegates",delegates.Text.Split(new[]{'\r','\n'},StringSplitOptions.RemoveEmptyEntries));if(key.Password.Length>0)value["key"]=key.Password;await Api("assistant.configure",value);key.Clear();ModelLabel(model.Text);ShowChat();status.Text="设置已保存";});
     ActionButton(p,"删除已保存密钥",async()=>{s.Remove("keyConfigured");s["key"]="";await Api("assistant.configure",s);await Settings();});
   }
   async Task Apps(){
@@ -220,24 +301,35 @@ public class CagentWindow : Window {
     UpdateLayout();var checks=new List<CheckBox>();FindChecks(overlay,checks);if(checks.Count!=3)throw new Exception("Package permission controls missing");foreach(var check in checks)if(check.IsChecked==true)throw new Exception("Installation implicitly granted capability");
     if(PackageState("not-installed")==PackageState("available"))throw new Exception("Uninstalled state hidden");
     RenderMarket(Obj("platform","win32","manager","winget","applications",new[]{Obj("id","git","package","Git.Git")}),Obj("enabled",true),new[]{item,Obj("id","cagent.desktop","name","远程桌面","installed",true)});
-    if(screenshot!=null)File.WriteAllText(screenshot+".json",json.Serialize(Obj("fixture",true,"marketOverlay",true,"chatDraftPreserved",true,"installedWithoutGrants","待授权","realSoftwareInstalled",false)),Encoding.UTF8);
+    if(screenshot!=null){foreach(int width in new[]{340,540,900}){Width=width;Height=620;UpdateLayout();var grids=new List<WrapPanel>();FindMarketGrids(overlay,grids);foreach(var grid in grids){FitMarketTiles(grid);UpdateLayout();foreach(FrameworkElement tile in grid.Children)if(tile is Button&&tile.ActualWidth+tile.Margin.Left+tile.Margin.Right>grid.ActualWidth+1)throw new Exception("Market card overflow");}SaveImage(screenshot+"-"+width+".png");}File.WriteAllText(screenshot+".json",json.Serialize(Obj("fixture",true,"marketOverlay",true,"chatDraftPreserved",true,"installedWithoutGrants","待授权","responsiveWidths",new[]{340,540,900},"realSoftwareInstalled",false)),Encoding.UTF8);}
+  }
+  void FindMarketGrids(DependencyObject parent,List<WrapPanel> result){var grid=parent as WrapPanel;if(grid!=null)result.Add(grid);for(int i=0;i<VisualTreeHelper.GetChildrenCount(parent);i++)FindMarketGrids(VisualTreeHelper.GetChild(parent,i),result);
   }
   void FindChecks(DependencyObject parent,List<CheckBox> result){var check=parent as CheckBox;if(check!=null)result.Add(check);for(int i=0;i<VisualTreeHelper.GetChildrenCount(parent);i++)FindChecks(VisualTreeHelper.GetChild(parent,i),result);}
   string PermissionName(string value){switch(value){case "wechat.read":return "读取微信与监听消息";case "wechat.send":return "发送微信与发布朋友圈";case "wechat.contacts.manage":return "修改好友备注";case "applications.read":return "读取系统应用目录";case "applications.plan":return "检查并生成安装计划";case "applications.install":return "按计划安装系统应用";default:return value;}}
   StackPanel MarketCard(StackPanel p,string title,string subtitle){var content=new StackPanel();var heading=Text(title,14);heading.FontWeight=FontWeights.SemiBold;content.Children.Add(heading);content.Children.Add(Text(subtitle,11));p.Children.Add(new Border{Background=Brushes.White,BorderBrush=Brush("#E5E8ED"),BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(12),Padding=new Thickness(12,7,12,7),Margin=new Thickness(0,5,0,7),Child=content});return content;}
   void AppTile(WrapPanel grid,string name,string symbol,string state,Func<Task> action){
-    var body=new StackPanel{Margin=new Thickness(8),HorizontalAlignment=HorizontalAlignment.Center};
-    var icon=new Border{Width=42,Height=42,CornerRadius=new CornerRadius(12),Background=Brush("#E7F1EE"),Margin=new Thickness(0,0,0,8),Child=new TextBlock{Text=symbol,FontSize=24,Foreground=Brush("#244B48"),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,FontFamily=new FontFamily("Segoe MDL2 Assets")}};body.Children.Add(icon);
-    body.Children.Add(new TextBlock{Text=name,FontSize=12,FontWeight=FontWeights.SemiBold,TextAlignment=TextAlignment.Center,TextTrimming=TextTrimming.CharacterEllipsis,MaxWidth=118});body.Children.Add(new TextBlock{Text=state,FontSize=10,Foreground=Brush("#78878C"),TextAlignment=TextAlignment.Center,Margin=new Thickness(0,5,0,0)});
-    var button=Button("",name);button.Width=136;button.Height=126;button.Margin=new Thickness(3);button.Background=Brushes.White;button.Content=body;button.Click+=async(sender,e)=>await Guard(action);grid.Children.Add(button);
+    var body=new Grid{Margin=new Thickness(12)};body.ColumnDefinitions.Add(new ColumnDefinition{Width=GridLength.Auto});body.ColumnDefinitions.Add(new ColumnDefinition());
+    var icon=new Border{Width=36,Height=36,CornerRadius=new CornerRadius(11),Background=Brush("#E7F1EE"),Margin=new Thickness(0,0,12,0),Child=new TextBlock{Text=symbol,FontSize=20,Foreground=Brush("#244B48"),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,FontFamily=new FontFamily("Segoe MDL2 Assets")}};body.Children.Add(icon);
+    var labels=new StackPanel{VerticalAlignment=VerticalAlignment.Center};Grid.SetColumn(labels,1);body.Children.Add(labels);
+    labels.Children.Add(new TextBlock{Text=name,FontSize=13,FontWeight=FontWeights.SemiBold,TextTrimming=TextTrimming.CharacterEllipsis});labels.Children.Add(new TextBlock{Text=state,FontSize=11,Foreground=Brush("#78878C"),Margin=new Thickness(0,5,0,0),TextTrimming=TextTrimming.CharacterEllipsis});
+    var button=Button("",name+" · "+state);button.Height=84;button.Margin=new Thickness(0,0,10,10);button.HorizontalContentAlignment=HorizontalAlignment.Stretch;button.Background=Brushes.White;button.Content=body;button.Click+=async(sender,e)=>await Guard(action);grid.Children.Add(button);
   }
-  void RenderMarket(Dictionary<string,object> catalog,Dictionary<string,object> policy,IEnumerable packages){
-    var p=Panel("应用市场");var search=Field(p,"搜索应用","");var cards=new WrapPanel();p.Children.Add(cards);
-    Action render=()=>{cards.Children.Clear();string query=search.Text.Trim().ToLowerInvariant();
-      if(S(catalog,"platform")=="win32"&&("linux wsl ubuntu 虚拟机".Contains(query)))AppTile(cards,"Linux 虚拟机","\uE756","WSL · 检查与安装",Linux);
-      foreach(var value in packages){var item=D(value);if(!(S(item,"name")+S(item,"id")).ToLowerInvariant().Contains(query))continue;AppTile(cards,S(item,"name"),S(item,"id")=="cagent.desktop"?"\uE7F4":"\uE71D",B(item,"installed")?"已安装 · 配置":"安装",async()=>await PackageDetail(item));}
-      foreach(var value in A(V(catalog,"applications"))){var item=D(value);if(!(S(item,"id")+S(item,"package")).ToLowerInvariant().Contains(query))continue;AppTile(cards,S(item,"id"),"\uE74C","查看安装",async()=>await Plan(D(await Api("applications.plan",Obj("app",S(item,"id"))))));}
-      if(cards.Children.Count==0)cards.Children.Add(Text("没有匹配的应用",11));
+  void FitMarketTiles(WrapPanel cards){double width=cards.ActualWidth;if(width<=0)return;int columns=Math.Max(1,(int)Math.Floor((width+10)/210));double tile=Math.Max(1,width/columns);foreach(FrameworkElement child in cards.Children){if(child is Button)child.Width=Math.Max(1,tile-10);}}
+  void RenderMarket(Dictionary<string,object> catalog,Dictionary<string,object> policy,IEnumerable packages,string queryText=""){
+    var p=Panel("应用市场");panelStatus.Visibility=Visibility.Collapsed;
+    var toolbar=new Grid{Margin=new Thickness(0,2,0,14)};toolbar.ColumnDefinitions.Add(new ColumnDefinition());toolbar.ColumnDefinitions.Add(new ColumnDefinition{Width=GridLength.Auto});p.Children.Add(toolbar);
+    var search=new TextBox{Text=queryText,Padding=new Thickness(10,7,10,7),MinHeight=36,ToolTip="搜索应用与能力工具"};AutomationProperties.SetName(search,"搜索应用与能力工具");toolbar.Children.Add(search);var hint=new TextBlock{Text="搜索应用与能力工具",Foreground=Brush("#78878C"),Margin=new Thickness(11,0,0,0),VerticalAlignment=VerticalAlignment.Center,IsHitTestVisible=false,Visibility=search.Text.Length==0?Visibility.Visible:Visibility.Collapsed};toolbar.Children.Add(hint);search.TextChanged+=(sender,e)=>hint.Visibility=search.Text.Length==0?Visibility.Visible:Visibility.Collapsed;
+    var refresh=Button("↻","刷新应用市场");refresh.Width=36;refresh.Height=36;refresh.FontSize=20;refresh.Margin=new Thickness(8,0,0,0);Grid.SetColumn(refresh,1);toolbar.Children.Add(refresh);refresh.Click+=async(sender,e)=>await Guard(async()=>{refresh.IsEnabled=false;try{var latest=D(await Api("applications.list"));var latestPolicy=D(await Api("applications.policy"));var latestPackages=A(await Api("packages.catalog"));RenderMarket(latest,latestPolicy,latestPackages,search.Text);}finally{refresh.IsEnabled=true;}});
+    var packageTitle=Text("能力工具",12);packageTitle.FontWeight=FontWeights.SemiBold;p.Children.Add(packageTitle);
+    var cards=new WrapPanel{Margin=new Thickness(0,6,-10,12)};p.Children.Add(cards);cards.SizeChanged+=(sender,e)=>FitMarketTiles(cards);
+    var appTitle=Text("系统应用",12);appTitle.FontWeight=FontWeights.SemiBold;p.Children.Add(appTitle);
+    var apps=new WrapPanel{Margin=new Thickness(0,6,-10,0)};p.Children.Add(apps);apps.SizeChanged+=(sender,e)=>FitMarketTiles(apps);
+    Action render=()=>{cards.Children.Clear();apps.Children.Clear();string query=search.Text.Trim().ToLowerInvariant();
+      foreach(var value in packages){var item=D(value);if(!(S(item,"name")+S(item,"id")).ToLowerInvariant().Contains(query))continue;string id=S(item,"id");AppTile(cards,S(item,"name"),id=="cagent.desktop"?"\uE7F4":id.StartsWith("cagent.wechat")?"\uE8F2":"\uE71D",PackageState(S(item,"status")),async()=>await PackageDetail(item));}
+      if(S(catalog,"platform")=="win32"&&("linux wsl ubuntu 虚拟机".Contains(query)))AppTile(apps,"Linux 虚拟机","\uE756","WSL · 检查与安装",Linux);
+      foreach(var value in A(V(catalog,"applications"))){var item=D(value);if(!(S(item,"id")+S(item,"package")).ToLowerInvariant().Contains(query))continue;AppTile(apps,S(item,"id"),"\uE74C","查看安装计划",async()=>await Plan(D(await Api("applications.plan",Obj("app",S(item,"id"))))));}
+      if(cards.Children.Count==0)cards.Children.Add(Text("没有匹配的能力工具",11));if(apps.Children.Count==0)apps.Children.Add(Text("没有匹配的系统应用",11));FitMarketTiles(cards);FitMarketTiles(apps);
     };search.TextChanged+=(sender,e)=>render();render();
     var settings=new StackPanel();p.Children.Add(new Expander{Header="安装设置",Content=settings,Margin=new Thickness(0,12,0,0)});var enabled=Check(settings,"允许应用安装",B(policy,"enabled"));ActionButton(settings,"保存",async()=>{policy["enabled"]=enabled.IsChecked==true;await Api("applications.configure",policy);});
   }
@@ -247,6 +339,7 @@ public class CagentWindow : Window {
     if(installed==null){p.Children.Add(Text("安装后按应用要求完成配置，可在这里调整工具权限。",11));ActionButton(p,"安装并核验能力包",async()=>{var installedNow=D(await Api("packages.install",Obj("id",id,"confirm",true)));await Api("packages.grant",Obj("id",id,"permissions",V(installedNow,"requiredPermissions")));await PackageDetail(item);});return;}
     p.Children.Add(Text(B(installed,"registered")?"工具已注册":"工具未注册",11));var grants=new HashSet<string>();foreach(var grant in A(V(installed,"grants")))grants.Add(Convert.ToString(grant));var choices=new Dictionary<string,CheckBox>();foreach(var value in A(V(installed,"requiredPermissions"))){string permission=Convert.ToString(value);choices[permission]=Check(p,PermissionName(permission),grants.Contains(permission));}
     if(id=="cagent.wechat")ActionButton(p,"微信账号与授权",WechatSettings);
+    if(id.StartsWith("cagent.wechat.v",StringComparison.Ordinal))ActionButton(p,"微信服务与消息订阅",async()=>await ManagedWechatSettings(id));
     if(id=="cagent.desktop"){var desktopBody=new StackPanel();var section=new Expander{Header="桌面服务与访问权限",Content=desktopBody,Margin=new Thickness(0,8,0,8)};bool loaded=false;section.Expanded+=async(s,e)=>{if(loaded)return;await Guard(async()=>{await DesktopSettings(desktopBody);loaded=true;});};p.Children.Add(section);}
     p.Children.Add(Text("选择仅修改草稿，保存后生效。系统应用安装还受独立安装权限限制。",11));
     ActionButton(p,"保存工具权限",async()=>{var allowed=new List<string>();foreach(var pair in choices)if(pair.Value.IsChecked==true)allowed.Add(pair.Key);await Api("packages.grant",Obj("id",id,"permissions",allowed.ToArray()));await PackageDetail(item);});
@@ -258,6 +351,7 @@ public class CagentWindow : Window {
   async Task Linux(){
     var p=Panel("Linux 虚拟机 · WSL");p.Children.Add(Text("正在检查此 Windows 主机…",12));
     var state=D(await Api("wsl.check"));p.Children.Clear();
+    ActionButton(p,"离线安装与国内下载源",async()=>{Process.Start(new ProcessStartInfo("https://shell.canp.ai/docs/wsl-offline.html"){UseShellExecute=true});await Task.Yield();});
     p.Children.Add(Text("在本机安装 Linux，安装后可在 CShell 的此机器终端中选择发行版。",12));
     p.Children.Add(Text("不会覆盖已有发行版，也不会自动重启。云服务器需要开放嵌套虚拟化。",11));
     p.Children.Add(Text("虚拟化："+(B(state,"virtualization")?"已启用":"未启用或不可用")+" · "+(B(state,"administrator")?"管理员":"普通用户")+(B(state,"rebootPending")?" · 系统等待重启":""),11));
@@ -277,6 +371,27 @@ public class CagentWindow : Window {
     ActionButton(p,"安装 Linux",async()=>await install(false));if(B(state,"updateSupported"))ActionButton(p,"更新 WSL",async()=>await install(true));ActionButton(p,"重新检查",Linux);ActionButton(p,"返回应用市场",Apps);
   }
   void VerifyDesktopSettings(){var p=Panel("桌面服务设置");RenderDesktopSettings(p,Obj("enabled",false,"bindAddress","127.0.0.1","tcpPort",9998,"udpPort",9999,"local",Obj("view",false,"control",false),"ownerGrants",Obj()),false);UpdateLayout();var checks=new List<CheckBox>();FindChecks(p,checks);if(checks.Count!=4)throw new Exception("Desktop grants missing");foreach(var check in checks)if(check.IsChecked==true)throw new Exception("Desktop permissions default enabled");bool refused=false;try{DesktopPort("0");}catch{refused=true;}if(!refused||DesktopPort("65535")!=65535)throw new Exception("Desktop port validation failed");if(screenshot!=null)File.WriteAllText(screenshot+".json",json.Serialize(Obj("fixture",true,"serviceDefaultOff",true,"viewDefaultOff",true,"controlDefaultOff",true,"portValidation",true,"realDesktopStarted",false)),Encoding.UTF8);}
+  async Task ManagedWechatSettings(string id){
+    var state=D(await Api("managedWechat.status",Obj("id",id)));var config=D(V(state,"settings"));var p=Panel("微信服务");
+    var service=MarketCard(p,"本机服务",B(state,"running")?"服务运行中 · 已核验":"配置后核验实际微信版本，完成后自动随 CAgent 启动");
+    if(B(state,"validationUnknown"))service.Children.Add(Text("上次核验结果未知，已停止服务。请检查微信状态，不会自动重放核验。",11));
+    var enabled=Check(service,"启动微信 API 服务",B(config,"apiEnabled"));var port=Field(service,"本机端口",S(config,"port"));
+    var events=MarketCard(p,"消息事件", "收到消息后交给通用事件订阅处理，规则可指定条件与动作");
+    var subscription=Check(events,"接收消息回调",B(config,"subscriptionEnabled"));var account=Field(events,"微信账号 ID",S(config,"accountId"));
+    var fields=new Dictionary<string,TextBox>();string[] keys={"receiveTargets","sendTargets","historyTargets","remarkTargets"};string[] titles={"接收消息范围","发送消息范围","历史记录范围","修改备注范围"};
+    var scopes=new StackPanel();p.Children.Add(new Expander{Header="账号范围与操作",Content=scopes,Margin=new Thickness(0,8,0,8)});
+    scopes.Children.Add(Text("填写微信内部 ID，逗号分隔；* 表示全部。",11));
+    for(int i=0;i<keys.Length;i++){var values=new List<string>();foreach(var v in A(V(config,keys[i])))values.Add(Convert.ToString(v));fields[keys[i]]=Field(scopes,titles[i],string.Join(",",values.ToArray()));}
+    var checks=new Dictionary<string,CheckBox>();string[] flags={"readContacts","readSessions","sendFiles","momentsRead","momentsWrite","receiveTransfers","receiveRedPackets"};string[] labels={"读取通讯录","读取最近会话","发送文件","读取朋友圈","发布朋友圈","接收转账","接收红包"};for(int i=0;i<flags.Length;i++)checks[flags[i]]=Check(scopes,labels[i],B(config,flags[i]));
+    ActionButton(p,"保存服务设置",async()=>{int n=DesktopPort(port.Text);if(n<1024)throw new Exception("端口需要大于或等于 1024");config["apiEnabled"]=enabled.IsChecked==true;config["port"]=n;config["subscriptionEnabled"]=subscription.IsChecked==true;config["accountId"]=account.Text.Trim();foreach(var field in fields)config[field.Key]=field.Value.Text.Split(new[]{',','，',' ','\n','\r'},StringSplitOptions.RemoveEmptyEntries);foreach(var check in checks)config[check.Key]=check.Value.IsChecked==true;await Api("managedWechat.configure",Obj("id",id,"settings",config));panelStatus.Text="设置已保存";});
+    var validation=MarketCard(p,"版本与进程核验","仅接受能力包匹配的微信版本，不匹配时不会加载工具");var pid=Field(validation,"微信进程 PID", "");
+    ActionButton(validation,"检测本机微信",async()=>{var result=await Api("managedWechat.processes",Obj("id",id));var output=Field(validation,"检测结果",json.Serialize(result),true);output.IsReadOnly=true;output.MaxHeight=140;});
+    Func<int> selected=()=>{int n;if(!int.TryParse(pid.Text.Trim(),out n)||n<=0)throw new Exception("请填写检测到的微信 PID");return n;};
+    ActionButton(validation,"绑定此微信进程",async()=>{await Api("managedWechat.bind",Obj("id",id,"pid",selected()));panelStatus.Text="已绑定，需通过核验后启用工具";});
+    var confirm=Check(validation,"允许短暂监听文件传输助手以核验连接",false);
+    ActionButton(validation,"核验并启动",async()=>{if(confirm.IsChecked!=true)throw new Exception("请先确认核验消息");await Api("managedWechat.validate",Obj("id",id,"pid",selected()));await ManagedWechatSettings(id);});
+    ActionButton(p,"返回应用市场",Apps);
+  }
   async Task WechatSettings(){
     var state=D(await Api("wechat.status"));RenderWechatSettings(state);
   }
@@ -393,7 +508,10 @@ public class CagentWindow : Window {
     if(B(s,"running"))ActionButton(p,"停止连接服务",async()=>{await Api("client.stop");await Remote();});
   }
   void SaveImage(string path){var bitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);bitmap.Render(this);var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bitmap));using(var output=File.Create(path))encoder.Save(output);}
+  static bool IsIsolatedAcceptanceData(){try{string raw=Environment.GetEnvironmentVariable("CSHELL_AGENT_DATA");if(String.IsNullOrWhiteSpace(raw))return false;string data=Path.GetFullPath(raw).TrimEnd(Path.DirectorySeparatorChar,Path.AltDirectorySeparatorChar);string temp=Path.GetFullPath(Path.GetTempPath()).TrimEnd(Path.DirectorySeparatorChar,Path.AltDirectorySeparatorChar);return String.Equals(Path.GetDirectoryName(data),temp,StringComparison.OrdinalIgnoreCase)&&Path.GetFileName(data).StartsWith("native-ui-acceptance-data-",StringComparison.Ordinal)&&Directory.Exists(data)&&(File.GetAttributes(data)&FileAttributes.ReparsePoint)==0;}catch{return false;}}
   [STAThread]public static void Main(string[] args){
+    if(args.Length>0&&(args[0]=="--verify-host-reconnect")&&!IsIsolatedAcceptanceData()){if(args.Length>1)File.WriteAllText(args[1],"{\"blockedBeforeRuntime\":true}",Encoding.UTF8);return;}
+
     if(args.Length>0){new Application().Run(new CagentWindow(args));return;}
     string scope=System.Security.Principal.WindowsIdentity.GetCurrent().User.Value;
     using(var mutex=new System.Threading.Mutex(false,"Local\\CAgent.Window."+scope)){

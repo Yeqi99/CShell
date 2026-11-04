@@ -1,6 +1,13 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { Bridge, SessionEvent } from '../shared/contracts';
 const bridge: Bridge = {
+  desktopViewClipboard:(id,input,generation)=>ipcRenderer.invoke('desktop:view-clipboard',id,input,generation),
+  localClipboardRead:()=>ipcRenderer.invoke('clipboard:content-read'),
+  localClipboardWrite:value=>ipcRenderer.invoke('clipboard:content-write',value),
+  localClipboardFileRead:(token,offset,length)=>ipcRenderer.invoke('clipboard:file-read',token,offset,length),
+  localClipboardFilesBegin:files=>ipcRenderer.invoke('clipboard:files-begin',files),
+  localClipboardFilesChunk:(id,index,offset,data)=>ipcRenderer.invoke('clipboard:files-chunk',id,index,offset,data),
+  localClipboardFilesCommit:id=>ipcRenderer.invoke('clipboard:files-commit',id),
   nativeDesktopSetup:(id,action)=>ipcRenderer.invoke('native-desktop:setup',id,action),
   nativeDesktopOpen:(id,endpoint)=>ipcRenderer.invoke('native-desktop:open',id,endpoint),
   nativeDesktopRead:id=>ipcRenderer.invoke('native-desktop:read',id),
@@ -12,6 +19,7 @@ const bridge: Bridge = {
   onDesktopLookChanged:listener=>{const fn=()=>listener();ipcRenderer.on('desktop-look:changed',fn);return()=>ipcRenderer.removeListener('desktop-look:changed',fn);},
   networkDiagnostics: () => ipcRenderer.invoke('network:diagnostics'),
   networkPing: input => ipcRenderer.invoke('network:ping', input),
+  connectionProbe: input => ipcRenderer.invoke('network:connection-probe', input),
   networkProbe: input => ipcRenderer.invoke('network:probe', input),
   networkProbeCancel: id => ipcRenderer.invoke('network:probe-cancel', id),
   connectionImportText: text => ipcRenderer.invoke('connections:import-text', text),
@@ -21,7 +29,10 @@ const bridge: Bridge = {
   connectionImportDiscard: token => ipcRenderer.invoke('connections:import-discard', token),
   networkRemoteSources: () => ipcRenderer.invoke('network:remote-sources'),
   networkRemoteOpen: input => ipcRenderer.invoke('network:remote-open',input),
+  identityNetwork:input=>ipcRenderer.invoke('network:identity',input),
   networkStatus: () => ipcRenderer.invoke('network:status'),
+  networkSystemStatus:()=>ipcRenderer.invoke('network:system-status'),
+  networkSystemSet:enabled=>ipcRenderer.invoke('network:system-set',enabled),
   networkSave: route => ipcRenderer.invoke('network:save', route),
   machineBrowser:(id,action,value)=>ipcRenderer.invoke('machine-browser:action',id,action,value),
   onMachineBrowserFocus:listener=>{const fn=(_e:unknown,id:string)=>listener(id);ipcRenderer.on('machine-browser:focus',fn);return()=>{ipcRenderer.removeListener('machine-browser:focus',fn);};},
@@ -61,7 +72,7 @@ const bridge: Bridge = {
   rdpStatus: (id) => ipcRenderer.invoke('connection:rdp-status',id),
   rdpClose: (id) => ipcRenderer.invoke('connection:rdp-close',id),
   rdpBounds: (id,bounds) => ipcRenderer.invoke('connection:rdp-bounds',id,bounds),
-  openRdp: (endpoint) => ipcRenderer.invoke('connection:rdp', endpoint),
+  openRdp: (endpoint, sessionId) => ipcRenderer.invoke('connection:rdp', endpoint, sessionId),
   clientDownloadPage: platform => ipcRenderer.invoke('client:download-page', platform),
   clientTheme: (theme) => ipcRenderer.invoke('client:theme', theme),
   clientDevices: () => ipcRenderer.invoke('client:devices'),
@@ -125,6 +136,8 @@ const bridge: Bridge = {
   },
   setAlwaysOnTop: (enabled) => ipcRenderer.invoke('window:always-on-top', enabled),
   setMinimalMode: (enabled) => ipcRenderer.invoke('window:minimal', enabled),
+  agentDownloadList:()=>ipcRenderer.invoke('agent:download-list'),
+  agentDownloadOpen:id=>ipcRenderer.invoke('agent:download-open',id),
   classroomTasks:{targets:()=>ipcRenderer.invoke('classroom:tasks-targets'),choices:()=>ipcRenderer.invoke('classroom:tasks-choices'),prepare:input=>ipcRenderer.invoke('classroom:tasks-prepare',input),execute:id=>ipcRenderer.invoke('classroom:tasks-execute',id),list:()=>ipcRenderer.invoke('classroom:tasks-list'),cancel:id=>ipcRenderer.invoke('classroom:tasks-cancel',id)},
   agentLan:{status:()=>ipcRenderer.invoke('classroom:lan-status'),prepare:ids=>ipcRenderer.invoke('classroom:lan-prepare',ids),confirm:input=>ipcRenderer.invoke('classroom:lan-confirm',input)},
   classroom: {screens:()=>ipcRenderer.invoke('classroom:screens'),status:()=>ipcRenderer.invoke('classroom:status'),start:(options:unknown)=>ipcRenderer.invoke('classroom:start',options),stop:()=>ipcRenderer.invoke('classroom:stop'),setDiscovery:(enabled:boolean)=>ipcRenderer.invoke('classroom:discover',enabled),frame:(id:string)=>ipcRenderer.invoke('classroom:frame',id)},
@@ -176,7 +189,7 @@ const bridge: Bridge = {
   onAiConnection: (listener) => {
     const handler = (
       _event: Electron.IpcRendererEvent,
-      value: { sessionId: string; profile: import('../shared/contracts').Profile },
+      value: { sessionId: string; profile: import('../shared/contracts').Profile; managementOnly?:boolean },
     ) => listener(value);
     ipcRenderer.on('ai:connected', handler);
     return () => ipcRenderer.removeListener('ai:connected', handler);
@@ -198,6 +211,7 @@ const bridge: Bridge = {
   aiApprove: (id, request, allow) => ipcRenderer.invoke('ai:approve', id, request, allow),
   aiStop: (id) => ipcRenderer.invoke('ai:stop', id),
   aiMode: (id, mode) => ipcRenderer.invoke('ai:mode', id, mode),
+  aiThreadProvider: (id, provider, model) => ipcRenderer.invoke('ai:thread-provider', id, provider, model),
   pythonReadFile: (id, path) => ipcRenderer.invoke('python:read', id, path),
   textReadFile: (id, path) => ipcRenderer.invoke('text:read', id, path),
   textEnvironments: (id, path) => ipcRenderer.invoke('text:environments', id, path),
@@ -205,6 +219,7 @@ const bridge: Bridge = {
   pythonSaveFile: (id, path, code, revision) =>
     ipcRenderer.invoke('python:save', id, path, code, revision),
   plugins: () => ipcRenderer.invoke('plugins:list'),
+  pluginsRestorePending:()=>ipcRenderer.invoke('plugins:restore-pending'),
   pluginInstall: (id) => ipcRenderer.invoke('plugins:install', id),
   pluginToggle: (id, enabled) => ipcRenderer.invoke('plugins:toggle', id, enabled),
   pluginRemove: (id) => ipcRenderer.invoke('plugins:remove', id),
@@ -294,3 +309,4 @@ const bridge: Bridge = {
   },
 };
 contextBridge.exposeInMainWorld('cshell', bridge);
+

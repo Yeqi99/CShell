@@ -1,4 +1,14 @@
 /* Agent surfaces share the workbench palette, with compact controls at the edges. */
+.ai-panel { position: relative; }
+.ai-panel .agent-goals-page:not([hidden]), .ai-panel .agent-events-page:not([hidden]) {
+  position:absolute; z-index:20; top:52px; right:10px; left:10px;
+  max-height:min(65%,560px); overflow:auto; border:1px solid var(--border);
+  border-radius:12px; background:var(--panel); box-shadow:0 12px 36px #172a4120;
+}
+.agent-goals-page[hidden], .agent-events-page[hidden] { display:none; }
+.agent-menu-heading { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; position:sticky; top:0; background:var(--panel); border-bottom:1px solid var(--border); z-index:1; }
+.agent-menu-heading button { border:0; background:transparent; color:var(--muted); font:inherit; cursor:pointer; padding:5px 8px; }
+.agent-menu-heading button:focus-visible { outline:2px solid var(--accent); }
 .ai-panel .agent-title {
   display: flex;
   align-items: center;
@@ -109,11 +119,15 @@
   opacity: 1;
 }
 .agent-message.user {
-  margin-left: 24px;
+  margin-left: auto;
+  width: fit-content;
+  max-width: calc(100% - 24px);
+  min-width: 72px;
   padding: 9px 12px;
   background: var(--panel);
   border-radius: 12px 12px 3px 12px;
 }
+.agent-message.user .agent-content { overflow-wrap: anywhere; }
 .agent-content {
   white-space: pre-wrap;
 }
@@ -652,6 +666,29 @@
   font-size: 11px;
   line-height: 1.6;
 }
+.permission-application-list {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.permission-global-section label.permission-application-option {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  line-height: 1.5;
+  min-width: 0;
+}
+.permission-application-option:hover,
+.permission-application-option:focus-within { background: var(--hover); }
+.permission-application-option > input[type='checkbox'] { margin: 2px 0 0; }
+.permission-application-option > span { min-width: 0; overflow-wrap: anywhere; }
+.permission-option-title { display: block; }
+.permission-application-option small { margin-top: 5px; }
+.permission-application-option.permission-location { outline-offset: -2px; }
 .permission-default-tools {
   display: flex;
   flex-wrap: wrap;

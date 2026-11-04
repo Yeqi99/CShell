@@ -3,6 +3,7 @@ import {machineInspectionInstructions,toolAwareHistory} from './ai-tool-context'
 import {checkpointSchema,compactContext,continuityInstructions,RunBudget} from './agent-continuity';
 import {AgentJobs,jobQuery} from './agent-jobs';
 import {remoteWechatTools} from './remote-wechat-tools';
+import {remoteAndroidTools} from './remote-android-tools';
 import { permissionLinkTool } from './permission-link-tool';
 import type { Profile } from '../shared/contracts';
 import { AiWork } from './ai-work';
@@ -28,6 +29,7 @@ import {
   aiPermissionSchema,
   aiPolicySchema,
   emptyAiPolicy,
+  newInstallationAiPolicy,
   type AiPolicy,
   aiProviderSchema,
   aiLocations,
@@ -57,6 +59,9 @@ const eventToolDenied = (name:string) => eventDeniedTools.has(name) || (name.sta
 const idSchema = z.string().uuid();
 export const modeSchema = z.enum(['review', 'restricted', 'allow']);
 export class AiService {
+  private untouchedInstallationPolicy = false;
+  /** A generated first-run default is not guest data. Never export edited/loaded guest grants here. */
+  registrationPolicy() { return this.untouchedInstallationPolicy ? newInstallationAiPolicy() : emptyAiPolicy(); }
   requestTransport?: typeof fetch;
   private jobs=new AgentJobs();
   readonly providerExtensions=new AiExtensionRegistry();
@@ -108,7 +113,7 @@ export class AiService {
       checkTarget: (t) => this.checkWorkTarget(t),
       pin: (t) => {
         t.permissionCeiling ??= structuredClone(this.policy);
-        t.boundIdentity ??= JSON.stringify(this.connections.describe(t.sessionId!));
+        if (t.sessionId) t.boundIdentity ??= JSON.stringify(this.connections.describe(t.sessionId));
       },
       child: (t, task) => this.spawn(t, task),
       send: (id, text) => this.send(id, text),
@@ -117,7 +122,7 @@ export class AiService {
     });
   }
   private checkWorkTarget(t: AiThread) {
-    if (!t.sessionId) throw new Error('请先绑定真实机器连接');
+    if (!t.sessionId) { if(t.boundIdentity) throw new Error('目标连接已断开'); return; }
     const target = this.connections.describe(t.sessionId);
     if (t.boundIdentity && JSON.stringify(target) !== t.boundIdentity)
       throw new Error('目标身份已变化');
@@ -209,7 +214,9 @@ export class AiService {
       throw error;
     }
   }
-  async load() {
+  async load(initializeNewInstallation = false) {
+    this.untouchedInstallationPolicy = false;
+    this.policy = emptyAiPolicy();
     try {
       const data = JSON.parse(
         await this.store.decryptPrivate(await readFile(join(this.directory, 'ai.enc'), 'utf8')),
@@ -217,6 +224,8 @@ export class AiService {
       this.providers = z.array(providerRecord).parse(data.providers);
       this.permissions = z.array(aiPermissionSchema).parse(data.permissions);
       this.policy = data.policy ? aiPolicySchema.parse(data.policy) : emptyAiPolicy();
+      this.untouchedInstallationPolicy = data.untouchedInstallationPolicy === true &&
+        JSON.stringify(this.policy) === JSON.stringify(newInstallationAiPolicy());
       if (data.textProviderIds)
         this.textProviderIds = z
           .object({ translate: idSchema.nullable(), compose: idSchema.nullable() })
@@ -250,6 +259,14 @@ export class AiService {
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== 'ENOENT')
         throw new Error('AI configuration could not be decrypted; original file preserved');
+      // Account workspaces and cloud restoration never opt into first-install defaults.
+      // Existing config without ai.enc is legacy data, not a fresh installation.
+      if (initializeNewInstallation && this.store.isNewInstallation()) {
+        this.policy = newInstallationAiPolicy();
+        this.untouchedInstallationPolicy = true;
+        try { await this.persist(); }
+        catch (error) { this.policy = emptyAiPolicy(); this.untouchedInstallationPolicy = false; throw error; }
+      }
     }
   }
   snapshot(): AiSnapshot {
@@ -270,6 +287,7 @@ export class AiService {
   private persist() {
     this.threads.forEach((t) => this.onThreadUpdate?.(t));
     const data = JSON.stringify({
+      untouchedInstallationPolicy: this.untouchedInstallationPolicy,
       providers: this.providers,
       permissions: this.permissions,
       policy: this.policy,
@@ -367,11 +385,14 @@ export class AiService {
     if (new Set(next.overrides.map((o) => o.profileId)).size !== next.overrides.length)
       throw new Error('Duplicate machine override');
     const previous = this.policy;
+    const previousOrigin = this.untouchedInstallationPolicy;
     this.policy = next;
+    this.untouchedInstallationPolicy = false;
     try {
       await this.persist();
     } catch (e) {
       this.policy = previous;
+      this.untouchedInstallationPolicy = previousOrigin;
       throw e;
     }
   }
@@ -434,6 +455,21 @@ export class AiService {
     this.stop(id);
     for (const child of this.work.children(this.thread(id))) await this.remove(child.id);
     this.threads = this.threads.filter((t) => t.id !== id);
+    await this.persist();
+  }
+  async changeThreadProvider(id:string,providerId:string,extensionModel?:string){
+    const t=this.thread(id);
+    if(t.parentId)throw Error('子任务不能单独切换模型');
+    if(this.runs.has(id))throw Error('请等待当前回复结束或停止后再切换模型');
+    const provider=this.providers.find(p=>p.id===idSchema.parse(providerId));
+    if(!provider)throw Error('所选基座不可用');
+    if(extensionModel&&!provider.extension)throw Error('此基座不支持扩展模型选择');
+    if(provider.extension){
+      const model=extensionModel??provider.extension.model;
+      await this.providerExtensions.resolve({...provider.extension,model},'configuration');
+    }
+    if(this.runs.has(id)||!this.threads.includes(t))throw Error('会话状态已变化，请在回复结束后重试');
+    t.providerId=provider.id;t.extensionModel=provider.extension?(extensionModel??provider.extension.model):undefined;
     await this.persist();
   }
   async mode(id: string, mode: unknown) {
@@ -614,7 +650,7 @@ export class AiService {
       const parent = this.threads.find((p) => p.id === t.parentId);
       if (!parent || !this.runs.has(parent.id) || !this.allowed(parent, tool, input)) return false;
     }
-    if ((t.parentId || t.goal || t.boundIdentity) && tool === 'connect_machine') return false;
+    if ((t.parentId || t.boundIdentity) && tool === 'connect_machine') return false;
     if (t.boundIdentity) {
       try {
         this.checkWorkTarget(t);
@@ -635,6 +671,7 @@ export class AiService {
     const appTool = this.applicationTools(t).find((d) => d.name === tool);
     if (appTool) {
       if (!allowsApplication(caller, appTool.capability)) return false;
+      if(input!==undefined&&appTool.applicationTargets){try{if(!appTool.applicationTargets(input).every(target=>target.capabilities.every(capability=>allowsCapability(caller,target,capability))))return false;}catch{return false;}}
       if(tool.startsWith('remote_wechat_')){
         if(!t.sessionId)return false;
         try{const scope=this.connections.scope(t.sessionId);return !!scope&&allowsCapability(caller,scope,'agent.manage');}catch{return false;}
@@ -881,7 +918,12 @@ export class AiService {
       if(t.sessionId){
         try{
           const scope=this.connections.scope(t.sessionId);
-          if(scope&&allowsCapability(aiCallerPolicy(this.policy),scope,'agent.manage'))this.remoteWechat.set(t.id,await remoteWechatTools(this.connections.agent(t.sessionId),signal));
+          if(scope&&allowsCapability(aiCallerPolicy(this.policy),scope,'agent.manage')){
+            const call=this.connections.agent(t.sessionId);
+            const results=await Promise.allSettled([remoteWechatTools(call,signal),remoteAndroidTools(call,signal)]);
+            signal.throwIfAborted();
+            this.remoteWechat.set(t.id,results.flatMap(result=>result.status==='fulfilled'?result.value:[]));
+          }
         }catch(error){signal.throwIfAborted();/* Older/non-Agent targets do not advertise these tools. */}
       }
       const available = [...this.applicationTools(t), ...machineTools]

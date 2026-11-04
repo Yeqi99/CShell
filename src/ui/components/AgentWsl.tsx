@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import {useEffect,useState} from 'react';
 import type {AgentCall} from '../../shared/agent';
 import {AgentWslNetwork} from './AgentWslNetwork';
@@ -47,6 +48,7 @@ export function AgentWsl({ target, call }: { target: string; call: Call }) {
   }, [call, plan?.state]);
   return (
     <div className="agent-settings">
+      <a href="https://shell.canp.ai/docs/wsl-offline.html" target="_blank" rel="noreferrer">离线安装与国内下载源 ↗</a>
       {check?.supported === false ? (
         <p>此 Agent 不是 Windows，无 WSL 功能。</p>
       ) : (
@@ -153,7 +155,7 @@ export function AgentWsl({ target, call }: { target: string; call: Call }) {
         </>
       )}
       {result && <p role="status">{result}</p>}
-      {error && <p role="alert">{error}</p>}
+      {error && <ErrorNotice title="WSL 操作未完成" error={error}/>}
     </div>
   );
 }

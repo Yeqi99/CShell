@@ -10,7 +10,7 @@ export const accessSchema = z.object({
   allowRelay: z.boolean().default(false),
   salt: z.string().regex(/^[a-f0-9]{32}$/),
   hash: z.string().regex(/^[a-f0-9]{64}$/),
-  shells: z.array(clientShellSchema).min(1).max(6),
+  shells: z.array(clientShellSchema).max(6),
 });
 export async function hashPassword(password: string) {
   const salt = randomBytes(16).toString('hex');

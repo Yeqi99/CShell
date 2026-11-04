@@ -1,6 +1,6 @@
 import type { Session } from 'electron';
 import { randomUUID } from 'node:crypto';
-import { readFile, writeFile, rename } from 'node:fs/promises';
+import { readFile, writeFile, rename, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { networkRouteSchema, type NetworkRoute, type NetworkRouteStatus } from '../shared/network-route';
 import type { Store } from '../core/store';
@@ -8,7 +8,16 @@ import type { Store } from '../core/store';
 /** Dedicated application requests; never changes the browser or OS proxy. */
 export class ApplicationNetworkRoute {
   private route: NetworkRoute = { mode: 'system' };
+  private hasSavedRoute = false;
   private current?: Session;
+  private control?:Session;
+  async captureControlProxy(previous:import('./system-proxy').SystemProxyState){
+    const {session}=await import('electron');const isolated=session.fromPartition('cshell-control-'+randomUUID(),{cache:false});
+    await isolated.setProxy(previous.AutoConfigURL?{mode:'pac_script',pacScript:previous.AutoConfigURL}:previous.ProxyEnable&&previous.ProxyServer?{mode:'fixed_servers',proxyRules:previous.ProxyServer,proxyBypassRules:previous.ProxyOverride??''}:previous.AutoDetect?{mode:'auto_detect'}:{mode:'direct'});
+    const old=this.control;this.control=isolated;await old?.closeAllConnections();
+  }
+  async releaseControlProxy(){const old=this.control;this.control=undefined;await old?.closeAllConnections();}
+  readonly controlFetch:typeof fetch=async(input,init)=>{const {net}=await import('electron');return this.control?this.control.fetch(input as any,init):net.fetch(String(input),init);};
   private currentProxy?: string;
   private queue: Promise<unknown> = Promise.resolve();
   private closed = false;
@@ -16,13 +25,17 @@ export class ApplicationNetworkRoute {
     list(): Promise<NetworkRouteStatus['machines']>;
     // Resolver must enforce entitlement, identity and forwarding permission.
     proxy(id: string): Promise<string>;
+    tunnel?(id:string,host:string,port:number):Promise<import('node:stream').Duplex>;
     close?(): Promise<void>;
   };
   constructor(private directory: string, private store: Store) {}
+  async prepareSystemProxy(){if(this.route.mode!=='machine'||!this.machine?.tunnel)throw Error('请先选择可用的机器出口，再开启系统代理');await this.machine.proxy(this.route.id);}
+  async systemTunnel(host:string,port:number){if(this.route.mode!=='machine'||!this.machine?.tunnel)throw Error('所选机器出口不可用，未回退直连');return this.machine.tunnel(this.route.id,host,port);}
   async load() {
     try {
       this.route = networkRouteSchema.parse(JSON.parse(await this.store.decryptPrivate(
         await readFile(join(this.directory, 'network-route.enc'), 'utf8'))));
+      this.hasSavedRoute = true;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw new Error('网络出口配置无法读取，已保留原文件');
     }
@@ -30,18 +43,30 @@ export class ApplicationNetworkRoute {
   async status(): Promise<NetworkRouteStatus> {
     return { route: structuredClone(this.route), machines: await this.machine?.list() ?? [] };
   }
-  async save(input: unknown) {
+  cloudExport(){return structuredClone(this.route);}
+  cloudValidate(input:unknown){return networkRouteSchema.parse(input);}
+  // System/direct/manual exits depend on this device's network environment.
+  // Retain the old cloud field without letting a different computer replace it.
+  async cloudImport(input:unknown){await this.save(input,false,true);}
+  cloudCheckpoint(){return {route:this.cloudExport(),saved:this.hasSavedRoute};}
+  async cloudRestore(input:{route:NetworkRoute;saved:boolean}){
+    await this.save(input.route,false,false,input.saved);
+  }
+  async save(input: unknown, connect = true, fromCloud = false, restoredSaved?:boolean) {
     const next = networkRouteSchema.parse(input);
     const task = this.queue.catch(() => {}).then(async () => {
       if (this.closed) throw new Error('网络服务已关闭');
-      if (next.mode === 'machine') {
+      if(fromCloud && (this.hasSavedRoute || next.mode !== 'machine')) return this.status();
+      if (next.mode === 'machine' && connect) {
         if (!this.machine) throw new Error('当前版本不支持机器网络出口');
         await this.machine.proxy(next.id);
       }
       const file = join(this.directory, 'network-route.enc');
       await writeFile(file + '.tmp', await this.store.encryptPrivate(JSON.stringify(next)), { mode: 0o600 });
       await rename(file + '.tmp', file);
+      if(restoredSaved===false) await unlink(file);
       this.route = next;
+      this.hasSavedRoute = restoredSaved ?? true;
       const previous = this.current;
       this.current = undefined;
       // Explicit application of a new route invalidates pooled old connections.
@@ -94,6 +119,7 @@ export class ApplicationNetworkRoute {
     this.closed = true;
     await this.queue.catch(() => {});
     await this.current?.closeAllConnections();
+    await this.releaseControlProxy();
     await this.machine?.close?.();
   }
 }

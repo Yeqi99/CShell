@@ -9,8 +9,12 @@ import React from 'react';import{createRoot}from'react-dom/client';import{Python
 window.reads=[];window.writes=[];
 window.cshell={textReadFile:()=>new Promise(resolve=>window.reads.push(resolve)),textSaveFile:async(...args)=>{window.writes.push(args);return {revision:'saved'}}};
 createRoot(document.getElementById('root')).render(<PythonEditor sessionId="fixture" path="/note.txt" python="" connected={true} textFile onDependency={()=>{}}/>);
-`,loader:'tsx',resolveDir:process.cwd()},bundle:true,write:false,jsx:'automatic'});
-const server=createServer((req,res)=>{res.setHeader('Content-Type',req.url==='/app.js'?'application/javascript':'text/html;charset=utf-8');res.end(req.url==='/app.js'?bundle.outputFiles[0].contents:'<!doctype html><div id="root"></div><script src="/app.js"></script>');});
+`,loader:'tsx',resolveDir:process.cwd()},bundle:true,write:false,outfile:'app.js',jsx:'automatic'});
+const server=createServer((req,res)=>{
+ const asset=req.url==='/app.js'||req.url==='/app.css'?bundle.outputFiles.find(file=>file.path.replaceAll('\\','/').endsWith(req.url!)):undefined;
+ res.setHeader('Content-Type',req.url==='/app.js'?'application/javascript':req.url==='/app.css'?'text/css':'text/html;charset=utf-8');
+ res.end(asset?.contents??'<!doctype html><link rel="stylesheet" href="/app.css"><div id="root"></div><script src="/app.js"></script>');
+});
 await new Promise<void>(r=>server.listen(0,'127.0.0.1',r));
 let owned:Awaited<ReturnType<typeof chromium.launchServer>>|undefined;
 try{
@@ -46,3 +50,4 @@ try{
  assert.deepEqual(errors,[]);
  console.log('PASS reload preserves concurrent edits, explicit retry applies, next save uses accepted revision');
 }finally{await owned?.kill();server.closeAllConnections();await new Promise<void>(r=>server.close(()=>r()));}
+

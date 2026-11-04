@@ -206,6 +206,52 @@ export class ApiTasks {
       error: structuredClone(t.error),
     };
   }
+  /** Reattach by ID/cursor after client reconnection; never enumerates another owner. */
+  list(
+    owner: string,
+    options: { target?: string; limit?: number; after?: string } = {},
+    permitted: (task: { target: string; permission: string }) => boolean = () => true,
+  ) {
+    const limit = options.limit ?? 100;
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100)
+      throw new ApiError(
+        'INVALID_ARGUMENT',
+        'Invalid task list limit.',
+        'Use a limit from 1 to 100.',
+      );
+    this.prune();
+    const visible = [...this.records.values()]
+      .filter(
+        (t) =>
+          t.owner === owner &&
+          !t.released &&
+          (!options.target || t.target === options.target) &&
+          permitted(t),
+      )
+      .sort((a, b) => b.createdAt - a.createdAt || a.id.localeCompare(b.id));
+    const index = options.after ? visible.findIndex((t) => t.id === options.after) : -1;
+    if (options.after && index < 0)
+      throw new ApiError(
+        'CURSOR_EXPIRED',
+        'Task list cursor is no longer available.',
+        'List again without a cursor; do not replay tasks.',
+      );
+    const page = visible.slice(index + 1, index + 1 + limit),
+      hasMore = visible.length > index + 1 + limit;
+    return {
+      tasks: page.map((t) => {
+        const { result: _result, error: _error, ...status } = this.describe(t);
+        return {
+          ...status,
+          latestCursor: t.sequence,
+          earliestCursor: t.events[0]?.sequence ?? t.sequence + 1,
+        };
+      }),
+      hasMore,
+      nextCursor: hasMore ? page.at(-1)!.id : null,
+      persistence: 'process-lifetime' as const,
+    };
+  }
   read(owner: string, id: string, after = 0, limit = 50) {
     if (
       !Number.isSafeInteger(after) ||

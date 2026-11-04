@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { useEffect, useState } from 'react';
 import type { LocalShell } from '../../shared/local-terminal';
 import { useI18n } from '../i18n';
@@ -26,7 +27,7 @@ export function ApiLocalScopes({
           ? '与远端机器范围分别授权；还需勾选终端读取或输入权限。'
           : 'Separate from remote machine scope; terminal read or input permission is also required.'}
       </p>
-      {error && <p role="alert">{error}</p>}
+      {error && <ErrorNotice title="操作未完成" error={error}/>}
       {[...new Set([...available, ...value])].map((shell) => (
         <label className="checkbox" key={shell}>
           <input

@@ -1,3 +1,4 @@
+import {portableCapabilitiesSchema} from '../shared/portable-capabilities';
 import { z } from 'zod';
 import { join, relative, isAbsolute } from 'node:path';
 import { rm } from 'node:fs/promises';
@@ -9,6 +10,9 @@ import { capabilityInstallInput, stageCapabilityBundle } from './capability-inst
 import type { AgentCapabilityManifest, CapabilityPackageRecord } from '../shared/agent-capability-packages';
 
 export interface TrustedCapabilityAdapter {
+  /** Host-owned exact allowlist. Must exclude tokens, filesystem paths, grants and device/session identity. */
+  portableConfiguration?:{export():unknown;validate(input:unknown):unknown;import(input:unknown):Promise<void>};
+  eventSource?:string;
   inspect(root:string):Promise<{installed:boolean;configured:boolean;systemVersion?:string}>;
   invoke(toolId:string,args:unknown,owner:string,signal:AbortSignal):Promise<unknown>;
   register?(root:string,grants:readonly string[]):Promise<void>;
@@ -58,9 +62,11 @@ export class CapabilityRuntime {
     this.adapters.set('cagent.system-apps',system);
     for(const extra of options.extraPackages??[]){
       if(this.entries.some(entry=>entry.id===extra.entry.id))throw new Error('Duplicate capability catalog ID');
-      if(extra.entry.source!=='bundled'||!extra.entry.bundle)throw new Error('Injected adapters require a bundled verified manifest');
-      const manifest=parseCapabilityManifest(JSON.parse(extra.entry.bundle).manifest,extra.entry.manifestSha256);
-      if(manifest.id!==extra.entry.id||this.adapters.has(manifest.adapterId))throw new Error('Duplicate or mismatched adapter ID');
+      const raw=extra.entry.source==='bundled'&&extra.entry.bundle?JSON.parse(extra.entry.bundle).manifest:extra.entry.manifestJson;
+      if(!raw)throw new Error('Injected adapters require a host-pinned verified manifest');
+      const manifest=parseCapabilityManifest(raw,extra.entry.manifestSha256);
+      if(extra.entry.source==='github'&&extra.entry.url!==manifest.source.assetUrl)throw new Error('Injected adapter source mismatch');
+      if(manifest.id!==extra.entry.id||manifest.version!==extra.entry.version||this.adapters.has(manifest.adapterId))throw new Error('Duplicate or mismatched adapter ID');
       this.entries.push(structuredClone(extra.entry));this.adapters.set(manifest.adapterId,extra.adapter);
     }
     this.manager=new CapabilityPackages({environment:{platform:process.platform,architecture:process.arch,agentVersion:options.agentVersion},
@@ -88,11 +94,29 @@ export class CapabilityRuntime {
       save:async records=>{await options.vault.write('capability-packages',records);this.roots=new Map(records.map(record=>[record.id,record.root]));this.installedManifestDigests=new Map(records.map(record=>[record.id,record.manifestSha256]));},
     });
   }
-  private manifestFor(id:string){const entry=this.entries.find(item=>item.id===id);if(!entry?.bundle)return undefined;return parseCapabilityManifest(JSON.parse(entry.bundle).manifest,entry.manifestSha256);}
+  private manifestFor(id:string){const entry=this.entries.find(item=>item.id===id);if(!entry)return undefined;const raw=entry.bundle?JSON.parse(entry.bundle).manifest:entry.manifestJson;return raw?parseCapabilityManifest(raw,entry.manifestSha256):undefined;}
   private mutate<T>(action:()=>Promise<T>):Promise<T>{const operation=this.mutation.then(()=>{if(this.closing)throw new Error('Capability runtime closing');return action();});this.mutation=operation.catch(()=>{});return operation;}
   async load(){await this.manager.init();for(const item of this.manager.list())await this.manager.refresh(item.id);}
   list(){return this.manager.list();}
-  catalog(){return this.entries.map(({bundle:_,url:__,manifestSha256:___,bundleSha256:____,bundleBytes:_____,...entry})=>{
+  cloudExport(){return this.manager.list().map(item=>{const manifest=this.manifestFor(item.id),config=manifest?this.adapters.get(manifest.adapterId)?.portableConfiguration:undefined;return portableCapabilitiesSchema.element.parse({id:item.id,version:item.version,manifestSha256:this.installedManifestDigests.get(item.id)!,...(config?{configuration:config.validate(config.export())}:{})});});}
+  async cloudImport(input:unknown){
+    const desired=portableCapabilitiesSchema.parse(input),pending:{id:string;version:string;manifestSha256:string;retryAvailable:boolean;reason:string}[]=[];
+    for(const item of desired){
+      const entry=this.entries.find(entry=>entry.id===item.id&&entry.version===item.version&&entry.manifestSha256===item.manifestSha256);
+      if(!entry){pending.push({...item,retryAvailable:false,reason:'此机器尚无匹配且已核验的能力包来源'});continue;}
+      try{
+        // Validate portable data before installation/registration can touch the host.
+        const manifest=this.manifestFor(item.id),config=manifest?this.adapters.get(manifest.adapterId)?.portableConfiguration:undefined;
+        let validated:unknown;
+        if(item.configuration!==undefined){if(!config)throw Error('此扩展没有声明可同步的配置');validated=config.validate(item.configuration);}
+        await this.install({id:item.id,confirm:true});
+        if(item.configuration!==undefined)await config!.import(validated);
+      }catch{pending.push({...item,retryAvailable:true,reason:'能力包恢复未完成，可在应用市场重试'});}
+    }
+    return pending;
+  }
+
+  catalog(){return this.entries.map(({bundle:_,url:__,manifestSha256:___,bundleSha256:____,bundleBytes:_____,manifestJson:______,maxBundleBytes:_______,...entry})=>{
     const installed=this.manager.list().find(item=>item.id===entry.id);return {...entry,installed:!!installed,status:installed?.status??'not-installed',reason:installed?.reason,grants:installed?.grants??[]};
   });}
   install(input:unknown,signal:AbortSignal=new AbortController().signal){return this.mutate(async()=>{
@@ -113,6 +137,7 @@ export class CapabilityRuntime {
   // managed root, and never turn optional retirement into a startup failure.
   private async cleanupRetiredRoot(root:string){try{await this.removeRoot(root);}catch{process.stderr.write('CAgent: retired capability files retained; active package is unchanged.\n');}}
   private async removeRoot(root:string){const parent=join(this.options.directory,'capability-packages'),within=relative(parent,root);if(!within||within.startsWith('..')||isAbsolute(within)||!/^package-[^/\\]+$/.test(within))throw new Error('Refusing to remove an unmanaged package path');await rm(root,{recursive:true,force:true});}
+  events(){return [...this.registered.values()].flatMap(({manifest,grants})=>{const source=this.adapters.get(manifest.adapterId)?.eventSource;return source?manifest.events.filter(event=>event.permissions.every(permission=>grants.includes(permission))).map(event=>({source,type:event.id,packageId:manifest.id,description:event.description,payloadSchema:structuredClone(event.payloadSchema)})):[];});}
   tools():RuntimeCapabilityTool[]{return [...this.registered.values()].flatMap(({manifest,grants})=>manifest.tools.filter(tool=>tool.permissions.every(permission=>grants.includes(permission))).map(tool=>({...structuredClone(tool),packageId:manifest.id,toolId:tool.id,...(manifest.process?{process:true as const,packageDigest:capabilityDigest(JSON.stringify(manifest)),sideEffect:true}:{})})));}
   async invoke(input:unknown,owner:string,signal:AbortSignal){
     if(this.closing)throw new Error('Capability runtime closing');signal.throwIfAborted();

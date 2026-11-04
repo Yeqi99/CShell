@@ -66,7 +66,7 @@ try {
   assert.equal(server.shellRequests(),requestCount);
   assert.equal(await terminal.locator('.xterm-helper-textarea').evaluate(el=>el===(window as any).__releaseTerminalInput),true,'visual view reuses the native terminal node');
   assert.ok((await terminal.locator('.xterm-rows').textContent())?.includes('release-desktop-history'));
-  await terminal.getByRole('button',{name:'最小化终端',exact:true}).click();
+  await terminal.getByRole('button',{name:/^最小化\s*终端$/}).click();
   const files = await desktopApp(page,'文件');
   await files.getByText('hello.txt',{exact:true}).waitFor();
   await files.getByRole('button',{name:'新建目录',exact:true}).click();
@@ -82,11 +82,11 @@ try {
   await files.getByText('release-folder',{exact:true}).dblclick();
   await page.waitForFunction(input => input?.value === '/release-folder', await files.getByLabel('路径',{exact:true}).elementHandle());
   assert.equal(await files.getByLabel('路径',{exact:true}).inputValue(),'/release-folder');
-  await files.getByRole('button',{name:'关闭文件窗口',exact:true}).click();
+  await files.getByRole('button',{name:/^关闭\s*文件窗口$/}).click();
   await desktopApp(page,'终端');
   assert.equal(server.shellRequests(),requestCount);
   assert.ok(await terminal.locator('.xterm-rows').textContent().then(t=>t?.includes('release-desktop-history')));
-  await terminal.getByRole('button',{name:'最小化终端',exact:true}).click();
+  await terminal.getByRole('button',{name:/^最小化\s*终端$/}).click();
   await desktopApp(page,'文件');
   assert.equal(await files.getByLabel('路径',{exact:true}).inputValue(),'/release-folder');
   await page.screenshot({path:'test-results/release-desktop.png'});

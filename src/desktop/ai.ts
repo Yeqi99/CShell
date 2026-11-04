@@ -1,3 +1,5 @@
+import {CloudflareExtension} from '../extensions/cloudflare/service';
+import {WindowsSystemProxy} from './system-proxy';
 import {OfficialOpenCode} from '../extensions/opencode/official-runtime';
 import {TavilyExtension} from '../extensions/tavily/service';
 import {ApplicationNetworkRoute} from './network-route';
@@ -29,6 +31,7 @@ export async function registerAiHandlers(
   wechat?: import('../core/wechat').WechatService,
   customTools?: () => readonly import('../core/connections/contracts').ConnectionTool[],
   machineNetwork?: NonNullable<ApplicationNetworkRoute['machine']>,
+  initializeNewAi = false,
 ) {
   const ai = new AiService(directory, store, connections, connectHost, { http, wechat });
   const drafts = new AiDrafts(directory, store);
@@ -50,6 +53,12 @@ export async function registerAiHandlers(
   const network = new ApplicationNetworkRoute(directory, store);
   network.machine = machineNetwork;
   await network.load();
+  const systemProxy=new WindowsSystemProxy(directory,store,(host,port)=>network.systemTunnel(host,port),()=>network.prepareSystemProxy());
+  systemProxy.beforeEnable=state=>network.captureControlProxy(state);
+  systemProxy.afterDisable=()=>network.releaseControlProxy();
+  await systemProxy.recover().catch(()=>{});
+  handle('network:system-status',()=>systemProxy.status());
+  handle('network:system-set',enabled=>systemProxy.set(z.boolean().parse(enabled)));
   ai.requestTransport = process.versions.electron ? network.fetch : undefined;
   handle('network:status', () => network.status());
   handle('network:save', input => network.save(input));
@@ -63,14 +72,21 @@ export async function registerAiHandlers(
       pending.clear();
     }, 40);
   };
-  await ai.load();
+  await ai.load(initializeNewAi);
   const officialOpenCode=new OfficialOpenCode(join(directory,'extensions','opencode'),ai.requestTransport);
   const openCode=new OpenCodeExtension({official:officialOpenCode.request,officialStatus:officialOpenCode.status,directory:join(directory,'extensions','opencode'),enabled:()=>pluginEnabled(store.plugins(),'opencode'),encrypt:s=>store.encryptPrivate(s),decrypt:s=>store.decryptPrivate(s),getProvider:id=>ai.snapshot().providers.find(p=>p.id===id),changed:()=>publish?.('ai:providers-changed'),saveProvider:async p=>{await ai.saveProvider(p);publish?.('ai:providers-changed');},open:async url=>(await import('electron')).shell.openExternal(url)},ai.requestTransport);
   await openCode.load();
   ai.providerExtensions.register(openCode);
   const tavily=new TavilyExtension({directory:join(directory,'extensions','tavily'),enabled:()=>pluginEnabled(store.plugins(),'tavily'),encrypt:s=>store.encryptPrivate(s),decrypt:s=>store.decryptPrivate(s)},ai.requestTransport);
-  await tavily.load();ai.extensionTools=()=>[...tavily.tools(),...(customTools?.()??[])];
-  handle('ai:extension-call',(id,action,input)=>id==='cshell.tavily'?tavily.call(z.string().max(80).parse(action),input):ai.providerExtensions.call(z.string().max(100).parse(id),z.string().max(80).parse(action),input));
+  const cloudflare = new CloudflareExtension({
+    directory: join(directory, 'extensions', 'cloudflare'), enabled: () => pluginEnabled(store.plugins(), 'cloudflare'),
+    encrypt: s => store.encryptPrivate(s), decrypt: s => store.decryptPrivate(s),
+    open: async url => (await import('electron')).shell.openExternal(url),
+    authorized: async () => { const policy = ai.snapshot().policy; if (!policy.application.includes('cloudflare.manage')) await ai.savePolicy({...policy, application:[...policy.application, 'cloudflare.manage']}); },
+  }, ai.requestTransport);
+  await cloudflare.load();
+  await tavily.load();ai.extensionTools=()=>[...tavily.tools(),...cloudflare.tools(),...(customTools?.()??[])];
+  handle('ai:extension-call',(id,action,input)=>id==='cshell.cloudflare'?cloudflare.call(z.enum(['status','authorize','refresh','disconnect']).parse(action)):id==='cshell.tavily'?tavily.call(z.string().max(80).parse(action),input):ai.providerExtensions.call(z.string().max(100).parse(id),z.string().max(80).parse(action),input));
   const bindingKey=(id:string)=>{
     const thread=ai.snapshot().threads.find(t=>t.id===id);
     if(!thread||!ai.canReceiveEvent(id))throw new Error('请选择已配置基座的普通智能体会话');
@@ -150,6 +166,7 @@ export async function registerAiHandlers(
   handle('ai:approve', (id, request, allow) => ai.approve(id, request, allow));
   handle('ai:stop', (id) => ai.stopAndSave(id));
   handle('ai:mode', (id, mode) => ai.mode(id, mode));
+  handle('ai:thread-provider', (id, provider, model) => ai.changeThreadProvider(id, provider, model));
   let disposal: Promise<void> | undefined;
   const dispose = () => {
     if (disposal) return disposal;
@@ -159,8 +176,8 @@ export async function registerAiHandlers(
     ai.dispose();
     clearTimeout(timer);
     pending.clear();
-    disposal = Promise.all([events.close(),ai.flush(),officialOpenCode.dispose(),remoteClose,network.close(),drafts.snapshot()]).then(()=>{});
+    disposal = Promise.all([events.close(),ai.flush(),officialOpenCode.dispose(),remoteClose,systemProxy.close().finally(()=>network.close()),drafts.snapshot()]).then(()=>{});
     return disposal;
   };
-  return Object.assign(dispose, { classroomModels:()=>ai.classroomModels(),classroomModel:(id:string)=>ai.classroomModel(id), hasActiveWork: () => ai.hasActiveWork || officialOpenCode.status().active > 0 });
+  return Object.assign(dispose, { network, classroomModels:()=>ai.classroomModels(),classroomModel:(id:string)=>ai.classroomModel(id), hasActiveWork: () => ai.hasActiveWork || officialOpenCode.status().active > 0 });
 }

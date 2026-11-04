@@ -7,12 +7,22 @@ import type { AgentCall } from '../../shared/agent';
  * the catalog coverage test rejects newly added, unclassified RPC methods.
  */
 export const agentApiExcludedMethods = {
+  'automation.list': 'Exposed through owner-scoped agent_automation_list in the connection tool registry.',
+  'automation.create': 'Exposed through reviewed agent_automation_create with execution authorization, never opaque management.',
+  'automation.change': 'Exposed through reviewed agent_automation_change with controller ownership and execution authorization.',
   'assistant.model.configure': 'Classroom model deployment requires the prepared target identity, selected model snapshot and explicit batch confirmation; generic management cannot bypass that boundary.',
   'environment.read': 'Managed environment may contain private values and is restricted to authenticated target administration, not generic MCP management.',
   'environment.save': 'Classroom environment deployment requires an authorized paired target and confirmed batch plan; generic management cannot bypass target scope or confirmation.',
   'management.script.start': 'Classroom script execution requires a prepared paired-target plan and explicit batch confirmation, not a generic management grant.',
   'management.script.status': 'Managed script output belongs to its authenticated controller and job; it is accessed through the dedicated classroom task lifecycle.',
   'management.script.cancel': 'Managed script cancellation is bound to the authenticated controller and active classroom job, not generic management.',
+  'network.proxy.start': 'Proxy leases are created by identity_network_configure after source and exit authorization, not opaque management.',
+  'network.proxy.clear': 'Persisted proxy revocation requires the original authenticated owner and rule binding on the dedicated transport.',
+  'network.proxy.poll': 'Proxy channel discovery is private to its authenticated controller lease, not a generic management tool.',
+  'network.proxy.read': 'Proxy bytes are private to the authenticated controller and channel lease, not generic management output.',
+  'network.proxy.write': 'Proxy writes require the dedicated authenticated stream lease, not an opaque management grant.',
+  'network.proxy.close': 'Proxy channel cleanup belongs to the dedicated controller lease and must not be independently exposed.',
+  'network.proxy.stop': 'Proxy listener teardown belongs to the authorized identity network rule lifecycle, not generic management.',
   'machine.snapshot': 'Machine diagnostics use the dedicated authenticated machine workspace, not generic management.',
   'network.probe': 'Network diagnostics are exposed through the dedicated authenticated connection diagnostics UI, not generic management.',
   'ide.cancel':'IDE install cancellation is scoped to the authenticated owner.',
@@ -90,5 +100,6 @@ export const agentApiExcludedMethods = {
   'desktop.configure': 'Desktop grants and listener configuration are local-owner-only.',
   'desktop.open': 'Connection tickets and session keys are main-process-only; use the dedicated authenticated desktop transport.',
   'desktop.status': 'Desktop status belongs to the dedicated viewing/control permission boundary, not generic API management.',
+  'desktop.clipboard': 'Clipboard transfers require a live desktop view, control grant, owner and generation; never generic API management.',
   'desktop.close': 'Desktop sessions are owned and closed by the dedicated desktop transport.',
 } as const satisfies Partial<Record<AgentCall['method'], string>>;

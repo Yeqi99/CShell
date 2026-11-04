@@ -67,6 +67,7 @@ export class ClientServer {
     private vault: ClientVault,
     private terminal: ManagedProvider,
     private options: {
+      http?: (request:import('../../shared/http').HttpWireRequest,signal:AbortSignal)=>Promise<unknown>;
       desktopStream?: (socket: TLSSocket, owner: string) => Promise<void>;
       manage?: (method: string, params: unknown, signal: AbortSignal, owner: string) => Promise<unknown>;
       shells?: () => Promise<AgentShellOption[]>;
@@ -130,6 +131,13 @@ export class ClientServer {
   async revealPassword() { return (await this.vault.read('connection-password', z.string())) ?? ''; }
   async setAccess(options: unknown) {
     const input = clientAccessSchema.parse(options);
+    // Defaults apply only to a new access record. Partial edits must retain
+    // explicit opt-outs stored by an existing installation.
+    if (this.access && options && typeof options === 'object') {
+      for (const key of ['allowHttp','allowManage','allowHosting','allowRelay'] as const) {
+        if (!Object.prototype.hasOwnProperty.call(options,key)) input[key]=this.access[key];
+      }
+    }
     if (this.server || this.changingAccess) throw new Error('请先停止服务再修改密码与权限');
     this.changingAccess = true;
     try {
@@ -491,7 +499,7 @@ export class ClientServer {
       c.socket.once('close', closed);
       try {
         if (!c.alive || !this.peers.includes(c.peer)) throw new Error('Revoked');
-        return await executeHttp(request, abort.signal, undefined, 65536);
+        return this.options.http?await this.options.http(request,abort.signal):await executeHttp(request, abort.signal, undefined, 65536);
       } finally {
         c.socket.off('close', closed);
       }

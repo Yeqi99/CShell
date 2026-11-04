@@ -21,3 +21,16 @@ test('real SSH jump transport forwards bytes with pinned host key and no termina
  const route=new MachineNetworkRoute({profile:()=>profile,host:()=>pin,secret:async()=>({password:'test-only'})} as any,{} as any);
  try{const stream=await route.tunnel('ssh','destination.invalid',443);const data=once(stream,'data');stream.write('via-ssh');assert.equal(String((await data)[0]),'via-ssh');stream.destroy();}finally{await route.close();await new Promise<void>(r=>server.close(()=>r()));}
 });
+import {createServer} from 'node:http';
+test('remote source can use the real local network exit and shutdown fails closed',async()=>{
+ const server=createServer((_req,res)=>res.end('local-exit-response'));
+ await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
+ const route=new MachineNetworkRoute({} as any,{} as any,['remote-source']);
+ try{
+  const stream=await route.tunnel('local','127.0.0.1',(server.address() as any).port);
+  const response=new Promise<string>((resolve,reject)=>{let body='';stream.on('data',chunk=>body+=chunk);stream.once('end',()=>resolve(body));stream.once('error',reject);});
+  stream.write('GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n');
+  assert.match(await response,/local-exit-response/);
+  await route.close();await assert.rejects(route.tunnel('local','127.0.0.1',(server.address() as any).port),/关闭/);
+ }finally{await route.close();await new Promise<void>(resolve=>server.close(()=>resolve()));}
+});

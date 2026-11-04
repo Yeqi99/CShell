@@ -20,9 +20,14 @@ export function TabStrip({ children }: { children: ReactNode }) {
       }
       measure();
     };
-    const resize = new ResizeObserver(reveal);
+    const resize = new ResizeObserver(measure);
     resize.observe(el);
-    const mutation = new MutationObserver(reveal);
+    let lastActive: Element | null = null;
+    const mutation = new MutationObserver(() => {
+      const active = el.querySelector('.tab.active');
+      if (active !== lastActive) { lastActive = active; reveal(); }
+      else measure();
+    });
     mutation.observe(el, {
       childList: true,
       subtree: true,
@@ -49,7 +54,7 @@ export function TabStrip({ children }: { children: ReactNode }) {
     <div className="tab-strip">
       <button
         className="icon tab-scroll"
-        hidden={!edges.left && !edges.right}
+        style={{ visibility: edges.left || edges.right ? 'visible' : 'hidden' }}
         disabled={!edges.left}
         title="查看左侧标签"
         aria-label="查看左侧标签"
@@ -62,7 +67,7 @@ export function TabStrip({ children }: { children: ReactNode }) {
       </div>
       <button
         className="icon tab-scroll"
-        hidden={!edges.left && !edges.right}
+        style={{ visibility: edges.left || edges.right ? 'visible' : 'hidden' }}
         disabled={!edges.right}
         title="查看右侧标签"
         aria-label="查看右侧标签"

@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { useState, type ReactNode } from 'react';
 import { ClipboardPaste, ScanText, Sparkles, X } from 'lucide-react';
 import type { ExtractedConnection } from '../../shared/connection-extraction';
@@ -223,9 +224,7 @@ export function ConnectionExtractor({
             {extraActions}
           </div>
           {error && (
-            <p className="form-error" role="alert">
-              {error}
-            </p>
+            <ErrorNotice title="操作未完成" error={error}/>
           )}
           <div className="connection-extract-controls">
             <small>

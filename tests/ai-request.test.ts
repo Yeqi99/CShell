@@ -89,3 +89,8 @@ test('real HTTP streamed finish completes while the server socket stays open', {
   });
 });
 
+
+test('network failures report actionable proxy guidance without leaking the transport error',async()=>{
+ const transport=(async()=>{throw new TypeError('fetch failed',{cause:{code:'ECONNREFUSED',message:'secret'}})}) as typeof fetch;
+ await assert.rejects(requestAiReply('https://example.invalid/v1/chat/completions',{body:JSON.stringify({model:'fixture',messages:[]})},new AbortController().signal,()=>{},undefined,transport),error=>{assert.match(String(error),/网络出口或系统代理/);assert.doesNotMatch(String(error),/secret|fetch failed/);return true;});
+});

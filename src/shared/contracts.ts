@@ -1,3 +1,4 @@
+import type {LocalClipboardBridge} from './local-clipboard';
 import type {CommandBridge} from './command-console';
 import type {LinuxWorkspaceBridge} from './linux-workspace';
 import type {MachineBrowserBridge} from './machine-browser';
@@ -136,6 +137,7 @@ export const apiLocalFileRootSchema = z.object({
   mutations: z.array(z.enum(['create', 'write', 'rename', 'delete', 'mkdir', 'rmdir', 'renameDirectory'])).max(7).optional(),
 }).strict();
 const apiLocalFileRoots = z.array(apiLocalFileRootSchema).max(32).refine((roots) => new Set(roots.map((root) => root.id)).size === roots.length).optional();
+export const apiApplicationCapabilities = ['plugins.read', 'plugins.manage', 'connections.read', 'connections.manage', 'credentials.manage', 'identity.trust', 'http.use'] as const;
 export const apiClientSchema = z
   .object({
     id: z.string().uuid(),
@@ -146,8 +148,8 @@ export const apiClientSchema = z
     allowedLocalShells: z.array(localShellSchema).max(100).optional(),
     localFileRoots: apiLocalFileRoots,
     applicationCapabilities: z
-      .array(z.enum(['plugins.read', 'plugins.manage']))
-      .max(2)
+      .array(z.enum(apiApplicationCapabilities))
+      .max(apiApplicationCapabilities.length)
       .optional(),
     targetPolicies: apiTargetPoliciesSchema,
     capabilities: z.array(apiCapabilitySchema).max(32),
@@ -171,8 +173,8 @@ export const mcpSettingsSchema = z
     allowedLocalShells: z.array(localShellSchema).max(100).optional(),
     localFileRoots: apiLocalFileRoots,
     applicationCapabilities: z
-      .array(z.enum(['plugins.read', 'plugins.manage']))
-      .max(2)
+      .array(z.enum(apiApplicationCapabilities))
+      .max(apiApplicationCapabilities.length)
       .optional(),
     targetPolicies: apiTargetPoliciesSchema,
     clients: z
@@ -226,6 +228,7 @@ export const preferencesSchema = z
     sidebarGroupSize: z.number().min(8).max(22).default(14),
     sidebarDetailSize: z.number().min(8).max(20).default(12),
     sidebarDensity: z.enum(['compact', 'comfortable', 'spacious']).default('comfortable'),
+    sidebarPingIntervalSeconds: z.number().int().min(0).max(3600).default(0),
     terminalFont: z.string().max(200),
     fontSize: z.number().min(8).max(28),
     lineHeight: z.number().min(1).max(1.8).default(1.2),
@@ -264,6 +267,7 @@ export const defaults: Preferences = {
   sidebarGroupSize: 14,
   sidebarDetailSize: 12,
   sidebarDensity: 'comfortable',
+  sidebarPingIntervalSeconds: 0,
   terminalFont: 'Cascadia Code, Consolas, Microsoft YaHei UI, monospace',
   fontSize: 14,
   lineHeight: 1.2,
@@ -361,7 +365,7 @@ export type SessionEvent =
   | { type: 'closed'; sessionId: string; error?: string }
   | { type: 'transfer'; transfer: Transfer };
 export interface Bridge
-  extends CommandBridge, LinuxWorkspaceBridge, MachineBrowserBridge,
+  extends LocalClipboardBridge, CommandBridge, LinuxWorkspaceBridge, MachineBrowserBridge,
     AgentBridge,
     DesktopViewBridge,
     HttpBridge,
@@ -380,6 +384,7 @@ export interface Bridge
   readonly platform: string;
   networkDiagnostics?(): Promise<import('./network-probe').NetworkDiagnostics>;
   networkPing(input:{profileId?:string;sessionId?:string}):Promise<import('./icmp-ping').PingResult>;
+  connectionProbe?(input:{host:string;port:number}):Promise<import('./network-probe').NetworkProbeResult>;
   networkProbe?(input: { id: string; source: string; target: string }): Promise<import('./network-probe').NetworkProbeResult>;
   networkProbeCancel?(id: string): Promise<void>;
   connectionImportText?(text: string): Promise<import('./connection-batch').ConnectionImportPreview>;
@@ -390,6 +395,9 @@ export interface Bridge
   networkRemoteSources?():Promise<{id:string;name:string}[]>;
   networkRemoteOpen?(input:{source:string;exit:string}):Promise<{port:number}>;
   networkStatus?(): Promise<import('./network-route').NetworkRouteStatus>;
+  networkSystemStatus?():Promise<{supported:boolean;enabled:boolean;error:string}>;
+  identityNetwork(input:import('./identity-network').IdentityNetworkCommand):Promise<import('./identity-network').IdentityNetworkStatus>;
+  networkSystemSet?(enabled:boolean):Promise<{supported:boolean;enabled:boolean;error:string}>;
   desktopLookGet?(id:string,legacy?:import('./desktop-look').DesktopLook):Promise<import('./desktop-look').DesktopLook|null>;
   desktopLookSave?(id:string,value:import('./desktop-look').DesktopLook|null):Promise<import('./desktop-look').DesktopLook|null>;
   onDesktopLookChanged?(listener:()=>void):()=>void;

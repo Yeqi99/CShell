@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { HighlightStyle, syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
 import { useEffect, useRef, useState } from 'react';
 import { EditorState, Compartment } from '@codemirror/state';
@@ -332,7 +333,7 @@ export function PythonEditor({
         </div>
       )}
       {(error || engineError) && (
-        <div className="extension-error" role="alert">
+        <div className="extension-error">
           {!error && engineError.includes('JEDI_MISSING') ? (
             <>
               <span>
@@ -345,7 +346,7 @@ export function PythonEditor({
               </button>
             </>
           ) : (
-            error || engineError
+            <ErrorNotice title="编辑器操作未完成" error={error || engineError}/>
           )}
         </div>
       )}

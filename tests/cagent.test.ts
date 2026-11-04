@@ -57,7 +57,12 @@ test('local app checks host, origin, bearer token and fixed method surface',asyn
  assert.equal((await send({Origin:'https://evil.invalid','X-Cagent-Token':token})).status,403);
  assert.equal(await new Promise(resolve=>{const r=httpRequest(origin,{headers:{Host:'evil.invalid'}},res=>{res.resume();resolve(res.statusCode);});r.end();}),403);
  assert.equal((await send({Origin:origin,'X-Cagent-Token':token},'relay.revealCredential')).status,400);
- assert.equal((await send({Origin:origin,'X-Cagent-Token':token})).status,200);assert.equal(calls,1);for(const method of ['update.check','update.download','update.status'])assert.equal((await send({Origin:origin,'X-Cagent-Token':token},method)).status,200);
+ assert.equal((await send({Origin:origin,'X-Cagent-Token':token})).status,200);assert.equal(calls,1);for(const method of ['update.check','update.download','update.status','update.verify','update.install','update.settings'])assert.equal((await send({Origin:origin,'X-Cagent-Token':token},method)).status,200);
+ assert.equal(calls,7,'native and browser update operations reach the authenticated local runtime');
+ assert.equal((await send({Origin:origin},'update.verify')).status,403);
+ assert.equal((await send({Origin:'https://evil.invalid','X-Cagent-Token':token},'update.verify')).status,403);
+ assert.equal((await send({Origin:origin,'X-Cagent-Token':token},'update.commit')).status,400);
+ assert.equal(calls,7,'internal commit and unauthenticated verification never reach runtime');
  }finally{await app.close();}
 });
 
@@ -91,3 +96,12 @@ test('installed capability tools require side-effect approval and are rechecked 
  }finally{await service.close();}
 });
 
+
+test('cloud base URLs become model endpoints without duplicating explicit paths',async()=>{
+ for(const [endpoint,expected] of [['https://example.invalid/v1','https://example.invalid/v1/chat/completions'],['https://example.invalid/v1/chat/completions','https://example.invalid/v1/chat/completions'],['https://api.openai.com/v1/responses','https://api.openai.com/v1/responses']]){
+  const data=new Map<string,unknown>();let called='';
+  const vault={read:async(k:string)=>data.get(k),write:async(k:string,v:unknown)=>{data.set(k,v)}} as unknown as ClientVault;
+  const service=new CagentAssistant(vault,{shells:async()=>[],applications:async()=>[],execute:async()=>{},allowed:()=>true},(async(url)=>{called=url;return {content:'OK'}}) as typeof requestAiReply);
+  try{await service.load();await service.configure({...config,endpoint,review:false});const task=await service.start({prompt:'OK only',requestId:randomUUID()},'local');await until(()=>service.get(task,'local').state==='completed');assert.equal(called,expected);}finally{await service.close();}
+ }
+});

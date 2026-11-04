@@ -1,4 +1,4 @@
-/** Public download traffic stays on the Hong Kong origin, including metadata. */
+/** Hong Kong is the primary download source; update requests have a fixed official release fallback. */
 export const downloadOrigin = 'https://shell.canp.ai';
 export const downloadRoot = downloadOrigin + '/downloads/opensource';
 export const downloadManifest = downloadRoot + '/releases.json';

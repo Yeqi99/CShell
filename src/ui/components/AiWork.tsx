@@ -77,11 +77,17 @@ export function AiGoals({
   const [editing, setEditing] = useState<string | null>(null);
   const [objective, setObjective] = useState('');
   const [interval, setInterval] = useState(15);
+  const [unit, setUnit] = useState(60);
+  const [memory, setMemory] = useState('');
   const goals = snapshot.threads.filter((t) => t.goal);
   const edit = (t?: AiThread) => {
     setEditing(t?.id ?? 'new');
     setObjective(t?.goal?.objective ?? '');
-    setInterval(t?.goal?.intervalMinutes ?? 15);
+    const seconds = t?.goal?.intervalSeconds ?? (t?.goal?.intervalMinutes ?? 15) * 60;
+    const nextUnit = seconds % 3600 === 0 ? 3600 : seconds % 60 === 0 ? 60 : 1;
+    setUnit(nextUnit);
+    setInterval(seconds / nextUnit);
+    setMemory(t?.goal?.memory ?? '');
   };
   return (
     <div className="agent-goals">
@@ -110,7 +116,7 @@ export function AiGoals({
                 editing === 'new'
                   ? await create()
                   : snapshot.threads.find((t) => t.id === editing)!;
-              await window.cshell.aiGoalSave(target.id, { objective, intervalMinutes: interval });
+              await window.cshell.aiGoalSave(target.id, { objective, intervalMinutes: Math.max(1, Math.ceil(interval * unit / 60)), intervalSeconds: interval * unit, memory });
               setEditing(null);
             });
           }}
@@ -127,28 +133,34 @@ export function AiGoals({
             />
           </label>
           <label>
-            检查间隔（分钟）
+            检查间隔
+            <span style={{display:'flex',gap:8}}>
             <input
-              aria-label="检查间隔（分钟）"
+              aria-label="检查间隔"
               type="number"
               min={1}
-              max={10080}
+              max={Math.floor(604800/unit)}
+              step={1}
+              required
               value={interval}
               onChange={(e) => setInterval(Number(e.target.value))}
             />
+            <select aria-label="间隔单位" value={unit} onChange={e=>setUnit(Number(e.target.value))}><option value={1}>秒</option><option value={60}>分钟</option><option value={3600}>小时</option></select>
+            </span>
           </label>
+          <label>目标记忆<textarea aria-label="目标记忆" value={memory} maxLength={16000} onChange={e=>setMemory(e.target.value)} placeholder="记录进展与后续注意事项，智能体可在执行中更新。"/></label>
           <small>
             {editing === 'new'
               ? sessionId
                 ? '绑定当前连接，新建独立目标会话'
-                : '请先连接目标机器'
+                : '按已授权范围执行，新建独立目标会话'
               : snapshot.threads.find((t) => t.id === editing)?.target}
           </small>
           <footer>
             <button type="button" className="secondary" onClick={() => setEditing(null)}>
               取消
             </button>
-            <button className="primary" disabled={busy || (editing === 'new' && !sessionId)}>
+            <button className="primary" disabled={busy}>
               保存目标
             </button>
           </footer>
@@ -167,8 +179,9 @@ export function AiGoals({
           </header>
           <small>
             {t.target} · {snapshot.providers.find((p) => p.id === t.providerId)?.name} · 每{' '}
-            {t.goal!.intervalMinutes} 分钟
+            {t.goal!.intervalSeconds ? `${t.goal!.intervalSeconds} 秒` : `${t.goal!.intervalMinutes} 分钟`}
           </small>
+          {t.goal!.memory && <details><summary>目标记忆</summary><p style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{t.goal!.memory}</p></details>}
           <p>
             {t.state === 'approval'
               ? '等待执行授权，请打开会话查看'

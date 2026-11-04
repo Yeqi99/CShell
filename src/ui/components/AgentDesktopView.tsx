@@ -1,12 +1,13 @@
 import { DesktopRecovery } from './DesktopRecovery';
 import { useEffect, useRef, useState } from 'react';
-import { Monitor, Square, SlidersHorizontal, Expand, Minimize, Maximize, MoreHorizontal } from 'lucide-react';
+import { Monitor, Square, SlidersHorizontal, Expand, Minimize, Maximize, MoreHorizontal, Copy, ClipboardPaste } from 'lucide-react';
 import {
   desktopQualitySchema,
   type DesktopVideoInfo,
   type DesktopQuality,
 } from '../../shared/agent-desktop';
 import { desktopScanCode, h264Codec } from '../desktop-keys';
+import {pushDesktopClipboard,pullDesktopClipboard,waitDesktopClipboardChange} from '../desktop-clipboard-transfer';
 import type { DesktopViewInput } from '../../shared/desktop-view';
 import './agent-desktop-view.css';
 import { ErrorNotice } from './ErrorNotice';
@@ -20,6 +21,7 @@ export function AgentDesktopView({
   visible = true,
   embedded = false,
   optionsOpen = false,
+  onVideoSize,
 }: {
   target: string;
   canView: boolean;
@@ -29,6 +31,7 @@ export function AgentDesktopView({
   visible?: boolean;
   embedded?: boolean;
   optionsOpen?: boolean;
+  onVideoSize?: (size: {width:number;height:number}) => void;
 }) {
   const [active, setActive] = useState(false),
     [busy, setBusy] = useState(false),
@@ -36,9 +39,13 @@ export function AgentDesktopView({
     [control, setControl] = useState(true),
     [error, setError] = useState(''),
     [info, setInfo] = useState<DesktopVideoInfo>();
+  const videoSizeCallback=useRef(onVideoSize);videoSizeCallback.current=onVideoSize;
+  useEffect(()=>{if(info?.width&&info?.height)videoSizeCallback.current?.({width:info.width,height:info.height});},[info?.width,info?.height]);
   const visibleRef = useRef(visible);
   visibleRef.current = visible;
   const requestedControl=useRef(true);
+  const pasteBusy=useRef(false);
+  const [clipboardStatus,setClipboardStatus]=useState('');
   const [qualityOpen,setQualityOpen]=useState(false);
   const [toolsOpen,setToolsOpen]=useState(false);
   const [picture, setPicture] = useState('等待远端画面…');
@@ -52,7 +59,7 @@ export function AgentDesktopView({
   },[]);
   const [expanded,setExpanded]=useState(false),[fullscreen,setFullscreen]=useState(false);
   const [frameSize,setFrameSize]=useState<{width:number;height:number}>();
-  const [fit,setFit]=useState<'fill'|'contain'|'native'>('fill');
+  const [fit,setFit]=useState<'fill'|'contain'|'native'>('contain');
   const [zoom,setZoom]=useState(100),[pan,setPan]=useState(false);
   const drag=useRef<{x:number;y:number;left:number;top:number}|undefined>(undefined);
   useEffect(()=>{
@@ -166,7 +173,7 @@ export function AgentDesktopView({
       }
       if (event.type === 'closed') {
         generation.current++;
-        setError(event.reason==='CAPTURE_ACCESS_DENIED'?'Windows 拒绝采集当前桌面。请检查远端是否锁屏，以及 Windows 远程桌面是否最小化或已断开，再重试。':event.reason==='CAPTURE_CLOSED'?'远端画面采集退出，请检查远端登录会话后重新连接（CAPTURE_CLOSED）':event.reason);
+        setError(event.reason==='CAPTURE_ACCESS_DENIED'?'当前没有可采集的用户桌面。请在目标机器登录或解锁原用户；若此前使用 RDP，可在恢复原会话后检查“转为独立远控”，无需长期保持 RDP 窗口可见。':event.reason==='CAPTURE_FAILED'?'远端桌面采集未成功。请检查目标用户是否已登录并解锁，以及远端 CAgent 与桌面组件是否已更新；可展开“转为独立远控”检查会话状态。':event.reason==='CAPTURE_CLOSED'?'远端画面采集退出，请检查远端登录会话后重新连接（CAPTURE_CLOSED）':event.reason);
         setActive(false);
         setReconnecting('');
         setBusy(false);
@@ -208,6 +215,11 @@ export function AgentDesktopView({
                 const c = canvas.current;
                 if (!c) { ack(false); return; }
                 {
+                  if (c.width !== frame.displayWidth || c.height !== frame.displayHeight) {
+                    // Decoder output is authoritative after an Android orientation change.
+                    setInfo(previous => previous ? {...previous, width:frame.displayWidth, height:frame.displayHeight} : previous);
+                    videoSizeCallback.current?.({width:frame.displayWidth,height:frame.displayHeight});
+                  }
                   if (c.width !== frame.displayWidth) c.width = frame.displayWidth;
                   if (c.height !== frame.displayHeight) c.height = frame.displayHeight;
                   const context = c.getContext('2d', { alpha: false });
@@ -364,6 +376,10 @@ export function AgentDesktopView({
   const key = (event: React.KeyboardEvent<HTMLCanvasElement>, down: boolean) => {
     if(event.key==='Escape' && (fullscreen||expanded)){event.preventDefault();release();if(down){if(fullscreen)void document.exitFullscreen();else setExpanded(false);}return;}
     if (!controlling.current || event.nativeEvent.isComposing) return;
+    // Allow Chromium's trusted paste event to supply only the user's chosen data.
+    if((event.code==='KeyV'||event.code==='KeyC')&&(event.ctrlKey||event.metaKey)){
+      event.preventDefault();if(down&&!event.repeat)void exchangeClipboard(event.code==='KeyV'?'paste':'copy');return;
+    }
     const code = desktopScanCode(event.code);
     if (!code) return;
     event.preventDefault();
@@ -371,6 +387,19 @@ export function AgentDesktopView({
     // macOS may suppress key-up for a key pressed with Command. Release the
     // remote chord when Command is released, so no remote modifier stays down.
     if(!down && (event.code==='MetaLeft'||event.code==='MetaRight'))release();
+  };
+  const exchangeClipboard=async(action:'copy'|'paste'|'fetch')=>{
+    if(pasteBusy.current)return;
+    const session=id.current,wire=wireGeneration.current;
+    const valid=()=>!!session&&id.current===session&&wireGeneration.current===wire&&controlling.current&&permissions.current.canControl&&visibleRef.current;
+    if(!valid())return;pasteBusy.current=true;setClipboardStatus(action==='paste'?'正在发送剪贴板…':'正在复制远端内容…');
+    const chord=async(code:number)=>{for(const event of [{kind:'key' as const,code:29,down:true},{kind:'key' as const,code,down:true},{kind:'key' as const,code,down:false},{kind:'key' as const,code:29,down:false}]){if(!valid())throw Error('连接或权限已变化');await window.cshell.desktopViewInput(session,event,wire);}};
+    try{
+      await window.cshell.desktopViewRelease(session,wire);
+      if(action==='paste'){if(await pushDesktopClipboard(window.cshell,session,wire,valid))await chord(47);}
+      else{if(action==='copy'){const before=await window.cshell.desktopViewClipboard(session,{action:'sequence'},wire);await chord(46);await waitDesktopClipboardChange(window.cshell,session,wire,before.sequence,valid);}await pullDesktopClipboard(window.cshell,session,wire,valid);}
+    }catch(error){if(id.current===session)setError(String(error));}
+    finally{pasteBusy.current=false;setClipboardStatus('');if(id.current===session)void window.cshell.desktopViewRelease(session,wire).catch(()=>{});}
   };
   const validateQuality = () => {
     const parsed = desktopQualitySchema.safeParse(quality);
@@ -437,6 +466,7 @@ export function AgentDesktopView({
           </>
         )}
         {busy && <button onClick={() => void stop()}>取消连接</button>}
+        {active && <><button title="取回远端剪贴板已有内容，不发送按键" aria-label="取回远端剪贴板" disabled={!control||!canControl} onClick={()=>void exchangeClipboard('fetch')}><Copy size={15}/></button><button title="粘贴本机剪贴板到远端（Ctrl+V）" aria-label="粘贴到远端" disabled={!control||!canControl} onClick={()=>void exchangeClipboard('paste')}><ClipboardPaste size={15}/></button></>}
         {active && info?.secureAttention && <button disabled={!control} onClick={() => input({kind:'secure-attention'})} title="向远端发送 Ctrl+Alt+Delete；是否显示登录界面由 Windows 决定">Ctrl+Alt+Delete</button>}
         <DesktopRecovery key={target} target={target} allowed={canControl&&!busy} beforeExecute={stop} onRecovered={start}/>
         {onFiles && <button onClick={onFiles} title="在当前机器选择目录，粘贴或拖入文件">传输文件</button>}
@@ -532,6 +562,7 @@ export function AgentDesktopView({
           {reconnecting}
         </p>
       )}
+      {clipboardStatus && <p role="status" className="desktop-info">{clipboardStatus}</p>}
       {info && (
         <p className="desktop-info">
           {info.width} × {info.height} · {info.encoder} · {info.hardware ? '硬件编码' : '软件编码'}
@@ -549,10 +580,11 @@ export function AgentDesktopView({
             height={1}
             onBlur={release}
             onKeyDown={(e) => {if(!pan)key(e, true);}}
+            onPaste={e=>{if(!pan){e.preventDefault();void exchangeClipboard('paste');}}}
             onKeyUp={(e) => {if(!pan)key(e, false);}}
             onContextMenu={(e) => e.preventDefault()}
             onPointerDown={(e) => {
-              e.currentTarget.focus();
+              e.currentTarget.focus({preventScroll:true});
               if(pan&&screen.current){e.preventDefault();e.currentTarget.setPointerCapture(e.pointerId);drag.current={x:e.clientX,y:e.clientY,left:screen.current.scrollLeft,top:screen.current.scrollTop};return;}
               if (controlling.current) {
                 e.preventDefault();

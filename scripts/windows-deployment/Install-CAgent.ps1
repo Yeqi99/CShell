@@ -74,6 +74,9 @@ if ($PrepareOnly) {
   @{ prepared = $true; version = $manifest.version; path = $versionRoot } | ConvertTo-Json -Compress
   return
 }
+# Program discovery metadata only; never touches the identity/configuration directory.
+New-Item -Path 'HKCU:\Software\CAgent\Installation' -Force | Out-Null
+Set-ItemProperty -LiteralPath 'HKCU:\Software\CAgent\Installation' -Name InstallLocation -Value $root
 $launcher = Join-Path $root 'Open CAgent.vbs'
 NoLink $launcher
 $vbs = 'Set sh = CreateObject("WScript.Shell")' + "`r`n" + 'sh.Run Chr(34) & "' + $exe.Replace('"','""') + '" & Chr(34), 1, False' + "`r`n"

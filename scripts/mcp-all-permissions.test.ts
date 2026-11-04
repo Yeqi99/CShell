@@ -9,6 +9,8 @@ mcpSettingsSchema.parse(next);
 assert.equal(JSON.stringify(initial),before);
 assert.deepEqual(next.allowedProfiles,[id]);
 assert.deepEqual(next.capabilities,apiCapabilitySchema.options);
+assert.deepEqual(next.applicationCapabilities,['plugins.read','plugins.manage','connections.read','http.use']);
+assert.deepEqual(mcpSettingsSchema.parse({...initial,applicationCapabilities:['plugins.read']}).applicationCapabilities,['plugins.read']);
 assert.deepEqual(next.targetPolicies,{});
 assert.equal(next.review,'authorized');
 assert.equal(next.localFileRoots?.[0].mutations?.length,7);

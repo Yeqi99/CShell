@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { submitsComposer } from '../composer-keys';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -274,10 +275,7 @@ export function CodingApp({
           </button>
         </header>
         {(statusError || error) && (
-          <div role="alert" className="coding-error">
-            {statusError ||
-              error.replace(/^Error: (?:Error invoking remote method '[^']+': Error: )?/, '')}
-          </div>
+          <ErrorNotice title="应用状态未完成" error={statusError || error}/>
         )}
         {panel === 'profiles' || (ready?.ready && !profile) ? (
           <div className="coding-settings">
@@ -488,7 +486,7 @@ export function CodingApp({
                     在这台机器的浏览器中继续
                   </button>
                 )}
-                {login.error && <p role="alert">{login.error}</p>}
+                {login.error && <ErrorNotice title="登录未完成" error={login.error}/>}
                 {engine === 'claude' && login.state === 'running' && (
                   <label>
                     网页返回登录码时填写
@@ -618,7 +616,7 @@ export function CodingApp({
                       </div>
                     </div>
                   )}
-                  {task.error && <p className="coding-error">{task.error}</p>}
+                  {task.error && <ErrorNotice title="任务未完成" error={task.error}/>}
                   <small>{states[task.state]}</small>
                 </>
               )}

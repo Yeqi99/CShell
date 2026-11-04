@@ -3,6 +3,8 @@ import { z } from 'zod';
 export const goalInputSchema = z
   .object({
     objective: z.string().trim().min(1).max(8000),
+    intervalSeconds: z.number().int().min(1).max(604800).optional(),
+    memory: z.string().max(16000).default(''),
     intervalMinutes: z.number().int().min(1).max(10080).default(15),
   })
   .strict();
@@ -21,3 +23,5 @@ export const goalStates = {
   complete: '已达成',
   blocked: '缺少条件',
 };
+
+export function goalIntervalMs(goal: {intervalSeconds?:number; intervalMinutes:number}) { return (goal.intervalSeconds ?? goal.intervalMinutes * 60) * 1000; }

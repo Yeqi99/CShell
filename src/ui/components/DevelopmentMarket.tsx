@@ -23,7 +23,7 @@ export function DevelopmentMarket({
     [error, setError] = useState(''), [compatibility,setCompatibility]=useState('');
   const refresh = async () => {
     const [c, i] = await Promise.allSettled([
-      agentRead(() => call('coding.status')),
+      Promise.resolve({supported:false,engines:[]}),
       agentRead(() => call('ide.status')),
     ]);
     setCoding(c.status === 'fulfilled' ? c.value : undefined);
@@ -70,12 +70,6 @@ export function DevelopmentMarket({
     return () => clearInterval(t);
   }, [installing, call]);
   const apps = [
-    ...(coding?.supported
-      ? [
-          { id: 'codex', title: 'Codex', description: 'OpenAI 编程智能体' },
-          { id: 'claude', title: 'Claude Code', description: 'Anthropic 编程智能体' },
-        ]
-      : []),
     ...(ide?.supported
       ? [{ id: 'ide', title: '代码编辑器', description: 'code-server · 文件、终端与扩展' }]
       : []),
@@ -213,7 +207,7 @@ export function DevelopmentMarket({
               </button>
             </div>
           )}
-          {selected === 'ide' && ide?.installError && <p role="alert">{ide.installError}</p>}
+          {selected === 'ide' && ide?.installError && <ErrorNotice title="安装未完成" error={ide.installError}/>}
           {selected === 'ide' && ide?.installing && <p role="status">正在下载并安装代码编辑器…</p>}
           {selected !== 'ide' &&
             coding?.installs?.map((job: any) => (

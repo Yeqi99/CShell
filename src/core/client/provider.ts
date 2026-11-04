@@ -30,6 +30,8 @@ import { ClientVault, fingerprint, type ClientIdentity } from './identity';
 import { frames, send, textChunks } from './wire';
 import { ManagementQueue } from './management-queue';
 import { remoteProcessTools } from '../remote-process-tools';
+import {remoteAutomationTools} from '../remote-automation-tools';
+import { remoteCapabilityTools } from '../remote-capability-tools';
 const deviceSchema = clientInvitationSchema
   .omit({ token: true, expires: true })
   .extend({ relay: agentRelayConnectionSchema.optional() });
@@ -202,6 +204,7 @@ export class ClientProvider implements ManagedProvider {
       deviceId: z.string().uuid(),
       shell: clientShellSchema,
       distribution: z.string().min(1).max(100).optional(),
+      managementOnly: z.boolean().optional(),
     })
     .strict();
   private identity?: Promise<ClientIdentity>;
@@ -352,6 +355,14 @@ export class ClientProvider implements ManagedProvider {
       channel.socket.destroy();
     }
   }
+  async networkProxyTransport(deviceId:string){
+    const device=this.devices.find(d=>d.deviceId===deviceId);if(!device)throw Error('Agent 身份不可用');
+    const channel=await dial(
+      device,await(this.identity??=this.vault.identity()),()=>{},new AbortController().signal);
+    try{const auth=this.verifyAuth(await channel.request('auth',{name:hostname(),}),deviceId);if(!auth.capabilities.includes('http.send')||!auth.capabilities.includes('agent.manage'))throw Error('未授权浏览器网络访问');}
+    catch(e){channel.socket.destroy();throw e;}
+    channel.pulse();return {call:async(method:string,params?:unknown)=>{if(!method.startsWith('network.proxy.'))throw Error('浏览器通道操作无效');if(channel.socket.destroyed)throw Error('浏览器通道已断开');return channel.request('manage',agentCallSchema.parse({method,params}),30000);},validate:()=>{if(channel.socket.destroyed)throw Error('浏览器通道已断开');},close:()=>channel.socket.destroy()};
+  }
   async browserTransport(deviceId:string){
     const device=this.devices.find(d=>d.deviceId===deviceId);if(!device)throw Error('Agent 身份不可用');
     const channel=await dial(device,await(this.identity??=this.vault.identity()),()=>{},new AbortController().signal);
@@ -398,6 +409,16 @@ export class ClientProvider implements ManagedProvider {
       }
     }
   }
+  async toolConfiguration(deviceId:string,shell?:import('../../shared/client').ClientShell,distribution?:string){
+    const options=await this.shells(deviceId);
+    if(!options.length){
+      if(distribution)throw new Error('此机器没有所选 WSL 环境');
+      return {deviceId,shell:'powershell' as const,managementOnly:true};
+    }
+    const selected=shell?options.find(option=>option.shell===shell&&option.distribution===distribution):options.find(option=>option.shell!=='wsl')??options[0];
+    if(!selected)throw new Error('此机器没有所选终端环境');
+    return {deviceId,shell:selected.shell,distribution:selected.distribution};
+  }
   async connect(
     value: unknown,
     _credentials: unknown,
@@ -436,13 +457,18 @@ export class ClientProvider implements ManagedProvider {
         await channel.request('auth', { name: hostname() }),
         device.deviceId,
       );
-      if (!auth.shells.includes(config.shell)) throw new Error('Client 未授权此 Shell');
-      await channel.request(
+      if(config.managementOnly){
+        if(config.distribution)throw new Error('机器管理连接不能冒充 WSL 环境');
+        if(!auth.capabilities.includes('agent.manage'))throw new Error('机器未开放管理能力');
+      }else {
+        if (!auth.shells.includes(config.shell)) throw new Error('Client 未授权此 Shell');
+        await channel.request(
         'open',
         config.distribution
           ? { shell: config.shell, distribution: config.distribution }
           : config.shell,
-      );
+        );
+      }
       signal.throwIfAborted();
       if (channel.socket.destroyed) throw new Error('Client disconnected');
       const fire = (op: string, payload: unknown) => {
@@ -476,6 +502,12 @@ export class ClientProvider implements ManagedProvider {
       };
       // Custom tools run on the native CAgent host, never a selected WSL environment.
       let processTools: import('../connections/contracts').ConnectionTool[] = [];
+      let automationTools: import('../connections/contracts').ConnectionTool[] = [];
+      let packageTools: import('../connections/contracts').ConnectionTool[] = [];
+      if(config.shell!=='wsl'&&auth.capabilities.includes('agent.manage')){
+        try{automationTools=await remoteAutomationTools((call,abort)=>this.call(device.deviceId,call,abort),auth.capabilities.includes('commands.execute'),AbortSignal.any([signal,AbortSignal.timeout(3000)]));}catch{/* Unsupported automation or revoked grants contributes no tools. */}
+        try{packageTools=await remoteCapabilityTools((call,abort)=>this.call(device.deviceId,call,abort),auth.capabilities.includes('commands.execute'),AbortSignal.any([signal,AbortSignal.timeout(3000)]));}catch{/* Unsupported package protocol contributes no tools. */}
+      }
       if(config.shell!=='wsl'&&auth.capabilities.includes('agent.manage')&&auth.capabilities.includes('commands.execute')) {
         try { processTools=await remoteProcessTools((call,abort)=>this.call(device.deviceId,call,abort),AbortSignal.any([signal,AbortSignal.timeout(3000)])); }
         catch { /* Older agents or unavailable metadata contribute no executable tools. */ }
@@ -487,7 +519,7 @@ export class ClientProvider implements ManagedProvider {
           providerId: this.id,
           resourceId: device.deviceId,
           identity: fingerprint(device.certificate),
-          label: `${device.name} · ${config.distribution ?? config.shell}`,
+          label: config.managementOnly?device.name:`${device.name} · ${config.distribution ?? config.shell}`,
         },
         http:
           auth.capabilities.includes('http.send') && config.shell !== 'wsl'
@@ -516,7 +548,9 @@ export class ClientProvider implements ManagedProvider {
         agent: (call, abort) => this.call(device.deviceId, call, abort),
         tools: [
           ...processTools,
-          ...(auth.capabilities.includes('commands.execute')
+          ...packageTools,
+          ...automationTools,
+          ...(auth.capabilities.includes('commands.execute')&&auth.shells.includes(config.shell)
             ? [
                 {
                   name: 'execute_command',
@@ -657,7 +691,7 @@ export class ClientProvider implements ManagedProvider {
               },
             })),
         ],
-        terminal: {
+        terminal: config.managementOnly?undefined:{
           input: (data) => {
             for (const chunk of textChunks(data)) fire('input', chunk);
           },

@@ -1,3 +1,5 @@
+import {agentDownloads,type AgentDownload} from '../shared/agent-downloads';
+import { requestUpdateWithFallback } from '../shared/update-source-fallback';
 import { app, shell, net, type BrowserWindow } from 'electron';
 import { mkdir, open, rename, rm, readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
@@ -27,14 +29,14 @@ export function registerUpdateHandlers(
     busy = false, queued = false;
   const request = async (url: string, timeout = 30000) => {
     // Follow the OS proxy configuration, like the user's browser.
-    const response = await net.fetch(url, {
+    const response = await requestUpdateWithFallback(url, candidate => net.fetch(candidate, {
       headers: {
         'User-Agent': 'CShell/' + app.getVersion(),
         Accept: 'application/json',
       },
       signal: AbortSignal.timeout(timeout),
-      redirect: 'error',
-    });
+      redirect: 'manual',
+    }));
     if (!response.ok) throw new Error('香港更新服务 HTTP ' + response.status);
     return response;
   };
@@ -42,6 +44,17 @@ export function registerUpdateHandlers(
     state = { ...state, phase: 'error', retry, error: e instanceof Error ? e.message : String(e) };
     return state;
   };
+  let agentPackages:AgentDownload[]=[];
+  handle('agent:download-list',async()=>{
+    const channel='opensource' as const;const catalogs=[await(await request('https://shell.canp.ai/downloads/'+channel+'/releases.json')).json()];
+    agentPackages=agentDownloads(catalogs,channel);
+    return agentPackages.map(({url,...item})=>item);
+  });
+  handle('agent:download-open',async(id:unknown)=>{
+    if(typeof id!=='string')throw Error('请选择安装包');
+    const item=agentPackages.find(p=>p.id===id);if(!item)throw Error('安装包列表已失效，请重新打开下载入口');
+    await shell.openExternal(item.url);
+  });
   handle('update:state', () => state);
   handle('update:open-page', () => shell.openExternal(releasesPage));
   const check = async () => {
@@ -216,3 +229,4 @@ export function registerUpdateHandlers(
     }
   });
 }
+

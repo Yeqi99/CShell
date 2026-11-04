@@ -1,4 +1,7 @@
+import {ErrorNotice} from './ErrorNotice';
 import {PingButton} from './PingButton';
+import {PingAll} from './PingAll';
+import {useSidebarGroups} from './useSidebarGroups';
 import type { LocalConnectionTarget } from '../../shared/local-terminal';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -62,7 +65,7 @@ export function ServerSidebar({
   const [query, setQuery] = useState('');
   const [menu, setMenu] = useState<Menu | null>(null);
   const [appearanceExpanded, setAppearanceExpanded] = useState(false);
-  const [collapsed, setCollapsed] = useState<string[]>([]);
+  const {isCollapsed,toggle:toggleGroup,setCollapsed:setGroupCollapsed}=useSidebarGroups('local');
   const [editor, setEditor] = useState<{ original?: string; move?: Profile } | null>(null);
   const [name, setName] = useState('');
   const [error, setError] = useState('');
@@ -174,7 +177,7 @@ export function ServerSidebar({
         );
       }
       setEditor(null);
-      setCollapsed((items) => items.filter((item) => item !== `group:${next}`));
+      setGroupCollapsed(`group:${next}`,false);
     } catch (e) {
       report(e);
     } finally {
@@ -184,7 +187,7 @@ export function ServerSidebar({
   async function move(profile: Profile, group: string) {
     try {
       await onSave({ ...profile, group });
-      setCollapsed((items) => items.filter((item) => item !== `group:${group}`));
+      setGroupCollapsed(`group:${group}`,false);
       closeMenu(true);
       setError('');
     } catch (e) {
@@ -232,6 +235,7 @@ export function ServerSidebar({
       </button>
       <div className="server-groups-heading">
         <span>{t('groups')}</span>
+        <PingAll profiles={profiles} interval={preferences.sidebarPingIntervalSeconds} onInterval={onPreferences ? value=>onPreferences({...preferences,sidebarPingIntervalSeconds:value}) : undefined}/>
         <button onClick={() => beginGroup()} title={t('newGroup')}>
           <FolderPlus size={13} />
           {t('newGroup')}
@@ -293,9 +297,7 @@ export function ServerSidebar({
         </form>
       )}
       {error && (
-        <p className="sidebar-error" role="alert">
-          {error}
-        </p>
+        <ErrorNotice title="操作未完成" error={error}/>
       )}
       <div className="server-list">
         {dragging && <div className="sidebar-drag-hint" role="status">{profiles.find(p => p.id === dragging)?.name} → {drop ? `${drop.group || t('ungrouped')}${drop.before ? ' · 插入此机器之前' : ' · 移到分组末尾'}` : '拖到机器之间或分组标题'}</div>}
@@ -339,19 +341,11 @@ export function ServerSidebar({
               <button
                 className="group-title"
                 aria-expanded={
-                  !collapsed.includes(`${section.favorite ? 'favorite' : 'group'}:${section.id}`)
+                  !isCollapsed(`${section.favorite ? 'favorite' : 'group'}:${section.id}`)
                 }
-                onClick={() =>
-                  setCollapsed((current) =>
-                    current.includes(`${section.favorite ? 'favorite' : 'group'}:${section.id}`)
-                      ? current.filter(
-                          (x) => x !== `${section.favorite ? 'favorite' : 'group'}:${section.id}`,
-                        )
-                      : [...current, `${section.favorite ? 'favorite' : 'group'}:${section.id}`],
-                  )
-                }
+                onClick={()=>toggleGroup(`${section.favorite ? 'favorite' : 'group'}:${section.id}`)}
               >
-                {collapsed.includes(`${section.favorite ? 'favorite' : 'group'}:${section.id}`) ? (
+                {isCollapsed(`${section.favorite ? 'favorite' : 'group'}:${section.id}`) ? (
                   <ChevronRight size={12} />
                 ) : (
                   <ChevronDown size={12} />
@@ -371,7 +365,7 @@ export function ServerSidebar({
                 </button>
               )}
             </div>
-            {!collapsed.includes(`${section.favorite ? 'favorite' : 'group'}:${section.id}`) &&
+            {!isCollapsed(`${section.favorite ? 'favorite' : 'group'}:${section.id}`) &&
               section.items.map((profile) => (
                 <div
                   key={profile.id}
@@ -471,7 +465,7 @@ export function ServerSidebar({
                 </div>
               ))}
             {!section.items.length &&
-              !collapsed.includes(`${section.favorite ? 'favorite' : 'group'}:${section.id}`) && (
+              !isCollapsed(`${section.favorite ? 'favorite' : 'group'}:${section.id}`) && (
                 <p className="empty-group">{t('emptyGroup')}</p>
               )}
           </section>

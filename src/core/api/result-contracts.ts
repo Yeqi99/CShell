@@ -53,8 +53,20 @@ export const metricsResult = z
     disk: z.number().nullable(),
     diskUsed: z.number().nullable(),
     diskTotal: z.number().nullable(),
-    physicalDisks: z.array(z.object({name: z.string(), size: z.number()}).strict()).optional(),
-    disks: z.array(z.object({device: z.string(), mount: z.string(), total: z.number(), used: z.number(), percent: z.number()}).strict()).optional(),
+    physicalDisks: z.array(z.object({ name: z.string(), size: z.number() }).strict()).optional(),
+    disks: z
+      .array(
+        z
+          .object({
+            device: z.string(),
+            mount: z.string(),
+            total: z.number(),
+            used: z.number(),
+            percent: z.number(),
+          })
+          .strict(),
+      )
+      .optional(),
     latency: z.number(),
     error: z.string().optional(),
   })
@@ -80,7 +92,16 @@ export const baseResultSchemas: Record<string, z.ZodType> = {
   ),
   list_files: fileListResult,
   monitor: metricsResult,
-  execute_command: z.object({ output: z.string(), exitCode: z.number().int().optional() }).strict(),
+  execute_command: z
+    .object({
+      output: z.string(),
+      stdout: z.string().optional(),
+      stderr: z.string().optional(),
+      exitCode: z.number().int().optional(),
+      stdoutTruncated: z.boolean().optional(),
+      stderrTruncated: z.boolean().optional(),
+    })
+    .strict(),
   invoke_connection: z
     .string()
     .describe(
@@ -88,7 +109,10 @@ export const baseResultSchemas: Record<string, z.ZodType> = {
     ),
   describe_connection: z
     .object({
-      terminalEnvironment: z.object({ parentSessionId: z.string().uuid(), conda: z.string(), prefix: z.string() }).strict().optional(),
+      terminalEnvironment: z
+        .object({ parentSessionId: z.string().uuid(), conda: z.string(), prefix: z.string() })
+        .strict()
+        .optional(),
       target: z
         .object({
           providerId: z.string(),

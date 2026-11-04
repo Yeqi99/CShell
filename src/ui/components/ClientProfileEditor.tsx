@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import { useState } from 'react';
 import type { Profile } from '../../shared/contracts';
 import { ClientConnectForm, type ClientConnected } from './ClientConnectForm';
@@ -88,7 +89,7 @@ export function ClientProfileEditor({
         </fieldset>
       </form>
       {saved && <p role="status">{cn ? '已保存' : 'Saved'}</p>}
-      {error && <p role="alert">{error}</p>}
+      {error && <ErrorNotice title="操作未完成" error={error}/>}
       <details>
         <summary>{cn ? '更新地址或认证' : 'Update address or authentication'}</summary>
         <ClientConnectForm key={profile.id} profile={draft} onConnect={onClient} />

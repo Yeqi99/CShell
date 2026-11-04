@@ -26,6 +26,7 @@ final class AgentConnection implements AutoCloseable {
   private final ExecutorService writer = new ThreadPoolExecutor(1,1,0,TimeUnit.MILLISECONDS,new ArrayBlockingQueue<>(128));
   private final ScheduledExecutorService heartbeat = Executors.newSingleThreadScheduledExecutor();
   private volatile SSLSocket socket;
+  private volatile RelayBridge relayBridge;
   private JSONArray environments = new JSONArray();
   private volatile boolean opened;
   private volatile DesktopTransport desktop;
@@ -46,7 +47,9 @@ final class AgentConnection implements AutoCloseable {
   private final List<String> earlyOutput = new ArrayList<>();
   private int earlySize;
   AgentConnection(Events events) { this.events = events; }
-  void connect(String host, int port, String password, Trust trust) throws Exception {
+  void connect(String host, int port, String password, Trust trust) throws Exception {connect(host,port,password,trust,null);}
+  void connect(String host, int port, String password, Trust trust, JSONObject relay) throws Exception {connect(host,port,password,trust,relay,null);}
+  void connect(String host, int port, String password, Trust trust, JSONObject relay,String delegation) throws Exception {
     if(closed.get())throw new IOException("连接已取消");
     if (android.os.Build.VERSION.SDK_INT < 29) throw new IOException("Agent 连接需要 Android 10 或更新版本（TLS 1.3）");
     SSLContext context = SSLContext.getInstance("TLSv1.3");
@@ -58,9 +61,24 @@ final class AgentConnection implements AutoCloseable {
         // Exact persisted leaf pin / human confirmation is checked before application traffic below.
       }
     }},null);
-    SSLSocket s=(SSLSocket)context.getSocketFactory().createSocket(); socket=s;
+    SSLSocket s;
+    if(relay!=null){
+      SSLSocket outer=(SSLSocket)context.getSocketFactory().createSocket();socket=outer;
+      try{
+        outer.setTcpNoDelay(true);outer.setEnabledProtocols(new String[]{"TLSv1.3"});outer.connect(new InetSocketAddress(relay.getString("host"),relay.getInt("port")),10000);outer.setSoTimeout(10000);outer.startHandshake();
+        byte[] pin=java.security.MessageDigest.getInstance("SHA-256").digest(outer.getSession().getPeerCertificates()[0].getEncoded());StringBuilder hex=new StringBuilder();for(byte b:pin)hex.append(String.format(java.util.Locale.ROOT,"%02x",b&255));
+        if(!hex.toString().equalsIgnoreCase(relay.getString("fingerprint").replace(":","")))throw new IOException("中继身份校验失败");
+        JSONObject hello=new JSONObject().put("protocol","cshell-relay/1").put("operation","forward").put("targetId",relay.getString("targetId")).put("credential",relay.getString("credential"));
+        outer.getOutputStream().write((hello.toString()+"\n").getBytes(StandardCharsets.UTF_8));outer.getOutputStream().flush();
+        ByteArrayOutputStream line=new ByteArrayOutputStream();int ch;while((ch=outer.getInputStream().read())!=-1&&ch!=10){if(line.size()>=4096)throw new IOException("中继响应过大");line.write(ch);}
+        if(ch!=10||!new JSONObject(line.toString("UTF-8")).optBoolean("ok"))throw new IOException("机器离线或会员连接未授权");
+        relayBridge=new RelayBridge(outer);
+        s=(SSLSocket)context.getSocketFactory().createSocket(relayBridge.client,host,port,true);
+      }catch(Exception e){if(relayBridge!=null)relayBridge.close();outer.close();throw e;}
+    }else s=(SSLSocket)context.getSocketFactory().createSocket();
+    socket=s;
     if(closed.get()){s.close();throw new IOException("连接已取消");}
-    s.setEnabledProtocols(new String[]{"TLSv1.3"});s.connect(new InetSocketAddress(host,port),10000);s.setSoTimeout(10000);s.startHandshake();
+    s.setTcpNoDelay(true);s.setEnabledProtocols(new String[]{"TLSv1.3"});if(relay==null)s.connect(new InetSocketAddress(host,port),10000);s.setSoTimeout(10000);s.startHandshake();
     byte[] certificate=s.getSession().getPeerCertificates()[0].getEncoded();
     if(!trust.verify(certificate)||closed.get())throw new IOException("Agent 身份未获信任或连接已取消");
     s.setSoTimeout(0);
@@ -69,6 +87,7 @@ final class AgentConnection implements AutoCloseable {
     if(info.getInt("protocol")!=1)throw new IOException("不支持的 Agent 协议");UUID.fromString(info.getString("deviceId"));
     JSONObject credentials=new JSONObject().put("name","CShell Android");
     if(!password.isEmpty())credentials.put("password",password);
+    if(delegation!=null)credentials.put("delegation",delegation);
     JSONObject auth=request("auth",credentials);
     if(auth.getInt("protocol")!=1||!info.getString("deviceId").equals(auth.getString("deviceId")))throw new IOException("Agent 身份不匹配");
     deviceId=info.getString("deviceId");
@@ -180,6 +199,27 @@ final class AgentConnection implements AutoCloseable {
     if(!closed.get())events.emit("data",android.util.Base64.encodeToString(data.getBytes(StandardCharsets.UTF_8),android.util.Base64.NO_WRAP));
   }
   private void fail(Exception e){if(!closed.get())events.emit("error",e.getMessage()==null?"Agent 操作失败":e.getMessage());close();}
-  public void close(){if(!closed.compareAndSet(false,true))return;heartbeat.shutdownNow();writer.shutdownNow();try{if(socket!=null)socket.close();}catch(IOException ignored){}for(CompletableFuture<JSONObject> future:pending.values())future.completeExceptionally(new IOException("Agent 已断开"));pending.clear();commands.clear();acknowledgements.clear();synchronized(acknowledgementLock){renderedCharacters=0;acknowledgementRequest=null;acknowledgementScheduled=false;}events.emit("closed","");}
+  public void close(){if(!closed.compareAndSet(false,true))return;heartbeat.shutdownNow();writer.shutdownNow();if(relayBridge!=null)relayBridge.close();try{if(socket!=null)socket.close();}catch(IOException ignored){}for(CompletableFuture<JSONObject> future:pending.values())future.completeExceptionally(new IOException("Agent 已断开"));pending.clear();commands.clear();acknowledgements.clear();synchronized(acknowledgementLock){renderedCharacters=0;acknowledgementRequest=null;acknowledgementScheduled=false;}events.emit("closed","");}
+  /** A distinct FD prevents Android 10 Conscrypt from bypassing outer TLS
+   * when wrapping an SSLSocket. The local bridge carries only target TLS bytes. */
+  private static final class RelayBridge implements AutoCloseable {
+    final java.net.Socket client,peer;final SSLSocket outer;
+    final AtomicBoolean stopped=new AtomicBoolean();
+    RelayBridge(SSLSocket transport)throws Exception {
+      outer=transport;java.net.Socket local=null,accepted=null;
+      try(java.net.ServerSocket listener=new java.net.ServerSocket()){
+        listener.bind(new InetSocketAddress(java.net.InetAddress.getLoopbackAddress(),0),1);listener.setSoTimeout(10000);
+        local=new java.net.Socket();local.connect(listener.getLocalSocketAddress(),10000);accepted=listener.accept();
+        if(accepted.getPort()!=local.getLocalPort())throw new IOException("Unexpected relay bridge peer");
+        local.setTcpNoDelay(true);accepted.setTcpNoDelay(true);client=local;peer=accepted;outer.setSoTimeout(0);
+      }catch(Exception failure){if(local!=null)local.close();if(accepted!=null)accepted.close();throw failure;}
+      pump(peer,outer);pump(outer,peer);
+    }
+    void pump(java.net.Socket source,java.net.Socket destination){Thread worker=new Thread(()->{
+      try{byte[] buffer=new byte[32768];int size;while(!stopped.get()&&(size=source.getInputStream().read(buffer))!=-1){destination.getOutputStream().write(buffer,0,size);destination.getOutputStream().flush();}}
+      catch(IOException ignored){}finally{close();}
+    },"cagent-relay-tls-bridge");worker.setDaemon(true);worker.start();}
+    public void close(){if(!stopped.compareAndSet(false,true))return;for(java.net.Socket part:new java.net.Socket[]{client,peer,outer})try{part.close();}catch(IOException ignored){}}
+  }
   private static final class AgentDenied extends IOException{AgentDenied(String message){super(message);}}
 }

@@ -30,3 +30,14 @@ test('IPC only pings selected stored/active targets, bounds duplicate work and r
  const pending=ping({profileId:id});await assert.rejects(ping({sessionId:'live'}),/正在进行/);
  assert.equal((await pending).status,'reply');assert.equal((await ping({sessionId:'live'})).status,'reply');
 });
+import { classifyPingRoute } from '../src/core/icmp-ping';
+test('selected route protects against synthetic ICMP without guessing from RTT', () => {
+ assert.equal(classifyPingRoute('199.102.219.30',{interfaceAlias:'Meta',sourceAddress:'198.18.0.0',nextHop:'198.18.0.1'}),'proxy-path');
+ assert.equal(classifyPingRoute('192.168.31.210',{interfaceAlias:'WLAN',sourceAddress:'192.168.31.29',nextHop:'0.0.0.0'}),'direct');
+ assert.equal(classifyPingRoute('199.102.219.30',{interfaceAlias:'Ethernet',sourceAddress:'10.41.81.52',nextHop:'10.41.81.1'}),'direct');
+ assert.equal(classifyPingRoute('127.0.0.1',null),'direct');
+ assert.equal(classifyPingRoute('::1',null),'direct');
+ assert.equal(classifyPingRoute('198.18.1.3',null),'proxy-path');
+ assert.equal(classifyPingRoute('199.102.219.30',null),'route-unknown');
+ assert.equal(classifyPingRoute('199.102.219.30',{interfaceAlias:'VPN',interfaceDescription:'Wintun Userspace Tunnel'}),'proxy-path');
+});

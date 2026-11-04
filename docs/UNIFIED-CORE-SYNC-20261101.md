@@ -1,0 +1,21 @@
+# 开源通用能力同步（2026-11-01）
+
+工作分支 codex/core-unified-followup 基于 db9a147，从 Pro 本轮已提交改动按通用文件和代码块移植，未合并 Pro 账号服务、会员中继、机器租借、云账号界面或加密账号资料。保留开源原有数据和协议。
+
+## 已同步
+
+- 设置与权限布局、稳定标签、连接前检测、批量 Ping、紧凑统计、智能体同会话模型切换。
+- 目标秒级间隔与记忆、未绑定目标按既有授权使用机器、扩展工具目录与调用。
+- CAgent 事件订阅与目标更新、终端环境修复、模型端点规范化、OpenCode 不可用状态持久化。
+- Windows 系统代理显式启停与恢复、应用流量的真实机器出口，失败不回退；不宣称覆盖 UDP 或所有应用。
+- Android 短信、电话及 UI 工具契约（仍需设备系统授权），WSL 离线安装文档与入口。
+- 桌面文字、PNG、文件剪贴板桥及 Windows 发行前原生校验；已同步 515bdf4 安全修复，文件读取与写入仅在交互用户令牌下执行。
+
+## 验证
+
+TypeScript、Vite 前端、桌面/CLI/CAgent JavaScript 构建通过；Windows CAgent 原生桌面组件和原生窗口构建通过。
+最终全量测试 703 项：699 通过、0 失败、4 项条件跳过。新增工具目录断言与异步命令准备阶段取消文案已修复。真实 Electron release-desktop-smoke 通过（SSH、SFTP、MCP、布局、重启持久化）；隔离 WinStation 原生剪贴板 text/png/files 三项通过，文件授权 Node 回归 4 项通过。构建与测试日志保存在本工作树 .local。
+
+本记录不代表已发布，不代表 Android/macOS/Linux 全部实机验收通过。未修改用户实际安装或账户数据。
+
+普通版独立 Windows x64 dir 包构建成功（保留 0.8.17 版号，仅验收未发布）。platform-package-smoke 和针对打包 CShell.exe 的 release-desktop-smoke 均通过，隔离测试 profile 未触及实际用户配置。

@@ -1,3 +1,5 @@
+import {CloudflareView} from '../../extensions/cloudflare/View';
+import {ErrorNotice} from './ErrorNotice';
 import type {ClassroomTasksBridge} from '../../shared/classroom-tasks';
 import type {AgentLanBridge} from '../../shared/agent-lan';
 import {TavilyView} from '../../extensions/tavily/View';
@@ -77,11 +79,12 @@ export function ExtensionWorkbench({
   const { locale } = useI18n(),
     zh = locale === 'zh-CN';
   const [section, setSection] = useState<
-    'plugins' | 'apps' | 'environment' | 'python' | 'wsl' | 'agent' | 'wechat' | 'opencode' | 'tavily' | 'classroom'
+    'plugins' | 'apps' | 'environment' | 'python' | 'wsl' | 'agent' | 'wechat' | 'opencode' | 'tavily' | 'cloudflare' | 'classroom'
   >('plugins');
   const [settingsPlugin, setSettingsPlugin] = useState<string | null>(null);
   const [importPreview,setImportPreview]=useState<Awaited<ReturnType<typeof window.cshell.pluginImportPreview>>>(null);
   const [importNotice,setImportNotice]=useState('');
+  const [restorePending,setRestorePending]=useState<(InstalledPlugin & {reason:string})[]>([]);
   const [processStatus,setProcessStatus]=useState<Awaited<ReturnType<typeof window.cshell.pluginProcessStatus>>>([]);
   const [dragging,setDragging]=useState(false);
   const views = availablePluginViews(plugins);
@@ -95,6 +98,7 @@ export function ExtensionWorkbench({
     [busy, setBusy] = useState(false),
     [catalogUrl, setCatalogUrl] = useState(pluginCatalogUrl),
     [catalog, setCatalog] = useState<CatalogEntry[]>([]);
+  useEffect(()=>{if(!visible||!window.cshell.pluginsRestorePending)return;let active=true;void window.cshell.pluginsRestorePending().then(items=>{if(active)setRestorePending(items);}).catch(e=>{if(active)setError(String(e));});return()=>{active=false;};},[visible,plugins]);
   useEffect(()=>{if(!plugins.some(item=>item.manifest.provider==='process')){setProcessStatus([]);return;}let active=true;void window.cshell.pluginProcessStatus().then(items=>{if(active)setProcessStatus(items);}).catch(e=>{if(active)setError(String(e));});return()=>{active=false;};},[plugins,visible]);
   useEffect(() => {
     void window.cshell
@@ -195,14 +199,14 @@ export function ExtensionWorkbench({
                       ? 'WSL Linux'
                       : section === 'agent'
                         ? 'CAgent'
-                        : section === 'classroom' ? '机房' : section === 'tavily' ? 'Tavily 搜索' : section === 'opencode' ? 'OpenCode' : section === 'wechat' ? '微信' : 'Python'}
+                        : section === 'cloudflare' ? 'Cloudflare' : section === 'classroom' ? '机房' : section === 'tavily' ? 'Tavily 搜索' : section === 'opencode' ? 'OpenCode' : section === 'wechat' ? '微信' : 'Python'}
             </h1>
             <p>
               {section === 'plugins'
                 ? zh
                   ? '按需添加，随时停用。'
                   : 'Add the tools you need.'
-                : section === 'classroom' ? '屏幕共享与机房管理' : section === 'tavily' ? '网络搜索扩展' : section === 'opencode' ? '模型接入扩展' : section === 'wechat' ? '本机微信 · 独立授权' : section === 'agent'
+                : section === 'cloudflare' ? 'Cloudflare' : section === 'classroom' ? '屏幕共享与机房管理' : section === 'tavily' ? '网络搜索扩展' : section === 'opencode' ? '模型接入扩展' : section === 'wechat' ? '本机微信 · 独立授权' : section === 'agent'
                   ? zh
                     ? '配置所选 Agent 的连接、权限与服务。'
                     : 'Manage connections, permissions and services on the selected Agent.'
@@ -213,7 +217,7 @@ export function ExtensionWorkbench({
                       : 'Actions belong to the selected connection.'}
             </p>
           </div>
-          {section !== 'plugins' && section !== 'wsl' && section !== 'agent' && section !== 'wechat' && section !== 'opencode' && section !== 'tavily' && section !== 'classroom' && (
+          {section !== 'plugins' && section !== 'wsl' && section !== 'agent' && section !== 'wechat' && section !== 'opencode' && section !== 'cloudflare' && section !== 'tavily' && section !== 'classroom' && (
             <label className="extension-server">
               {zh ? '目标服务器' : 'Target server'}
               <select
@@ -234,9 +238,7 @@ export function ExtensionWorkbench({
           )}
         </header>
         {error && (
-          <div className="extension-error" role="alert">
-            {error}
-          </div>
+          <ErrorNotice title="操作未完成" error={error}/>
         )}
         <div hidden={section !== 'plugins'} className={`plugin-market${dragging?' extension-drop-active':''}`}
           onDragOver={e=>{if(e.dataTransfer.types.includes('Files')){e.preventDefault();e.dataTransfer.dropEffect='copy';setDragging(true);}}}
@@ -263,7 +265,13 @@ export function ExtensionWorkbench({
             </select>
             <button disabled={busy} onClick={()=>void run(async()=>{setImportNotice('');setImportPreview(await window.cshell.pluginImportPreview());})}><Plus size={15}/>{zh?'导入扩展':'Import extension'}</button>
           </div>
-          <p className="custom-extension-hint">{zh?'可将 .cshellext 文件拖入此处。自定义扩展单独管理，导入后由你启用。':'Drop a .cshellext file here. Imported extensions remain disabled until you enable them.'}</p>
+          <p className="custom-extension-hint">{zh?'可将 .cshellext 文件拖入此处。导入前核验来源，运行权限单独管理。':'Drop a .cshellext file here. Verify its source before importing; execution permissions are managed separately.'}</p>
+          {restorePending.length>0&&<details className="extension-restore-pending">
+            <summary>{zh?`${restorePending.length} 个扩展待恢复`:`${restorePending.length} extensions awaiting restore`}</summary>
+            <p>{zh?'账号已记住这些扩展。此电脑还需要匹配的安装包；导入时会核验来源与版本。':'Your account remembers these extensions. Import the matching packages to verify their source and version on this computer.'}</p>
+            <ul>{restorePending.map(item=><li key={item.manifest.id}><div><strong>{item.manifest.name}</strong><small>{item.manifest.version}</small></div><span>{zh?item.reason:'The matching verified package is not installed on this computer.'}</span></li>)}</ul>
+            <button disabled={busy} onClick={()=>void run(async()=>{setImportNotice('');setImportPreview(await window.cshell.pluginImportPreview());})}><Download size={15}/>{zh?'选择扩展包':'Choose package'}</button>
+          </details>}
           {dragging&&<div className="custom-extension-drop" role="status">{zh?'放开以预览扩展包':'Drop to preview extension'}</div>}
           {importNotice&&<p role="status" className="custom-extension-hint">{importNotice}</p>}
           {importPreview&&<section className="custom-extension-preview" aria-label={zh?'扩展导入预览':'Extension import preview'}>
@@ -271,7 +279,7 @@ export function ExtensionWorkbench({
             <p>{importPreview.manifest.publisher} · {importPreview.trusted?(zh?'签名已验证':'Signature verified'):importPreview.manifest.provider==='process'?(zh?'未签名 · 含可执行代码':'Unsigned · contains executable code'):(zh?'自定义声明包 · 无可执行代码':'Custom declarative package · no executable code')}</p>
             {importPreview.manifest.provider==='process'&&<p>{zh?'代码在此电脑的独立进程中运行，具有当前系统用户权限。导入后仍需单独授权，独立进程不是安全沙箱。':'Code runs in a separate process on this computer with your OS user’s privileges. Importing does not authorize execution; a separate process is not a security sandbox.'}</p>}
             <p>{zh?'权限：':'Permissions: '}{importPreview.manifest.provider==='wechat'?(zh?'微信读取、发送、联系人管理均需另外授权；导入不会访问微信。':'WeChat operations require separate grants; importing does not access WeChat.'):importPreview.manifest.permissions.join(' · ')||(zh?'无':'None')}</p>
-            <div className="custom-extension-actions"><button disabled={busy} onClick={()=>setImportPreview(null)}>{zh?'取消':'Cancel'}</button><button className="primary" disabled={busy} onClick={()=>void run(async()=>{await window.cshell.pluginImportApply(importPreview.token);await onChange();setFilter('custom');setImportPreview(null);setImportNotice(zh?'已导入。请启用扩展；微信运行包首次载入需要重新打开 CShell / CAgent。':'Imported. Enable the extension; restart CShell / CAgent to load the WeChat runtime.');})}>{zh?'确认导入':'Import'}</button></div>
+            <div className="custom-extension-actions"><button disabled={busy} onClick={()=>setImportPreview(null)}>{zh?'取消':'Cancel'}</button><button className="primary" disabled={busy} onClick={()=>void run(async()=>{await window.cshell.pluginImportApply(importPreview.token);await onChange();setFilter('custom');setImportPreview(null);setImportNotice(zh?'已导入，可在列表查看状态；微信运行包首次载入需要重新打开 CShell / CAgent。':'Imported. Check its status in the list; restart CShell / CAgent to load the WeChat runtime.');})}>{zh?'确认导入':'Import'}</button></div>
           </section>}
           <div className="plugin-list">
             {manifests
@@ -424,9 +432,10 @@ export function ExtensionWorkbench({
         {section === 'wechat' && currentView && <WechatPlugin />}
         {section === 'opencode' && currentView && <OpenCodeView />}
         {section === 'tavily' && currentView && <TavilyView />}
+        {section === 'cloudflare' && currentView && <CloudflareView />}
         {section === 'classroom' && currentView && (classroomBridge && onClassroomWatch ? <ClassroomView tasksBridge={classroomTasksBridge} discoveryBridge={discoveryBridge} onDevicesAdded={onDevicesAdded} bridge={classroomBridge} onWatch={onClassroomWatch}/> : <p role="status">屏幕共享服务尚未就绪。</p>)}
         {section === 'wsl' && currentView && <WslPlugin onOpen={onLocal} />}
-        {section !== 'plugins' && section !== 'wsl' && section !== 'agent' && section !== 'wechat' && section !== 'opencode' && section !== 'tavily' && section !== 'classroom' && !target && (
+        {section !== 'plugins' && section !== 'wsl' && section !== 'agent' && section !== 'wechat' && section !== 'opencode' && section !== 'cloudflare' && section !== 'tavily' && section !== 'classroom' && !target && (
           <div className="extension-empty">
             {zh
               ? '先连接一台服务器，再选择安装或管理环境。'
@@ -438,7 +447,7 @@ export function ExtensionWorkbench({
             className="extension-session"
             key={s.id}
             hidden={
-              section === 'plugins' || section === 'wsl' || section === 'agent' || section === 'wechat' || section === 'opencode' || section === 'tavily' || section === 'classroom' || target !== s.id
+              section === 'plugins' || section === 'wsl' || section === 'agent' || section === 'wechat' || section === 'opencode' || section === 'cloudflare' || section === 'tavily' || section === 'classroom' || target !== s.id
             }
           >
             <ServerExtensions
@@ -448,10 +457,10 @@ export function ExtensionWorkbench({
                 target === s.id &&
                 section !== 'plugins' &&
                 section !== 'wsl' &&
-                section !== 'wechat' && section !== 'opencode' && section !== 'tavily' && section !== 'classroom' &&
+                section !== 'wechat' && section !== 'opencode' && section !== 'cloudflare' && section !== 'tavily' && section !== 'classroom' &&
                 section !== 'agent'
               }
-              section={section === 'wsl' || section === 'wechat' || section === 'opencode' || section === 'tavily' || section === 'classroom' ? 'plugins' : section}
+              section={section === 'wsl' || section === 'wechat' || section === 'opencode' || section === 'cloudflare' || section === 'tavily' || section === 'classroom' ? 'plugins' : section}
               plugins={plugins}
               appRequest={appRequest}
               fileRequest={request?.sessionId === s.id ? request : null}
@@ -628,9 +637,7 @@ function ServerExtensions({
         </div>
       )}
       {error && (
-        <div className="extension-error" role="alert">
-          {error}
-        </div>
+        <ErrorNotice title="操作未完成" error={error}/>
       )}
       <div hidden={section !== 'apps'} className="application-market">
         <div className="application-toolbar">

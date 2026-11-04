@@ -10,7 +10,8 @@ import {
 import { toolsDefaults, toolsSettingsSchema, type ToolsSettings } from '../shared/docker';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
+import { renameSync, unlinkSync } from 'node:fs';
 import { monitorViewSchema, type MonitorView } from '../shared/monitor-views';
 import { z } from 'zod';
 import {
@@ -57,6 +58,8 @@ export interface SecretCodec {
   decrypt(value: string): Promise<string>;
 }
 export class Store {
+  private firstInstallation = false;
+  isNewInstallation() { return this.firstInstallation; }
   monitorViews(): MonitorView[] { return structuredClone(this.data.monitorViews); }
   async saveMonitorView(value: MonitorView) {
     const view = monitorViewSchema.parse(value);
@@ -88,6 +91,7 @@ export class Store {
     private codec: SecretCodec,
   ) {}
   async load() {
+    this.firstInstallation = false;
     try {
       this.data = schema.parse(
         JSON.parse(await readFile(join(this.directory, 'config.json'), 'utf8')),
@@ -97,6 +101,7 @@ export class Store {
         throw new Error('Configuration could not be read. Original file was preserved.', {
           cause: error,
         });
+      this.firstInstallation = true;
     }
   }
   presets() {
@@ -220,6 +225,42 @@ export class Store {
     const profile = this.data.profiles.find((p) => p.id === id);
     if (!profile) throw new Error('Unknown server');
     return { ...profile };
+  }
+  connectionRevision(id: string) {
+    return createHash('sha256').update(JSON.stringify([this.data.profiles.find(p => p.id === id) ?? null, this.data.secrets[id] ?? null])).digest('hex');
+  }
+  credentialConfigured(id: string) { return Boolean(this.data.secrets[id]); }
+  /** Scoped transaction: encryption and authorization failure never partly save a profile. */
+  async saveConnection(value: Profile, expected: string, guard: () => void,
+    secret?: {password?:string;privateKey?:string;passphrase?:string} | null,
+    trust?: {endpoint:string;fingerprint:string;previous?:string}) {
+    const profile=profileSchema.parse(value); guard();
+    const encrypted=secret == null ? secret : await this.codec.encrypt(JSON.stringify(secret));
+    const task=this.writes.catch(()=>{}).then(async()=>{
+      const check=()=>{guard(); if(this.connectionRevision(profile.id)!==expected)throw new Error('CONNECTION_CHANGED');
+        if(trust&&this.host(trust.endpoint)!==trust.previous)throw new Error('HOST_TRUST_CHANGED');};
+      check();
+      const old=this.data.profiles.find(p=>p.id===profile.id);
+      const changed=old&&(['host','port','username','auth','protocol','jumpProfileId'] as const).some(k=>old[k]!==profile[k]);
+      const nextSecret=encrypted===undefined?(changed?undefined:this.data.secrets[profile.id]):encrypted??undefined;
+      const groups=[...new Set([...this.groups(),...(profile.group?[profile.group]:[])])];
+      if(groups.length>1000)throw new Error('GROUP_LIMIT');
+      const secrets={...this.data.secrets}; if(nextSecret===undefined)delete secrets[profile.id];else secrets[profile.id]=nextSecret;
+      const data={...this.data,groups,profiles:old?this.data.profiles.map(p=>p.id===profile.id?profile:p):[...this.data.profiles,profile],secrets,
+        hosts:trust?{...this.data.hosts,[trust.endpoint]:trust.fingerprint}:this.data.hosts};
+      await mkdir(this.directory,{recursive:true});
+      const temporary=join(this.directory,`config.management-${randomUUID()}.tmp`);
+      try {
+        await writeFile(temporary,JSON.stringify(data,null,2),{mode:0o600}); check();
+        // Final guard and commit have no asynchronous gap.
+        renameSync(temporary,join(this.directory,'config.json'));
+        this.data.profiles=old?this.data.profiles.map(p=>p.id===profile.id?profile:p):[...this.data.profiles,profile];
+        if(nextSecret===undefined)delete this.data.secrets[profile.id];else this.data.secrets[profile.id]=nextSecret;
+        this.data.groups=[...new Set([...this.groups(),...groups])];
+        if(trust)this.data.hosts[trust.endpoint]=trust.fingerprint;
+      } finally {try{unlinkSync(temporary);}catch{}}
+    });
+    this.writes=task.then(()=>{},()=>{}); await task;
   }
   async saveProfile(value: Profile) {
     const profile = profileSchema.parse(value),
