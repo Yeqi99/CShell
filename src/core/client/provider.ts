@@ -267,6 +267,14 @@ export class ClientProvider implements ManagedProvider {
     this.devices = devices;
     // Controller identity stays local: new installations still authenticate to the target.
   }
+  async updateEndpoint(deviceId: string, value: unknown) {
+    const endpoint = clientEndpointSchema.parse(value);
+    const current = this.devices.find(d => d.deviceId === deviceId);
+    if (!current) throw Error('Client identity missing');
+    const next = this.devices.map(d => d.deviceId === deviceId ? {...d, ...endpoint} : d);
+    await this.vault.write('devices', next);
+    this.devices = next;
+  }
   list(): ClientDevice[] {
     return this.devices.map(({ certificate, relay: _relay, accountPassword:_password, accountManaged:_managed, ...d }) => ({
       ...d,
@@ -398,7 +406,7 @@ export class ClientProvider implements ManagedProvider {
         !auth.capabilities.includes(agentCapability(call.method))
       )
         throw new Error('受控端未授予此管理权限');
-      return await channel.request('manage', call, 60000);
+      return await channel.request('manage', call, call.method==='files.transferPull'?15*60_000:60000);
     } finally {
       channel.socket.destroy();
     }

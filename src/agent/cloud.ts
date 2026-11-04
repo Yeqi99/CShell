@@ -95,11 +95,14 @@ export class CagentCloud {
             const answer = await this.sync.accountRequest('/v1/devices/register', publicDevice);
             if (profile.membership.active && answer.relay) await this.hooks.start(answer.relay);
             else await this.hooks.stop();
+            const savedProfile = this.cached.store.profiles.find((p: any) => p.id === device.deviceId);
+            const savedDevice = this.cached.devices.find((d: any) => d.deviceId === device.deviceId);
+            const address = savedProfile ?? savedDevice ?? (device.host ? device : (answer.endpoint ?? answer.relay));
             const entry = {
               protocol: 1,
               ...device,
-              host: (answer.endpoint ?? answer.relay).host,
-              port: (answer.endpoint ?? answer.relay).port,
+              host: address.host,
+              port: address.port,
               accountManaged: true,
             };
             this.cached.devices = [

@@ -115,6 +115,7 @@ export async function registerCloudHandlers(
     await mkdir(join(directory, 'appearance'), { recursive: true });
     for (const [name, encoded] of Object.entries(data.assets))
       await writeFile(join(directory, 'appearance', name), Buffer.from(encoded, 'base64'));
+    const importedProfiles=store.cloudValidate(data.store).profiles;
     const stages: CloudImportStage[] = [];
     if(data.identityNetwork!==undefined&&identityNetwork)stages.push({read:()=>identityNetwork.cloudExport(),value:data.identityNetwork,apply:value=>identityNetwork.cloudImport(value),restore:value=>identityNetwork.cloudImport(value)});
     if(data.networkRoute!==undefined&&network)stages.push({read:()=>network.cloudCheckpoint(),value:network.cloudValidate(data.networkRoute),apply:value=>network.cloudImport(value),restore:value=>network.cloudRestore(value as ReturnType<typeof network.cloudCheckpoint>)});
@@ -123,7 +124,10 @@ export async function registerCloudHandlers(
       apply: value => desktopLooks.cloudImport(value), restore: value => desktopLooks.cloudImport(value, true),
     });
     stages.push(
-      {read: () => client.cloudExport(), value: client.cloudValidate(data.devices), apply: value => client.cloudImport(value), restore: value => client.cloudImport(value)},
+      {read: () => client.cloudExport(), value: client.cloudValidate(data.devices).map(device=>{
+        const saved=importedProfiles.find(p=>p.id===device.deviceId&&p.protocol==='client');
+        return saved?{...device,host:saved.host,port:saved.port}:device;
+      }), apply: value => client.cloudImport(value), restore: value => client.cloudImport(value)},
       {read: () => http.cloudExport(), value: http.cloudValidate(data.http), apply: value => http.cloudImport(value), restore: value => http.cloudImport(value)},
     );
     if (data.opencode !== undefined) stages.push({read: () => openCode.cloudExport(), value: openCode.cloudValidate(data.opencode), apply: value => openCode.cloudImport(value), restore: value => openCode.cloudImport(value)});

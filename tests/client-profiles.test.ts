@@ -37,9 +37,13 @@ test('Client sidebar migration is idempotent and preserves names, groups, favori
     await syncClientProfiles(store, [device]);
     assert.equal(store.snapshot().profiles.length, 1);
     await syncClientProfiles(store, [{ ...device, host: '192.168.1.10' }]);
+    assert.equal(store.profile(device.deviceId).host, '127.0.0.1');
     assert.equal(store.profile(device.deviceId).name, 'Office PC');
     assert.equal(store.profile(device.deviceId).favorite, true);
     assert.equal(store.profile(device.deviceId).clientShell, 'cmd');
+    await syncClientProfiles(store,[{...device,host:'p3.deviy.cn',port:53773}],true);
+    assert.equal(store.profile(device.deviceId).host,'p3.deviy.cn');
+    assert.equal(store.profile(device.deviceId).group,'Office');
     await store.manageGroup({ type: 'rename', name: 'Office', next: 'Work' });
     const reloaded = new Store(directory, codec);
     await reloaded.load();

@@ -212,15 +212,19 @@ final class CloudSync {
     JSONObject answer=api("devices/register",descriptor);
     JSONObject remote=api("vault",null),data=decrypt(remote.getJSONObject("envelope"),state.getString("key"));
     String id=descriptor.getString("deviceId");JSONObject endpoint=answer.getJSONObject("endpoint");
+    JSONObject store=data.getJSONObject("store");JSONArray profiles=store.getJSONArray("profiles");
+    JSONObject savedProfile=null;for(int i=0;i<profiles.length();i++)if(profiles.getJSONObject(i).optString("id").equals(id)){savedProfile=profiles.getJSONObject(i);break;}
     JSONObject device=new JSONObject(descriptor.toString()).put("protocol",1).put("host",endpoint.getString("host")).put("port",endpoint.getInt("port")).put("accountManaged",true).put("accountPassword",password);
     JSONArray devices=data.getJSONArray("devices");boolean changed=false,found=false;
     for(int i=0;i<devices.length();i++)if(devices.getJSONObject(i).optString("deviceId").equals(id)){
       JSONObject old=devices.getJSONObject(i);
       if(!old.optString("certificate").equals(device.getString("certificate")))throw new IOException("账号中设备身份不一致");
+      JSONObject address=savedProfile!=null?savedProfile:old;
+      device.put("host",address.getString("host")).put("port",address.getInt("port"));
       found=true;if(!old.optString("accountPassword").equals(password)||!old.optBoolean("accountManaged")||!old.optString("host").equals(device.getString("host"))||old.optInt("port")!=device.getInt("port")){devices.put(i,device);changed=true;}break;
     }
-    if(!found){devices.put(device);changed=true;}
-    JSONObject store=data.getJSONObject("store");JSONArray profiles=store.getJSONArray("profiles");found=false;
+    if(!found){if(savedProfile!=null)device.put("host",savedProfile.getString("host")).put("port",savedProfile.getInt("port"));devices.put(device);changed=true;}
+    found=false;
     for(int i=0;i<profiles.length();i++)if(profiles.getJSONObject(i).optString("id").equals(id)){found=true;break;}
     if(!found){profiles.put(new JSONObject().put("id",id).put("protocol","client").put("name",descriptor.getString("name")).put("host",endpoint.getString("host")).put("port",endpoint.getInt("port")).put("username","agent").put("auth","password").put("group","同账号设备").put("favorite",false));
       JSONArray groups=store.getJSONArray("groups");boolean group=false;for(int i=0;i<groups.length();i++)if(groups.optString(i).equals("同账号设备"))group=true;if(!group)groups.put("同账号设备");changed=true;}
