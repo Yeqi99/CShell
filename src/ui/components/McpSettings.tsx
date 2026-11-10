@@ -134,7 +134,7 @@ export function McpSettings({
           <p className="muted">{t('mcpScope')}</p>
           <div className="mcp-profiles">
             {profiles
-              .filter((p) => !p.protocol || ['ssh', 'sftp', 'ftp', 'ftps', 'client', 'http'].includes(p.protocol))
+              .filter((p) => !p.protocol || ['ssh', 'sftp', 'ftp', 'ftps', 'client', 'http', 'rdp'].includes(p.protocol))
               .map((profile) => (
                 <label className="checkbox" key={profile.id}>
                   <input
@@ -384,7 +384,7 @@ export function McpSettings({
                 </label>
                 <div className="mcp-profiles">
                   {profiles
-                    .filter((p) => !p.protocol || ['ssh', 'sftp', 'ftp', 'ftps', 'client', 'http'].includes(p.protocol))
+                    .filter((p) => !p.protocol || ['ssh', 'sftp', 'ftp', 'ftps', 'client', 'http', 'rdp'].includes(p.protocol))
                     .map((p) => (
                       <label className="checkbox" key={p.id}>
                         <input

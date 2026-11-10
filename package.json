@@ -91,7 +91,9 @@
       "icon": "assets/icon.png",
       "maintainer": "CShell contributors"
     },
+    "beforePack": "./scripts/rdp/build.cjs",
     "win": {
+      "extraResources": [{"from": ".local/rdp-dist/cshell-rdp", "to": "cshell-rdp"}],
       "target": "nsis",
       "icon": "assets/icon.ico",
       "signExecutable": false

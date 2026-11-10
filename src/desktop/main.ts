@@ -2,6 +2,8 @@ import {preferencesTool} from '../core/preferences-tool';
 import {providerFileCall} from '../core/provider-file-call';
 import {IdentityNetwork} from './identity-network';
 import {remoteAppProxy,proxyShellCommand} from './remote-app-proxy';
+import { existsSync } from 'node:fs';
+import { RdpConnectionProvider, rdpIdentity } from '../core/connections/rdp-provider';
 import { EmbeddedRdpService } from './embedded-rdp';
 import { MachineNetworkRoute } from './machine-network-route';
 import {NativeDesktopService} from './native-desktop';
@@ -296,12 +298,24 @@ else
       window.once('closed', () => { void processExtensions.dispose(); });
       const ftp = new FtpService(emit);
       connections = createSshManager(ssh, () => store.snapshot().profiles, extensionServices.tools, target => {
+        if (target.providerId === 'cshell.rdp') {
+          const saved = store.snapshot().profiles.find(p => p.id === target.resourceId);
+          if (saved?.protocol === 'rdp' && rdpIdentity(saved) === target.identity) return { id: saved.id, group: saved.group };
+          return;
+        }
         if(target.providerId!=='cshell.ftp')return;
         const profile=store.snapshot().profiles.find(p=>p.id===target.resourceId);
         if(!profile||!['ftp','ftps'].includes(profile.protocol??'')||ftpIdentity(profile as typeof profile & {protocol:'ftp'|'ftps'})!==target.identity)return;
         return {id:profile.id,group:profile.group};
       });
       connections.register(new FtpConnectionProvider(ftp));
+      const rdpExecutable = app.isPackaged
+        ? join(process.resourcesPath, 'cshell-rdp', 'python.exe')
+        : join(app.getAppPath(), '.local', 'rdp-dist', 'cshell-rdp', 'python.exe');
+      if (process.platform === 'win32' && existsSync(rdpExecutable)) {
+        const manager = connections;
+        manager.register(new RdpConnectionProvider(rdpExecutable, id => { manager.closed(id); mcp?.event({type: 'closed', sessionId: id}); }));
+      }
 
       const attempts = new ConnectionAttempts((id) => connections!.disconnect(id));
       window.webContents.on('render-process-gone', () => attempts.dispose());

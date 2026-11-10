@@ -638,6 +638,7 @@ export class McpService {
     if (
       profile.protocol &&
       !['ssh', 'sftp'].includes(profile.protocol) &&
+      !(this.host && profile.protocol === 'rdp' && this.manager.list().some(p => p.id === 'cshell.rdp')) &&
       !(this.host && ['ftp','ftps'].includes(profile.protocol) && this.manager.list().some(p => p.id === 'cshell.ftp')) &&
       !(this.host && profile.protocol === 'client')
     )
@@ -1423,16 +1424,16 @@ export class McpService {
     const visibleServers = () => {
       const allowedProfiles = new Set(this.principal(owner).allowedProfiles);
       return this.store.snapshot().profiles.filter(
-      (p) => (!p.protocol || ['ssh','sftp'].includes(p.protocol) || (this.host && (p.protocol === 'client' || (['ftp','ftps'].includes(p.protocol) && this.manager.list().some(v => v.id === 'cshell.ftp'))))) &&
+      (p) => (!p.protocol || ['ssh','sftp'].includes(p.protocol) || (this.host && (p.protocol === 'client' || (p.protocol === 'rdp' && this.manager.list().some(v => v.id === 'cshell.rdp')) || (['ftp','ftps'].includes(p.protocol) && this.manager.list().some(v => v.id === 'cshell.ftp'))))) &&
         allowedProfiles.has(p.id),
     ).map(({ id, name, host, port, username, protocol }) => ({
-      id, name, host, port, username, protocol: (protocol ?? 'ssh') as 'ssh' | 'client' | 'sftp' | 'ftp' | 'ftps',
+      id, name, host, port, username, protocol: (protocol ?? 'ssh') as 'ssh' | 'client' | 'sftp' | 'ftp' | 'ftps' | 'rdp',
     }));
     };
     register(
       'list_servers_page',
       {
-        description: 'Search authorized saved SSH, SFTP, FTP/FTPS and Agent connections with bounded pages. Only installed providers are included. Cursors expire after five minutes and on visible directory or authorization changes. No credentials are returned; counts include only authorized search matches. budgetBytes bounds the JSON result, excluding the transport envelope.',
+        description: 'Search authorized saved RDP, SSH, SFTP, FTP/FTPS and Agent connections with bounded pages. Only installed providers are included. Cursors expire after five minutes and on visible directory or authorization changes. No credentials are returned; counts include only authorized search matches. budgetBytes bounds the JSON result, excluding the transport envelope.',
         inputSchema: serverPageInput.shape,
         annotations: { readOnlyHint: true },
         permission: 'connections.read', target: 'application',

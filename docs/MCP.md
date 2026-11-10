@@ -58,3 +58,11 @@
 - SSH 命令分别提供 `stdout`、`stderr`、真实 `exitCode` 和截断标记；每个输出流保留有界尾段，旧 `output` 字段保留 stdout 兼容语义。
 
 应用级连接修改、凭据写入、主机信任使用独立授权，已有授权不会因升级自动扩大。任何入口都不返回密码、私钥或口令；请求秘密不进入审计与审核摘要。
+
+### Windows RDP 后台截图与输入
+
+在 Windows x64 版 CShell 的 MCP 设置中勾选已保存的 RDP 连接，按需授予「查看远程桌面与截图」和「远程桌面键鼠输入」。首次连接先在 Windows 远程桌面客户端核对并信任该主机的证书。证书变化后需要重新核对。
+
+客户端使用 `list_servers` 取得连接 ID，调用 `connect` 创建自己的 RDP 会话，再用 `describe_connection` 查看获准工具。通过 `invoke_connection` 调用 `desktop_screenshot` 可获取 JPEG；`desktop_interact` 支持归一化坐标点击、单行 BMP 文本、扫描码及组合键。例如 Win+R 的参数为 `{"action":"key","scanCode":19,"modifiers":["win"]}`，Esc 为 `{"action":"key","scanCode":1}`。完成后调用 `disconnect`。
+
+输入发送到该 MCP 会话的远端桌面。Windows 的远程会话策略可能会重新连接同一账号已有的远端会话。仅授予截图权限的客户端无法发送输入。

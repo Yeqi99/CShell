@@ -4,7 +4,7 @@ import type { LocalShell } from '../../shared/local-terminal';
 /** Explicit global action, applied only when the settings draft is saved. */
 export function selectAllMcpPermissions(settings: McpSettings, profiles: Profile[], shells: LocalShell[]): McpSettings {
   const grants = {
-    allowedProfiles: profiles.filter(p => !p.protocol || ['ssh', 'sftp', 'ftp', 'ftps', 'client', 'http'].includes(p.protocol)).map(p => p.id),
+    allowedProfiles: profiles.filter(p => !p.protocol || ['ssh', 'sftp', 'ftp', 'ftps', 'client', 'http', 'rdp'].includes(p.protocol)).map(p => p.id),
     allowedLocalShells: [...new Set(shells)],
     allowCommands: true,
     capabilities: [...apiCapabilitySchema.options],
