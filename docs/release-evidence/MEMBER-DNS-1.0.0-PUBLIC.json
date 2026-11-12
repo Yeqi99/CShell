@@ -1,0 +1,51 @@
+{
+  "limitations": "Existing signed Android candidate reused. Native builds are not physical-device coverage.",
+  "agentProNativeRun": 43270730168,
+  "publicReleases": [
+    "https://github.com/Yeqi99/CShell/releases/tag/v1.0.0",
+    "https://github.com/Yeqi99/CShell/releases/tag/pro-v1.0.0"
+  ],
+  "version": "1.0.0",
+  "publicDownloadCheck": {
+    "checked": "2026-11-12T17:51:38.129Z",
+    "count": 28,
+    "downloads": [
+      "opensource/CAgent-1.0.0-linux-x64.tar.gz",
+      "opensource/CAgent-1.0.0-linux-arm64.tar.gz",
+      "opensource/CAgent-1.0.0-mac-arm64.tar.gz",
+      "opensource/CAgent-Setup-1.0.0-win-x64.exe",
+      "opensource/CAgent-1.0.0-mac-x64.tar.gz",
+      "opensource/CShell-1.0.0-android.apk",
+      "opensource/CShell-1.0.0-linux-amd64.deb",
+      "opensource/CShell-1.0.0-linux-arm64.AppImage",
+      "opensource/CShell-1.0.0-linux-arm64.deb",
+      "opensource/CShell-1.0.0-mac-arm64.dmg",
+      "opensource/CShell-1.0.0-linux-x86_64.AppImage",
+      "opensource/CShell-1.0.0-mac-x64.dmg",
+      "opensource/SHA256SUMS.txt",
+      "opensource/CShell-1.0.0-win-x64.exe",
+      "pro/CAgent-1.0.0-linux-x64.tar.gz",
+      "pro/CAgent-1.0.0-mac-arm64.tar.gz",
+      "pro/CAgent-1.0.0-linux-arm64.tar.gz",
+      "pro/CAgent-1.0.0-mac-x64.tar.gz",
+      "pro/CAgent-Setup-1.0.0-win-x64.exe",
+      "pro/CShell-Pro-1.0.0-linux-amd64.deb",
+      "pro/CShell-Pro-1.0.0-android.apk",
+      "pro/CShell-Pro-1.0.0-linux-arm64.AppImage",
+      "pro/CShell-Pro-1.0.0-linux-arm64.deb",
+      "pro/CShell-Pro-1.0.0-linux-x86_64.AppImage",
+      "pro/CShell-Pro-1.0.0-mac-arm64.dmg",
+      "pro/CShell-Pro-1.0.0-mac-x64.dmg",
+      "pro/CShell-Pro-1.0.0-win-x64.exe",
+      "pro/SHA256SUMS.txt"
+    ]
+  },
+  "desktopProNativeRun": 43270356194,
+  "uiCommit": "74f36d4",
+  "domainEvidence": [
+    "Authenticated member temporary TXT created, read and deleted",
+    "Concurrent same-prefix claims: one success, one conflict",
+    "Cross-account DNS update and delete rejected",
+    "Responsive 390 / 760 / 1100 px browser smoke, isolated Windows packaged smoke passed"
+  ]
+}
