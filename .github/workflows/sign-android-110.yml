@@ -1,0 +1,48 @@
+name: Sign reviewed Android 1.0.10 binaries
+on:
+  push:
+    branches: ['codex/sign-android-1.0.10']
+permissions:
+  contents: read
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Confirm reviewed artifacts
+        run: sha256sum --check unsigned/SHA256SUMS.txt
+      - name: Sign existing release identities
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          umask 077
+          bt=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
+          ks="$RUNNER_TEMP/signing.p12"
+          trap 'rm -f "$ks"' EXIT
+          printf '%s' "$KS" | base64 -d > "$ks"
+          mkdir outgoing
+          for edition in opensource pro; do
+            apk="unsigned/$edition.apk"
+            id=org.canpshell.mobile
+            file=CShell-1.0.10-android.apk
+            if [ "$edition" = pro ]; then id="$id.pro"; file=CShell-Pro-1.0.10-android.apk; fi
+            "$bt/aapt" dump badging "$apk" > "$RUNNER_TEMP/badging"
+            grep -F "package: name='$id' versionCode='1000010' versionName='1.0.10'" "$RUNNER_TEMP/badging"
+            "$bt/aapt" list "$apk" > "$RUNNER_TEMP/files"
+            for abi in armeabi-v7a arm64-v8a x86 x86_64; do grep -Fx "lib/$abi/libhev-socks5-tunnel.so" "$RUNNER_TEMP/files"; done
+            grep -Fx assets/VPN_THIRD_PARTY_NOTICES.txt "$RUNNER_TEMP/files"
+            "$bt/apksigner" sign --ks "$ks" --ks-key-alias "$ALIAS" --ks-pass env:STORE --key-pass env:PASS --out "outgoing/$file" "$apk"
+            "$bt/apksigner" verify --verbose --print-certs "outgoing/$file" > "$RUNNER_TEMP/cert"
+            grep -Fi 'certificate SHA-256 digest: 34cc1c9a0eacafc512a0837c3d286081879822f047e5637a65cdbc5b525914c5' "$RUNNER_TEMP/cert"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verified-android-110
+          path: outgoing/*.apk
+
