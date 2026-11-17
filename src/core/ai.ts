@@ -1,3 +1,4 @@
+import {contextInputLimit} from './model-context';
 import { functionParameters } from './ai-function-schema';
 import {machineInspectionInstructions,toolAwareHistory} from './ai-tool-context';
 import {checkpointSchema,compactContext,continuityInstructions,RunBudget} from './agent-continuity';
@@ -909,7 +910,6 @@ export class AiService {
     let remaining=triggered?.maxTokensPerRun??Infinity;
     for (let step = 0; step < (triggered?.maxModelCalls??Infinity); step++) {
       signal.throwIfAborted();
-      if(!triggered)await compactContext(messages,summarize,async(summary,removed)=>{t.contextSummary=summary;t.contextThrough=Math.max(t.contextThrough??0,...removed.map(m=>(m.historyIndex??-1)+1));await this.persist();});
       let machineTools: ReturnType<ConnectionRegistry['tools']> = [];
       try {
         if (t.sessionId) machineTools = this.connections.tools(t.sessionId);
@@ -961,6 +961,7 @@ export class AiService {
       const url = base + (base.endsWith('/chat/completions') ? '' : '/chat/completions');
       const streamed = { role: 'assistant' as const, content: '', time: Date.now() };
       let inserted = false;
+      if(!triggered)await compactContext(messages,summarize,async(summary,removed)=>{t.contextSummary=summary;t.contextThrough=Math.max(t.contextThrough??0,...removed.map(m=>(m.historyIndex??-1)+1));await this.persist();},{inputTokens:contextInputLimit(p,available,imageData?1:0)});
       const requestMessages=attachToolImage(messages,imageData,imageReference);
       if(triggered){
         const reservation=Buffer.byteLength(JSON.stringify({messages:requestMessages,tools:available}),'utf8')+1024;

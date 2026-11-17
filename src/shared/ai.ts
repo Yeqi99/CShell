@@ -34,6 +34,7 @@ export const aiProviderSchema = z
         );
       }, 'Use HTTPS or a loopback HTTP endpoint, without embedded credentials'),
     model: z.string().trim().min(1).max(200),
+    contextWindowTokens:z.number().int().min(1024).optional(),
     runBudget:z.object({minutes:z.number().int().min(1).max(240),contextBytes:z.number().int().min(10000).max(20000000),noProgress:z.number().int().min(2).max(20)}).optional(),
     extension: z.object({id:z.string().regex(/^[a-z][a-z0-9-]*\.[a-z][a-z0-9-]*$/),model:z.string().min(1).max(300)}).strict().optional(),
   })

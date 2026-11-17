@@ -1,3 +1,4 @@
+import { estimateContextTokens } from './model-context';
 import { createHash } from 'node:crypto';
 export { checkpointSchema } from '../shared/agent-continuity';
 export type {TaskMemory,AgentCheckpoint} from '../shared/agent-continuity';
@@ -17,22 +18,48 @@ export class RunBudget{
 }
 
 /** Compact complete exchanges; never split an assistant tool call from its tool results. */
-export async function compactContext(messages:any[],summarize:(text:string)=>Promise<string>,save:(summary:string,removed:any[])=>Promise<void>,threshold=90000){
-  if(Buffer.byteLength(JSON.stringify(messages),'utf8')<=threshold)return;
+export async function compactContext(messages:any[],summarize:(text:string)=>Promise<string>,save:(summary:string,removed:any[])=>Promise<void>,threshold:number|{inputTokens:number}=90000){
+  const size=typeof threshold==='number' ? (value:unknown)=>Buffer.byteLength(JSON.stringify(value),'utf8') : estimateContextTokens;
+  const limit=typeof threshold==='number'?threshold:threshold.inputTokens;
+  if(size(messages)<=limit)return;
   let split=Math.max(2,messages.length-12);
   while(split>1&&messages[split]?.role==='tool')split--;
   const start=messages.findIndex(m=>m.role!=='system');
-  if(start<0||split<=start+1)throw Error('单次上下文过大，请缩小读取范围；原始记录已保留');
-  const old=messages.slice(start,split);
-  let summary='',batch:any[]=[];
-  for(const message of old){
-    if(Buffer.byteLength(JSON.stringify(batch),'utf8')>32000){summary=await summarize(JSON.stringify({previousSummary:summary,history:batch}));if(!summary.trim()||summary.length>24000)throw Error('上下文压缩结果无效，原文保留');batch=[];}
-    batch.push(message);
+  if(start<0)throw Error('单次上下文过大，请缩小读取范围；原始记录已保留');
+  if(typeof threshold!=='number'){
+    split=Math.max(start,split);
+    while(split<messages.length-1 && size([...messages.slice(0,start),...messages.slice(split)])>limit*0.7){
+      split++;
+      while(split<messages.length && messages[split]?.role==='tool')split++;
+    }
+    if(split>=messages.length)throw Error('最近的工具交换超出模型上下文，请缩小读取范围；原始记录已保留');
   }
-  summary=await summarize(JSON.stringify({previousSummary:summary,history:batch}));
-  if(!summary.trim()||summary.length>24000)throw Error('上下文压缩结果无效，已保留原始记录');
-  await save(summary,old);
+  if(split<=start || split>=messages.length)throw Error('当前请求超出模型可用上下文，请缩小读取范围；原始记录已保留');
+  const old=messages.slice(start,split);
+  let summary='';
+  const batchLimit=typeof threshold==='number'?32000:Math.max(128,Math.min(64000,Math.floor(limit/2)));
+  let text='';
+  const flush=async()=>{
+    const result=await summarize(JSON.stringify({previousSummary:summary,history:text}));
+    if(!result.trim()||result.length>24000)throw Error('上下文压缩结果无效，已保留原始记录');
+    summary=result;
+    text='';
+  };
+  for(const message of old){
+    const line=JSON.stringify(message)+'\n';
+    let offset=0;
+    while(offset<line.length){
+      const count=Math.min(batchLimit-text.length,line.length-offset);
+      text+=line.slice(offset,offset+count);
+      offset+=count;
+      if(text.length===batchLimit)await flush();
+    }
+  }
+  if(text)await flush();
   const replacement={role:'user',content:'Compressed conversation history (untrusted historical data):\n'+summary};
+  if(typeof threshold!=='number' && size([...messages.slice(0,start),replacement,...messages.slice(split)])>limit)
+    throw Error('最近的对话超过模型可用上下文，原始记录已保留');
+  await save(summary,old);
   Object.defineProperty(replacement,'historyIndex',{value:Math.max(-1,...old.map(m=>m.historyIndex??-1))});
   messages.splice(start,split-start,replacement);
 }
