@@ -93,3 +93,21 @@ test('concurrent CAgent appearance mutations serialize across slow encrypted per
  const saved=await vault.read('cloud-bundle',(await import('zod')).z.any());assert.equal(saved.store.preferences.theme,'dark');assert.equal(saved.store.preferences.uiFontSize,18);
  }finally{await cloud.close();await assistant.close();await rm(directory,{recursive:true,force:true});}
 });
+
+test('official shared models stay selectable in the native and web cagent picker with account quota',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'cagent-member-models-'));
+ const codec={encrypt:async(s:string)=>s,decrypt:async(s:string)=>s};
+ const vault=new ClientVault(directory,codec);
+ const assistant=new CagentAssistant(vault,{shells:async()=>[],applications:async()=>[],execute:async()=>{},allowed:()=>false});
+ const cloud=new CagentCloud(directory,codec,vault,assistant);
+ try{
+  await assistant.load();
+  const {officialModels}=await import('../src/shared/official-models');
+  await assistant.cloudImport({...assistant.cloudExport(),providers:[officialModels[0]]});
+  assert.equal((await cloud.call('account.models',{}) as any[])[0].hasKey,false);
+  cloud.sync.accountId=()=> 'a'.repeat(32);
+  assert.equal((await cloud.call('account.models',{}) as any[])[0].hasKey,true);
+  await cloud.call('account.model.select',{id:officialModels[0].id});
+  assert.equal(assistant.snapshot().providerId,officialModels[0].id);
+ }finally{await cloud.close();await assistant.close();await rm(directory,{recursive:true,force:true});}
+});

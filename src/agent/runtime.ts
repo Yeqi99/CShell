@@ -43,6 +43,7 @@ import { runningWechatVersions, selectWechatMarket, requireWechatVersion } from 
 import { CagentAssistant } from './assistant';
 import { CapabilityRuntime } from './capability-runtime';
 import { createDesktopCapability } from './desktop-capability';
+import { knowledgeAdapter } from './knowledge';
 import { version as agentVersion } from '../../package.json';
 import {submitFeedback} from '../shared/feedback-submit';
 import {redactFeedback,feedbackDiagnostic} from '../shared/feedback';
@@ -309,6 +310,7 @@ export async function createAgentRuntime(
     if(tracked)activeDispatches++;
     try{return await dispatchOperation(method,params,signal,local,owner);}finally{if(tracked)activeDispatches--;}
   }
+  const accountChallenges=new Map<string,{nonce:string;expires:number}>();
   async function dispatchOperation(
     method: string,
     params: unknown,
@@ -428,6 +430,13 @@ export async function createAgentRuntime(
       if(method==='wechat.stop'){await wechat.service.subscriptions.stopAll();return {stopped:true};}
       throw new Error('未知微信管理操作');
     }
+    if(method==='knowledge.manage'){
+      if(!admin)throw Error('未授权管理这台机器');
+      const item=packages.list().find(record=>record.id==='cagent.knowledge');
+      if(!item||!['available','authorization-required'].includes(item.status))throw Error('请先安装并核验知识库');
+      const input=z.object({toolId:z.enum(['knowledge_put','knowledge_search','knowledge_get']),args:z.unknown()}).strict().parse(params);
+      return knowledgeAdapter(directory).invoke(input.toolId,input.args,owner,signal);
+    }
     if(method.startsWith('packages.')){
       if(!local&&(owner==='local'||!server.managementAllowed(owner)))throw new Error('未授权控制端管理能力包');
       if(method==='packages.catalog')return selectWechatMarket(packages.catalog(),await runningWechatVersions().catch(()=>[]));
@@ -470,7 +479,22 @@ export async function createAgentRuntime(
       if(method==='assistant.task')return structuredClone(assistant.get(params,owner));
       if(method==='assistant.cancel')return assistant.cancel(params,owner);
       if(!admin)throw new Error('未授权管理智能体配置');
-      if(method==='assistant.settings')return assistant.snapshot();
+      if(method==='assistant.account.prepare'){
+        assistant.assertAccountIdle();
+        for(const [peer,value] of accountChallenges)if(value.expires<Date.now())accountChallenges.delete(peer);
+        const nonce=randomBytes(32).toString('hex');
+        accountChallenges.set(owner,{nonce,expires:Date.now()+60000});
+        return {nonce,deviceId:server.status().deviceId,email:account.sync.status().email};
+      }
+      if(method==='assistant.account.connect'){
+        const q=z.object({nonce:z.string(),deviceId:z.string(),login:z.unknown()}).strict().parse(params);
+        const challenge=accountChallenges.get(owner);
+        accountChallenges.delete(owner);
+        if(!challenge||challenge.nonce!==q.nonce||challenge.expires<Date.now()||q.deviceId!==server.status().deviceId)throw Error('设备登录确认已失效，请重试');
+        return account.call('account.deviceLogin',q.login);
+      }
+      if(method==='assistant.settings')return {...assistant.snapshot(),account:await account.sync.accountStatus()};
+      if(method==='assistant.provider.select')return serialized(()=>assistant.selectProvider(params));
       if(method==='assistant.model.configure')return serialized(()=>assistant.configureModel(params));
       if(method==='assistant.configure')return serialized(()=>assistant.configure(params));
       if(method==='assistant.approve')return assistant.approve(params);

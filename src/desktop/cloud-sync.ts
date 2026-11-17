@@ -222,6 +222,7 @@ export async function registerCloudHandlers(
     };
     app.once('before-quit', () => { for (const proxy of proxies.values()) proxy.close(); proxies.clear(); });
   }
+  client.cloudAccountLogin=send=>cloud.deviceLogin(send);
   client.cloudLease=async id=>{const result=await cloud.accountRequest('/v1/devices/lease',{deviceId:id});return (await import('../shared/agent-relay')).agentRelayConnectionSchema.parse(result.relay);};
   client.cloudDelegation=async(deviceId,fingerprint)=>{const result=await cloud.accountRequest('/v1/devices/delegate',{deviceId,fingerprint});return z.string().regex(/^[a-f0-9]{64}$/).parse(result.credential);};
   handle('cloud:network',async(input?:unknown)=>{

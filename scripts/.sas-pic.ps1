@@ -1,0 +1,1 @@
+$r=(el '远程桌面，点击后输入').Current.BoundingRectangle;$bm=New-Object Drawing.Bitmap ([int]$r.Width),([int]$r.Height);$g=[Drawing.Graphics]::FromImage($bm);$g.CopyFromScreen([int]$r.X,[int]$r.Y,0,0,$bm.Size);$bm.GetThumbnailImage(610,360,$null,[intptr]::Zero).Save("$env:TEMP\sas-now.png");$g.Dispose();$bm.Dispose()

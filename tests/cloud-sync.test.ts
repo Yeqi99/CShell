@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, readFile } from 'node:fs/promises';
+import { mkdtemp, rm, readFile, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { encryptVault, decryptVault, newRecoveryKey, unwrapRecoveryKey } from '../src/core/cloud-crypto';
+import { encryptVault, decryptVault, newRecoveryKey, unwrapRecoveryKey, vaultDigest } from '../src/core/cloud-crypto';
 import { pbkdf2Sync, randomBytes } from 'node:crypto';
 import { CloudSync } from '../src/core/cloud-sync';
 
@@ -163,4 +163,50 @@ test('vault schema advances only when new portable fields are present',async()=>
  assert.equal(vaultWriteSchema({store:{accountPreferences:{}}}),1);
  assert.equal(vaultWriteSchema({store:{accountPreferences:{autoDiscoverDevices:false}}}),4);
  assert.equal(vaultWriteSchema({store:{accountPreferences:{autoDiscoverDevices:true}}}),4);
+});
+
+test('device login restores the shared encrypted vault and refuses replacing another account',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'device-login-'));
+ const accountId='b'.repeat(32),key=newRecoveryKey(),token='n'.repeat(43);
+ const snapshot={providers:[{name:'shared',key:'private-model-key'}]};
+ let restored:unknown;
+ const request:typeof fetch=async(url)=>{
+  if(String(url).endsWith('/vault/chunks'))return Response.json({error:'legacy'},{status:404});
+  if(String(url).endsWith('/vault'))return Response.json({revision:1,envelope:encryptVault(snapshot,key,accountId)});
+  return Response.json({membership:{active:true,expiresAt:null}});
+ };
+ const cloud=new CloudSync(directory,{encrypt:async(s)=>Buffer.from(s).toString('base64'),decrypt:async(s)=>Buffer.from(s,'base64').toString()},{
+  export:async()=>restored??{},import:async(value)=>{restored=value;},validate:()=>{},
+ },'https://test.invalid',request);
+ try{
+  await cloud.acceptDeviceLogin({accountId,email:'member@example.com',token},key);
+  assert.deepEqual(restored,snapshot);
+  assert.equal(cloud.status().unlocked,true);
+  await assert.rejects(cloud.acceptDeviceLogin({accountId:'c'.repeat(32),email:'other@example.com',token},key),/其他账号/);
+  assert.equal(cloud.accountId(),accountId);
+  assert.equal((await readFile(join(directory,'cloud-sync.enc'),'utf8')).includes(token),false);
+ }finally{await rm(directory,{recursive:true,force:true});}
+});
+
+test('device login reuses the saved baseline for offline changes in an existing account workspace',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'device-relogin-'));
+ const accountId='d'.repeat(32),key=newRecoveryKey(),baseline={value:'before'},local={value:'offline edit'};
+ let uploaded:unknown;
+ const codec={encrypt:async(s:string)=>Buffer.from(s).toString('base64'),decrypt:async(s:string)=>Buffer.from(s,'base64').toString()};
+ const request:typeof fetch=async(url,init)=>{
+  if(String(url).endsWith('/vault/chunks'))return Response.json({error:'legacy'},{status:404});
+  if(String(url).endsWith('/vault')){
+   if(init?.body){const body=JSON.parse(String(init.body));uploaded=decryptVault(body.envelope,key,accountId);return Response.json({revision:2});}
+   return Response.json({revision:1,envelope:encryptVault(baseline,key,accountId)});
+  }
+  return Response.json({membership:{active:true,expiresAt:null}});
+ };
+ const cloud=new CloudSync(directory,codec,{export:async()=>local,import:async(value:any)=>{Object.assign(local,value);},validate:()=>{},accountChanged:async()=>{}},'https://test.invalid',request);
+ try{
+  await mkdir(join(directory,'cloud-accounts'));
+  await writeFile(join(directory,'cloud-accounts',accountId+'.enc'),await codec.encrypt(JSON.stringify({revision:1,key,baseline,digest:vaultDigest(baseline)})));
+  await cloud.acceptDeviceLogin({accountId,email:'member@example.com',token:'t'.repeat(43)},key);
+  assert.deepEqual(local,{value:'offline edit'});
+  assert.deepEqual(uploaded,{value:'offline edit'});
+ }finally{await rm(directory,{recursive:true,force:true});}
 });

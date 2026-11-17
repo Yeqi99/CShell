@@ -364,6 +364,14 @@ class Service:
             box = db.execute('SELECT box FROM keyboxes WHERE account=?', (row[0],)).fetchone()
         return {'accountId': row[0], 'email': email, 'token': token, 'keybox': json.loads(box[0]) if box else None}
 
+    def device_session(self, account):
+        self.limit('device-session:' + account, 20, 600)
+        token = secrets.token_urlsafe(32)
+        with self.db() as db:
+            email = db.execute('SELECT email FROM accounts WHERE id=?', (account,)).fetchone()[0]
+            db.execute('INSERT INTO sessions VALUES(?,?,?)', (self.digest(token), account, time.time() + 30 * 86400))
+        return {'accountId': account, 'email': email, 'token': token}
+
     def authorize_admin_account(self, credential, ip):
         if credential.startswith('Bearer '):
             account = self.authenticate(credential[7:])
@@ -683,7 +691,9 @@ def handler(service):
                 else:
                     token = self.headers.get('Authorization', '').removeprefix('Bearer ')
                     account = service.authenticate(token)
-                    if self.path == '/v1/account/rewards' and self.command == 'GET':
+                    if self.path == '/v1/auth/device-session' and self.command == 'POST':
+                        value=service.device_session(account)
+                    elif self.path == '/v1/account/rewards' and self.command == 'GET':
                         value=service.rewards.account(account)
                     elif self.path == '/v1/account/points-trace' and self.command == 'POST':
                         value=service.rewards.trace(account,body.get('reference'))

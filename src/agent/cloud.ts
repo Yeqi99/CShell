@@ -1,3 +1,4 @@
+import {isOfficialModel} from '../shared/official-models';
 import {extendsChat} from '../shared/cloud-conversations';
 import {portableCapabilitiesSchema} from '../shared/portable-capabilities';
 import { OpenCodeExtension } from '../extensions/opencode/service';
@@ -202,7 +203,7 @@ export class CagentCloud {
     }, undefined, request);
   }
   async load() {
-    this.assistant.officialCredential = () => this.sync.sessionCredential();
+    this.assistant.officialCredential = () => this.sync.accountId()?this.sync.sessionCredential():'';
     this.cached = (await this.vault.read('cloud-bundle', bundle)) ?? {
       format: 1,
       store: {
@@ -243,6 +244,17 @@ export class CagentCloud {
     this.accountWrites=next;return next;
   }
   private async performCall(method: string, input: unknown) {
+    if(method==='account.deviceLogin') {
+      const q=z.object({session:z.object({accountId:z.string(),email:z.email(),token:z.string()}).strict(),key:z.string()}).strict().parse(input);
+      this.assistant.assertAccountIdle();
+      this.paused=true;
+      try {
+        await this.pending;
+        const result=await this.sync.acceptDeviceLogin(q.session,q.key);
+        this.lastEnroll=0;
+        return result;
+      } finally {this.paused=false;void this.tick();}
+    }
     if(method==='account.spending'){const q=z.object({enabled:z.boolean().optional()}).strict().parse(input??{});return this.sync.accountRequest('/v1/account/agent-spending',q.enabled===undefined?undefined:q);}
     if(method==='account.conversations')return this.conversationCommand(input);
     if (method === 'account.status')
@@ -325,15 +337,10 @@ export class CagentCloud {
     if (method === 'account.models')
       return this.assistant
         .cloudExport()
-        .providers.map(({ key, ...p }) => ({ ...p, hasKey: !!key || !!p.extension }));
+        .providers.map(({ key, ...p }) => ({ ...p, hasKey: !!key || !!p.extension || (isOfficialModel(p.url,p.model)&&!!this.sync.accountId()) }));
     if (method === 'account.model.select') {
       const { id } = z.object({ id: z.string().uuid() }).strict().parse(input);
-      const data = this.assistant.cloudExport(),
-        p = data.providers.find((p) => p.id === id);
-      if (!p) throw Error('基座不可用');
-      const s = this.assistant.snapshot();
-      const { keyConfigured, ...settings } = s;
-      return this.assistant.configure({ ...settings, providerId:p.id, endpoint: p.url, model: p.model, key: p.key });
+      return this.assistant.selectProvider({providerId:id});
     }
     throw Error('未知账号操作');
   }

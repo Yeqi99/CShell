@@ -124,6 +124,7 @@ const bridge: Bridge = {
   agentFileCancel:(id)=>ipcRenderer.invoke('agent:file-cancel',id),
   agentMachineClose: (target) => ipcRenderer.invoke('agent:machine-close',target),
   agentLaunch: () => ipcRenderer.invoke('agent:launch'),
+  agentAccountConnect: (target:string) => ipcRenderer.invoke('agent:account-connect',target),
   agentCall: (target, call) => ipcRenderer.invoke('agent:call', target, call),
   desktopViewStart: input => ipcRenderer.invoke('desktop:view-start', input),
   desktopViewStop: id => ipcRenderer.invoke('desktop:view-stop', id),

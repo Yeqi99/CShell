@@ -19,7 +19,9 @@ export const agentMethods = [
   'connection.autostart',
   'connection.settings',
   'connection.save',
+  'assistant.account.prepare','assistant.account.connect',
   'assistant.settings',
+  'assistant.provider.select',
   'assistant.configure',
   'assistant.start',
   'assistant.tasks',
@@ -27,7 +29,7 @@ export const agentMethods = [
   'assistant.cancel',
   'packages.catalog',
   'packages.list',
-  'packages.tools',
+  'knowledge.manage','packages.tools',
   'packages.invoke',
   'packages.install',
   'packages.grant',
@@ -108,6 +110,7 @@ export interface AgentBridge {
   agentMachineClose(target:string): Promise<void>;
   agentTargets(): Promise<AgentTarget[]>;
   agentLaunch(): Promise<void>;
+  agentAccountConnect?(target:string):Promise<unknown>;
   agentCall(target: string, call: AgentCall): Promise<unknown>;
   agentImportLegacy(): Promise<void>;
   clientShells(deviceId: string): Promise<AgentShellOption[]>;

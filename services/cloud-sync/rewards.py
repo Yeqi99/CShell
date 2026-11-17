@@ -17,6 +17,7 @@ class Rewards:
             CREATE TABLE IF NOT EXISTS recharge_orders(id TEXT PRIMARY KEY, account TEXT NOT NULL, points INTEGER NOT NULL, created REAL NOT NULL);
             CREATE TABLE IF NOT EXISTS plan_offers(plan TEXT PRIMARY KEY,days INTEGER NOT NULL,price INTEGER NOT NULL,enabled INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS plan_orders(account TEXT,request TEXT,plan TEXT,days INTEGER,price INTEGER,expires REAL,PRIMARY KEY(account,request));
+            CREATE TABLE IF NOT EXISTS gift_sale_orders(id TEXT PRIMARY KEY,card TEXT UNIQUE NOT NULL,created REAL NOT NULL);
             CREATE TABLE IF NOT EXISTS gift_cards(id TEXT PRIMARY KEY, kind TEXT NOT NULL, quantity INTEGER NOT NULL, plan TEXT NOT NULL, created REAL NOT NULL, recipient TEXT, redeemed REAL);
             """)
 
@@ -41,6 +42,9 @@ class Rewards:
                 if prefix in ('recharge','invite'):
                     receipt=db.execute('SELECT id,points,created FROM recharge_orders WHERE id=?',(order,)).fetchone()
                     if receipt:result['order']=dict(id=receipt[0],paidPoints=receipt[1],created=receipt[2])
+                if prefix=='gift':
+                    sale=db.execute('SELECT id FROM gift_sale_orders WHERE card=?',(order,)).fetchone()
+                    if sale:result['saleOrder']=sale[0]
                 return result
             if row[1]>=0:return dict(entries=[source(reference,row[1])])
             # Credit and debit totals define intervals on the same FIFO point sequence.
@@ -113,14 +117,19 @@ class Rewards:
         if not isinstance(request,str) or not re.fullmatch(r'[a-f0-9-]{36}',request) or kind not in ('points','membership','reset') or type(quantity) is not int or not 1<=quantity<={'points':100000000,'membership':3660,'reset':1}[kind]:
             raise self.fail(400,'礼品卡参数无效')
         plan=plan if kind=='membership' else ''
-        code=self.s.digest('gift-card:'+request)[:32].upper()
+        order=body.get('saleOrder','')
+        if not isinstance(order,str) or (order and not re.fullmatch(r'[A-Za-z0-9._-]{1,100}',order)):
+            raise self.fail(400,'销售单号可填写字母、数字、点、横线或下划线')
+        code=self.s.digest('gift-sale:'+order if order else 'gift-card:'+request)[:32].upper()
         ident=self.s.digest('gift-redeem:'+code)
         with self.s.db() as db:
             db.execute('BEGIN IMMEDIATE')
             if kind=='membership' and not db.execute('SELECT 1 FROM member_plans WHERE name=?',(plan,)).fetchone():raise self.fail(400,'会员套餐无效')
+            if order:
+                db.execute('INSERT OR IGNORE INTO gift_sale_orders VALUES(?,?,?)',(order,ident,time.time()))
             db.execute('INSERT OR IGNORE INTO gift_cards VALUES(?,?,?,?,?,NULL,NULL)',(ident,kind,quantity,plan,time.time()))
             if db.execute('SELECT kind,quantity,plan FROM gift_cards WHERE id=?',(ident,)).fetchone()!=(kind,quantity,plan):raise self.fail(409,'发卡编号已使用')
-        return dict(code=code,kind=kind,quantity=quantity,plan=plan)
+        return dict(code=code,kind=kind,quantity=quantity,plan=plan,saleOrder=order)
 
     def redeem(self,account,body):
         code=body.get('code')

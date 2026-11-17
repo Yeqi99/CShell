@@ -253,6 +253,36 @@ export class CloudSync {
   }
   accountId(){return this.data.session?.accountId;}
   sessionCredential(){if(!this.data.session)throw Error('请先登录');return this.data.session.token;}
+  /** Only the main process passes this directly over a verified device channel. */
+  async deviceLogin(send:(login:{session:CloudSession;key:string})=>Promise<unknown>) {
+    return this.exclusive(async()=>{
+      if(!this.data.session||!this.data.key||this.handedOff)throw Error('请先登录并解锁 CShell 云同步');
+      const session:CloudSession=await this.api('/v1/auth/device-session',{});
+      if(session.accountId!==this.data.session.accountId||! /^[A-Za-z0-9_-]{43}$/.test(session.token))throw Error('设备登录响应无效');
+      return send({session,key:this.data.key});
+    });
+  }
+  async acceptDeviceLogin(session:CloudSession,key:string) {
+    if(!/^[a-f0-9]{32}$/.test(session.accountId)||! /^[A-Za-z0-9_-]{43}$/.test(session.token)||! /^[A-Za-z0-9_-]{43}$/.test(key))throw Error('设备登录信息无效');
+    await this.exclusive(async()=>{
+      if(this.data.session&&this.data.session.accountId!==session.accountId)throw Error('目标机器已登录其他账号，请在目标机器退出后再同步');
+      const same=this.data.session?.accountId===session.accountId;
+      let cached:LocalState|undefined;
+      if(!same&&this.adapter.accountChanged){
+        try {
+          cached=JSON.parse(await this.codec.decrypt(await readFile(join(this.directory,'cloud-accounts',session.accountId+'.enc'),'utf8')));
+          if(!cached||!Number.isSafeInteger(cached.revision)||cached.revision<0)throw Error('Invalid cached cloud revision');
+        } catch(error) {
+          if((error as NodeJS.ErrnoException).code!=='ENOENT')throw Error('账号本机同步记录无法读取，原数据已保留');
+        }
+      }
+      await this.activate({...same?this.data:cached??{revision:0},session,key});
+      this.profileChecked=0;
+      this.error=undefined;
+    });
+    await this.autoSync();
+    return this.status();
+  }
   async requestCode(email: string) {
     await this.api('/v1/auth/code', { email });
   }

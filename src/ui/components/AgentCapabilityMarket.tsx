@@ -72,7 +72,7 @@ const permissionNames: Record<string, string> = {
 };
 type Call = (method: AgentCall['method'], params?: unknown) => Promise<unknown>;
 
-export function AgentCapabilityMarket({ target, call }: { target: AgentTarget; call: Call }) {
+export function AgentCapabilityMarket({ target, call, onChanged, onOpen }: { target: AgentTarget; call: Call; onChanged?:()=>void; onOpen?:(id:string)=>void }) {
   const [catalog, setCatalog] = useState<z.infer<typeof catalogSchema>>([]);
   const [installed, setInstalled] = useState<z.infer<typeof installedSchema>>([]);
   const [selected, setSelected] = useState('');
@@ -120,7 +120,7 @@ export function AgentCapabilityMarket({ target, call }: { target: AgentTarget; c
   const item = catalog.find((p) => p.id === selected),
     record = installed.find((p) => p.id === selected);
   const update = async (method: AgentCall['method'], params: unknown) => {
-    await call(method, params);
+    await call(method, params); onChanged?.();
     await refresh();
   };
   return (
@@ -201,6 +201,7 @@ export function AgentCapabilityMarket({ target, call }: { target: AgentTarget; c
             )
           ) : (
             <>
+              {item.id==='cagent.knowledge' && onOpen && ['available','authorization-required'].includes(record.status) && <button onClick={()=>onOpen('knowledge')}>打开知识库</button>}
               <p>{record.registered ? '已就绪' : '尚未就绪'}</p>{['not-installed','fault','incompatible'].includes(record.status)&&<button disabled={busy || item.wechatSupport?.installable === false} onClick={()=>void run(()=>update('packages.install',{id:item.id,confirm:true}))}>修复安装</button>}
               {true ? (
                 <>

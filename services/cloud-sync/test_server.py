@@ -8,6 +8,16 @@ from server import Service, Failure
 
 
 class ServiceTest(unittest.TestCase):
+    def test_device_session_is_independent_and_revocable(self):
+        desktop = self.login('device-login@example.com', 'device-login')
+        remote = self.service.device_session(desktop['accountId'])
+        self.assertNotEqual(desktop['token'], remote['token'])
+        self.assertEqual(self.service.authenticate(remote['token']), desktop['accountId'])
+        self.service.logout(remote['token'])
+        self.assertEqual(self.service.authenticate(desktop['token']), desktop['accountId'])
+        with self.assertRaises(Failure):
+            self.service.authenticate(remote['token'])
+
     def test_purchase_pro_idempotent_and_renews_existing_expiry(self):
         account = self.login('member@example.com', 'purchase')['accountId']
         with self.service.db() as db:

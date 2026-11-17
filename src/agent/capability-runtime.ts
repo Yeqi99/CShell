@@ -1,3 +1,4 @@
+import { knowledgeAdapter, knowledgeToolConfigured } from './knowledge';
 import {portableCapabilitiesSchema} from '../shared/portable-capabilities';
 import { z } from 'zod';
 import { join, relative, isAbsolute } from 'node:path';
@@ -61,6 +62,7 @@ export class CapabilityRuntime {
       },
     };
     this.adapters.set('cagent.system-apps',system);
+    this.adapters.set('cagent.knowledge', knowledgeAdapter(options.directory));
     for(const extra of options.extraPackages??[]){
       if(this.entries.some(entry=>entry.id===extra.entry.id))throw new Error('Duplicate capability catalog ID');
       const raw=extra.entry.source==='bundled'&&extra.entry.bundle?JSON.parse(extra.entry.bundle).manifest:extra.entry.manifestJson;
@@ -128,7 +130,7 @@ export class CapabilityRuntime {
     const staged=await stageCapabilityBundle(join(this.options.directory,'capability-packages'),entry,signal);
     let result;
     const grantWechatDefaults = manualInstall && managedWechatCatalog.some(pin => pin.id === id && pin.manifestSha256 === staged.manifestSha256);
-    try{result=await this.manager.stage(staged.manifestJson,staged.root,staged.manifestSha256,localMarket||grantWechatDefaults);}
+    try{result=await this.manager.stage(staged.manifestJson,staged.root,staged.manifestSha256,(localMarket && id !== 'cagent.knowledge')||grantWechatDefaults);}
     catch(error){if(this.roots.get(id)!==staged.root)await this.removeRoot(staged.root);throw error;}
     if(oldRoot&&oldRoot!==staged.root)await this.cleanupRetiredRoot(oldRoot);return result;
   });}
@@ -141,11 +143,11 @@ export class CapabilityRuntime {
   private async cleanupRetiredRoot(root:string){try{await this.removeRoot(root);}catch{process.stderr.write('CAgent: retired capability files retained; active package is unchanged.\n');}}
   private async removeRoot(root:string){const parent=join(this.options.directory,'capability-packages'),within=relative(parent,root);if(!within||within.startsWith('..')||isAbsolute(within)||!/^package-[^/\\]+$/.test(within))throw new Error('Refusing to remove an unmanaged package path');await rm(root,{recursive:true,force:true});}
   events(){return [...this.registered.values()].flatMap(({manifest,grants})=>{const source=this.adapters.get(manifest.adapterId)?.eventSource;return source?manifest.events.filter(event=>event.permissions.every(permission=>grants.includes(permission))).map(event=>({source,type:event.id,packageId:manifest.id,description:event.description,payloadSchema:structuredClone(event.payloadSchema)})):[];});}
-  tools():RuntimeCapabilityTool[]{return [...this.registered.values()].flatMap(({manifest,grants})=>manifest.tools.filter(tool=>tool.permissions.every(permission=>grants.includes(permission))).map(tool=>({...structuredClone(tool),packageId:manifest.id,toolId:tool.id,...(manifest.process?{process:true as const,packageDigest:capabilityDigest(JSON.stringify(manifest)),sideEffect:true}:{})})));}
+  tools():RuntimeCapabilityTool[]{return [...this.registered.values()].flatMap(({manifest,grants})=>manifest.tools.filter(tool=>knowledgeToolConfigured(tool.id)&&tool.permissions.every(permission=>grants.includes(permission))).map(tool=>({...structuredClone(tool),packageId:manifest.id,toolId:tool.id,...(manifest.process?{process:true as const,packageDigest:capabilityDigest(JSON.stringify(manifest)),sideEffect:true}:{})})));}
   async invoke(input:unknown,owner:string,signal:AbortSignal){
     if(this.closing)throw new Error('Capability runtime closing');signal.throwIfAborted();
     const {packageId,toolId,args}=invokeInput.parse(input),record=this.registered.get(packageId),tool=record?.manifest.tools.find(tool=>tool.id===toolId);
-    if(!record||!tool||!tool.permissions.every(permission=>record.grants.includes(permission)))throw new Error('Capability not installed, configured or authorized');
+    if(!record||!tool||!knowledgeToolConfigured(tool.id)||!tool.permissions.every(permission=>record.grants.includes(permission)))throw new Error('Capability not installed, configured or authorized');
     const parsed=z.fromJSONSchema(tool.inputSchema as Parameters<typeof z.fromJSONSchema>[0]).parse(args);
     const total=[...this.active.values()].reduce((sum,set)=>sum+set.size,0);if(total>=8)throw new Error('Capability concurrency limit reached');
     const controller=new AbortController(),combined=AbortSignal.any([signal,controller.signal]);let resolve!:()=>void;

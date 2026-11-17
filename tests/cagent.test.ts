@@ -139,3 +139,22 @@ test('cloud base URLs become model endpoints without duplicating explicit paths'
   try{await service.load();await service.configure({...config,endpoint,review:false});const task=await service.start({prompt:'OK only',requestId:randomUUID()},'local');await until(()=>service.get(task,'local').state==='completed');assert.equal(called,expected);}finally{await service.close();}
  }
 });
+
+test('shared model picker keeps provider credentials private and uses account credentials for official quota',async()=>{
+ const f=await fixture();
+ try {
+  const {officialModels}=await import('../src/shared/official-models');
+  const privateId=randomUUID();
+  await f.service.cloudImport({...f.service.cloudExport(),providers:[{id:privateId,name:'Private',url:config.endpoint,model:'private',key:'private-secret'},officialModels[0]],habits:[]});
+  assert.equal(JSON.stringify(f.service.snapshot()).includes('private-secret'),false);
+  await f.service.selectProvider({providerId:officialModels[0].id});
+  assert.equal(f.service.snapshot().keyConfigured,false);
+  f.service.officialCredential=()=> 'account-session';
+  assert.equal(f.service.snapshot().keyConfigured,true);
+  assert.equal(f.service.snapshot().providerId,officialModels[0].id);
+  await f.service.load();
+  assert.equal(f.service.snapshot().providerId,officialModels[0].id);
+  assert.equal(f.service.snapshot().commands,true);
+  await assert.rejects(f.service.selectProvider({providerId:randomUUID()}),/已移除/);
+ } finally {await f.service.close();}
+});

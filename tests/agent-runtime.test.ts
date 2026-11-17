@@ -38,13 +38,22 @@ test('independent Agent encrypts vault, authenticates local control, preserves i
     const packageCatalog=await callAgent('packages.catalog',undefined,directory);
     assert.ok(packageCatalog.some((item:any)=>item.id==='cagent.system-apps'&&!item.installed));
     const packageInstalled=await callAgent('packages.install',{id:'cagent.system-apps',confirm:true},directory);
-    assert.equal(packageInstalled.status,'authorization-required');
+    assert.equal(packageInstalled.status,'available');
     await callAgent('packages.grant',{id:'cagent.system-apps',permissions:['applications.read']},directory);
     assert.equal((await callAgent('packages.tools',undefined,directory)).length,2);
     await assert.rejects(runtime.dispatch('packages.invoke',{packageId:'cagent.system-apps',toolId:'system_apps_catalog',args:{}},new AbortController().signal,false,'a'.repeat(64)),/未授权/);
     await assert.rejects(runtime.dispatch('packages.grant',{id:'cagent.system-apps',permissions:[]},new AbortController().signal,false,'local'),/未授权/);
     await callAgent('packages.uninstall',{id:'cagent.system-apps',confirm:true},directory);
     assert.equal((await callAgent('packages.tools',undefined,directory)).length,0);
+    const knowledge=await callAgent('packages.install',{id:'cagent.knowledge',confirm:true},directory);
+    assert.equal(knowledge.status,'authorization-required');
+    assert.equal((await callAgent('packages.tools',undefined,directory)).length,0);
+    await callAgent('packages.grant',{id:'cagent.knowledge',permissions:['knowledge.read']},directory);
+    const knowledgeTools=await callAgent('packages.tools',undefined,directory);
+    assert.ok(knowledgeTools.some((tool:any)=>tool.toolId==='knowledge_search'));
+    assert.ok(!knowledgeTools.some((tool:any)=>tool.toolId==='knowledge_put'));
+    await callAgent('packages.uninstall',{id:'cagent.knowledge',confirm:true},directory);
+
     await assert.rejects(
       callDiscoveredAgent({ ...endpoint, token: '0'.repeat(64) }, 'client.status'),
     );

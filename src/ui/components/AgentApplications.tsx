@@ -112,7 +112,7 @@ export function AgentApplications({
           onChanged={onDevelopmentChanged}
         />
         {nativeCapabilities && !target.id.startsWith('ssh:') && (
-          <AgentCapabilityMarket key={target.id} target={target} call={call} />
+          <AgentCapabilityMarket onChanged={onDevelopmentChanged} onOpen={onDevelopmentOpen} key={target.id} target={target} call={call} />
         )}
         {nativeCapabilities && catalog?.platform === 'win32' && (
           <details className="agent-system-apps" onToggle={(e) => setWslOpen(e.currentTarget.open)}>

@@ -246,6 +246,7 @@ export class ClientProvider implements ManagedProvider {
     private vault: ClientVault,
     private emit: (event: SessionEvent) => void,
   ) {}
+  cloudAccountLogin?:(send:(login:unknown)=>Promise<unknown>)=>Promise<unknown>;
   cloudDelegation?:(id:string,fingerprint:string)=>Promise<string>;
   private async authFields(device:Device){if(device.accountBorrowed){if(!this.cloudDelegation)throw Error('请登录借用账号');const identity=await(this.identity??=this.vault.identity());return {delegation:await this.cloudDelegation(device.deviceId,fingerprint(identity.certificate))};}return device.accountManaged?{password:device.accountPassword}:{};}
   recoverRentalPairing?: (deviceId: string) => Promise<boolean>;
@@ -285,6 +286,7 @@ export class ClientProvider implements ManagedProvider {
     const device = this.devices.find(d => d.deviceId === deviceId);
     return !!device && fingerprint(device.certificate) === identity;
   }
+  isBorrowed(deviceId:string){return this.devices.find(device=>device.deviceId===deviceId)?.accountBorrowed===true;}
   list(): ClientDevice[] {
     return this.devices.map(({ certificate, relay: _relay, accountPassword:_password, accountManaged:_managed, ...d }) => ({
       ...d,

@@ -1,3 +1,4 @@
+import { knowledgeInputs } from './knowledge';
 import { createHash } from 'node:crypto';
 import { appInstallInput, appPlanInput, appTaskInput } from '../shared/agent-applications';
 import { z } from 'zod';
@@ -37,7 +38,22 @@ const manifestJson = JSON.stringify(manifest);
 const bundled = JSON.stringify({ protocol: 1, manifest: manifestJson, files: { 'NOTICE.txt': Buffer.from(notice).toString('base64') } } satisfies CapabilityBundle);
 const catalog: CapabilityCatalogEntry[] = [{ id: manifest.id, name: manifest.name, version: manifest.version, description: manifest.description, permissions: manifest.permissions,
   source: 'bundled', bundle: bundled, bundleBytes: Buffer.byteLength(bundled), bundleSha256: capabilityDigest(bundled), manifestSha256: capabilityDigest(manifestJson) }];
-export function capabilityCatalog() { return structuredClone(catalog); }
+const knowledgeDescriptions = {
+  knowledge_put: '保存知识。text 接受正文，json 接受 JSON 字符串，procedure 接受含 steps 字符串数组与 outcome 的 JSON 字符串。相同记录可重试同步。',
+  knowledge_get: '按库、分类 key 和记录 ID 读取原文。',
+  knowledge_search: '按库、分类 key、关键词分页浏览记录，每页 30 条。省略筛选可浏览共享库。',
+  knowledge_similar: '使用主机配置的嵌入模型和 Milvus 集合检索相同库与 key 的相关知识。',
+};
+catalog.push(createBundledCapabilityEntry({
+  ...manifest, id:'cagent.knowledge', adapterId:'cagent.knowledge', name:'机器知识库',
+  description:'在机器磁盘保存文档、结构化数据和可复用任务步骤。可配置向量检索和网盘同步。',
+  source:{...manifest.source,releaseTag:'capability-knowledge-1.0.0',assetUrl:manifest.source.repository+'/releases/download/capability-knowledge-1.0.0/knowledge.cagent-package.json'},
+  permissions:['knowledge.read','knowledge.write'],
+  tools:(Object.keys(knowledgeInputs) as (keyof typeof knowledgeInputs)[]).map(id=>({
+    id,description:knowledgeDescriptions[id],inputSchema:contract(knowledgeInputs[id]),outputSchema:output,
+    permissions:[id==='knowledge_put'?'knowledge.write':'knowledge.read'],sideEffect:id==='knowledge_put',
+  })),
+}, {'NOTICE.txt':Buffer.from('MIT\nCAgent knowledge capability\n')}));export function capabilityCatalog() { return structuredClone(catalog); }
 export function createBundledCapabilityEntry(manifest: AgentCapabilityManifest, files: Record<string, Uint8Array>): CapabilityCatalogEntry {
   const fileEntries=Object.entries(files);
   const complete={...manifest,files:fileEntries.map(([path,bytes])=>({path,bytes:bytes.byteLength,sha256:capabilityDigest(bytes)}))};

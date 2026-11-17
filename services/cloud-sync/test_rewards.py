@@ -72,3 +72,14 @@ class RewardsTest(unittest.TestCase):
         self.assertEqual([(e['order']['id'],e['points']) for e in trace['entries']],[('first',8),('second',32)])
         self.assertEqual(trace['unmatched'],0)
         self.assertEqual(self.r.trace('a','invite:first')['entries'][0]['order']['paidPoints'],20)
+
+    def test_xianyu_order(self):
+        order=dict(saleOrder='XY-test',request=str(uuid.uuid4()),kind='points',quantity=50)
+        card=self.r.issue(order)
+        self.assertEqual(card,self.r.issue(dict(order,request=str(uuid.uuid4()))))
+        with self.assertRaises(Failure):self.r.issue(dict(order,quantity=51))
+        self.assertFalse(self.r.account('b')['ledger'])
+        self.r.redeem('b',card)
+        credit=self.r.account('b')['ledger'][0]
+        self.assertEqual(credit['points'],50)
+        self.assertEqual(self.r.trace('b',credit['reference'])['entries'][0]['saleOrder'],'XY-test')

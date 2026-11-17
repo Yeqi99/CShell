@@ -10,3 +10,38 @@
 .machine-chat-compose{flex:none;display:block;margin:0 16px 14px;padding:10px;border:1px solid var(--border);border-radius:14px;background:var(--bg)}.machine-chat-compose:focus-within{border-color:var(--accent,#3478f6);box-shadow:0 0 0 2px #3478f610}.machine-chat-compose textarea{display:block;width:100%;box-sizing:border-box;min-height:66px;max-height:160px;resize:vertical;border:0;background:transparent;color:inherit;font:inherit;line-height:1.6;padding:4px;outline:none}.machine-chat-compose>div{display:flex;align-items:center;gap:6px;margin-top:6px}.machine-chat-compose button{font-size:11px;padding:5px 8px}.machine-chat-model{border:0!important;background:transparent!important;max-width:75%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.machine-chat-model span{color:var(--muted)}.machine-chat-compose>small{color:var(--muted);display:block;padding:6px;font-size:11px}.machine-chat-conversation>.form-error{margin:8px 16px}
 .machine-chat-settings{flex:1;min-width:0;overflow:auto;padding:16px 22px}.machine-chat-settings .agent-form{max-width:650px;margin:16px auto}.machine-chat-settings fieldset{border:0;padding:0;display:grid;gap:14px}.machine-chat-settings label{display:flex;flex-direction:column;gap:7px}.machine-chat-settings label:has(input[type=checkbox]){flex-direction:row;align-items:center}.machine-chat-settings input:not([type=checkbox]),.machine-chat-settings textarea{font:inherit;color:inherit;padding:9px;border:1px solid var(--border);border-radius:7px;background:var(--bg);min-width:0}.machine-chat-settings h3{font-size:16px}
 @media(max-width:700px){.machine-chat-model span{display:none}.machine-chat-header small{max-width:150px;overflow:hidden;white-space:nowrap}.machine-chat-history{width:145px}}
+
+/* Keep the conversation readable inside a machine window and at phone widths. */
+.machine-chat-header>div{min-width:0}
+.machine-chat-header small{min-width:0;max-width:260px}
+.machine-chat-header small span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.machine-chat-messages{padding:28px max(20px,calc((100% - 740px)/2))}
+.machine-chat-empty{gap:14px;padding-bottom:24px;box-sizing:border-box}
+.machine-chat-empty>svg{padding:14px;border-radius:18px;background:var(--hover)}
+.machine-chat-empty h2{font-size:24px;font-weight:600;letter-spacing:-.4px;max-width:100%;overflow-wrap:anywhere}
+.machine-chat-empty p{font-size:13px}
+.machine-chat-compose{width:calc(100% - 40px);max-width:760px;box-sizing:border-box;margin:0 auto 22px;padding:14px;border-radius:18px;background:var(--panel);box-shadow:0 3px 16px #00000006}
+.machine-chat-compose textarea{min-height:72px;font-size:14px}
+.machine-chat-compose .machine-chat-model{max-width:55%;font:inherit;font-size:12px;color:var(--text);padding:6px 8px;border-radius:7px;min-width:0}
+.machine-chat-compose .machine-chat-policy{color:var(--muted);background:transparent;border-color:transparent}
+.machine-chat-compose button.primary{min-height:32px;border-radius:10px}
+.machine-chat button:focus-visible,.machine-chat select:focus-visible{outline:2px solid var(--accent,#3478f6);outline-offset:2px}
+.machine-chat-user{margin-left:auto;width:fit-content;max-width:85%;box-sizing:border-box}
+.machine-chat-answer{padding:8px 0}
+.machine-chat-messages article>small{margin-bottom:8px}
+@media(max-width:600px){
+ .machine-chat-header small{max-width:130px}
+ .machine-chat-messages{padding:16px}
+ .machine-chat-compose{width:calc(100% - 24px);margin-bottom:12px;padding:10px}
+ .machine-chat-empty h2{font-size:21px}
+ .machine-chat-compose .machine-chat-policy{max-width:90px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+}
+
+.machine-chat-account{border:1px solid var(--border);border-radius:12px;padding:16px;background:var(--bg)}
+.machine-chat-account p{color:var(--muted);line-height:1.7;margin:8px 0 12px}
+.machine-chat-settings select{font:inherit;padding:9px;color:var(--text);background:var(--panel);border:1px solid var(--border);border-radius:7px}
+
+.machine-chat-empty>svg{box-sizing:content-box;flex-shrink:0}
+.machine-chat-compose .machine-chat-model{width:auto}
+.machine-chat-compose button.primary{background:var(--accent,#3478f6);color:#fff;border-color:transparent}
+.machine-chat-compose button.primary:disabled{opacity:.45}

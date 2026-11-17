@@ -308,6 +308,19 @@ export async function registerAgent(
     }finally{progress?.finish(finished?'done':controller.signal.aborted?'cancelled':'failed');downloads.delete(p.id);if(temporary)await unlink(temporary).catch(()=>{});}
   });
   handle('agent:machine-close',async(target)=>{await stopTarget(z.string().parse(target));machines.delete(target);});
+  handle('agent:account-connect',async(target:unknown)=>{
+    const key=z.string().parse(target);
+    const active=activeTarget(key);
+    if(!active)throw Error('请先连接并核对 cagent 身份');
+    if(provider.isBorrowed(active.resourceId))throw Error('借用设备不支持同步账号登录');
+    if(!provider.cloudAccountLogin)throw Error('请先登录 CShell 账号');
+    const prepared=z.object({nonce:z.string(),deviceId:z.string(),email:z.string().optional()}).parse(await provider.call(active.resourceId,{method:'assistant.account.prepare'}));
+    if(prepared.deviceId!==active.resourceId)throw Error('目标机器身份已改变');
+    return provider.cloudAccountLogin(async login=>{
+      if(activeTarget(key)?.resourceId!==active.resourceId)throw Error('目标连接已改变，请重新操作');
+      return provider.call(active.resourceId,{method:'assistant.account.connect',params:{nonce:prepared.nonce,deviceId:prepared.deviceId,login}});
+    });
+  });
   handle('agent:call', async (target, raw) => {
     if(target==='local')guard();
     const call = agentCallSchema.parse(raw);

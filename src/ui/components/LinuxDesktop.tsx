@@ -28,6 +28,7 @@ import {
 import type { AgentCall } from '../../shared/agent';
 import type { Preferences } from '../../shared/contracts';
 import { AgentMachineFiles } from './AgentMachineFiles';
+import { MachineKnowledge } from './MachineKnowledge';
 import { AgentApplications } from './AgentApplications';
 import { NativeApplications } from './NativeApplications';
 import { MachineBrowser } from './MachineBrowser';
@@ -35,6 +36,7 @@ import { TerminalPane } from './TerminalPane';
 import './linux-desktop.css';
 
 const apps = [
+  { id:'knowledge',label:'知识库',icon:Folder,color:'green' },
   { id: 'machine-info', label: '机器信息', icon: Monitor, color: 'blue' },
   { id: 'ide', label: '代码编辑器', icon: Terminal, color: 'blue' },
   { id: 'browser', label: '浏览器', icon: Globe, color: 'blue' },
@@ -129,15 +131,16 @@ export function LinuxDesktop({
   const [installed,setInstalled]=useState<string[]>([]);
   const refreshInstalled=useCallback(async()=>{
     if(workbench || machine.sshOnly || machine.desktopOnly || closed)return;
-    const [c,i]=await Promise.allSettled([agentRead(()=>call('coding.status')),agentRead(()=>call('ide.status'))]);
+    const [c,i,k]=await Promise.allSettled([agentRead(()=>call('coding.status')),agentRead(()=>call('ide.status')),agentRead(()=>call('packages.list'))]);
     const ids:string[]=[];
+    if(k.status==='fulfilled' && Array.isArray(k.value) && k.value.some(item=>item.id==='cagent.knowledge' && ['available','authorization-required'].includes(item.status)))ids.push('knowledge');
     if(c.status==='fulfilled')for(const engine of (c.value as any)?.engines??[])if(engine.ready)ids.push(engine.engine);
     if(i.status==='fulfilled'&&(i.value as any)?.ready&&(i.value as any)?.supported)ids.push('ide');
     setInstalled(ids);
   },[call,machine.sshOnly,machine.desktopOnly,closed,workbench]);
   useEffect(()=>{void refreshInstalled();},[refreshInstalled]);
   const catalog = [
-    ...apps.map(app => ({...app,label:tr(app.label)})).filter(app => workbench ? false : machine.desktopOnly ? false : machine.sshOnly ? ['terminal','files'].includes(app.id) : ['codex','claude','ide'].includes(app.id)?installed.includes(app.id):machine.terminalOnly ? app.id === 'terminal' : machine.platform === 'android' ? ['settings','files'].includes(app.id) : app.id === 'browser' ? ['linux','win32','darwin'].includes(machine.platform) : app.id !== 'native' || machine.platform === 'linux'),
+    ...apps.map(app => ({...app,label:tr(app.label)})).filter(app => workbench ? false : machine.desktopOnly ? false : machine.sshOnly ? ['terminal','files'].includes(app.id) : ['knowledge','codex','claude','ide'].includes(app.id)?installed.includes(app.id):machine.terminalOnly ? app.id === 'terminal' : machine.platform === 'android' ? ['settings','files'].includes(app.id) : app.id === 'browser' ? ['linux','win32','darwin'].includes(machine.platform) : app.id !== 'native' || machine.platform === 'linux'),
     ...extraPanels.map((p) => ({ id: p.id, label: ['remote','android-apps','assistant','permissions','install-cagent','native-desktop',...(workbench?['connections','command','capabilities','extensions','agent','preferences']:[])].includes(p.id) ? tr(p.label) : p.label, icon: p.icon ?? Settings, color: p.color ?? 'slate' })),
     ...(workbench ? [{ id: 'settings', label: tr("桌面外观"), icon: Settings, color: 'slate' }] : []),
   ];
@@ -562,6 +565,7 @@ export function LinuxDesktop({
                   ? files(active && visible && front === w.id && !closed)
                   : files ?? (!closed && <AgentMachineFiles target={target} call={call} />))}
                 {w.id === 'machine-info' && <MachineInformation key={machine.deviceId} deviceId={!machine.sshOnly&&!workbench?machine.deviceId:undefined} call={call} active={active && visible && front === w.id} closed={closed}/>}
+                {w.id === 'knowledge' && installed.includes('knowledge') && !closed && <MachineKnowledge key={target} call={call}/>}
                 {w.id === 'applications' && (
                   <AgentApplications
                     onDevelopmentOpen={id=>{void refreshInstalled().then(()=>open(id))}}

@@ -465,6 +465,17 @@ public class CagentWindow : Window {
     if(item.ContainsKey("wechatSupport")){var scope=MarketCard(p,"此版本的能力",S(support,"reason"));foreach(var capability in A(V(support,"capabilities")))scope.Children.Add(Text("• "+Convert.ToString(capability),12));var missing=new StackPanel();foreach(var capability in A(V(support,"unavailable")))missing.Children.Add(Text(Convert.ToString(capability),11));scope.Children.Add(new Expander{Header="尚未支持",Content=missing});}
     if(installed==null){p.Children.Add(Text("安装后按应用要求完成配置，可在这里调整工具权限。",11));var installButton=ActionButton(p,"安装并核验能力包",async()=>{await Api("packages.install",Obj("id",id,"confirm",true));await PackageDetail(item);});installButton.IsEnabled=packageInstallable;return;}
     p.Children.Add(Text(B(installed,"registered")?"工具已注册":"工具未注册",11));var grants=new HashSet<string>();foreach(var grant in A(V(installed,"grants")))grants.Add(Convert.ToString(grant));var choices=new Dictionary<string,CheckBox>();foreach(var value in A(V(installed,"requiredPermissions"))){string permission=Convert.ToString(value);choices[permission]=Check(p,PermissionName(permission),grants.Contains(permission));}
+        if(id=="cagent.knowledge" && B(installed,"registered")){
+      var library=Field(p,"知识库","default");var key=Field(p,"分类 key","general");
+      var title=Field(p,"标题","");var body=Field(p,"正文","",true);
+      var query=Field(p,"检索词","");var output=Field(p,"结果","",true);output.IsReadOnly=true;
+      if(grants.Contains("knowledge.write"))ActionButton(p,"保存文本",async()=>{
+        output.Text=json.Serialize(await Api("packages.invoke",Obj("packageId",id,"toolId","knowledge_put","args",Obj("library",library.Text,"key",key.Text,"title",title.Text,"content",body.Text,"kind","text"))));
+      });
+      if(grants.Contains("knowledge.read"))ActionButton(p,"查询记录",async()=>{
+        output.Text=json.Serialize(await Api("packages.invoke",Obj("packageId",id,"toolId","knowledge_search","args",Obj("library",library.Text,"key",key.Text,"query",query.Text))));
+      });
+    }
     if(id=="cagent.wechat")ActionButton(p,"微信账号与授权",WechatSettings);
     if(id.StartsWith("cagent.wechat.v",StringComparison.Ordinal))ActionButton(p,"微信服务与消息订阅",async()=>await ManagedWechatSettings(id));
     if(id=="cagent.desktop"){var desktopBody=new StackPanel();var section=new Expander{Header="桌面服务与访问权限",Content=desktopBody,Margin=new Thickness(0,8,0,8)};bool loaded=false;section.Expanded+=async(s,e)=>{if(loaded)return;await Guard(async()=>{await DesktopSettings(desktopBody);loaded=true;});};p.Children.Add(section);}

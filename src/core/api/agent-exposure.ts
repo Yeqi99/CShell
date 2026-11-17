@@ -7,6 +7,10 @@ import type { AgentCall } from '../../shared/agent';
  * the catalog coverage test rejects newly added, unclassified RPC methods.
  */
 export const agentApiExcludedMethods = {
+  'assistant.provider.select': 'Model selection belongs to authenticated machine settings.',
+  'assistant.account.prepare': 'Account login requires an explicit user action through the desktop account transfer flow.',
+  'assistant.account.connect': 'Account credentials are transferred directly by the main process over the verified device channel.',
+
   'automation.list': 'Exposed through owner-scoped agent_automation_list in the connection tool registry.',
   'automation.create': 'Exposed through reviewed agent_automation_create with execution authorization, never opaque management.',
   'automation.change': 'Exposed through reviewed agent_automation_change with controller ownership and execution authorization.',
@@ -97,6 +101,7 @@ export const agentApiExcludedMethods = {
   'packages.refresh': 'Capability re-registration is restricted to the target local owner.',
   'packages.catalog': 'Package metadata needs a dedicated permission-filtered API catalog before exposure.',
   'packages.list': 'Installed package metadata needs a dedicated permission-filtered API catalog before exposure.',
+  'knowledge.manage': 'Interactive machine knowledge maintenance requires authenticated management.',
   'packages.tools': 'Dynamic tool schemas must enter the permission-filtered capability registry, not an opaque management wrapper.',
   'packages.invoke': 'Dynamic invocation requires its concrete tool schema and operation authorization; agent.manage alone must not expose it.',
   'assistant.start': 'Delegated execution needs a dedicated API capability and task ownership contract, not generic management authorization.',
