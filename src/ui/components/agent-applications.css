@@ -167,3 +167,15 @@
 .agent-applications .agent-app-grid > button:hover {border-color:var(--accent);}
 
 .ide-market-card{display:flex;align-items:center;gap:16px;padding:20px!important;border:1px solid var(--border);border-radius:14px;background:var(--panel);text-align:left}.ide-market-card span{display:grid;gap:6px}.ide-market-card small{color:var(--muted)}
+
+.agent-applications [hidden] { display:none !important; }
+.agent-applications .market-controls { display:flex; align-items:center; gap:8px; margin:12px 0; }
+.agent-applications .market-search { display:flex; align-items:center; gap:8px; flex:1; min-width:0; background:var(--field,var(--panel)); border:1px solid var(--border); border-radius:8px; padding:0 10px; }
+.agent-applications .market-search input { border:0; background:transparent; width:100%; min-width:0; }
+.agent-applications .market-categories { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:18px; padding-bottom:12px; border-bottom:1px solid var(--border); }
+.agent-applications .market-categories button { border-color:transparent; background:transparent; }
+.agent-applications .market-categories button[aria-pressed=true] { background:var(--accent-soft,var(--panel)); color:var(--accent); border-color:var(--border); }
+.agent-applications .market-embedded { margin:0; border:0; padding:0; background:transparent; }
+.agent-applications .agent-app-grid, .agent-applications .development-grid { grid-template-columns:repeat(auto-fill,minmax(min(100%,190px),230px)); gap:12px; margin:0 0 16px; }
+.agent-applications .agent-app-grid > button, .agent-applications .development-grid > button { height:148px; min-height:148px; padding:14px; gap:8px; }
+.agent-applications .machine-app-permissions { margin:12px 0; }

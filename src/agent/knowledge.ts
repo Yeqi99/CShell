@@ -10,7 +10,7 @@ export const knowledgeInputs = {
   knowledge_put: address.extend({
     kind: z.enum(['text', 'json', 'procedure']),
     title: label,
-    content: z.string().min(1).max(64000),
+    content: z.string().min(1).max(64000).describe('text: 原文；json: 有效 JSON 字符串；procedure: JSON 字符串，包含非空 steps 字符串数组和非空 outcome 字符串，例如 {"steps":["执行检查"],"outcome":"已验证成功"}。'),
     source: z.string().max(1000).optional(),
   }),
   knowledge_get: address.extend({ id: z.string().regex(/^[a-f0-9]{64}$/) }),
@@ -85,8 +85,13 @@ export function knowledgeAdapter(directory: string): TrustedCapabilityAdapter {
         if (tool !== 'knowledge_put') throw Error('未知知识库操作');
         const record = knowledgeInputs.knowledge_put.parse(args);
         const {library,key,kind,title,content,source} = record;
-        if (kind === 'json') JSON.parse(content);
-        if (kind === 'procedure') z.object({steps:z.array(z.string().min(1)).nonempty(),outcome:z.string().min(1)}).parse(JSON.parse(content));
+        try {
+          if (kind === 'json') JSON.parse(content);
+          if (kind === 'procedure') z.object({steps:z.array(z.string().min(1)).nonempty(),outcome:z.string().min(1)}).parse(JSON.parse(content));
+        } catch (error) {
+          if (!(error instanceof SyntaxError || error instanceof z.ZodError)) throw error;
+          return {stored:false,error:kind==='procedure'?'content 必须是 JSON 字符串，包含非空 steps 字符串数组和非空 outcome 字符串。请修正参数后重试；本次未写入记录。':'content 必须是有效 JSON 字符串。请修正后重试；本次未写入记录。'};
+        }
         const id = createHash('sha256').update(JSON.stringify(record)).digest('hex');
         db.prepare('INSERT OR IGNORE INTO records VALUES (?,?,?,?,?,?,?,?)').run(id,library,key,kind,title,content,source ?? '',Date.now());
         const result = { id, stored:true, vector:'disabled', backup:'disabled' };

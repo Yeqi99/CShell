@@ -16,3 +16,14 @@ test('third-party chat endpoint keeps its explicit protocol and is never retried
  const response=await fetchAiProtocol((async(url,init)=>{calls++;assert.equal(String(url),'https://example.invalid/v1/chat/completions');assert.equal(init?.body,original);return new Response('',{status:400});}) as typeof fetch,'https://example.invalid/v1/chat/completions',{body:original});
  assert.equal(response.status,400);assert.equal(calls,1);
 });
+
+test('MiniMax requests separate reasoning without disabling thinking or changing tools', async () => {
+ const messages=[{role:'assistant',content:'answer',reasoning_content:'previous thinking'}];
+ await fetchAiProtocol((async (_url,init)=>{
+   const body=JSON.parse(String(init?.body));
+   assert.equal(body.reasoning_split,true);
+   assert.deepEqual(body.messages,messages);
+   assert.equal(body.thinking,undefined);
+   return Response.json({choices:[]});
+ }) as typeof fetch,'https://example.invalid/v1/chat/completions',{body:JSON.stringify({model:'MiniMax-M3',messages,stream:true})});
+});

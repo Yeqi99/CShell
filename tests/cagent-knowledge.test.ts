@@ -11,6 +11,20 @@ import {ClientVault} from '../src/core/client/identity';
 import {knowledgeAdapter,knowledgeInputs} from '../src/agent/knowledge';
 import type {requestAgentModel} from '../src/agent/model-request';
 
+test('invalid procedure is recoverable and never stored before correction',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'cagent-memory-invalid-'));
+ try{
+  const adapter=knowledgeAdapter(directory),signal=new AbortController().signal;
+  const base={library:'experience',key:'ledger',kind:'procedure',title:'verified reconciliation'};
+  const bad=await adapter.invoke('knowledge_put',{...base,content:'plain text is not a structured procedure'},'local',signal) as any;
+  assert.equal(bad.stored,false);assert.match(bad.error,/steps/);
+  const empty=await adapter.invoke('knowledge_search',{library:'experience',key:'ledger'},'local',signal) as any;
+  assert.equal(empty.records.length,0);
+  const good=await adapter.invoke('knowledge_put',{...base,content:JSON.stringify({steps:['Deduplicate transaction IDs','Sum signed integer cents'],outcome:'Totals passed verification'})},'local',signal) as any;
+  assert.equal(good.stored,true);
+ }finally{await rm(directory,{recursive:true,force:true});}
+});
+
 test('agent stores a verified procedure and a fresh agent retrieves it from host disk',async()=>{
  const directory=await mkdtemp(join(tmpdir(),'cagent-memory-'));
  const adapter=knowledgeAdapter(directory);

@@ -11,7 +11,7 @@ await build({
   target: 'chrome90',
   jsx: 'automatic',
 });
-await build({entryPoints:['src/ui/markdown-worker.ts'],outfile:`${directory}/markdown-worker.js`,bundle:true,minify:true,target:'chrome90'});
+await build({entryPoints:['src/ui/markdown-worker.ts'],outfile:`${directory}/markdown-worker.js`,bundle:true,minify:true,target:'chrome90',conditions:['worker']});
 await copyFile('android/web/index.html', `${directory}/index.html`);
 
 const brandIcon = process.env.CSHELL_EDITION === 'pro' ? 'assets/brand/cshell-pro.png' : 'assets/icon.png';

@@ -6,10 +6,11 @@ import './development-market.css';
 import { agentRead } from '../agent-read';
 import { agentCapabilityError, agentCompatibilityNotice } from '../../shared/agent-compatibility';
 export function DevelopmentMarket({
-  call,
+  call, embedded = false, query = '', refreshToken = 0,
   onOpen,
   onChanged,
 }: {
+  embedded?: boolean; query?: string; refreshToken?: number;
   call: (method: AgentCall['method'], params?: unknown) => Promise<unknown>;
   onOpen?: (id: string) => void;
   onChanged?: (apps?: { codex: boolean; claude: boolean; ide: boolean }) => void;
@@ -53,7 +54,7 @@ export function DevelopmentMarket({
   };
   useEffect(() => {
     void run();
-  }, [call]);
+  }, [call, refreshToken]);
   const installing = coding?.installs?.some((j: any) => j.state === 'running') || ide?.installing;
   useEffect(() => {
     if (!installing) return;
@@ -77,8 +78,8 @@ export function DevelopmentMarket({
   const app = apps.find((a) => a.id === selected),
     state = selected === 'ide' ? ide : coding?.engines?.find((e: any) => e.engine === selected);
   return (
-    <section className="development-market">
-      <header>
+    <section className={"development-market"+(embedded?" market-embedded":"")}>
+      {!embedded && <header>
         <div>
           <h3>开发工具</h3>
           <p>安装到这台机器，验证完成后加入桌面。</p>
@@ -91,7 +92,7 @@ export function DevelopmentMarket({
         >
           <RefreshCw size={16} />
         </button>
-      </header>
+      </header>}
       {error && (
         <ErrorNotice title="应用操作未完成" error={error} />
       )}
@@ -234,7 +235,7 @@ export function DevelopmentMarket({
         </div>
       ) : (
         <div className="development-grid">
-          {apps.map((a) => {
+          {apps.filter(a=>(a.title+' '+a.description).toLowerCase().includes(query.toLowerCase())).map((a) => {
             const ready =
               a.id === 'ide'
                 ? ide?.ready

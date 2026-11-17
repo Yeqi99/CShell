@@ -72,7 +72,7 @@ const permissionNames: Record<string, string> = {
 };
 type Call = (method: AgentCall['method'], params?: unknown) => Promise<unknown>;
 
-export function AgentCapabilityMarket({ target, call, onChanged, onOpen }: { target: AgentTarget; call: Call; onChanged?:()=>void; onOpen?:(id:string)=>void }) {
+export function AgentCapabilityMarket({ target, call, onChanged, onOpen, embedded = false, query: externalQuery, refreshToken = 0 }: { embedded?: boolean; query?: string; refreshToken?: number; target: AgentTarget; call: Call; onChanged?:()=>void; onOpen?:(id:string)=>void }) {
   const [catalog, setCatalog] = useState<z.infer<typeof catalogSchema>>([]);
   const [installed, setInstalled] = useState<z.infer<typeof installedSchema>>([]);
   const [selected, setSelected] = useState('');
@@ -116,7 +116,7 @@ export function AgentCapabilityMarket({ target, call, onChanged, onOpen }: { tar
     return () => {
       cancelled = true;
     };
-  }, [target.id]);
+  }, [target.id, refreshToken]);
   const item = catalog.find((p) => p.id === selected),
     record = installed.find((p) => p.id === selected);
   const update = async (method: AgentCall['method'], params: unknown) => {
@@ -125,28 +125,28 @@ export function AgentCapabilityMarket({ target, call, onChanged, onOpen }: { tar
   };
   return (
     <section className="agent-capability-market" aria-label="能力工具包">
-      <div className="agent-toolbar">
+      {!embedded && <div className="agent-toolbar">
         <h3>能力工具包</h3>
         <button onClick={()=>{setCustomOnly(!customOnly);setSelected('');}}>{customOnly?'应用市场':'自定义扩展'}</button>
         <button disabled={busy} onClick={() => void run(refresh)}>
           刷新能力包
         </button>
-      </div>
+      </div>}
       {error && (
         <ErrorNotice title="应用能力操作未完成" error={error} />
       )}
       {!item ? (
         <>
-          <input
+          {!embedded && <input
             aria-label="搜索能力包"
             placeholder="搜索能力包"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-          />
+          />}
           <div className="agent-app-grid">
             {catalog
-              .filter(p=>customOnly?p.id==='cagent.wechat':p.id!=='cagent.wechat')
-              .filter((p) => (p.name + p.id).toLowerCase().includes(query.toLowerCase()))
+              .filter(p=>embedded?true:customOnly?p.id==='cagent.wechat':p.id!=='cagent.wechat')
+              .filter((p) => (p.name + p.id).toLowerCase().includes((externalQuery ?? query).toLowerCase()))
               .map((p) => (
                 <button
                   key={p.id}

@@ -117,3 +117,26 @@ test('records one cumulative usage sample even when delivered after finish_reaso
   await readAiResponse(response, () => {}, undefined, usage => samples.push(usage));
   assert.deepEqual(samples, [{ input:5, output:3, total:8 }]);
 });
+
+test('inline MiniMax thinking never reaches streaming callbacks, including split tags', async () => {
+  const snapshots: string[] = [];
+  const reply = await readAiResponse(response([
+    ...['<', 'thi', 'nk>', 'We need answer Chinese.', '</thi', 'nk>', '\n你好'].map(content => event({content})),
+    event({}, 'stop'),
+  ]), text => snapshots.push(text));
+  assert.deepEqual(snapshots, ['你好']);
+  assert.equal(reply.content, '你好');
+  assert.equal(reply.reasoning_content, 'We need answer Chinese.');
+});
+test('JSON thinking is separated and unterminated thinking cannot execute tools', async () => {
+  const reply = await readAiResponse(Response.json({choices:[{message:{content:'<think>private</think>你好'}}]}),()=>{});
+  assert.equal(reply.content, '你好');
+  assert.equal(reply.reasoning_content, 'private');
+  await assert.rejects(readAiResponse(response([event({content:'<think>private'},'stop')]),()=>assert.fail('reasoning leaked')), /思考响应未完成/);
+});
+test('normal English and quoted think examples remain answers', async () => {
+  for (const text of ['Hello', 'Example: <think>literal</think>']) {
+    const reply = await readAiResponse(response([event({content:text},'stop')]),()=>{});
+    assert.equal(reply.content,text);
+  }
+});

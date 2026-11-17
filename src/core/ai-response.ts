@@ -22,6 +22,19 @@ const replySchema = z.object({
   reasoning_content: z.string().max(2_000_000).optional(),
   tool_calls: z.array(callSchema).max(16).nullish(),
 });
+/** Only a leading protocol envelope is reasoning; examples inside an answer stay literal. */
+function splitInlineReasoning(text: string, complete = false) {
+  const start = text.trimStart();
+  const open = '<think>', close = '</think>';
+  if (!complete && open.startsWith(start)) return { content: '', reasoning: '' };
+  if (!start.startsWith(open)) return { content: text, reasoning: '' };
+  const end = start.indexOf(close, open.length);
+  if (end < 0) {
+    if (complete) throw new Error('模型思考响应未完成，请重试；未执行本轮工具调用。');
+    return { content: '', reasoning: '' };
+  }
+  return { content: start.slice(end + close.length).trimStart(), reasoning: start.slice(open.length, end) };
+}
 export const pseudoToolCall = (text: string) => /<tool_call\b|<function\s*=/i.test(text);
 // Only explicit short progress announcements get one continuation, never arbitrary answers.
 export const progressOnly = (text: string) =>
@@ -55,6 +68,7 @@ export async function readAiResponse(response: Response, onContent: (content: st
   let raw = '',
     pending = '',
     content = '',
+    visible = '',
     reasoning = '',
     finished = false;
   let usage: Tokens | undefined;
@@ -90,7 +104,8 @@ export async function readAiResponse(response: Response, onContent: (content: st
     if (typeof delta.content === 'string') {
       content += delta.content;
       checkResponseSize(content.length);
-      onContent(content);
+      const next = splitInlineReasoning(content).content;
+      if (next !== visible) { visible = next; onContent(visible); }
     }
     if (delta.tool_calls != null) {
       if (!Array.isArray(delta.tool_calls)) throw new Error('AI 工具调用格式无效');
@@ -141,12 +156,17 @@ export async function readAiResponse(response: Response, onContent: (content: st
       const value = parseAiJson(raw, 'json');
       usage = reportedTokens(value?.usage);
       checkFinish(value?.choices?.[0]?.finish_reason);
-      return validateReply(value?.choices?.[0]?.message);
+      const reply = validateReply(value?.choices?.[0]?.message);
+      const separated = splitInlineReasoning(reply.content ?? '', true);
+      return { ...reply, content: separated.content, ...((reply.reasoning_content || separated.reasoning) ? { reasoning_content: (reply.reasoning_content ?? '') + separated.reasoning } : {}) };
     }
     if (pending.trim()) event(pending.replace(/\r\n/g, '\n'));
     if (!finished) throw new Error('AI 响应中断，请重试；未执行未完成的工具调用。');
+    const separated = splitInlineReasoning(content, true);
+    if (separated.content !== visible) onContent(separated.content);
+    reasoning += separated.reasoning;
     return validateReply({
-      content,
+      content: separated.content,
       ...(reasoning ? {reasoning_content: reasoning} : {}),
       tool_calls: [...calls.entries()].sort((a, b) => a[0] - b[0]).map(([, c]) => c),
     });

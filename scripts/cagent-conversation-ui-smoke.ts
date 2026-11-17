@@ -3,6 +3,7 @@ import {mkdtemp,mkdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createServer} from 'node:net';
+import {createServer as createHttpServer} from 'node:http';
 import {once} from 'node:events';
 import assert from 'node:assert/strict';
 import {createAgentRuntime} from '../src/agent/runtime';
@@ -11,7 +12,15 @@ const runtime=await createAgentRuntime({directory:join(data,'agent')});
 const holder=createServer().listen(0,'127.0.0.1');await once(holder,'listening');
 const port=(holder.address() as any).port;await new Promise<void>(resolve=>holder.close(()=>resolve()));
 await runtime.dispatch('connection.save',{bind:'127.0.0.1',port,password:'fixture-password'});
-await runtime.dispatch('assistant.configure',{endpoint:'https://fixture.invalid/v1',model:'Shared model',key:'fixture',commands:false,review:true,delegates:['*']});
+let finishModel: (()=>void)|undefined;
+const modelServer=createHttpServer(async(req,res)=>{
+ for await(const _ of req){}
+ res.writeHead(200,{'Content-Type':'text/event-stream'});
+ res.write('data: '+JSON.stringify({choices:[{index:0,delta:{content:'<think>PRIVATE_REASONING</think>左侧正在逐步回复'}}]})+'\n\n');
+ finishModel=()=>res.end('data: '+JSON.stringify({choices:[{index:0,delta:{content:'，测试完成。'},finish_reason:'stop'}]})+'\n\ndata: [DONE]\n\n');
+});
+await new Promise<void>(resolve=>modelServer.listen(0,'127.0.0.1',resolve));
+await runtime.dispatch('assistant.configure',{endpoint:'http://127.0.0.1:'+(modelServer.address() as any).port+'/v1',model:'Shared model',key:'fixture',commands:false,review:true,delegates:['*']});
 const env={...process.env,CSHELL_TEST_DATA:join(data,'cshell'),CSHELL_TEST_START_GATE:'1'};delete env.ELECTRON_RUN_AS_NODE;
 const app=await electron.launch({args:process.env.CSHELL_EXECUTABLE?[]:['.'],executablePath:process.env.CSHELL_EXECUTABLE,env});
 await app.evaluate(()=>{(globalThis as any).__cshellPackagedTestAttached=true;});
@@ -34,11 +43,25 @@ try{
  await chat.getByRole('button',{name:'返回对话',exact:true}).click();
  assert.equal(await chat.getByLabel('交给这台机器的任务').inputValue(),'保留这条任务草稿');
  await chat.getByRole('combobox',{name:'智能体基座'}).waitFor();
+ await chat.getByLabel('交给这台机器的任务').fill('界面回归测试，不调用工具。');
+ await chat.getByRole('button',{name:'发送任务',exact:true}).click();
+ await chat.getByText('左侧正在逐步回复',{exact:true}).waitFor();
+ assert(!(await chat.innerText()).includes('PRIVATE_REASONING'));
+ await chat.getByRole('button',{name:'停止当前任务',exact:true}).waitFor();
+ await page.screenshot({path:'test-results/cagent-stream-partial.png'});
+ finishModel!();
+ await chat.getByText('左侧正在逐步回复，测试完成。',{exact:true}).waitFor();
+ await chat.getByRole('button',{name:'停止当前任务',exact:true}).waitFor({state:'hidden'});
+ await chat.getByLabel('交给这台机器的任务').fill('保留这条任务草稿');
  await page.screenshot({path:'test-results/cagent-conversation-light.png'});
  await page.getByRole('button',{name:'切换桌面明暗主题',exact:true}).click();
  await page.screenshot({path:'test-results/cagent-conversation-dark.png'});
  const overflow=await chat.evaluate(el=>el.scrollWidth>el.clientWidth+1);
  assert.equal(overflow,false);
+ await chat.evaluate(el=>{(el as HTMLElement).style.width='340px';});
+ assert.equal(await chat.evaluate(el=>el.scrollWidth>el.clientWidth+1),false);
+ assert.equal(await chat.getByLabel('交给这台机器的任务').inputValue(),'保留这条任务草稿');
+
  console.log('PASS real paired machine, model picker, account action, draft preservation, light/dark and no horizontal overflow');
 }catch(error){await (await app.firstWindow()).screenshot({path:'test-results/cagent-conversation-failure.png'});throw error;}
-finally{await app.evaluate(({app})=>app.exit(0)).catch(()=>{});await runtime.close();}
+finally{await app.evaluate(({app})=>app.exit(0)).catch(()=>{});finishModel?.();modelServer.closeAllConnections();modelServer.close();await runtime.close();}

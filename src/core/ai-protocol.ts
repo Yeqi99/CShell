@@ -8,6 +8,8 @@ export async function fetchAiProtocol(transport: typeof fetch, url: string, init
   if (!explicit && !(endpoint.hostname === 'api.openai.com' && /^gpt-6(?:[.-]|$)/.test(body?.model ?? ''))) {
     if (body?.stream && ['api.openai.com', 'api.deepseek.com'].includes(endpoint.hostname))
       return transport(url, { ...init, body: JSON.stringify({ ...body, stream_options: { ...body.stream_options, include_usage: true } }) });
+    if (/minimax/i.test(body?.model ?? ''))
+      return transport(url, { ...init, body: JSON.stringify({ ...body, reasoning_split: true }) });
     return transport(url, init);
   }
   endpoint.pathname = endpoint.pathname.replace(/\/(?:responses\/)?chat\/completions\/?$/, '/responses');

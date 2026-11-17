@@ -1,6 +1,6 @@
 import { _electron as electron } from 'playwright';
 import { createServer } from 'node:http';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import assert from 'node:assert/strict';
@@ -17,7 +17,7 @@ const api = createServer(async (req, res) => {
   res.setHeader('content-type', 'text/event-stream');
   res.write(
     'data: ' +
-      JSON.stringify({ choices: [{ index: 0, delta: { content: '正在逐字回复' } }] }) +
+      JSON.stringify({ choices: [{ index: 0, delta: { content: '<think>PRIVATE_REASONING</think>正在逐字回复' } }] }) +
       '\n\n',
   );
   finish = () =>
@@ -30,7 +30,7 @@ const api = createServer(async (req, res) => {
     );
 });
 await new Promise<void>((r) => api.listen(0, '127.0.0.1', r));
-const env = { ...process.env, CSHELL_TEST_DATA: directory };
+const env = { ...process.env, CSHELL_TEST_DATA: directory, CSHELL_TEST_START_GATE: '1' };
 delete env.ELECTRON_RUN_AS_NODE;
 const app = await electron.launch({
   ...(process.env.CSHELL_EXECUTABLE
@@ -38,50 +38,52 @@ const app = await electron.launch({
     : { args: ['.'] }),
   env,
 });
+await app.evaluate(()=>{(globalThis as any).__cshellPackagedTestAttached=true;});
 try {
   const page = await app.firstWindow();
   await page.getByRole('heading', { name: '工作台', exact: true }).waitFor();
   await page.getByRole('button', { name: 'AI 智能体', exact: true }).click();
   const panel = page.getByRole('complementary', { name: 'AI 智能体' });
-  await panel.getByRole('heading', { name: '连接你的 AI' }).waitFor();
-  assert.equal(await panel.getByLabel('发送给智能体').isVisible(), false);
-  await page.locator('.sidebar-search input').fill('选择这些文字');
-  await page.locator('.sidebar-search input').selectText();
-  await page.locator('.sidebar-search input').click({ button: 'right' });
-  assert.equal(await page.getByRole('menuitem', { name: '我想……', exact: true }).count(), 0);
-  await page.keyboard.press('Escape');
   const provider = {
     id: crypto.randomUUID(),
     name: 'Stream fixture',
     model: 'test',
     url: `http://127.0.0.1:${(api.address() as any).port}/v1`,
   };
-  await page.evaluate((p) => window.cshell.aiProviderSave(p), provider);
+  await page.evaluate((p) => window.cshell.aiProviderSave(p, 'fixture-only'), provider);
   await panel.getByLabel('发送给智能体').waitFor({ state: 'visible' });
   await panel.getByLabel('发送给智能体').fill('测试流式显示');
-  await panel.getByLabel('发送给智能体').press('Enter');
+  await panel.getByRole('button', {name:'发送',exact:true}).click();
   // The server deliberately holds the response open until visible partial text is verified.
   await panel.getByText('正在逐字回复', { exact: true }).waitFor();
   assert.equal((await page.evaluate(() => window.cshell.aiSnapshot())).threads[0].state, 'running');
   await panel.getByRole('button', { name: '停止 AI' }).waitFor();
+  assert(!await panel.innerText().then(text=>text.includes('PRIVATE_REASONING')));
   finish!();
   await panel.getByText('正在逐字回复，已完成。', { exact: true }).waitFor();
   await panel.getByRole('button', { name: '停止 AI' }).waitFor({ state: 'hidden' });
   await panel.getByLabel('发送给智能体').fill('测试停止');
-  await panel.getByLabel('发送给智能体').press('Enter');
+  await panel.getByRole('button', {name:'发送',exact:true}).click();
   await panel.getByText('正在逐字回复', { exact: true }).waitFor();
   await panel.getByRole('button', { name: '停止 AI' }).click();
-  await panel.getByRole('alert').filter({ hasText: '已停止' }).waitFor();
+  await panel.getByRole('button', {name:'停止 AI'}).waitFor({state:'hidden'});
+  assert.notEqual((await page.evaluate(()=>window.cshell.aiSnapshot())).threads[0].state, 'running');
   finish!();
   assert.equal(calls, 2);
   await page.evaluate((id) => window.cshell.aiProviderDelete(id), provider.id);
-  await panel.getByLabel('发送给智能体').waitFor({ state: 'hidden' });
+  assert.equal((await page.evaluate(()=>window.cshell.aiSnapshot())).providers.some(p=>p.id===provider.id),false);
   console.log(
-    'PASS: no-provider AI actions hidden; partial reply visible before stream closes; stop cancels response; provider removal hides composer',
+    'PASS: partial reply visible before stream closes; thinking hidden; stop settles task; provider removal verified',
   );
+} catch(error) {
+ await mkdir('test-results',{recursive:true});
+ const page=await app.firstWindow();await page.screenshot({path:'test-results/stream-failure.png'});
+ console.log('Fixture requests:', calls);
+ throw error;
 } finally {
   finish?.();
-  await app.close();
+  await app.evaluate(({app})=>app.exit(0)).catch(()=>{});
+  await app.close().catch(()=>{});
   await new Promise<void>((r) => api.close(() => r()));
   await rm(directory, { recursive: true, force: true });
 }

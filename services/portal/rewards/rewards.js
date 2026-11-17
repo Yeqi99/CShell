@@ -1,3 +1,4 @@
+import {drawPoster} from './poster.js';
 const el=id=>document.getElementById(id);
 const params=new URLSearchParams(location.hash.slice(1));
 const invite=params.get('invite')||'',gift=params.get('gift')||'';
@@ -17,20 +18,13 @@ async function registration(email,password,code){
  const key=b64(raw).replaceAll('+','-').replaceAll('/','_').replaceAll('=','');
  return api('auth/register',{email,password,code,accountId,invite,keybox:{salt:b64(salt),envelope:await seal(wrappingKey,{key})},envelope:await seal(await crypto.subtle.importKey('raw',raw,'AES-GCM',false,['encrypt']),empty)});
 }
-function poster(type,code,label){
- const link=new URL(location.pathname,location.origin);link.hash=new URLSearchParams({[type]:code});
- const ctx=canvas.getContext('2d'),g=ctx.createLinearGradient(0,0,840,1040);
- g.addColorStop(0,'#123931');g.addColorStop(1,'#387465');ctx.fillStyle=g;ctx.fillRect(0,0,840,1040);
- ctx.strokeStyle='#659585';ctx.lineWidth=2;for(let i=0;i<6;i++){ctx.beginPath();ctx.arc(860,100,100+i*42,0,Math.PI*2);ctx.stroke();}
- ctx.fillStyle='#e2f4db';ctx.font='bold 40px system-ui';const icon=document.querySelector('header img');if(icon.complete&&icon.naturalWidth)ctx.drawImage(icon,64,53,55,55);ctx.fillText('CShell',132,96);
- ctx.font='bold 62px system-ui';ctx.fillText(type==='gift'?'礼品卡':'邀请你加入 CShell',64,246,712);
- ctx.font='32px system-ui';ctx.fillText(label,64,320,712);
- const qr=qrcode(0,'M');qr.addData(link.href);qr.make();const n=qr.getModuleCount(),scale=Math.floor(430/(n+8)),size=(n+8)*scale;
- ctx.fillStyle='white';ctx.fillRect(64,428,size,size);ctx.fillStyle='#122c25';
- for(let r=0;r<n;r++)for(let c=0;c<n;c++)if(qr.isDark(r,c))ctx.fillRect(64+(c+4)*scale,428+(r+4)*scale,scale,scale);
- ctx.fillStyle='#e2f4db';ctx.font='28px system-ui';ctx.fillText(type==='gift'?'扫码兑换，或输入下方兑换码':'扫码注册',64,916);
- ctx.font='26px monospace';ctx.fillText(code,64,972,712);canvas.hidden=false;el('save').hidden=false;
+let posterSequence=0;
+async function poster(type,code,label){
+ const sequence=++posterSequence;el('save').hidden=true;el('save').disabled=true;el('status').textContent='正在生成高清海报…';
+ try{const draft=document.createElement('canvas');await drawPoster(draft,{type,code,label});if(sequence!==posterSequence)return;canvas.width=draft.width;canvas.height=draft.height;canvas.getContext('2d').drawImage(draft,0,0);canvas.hidden=false;el('save').hidden=false;el('save').disabled=false;el('status').textContent='海报已生成，可保存图片。';}
+ catch(error){if(sequence===posterSequence)el('status').textContent=error.message;}
 }
+
 function mode(){el('codeRow').hidden=!registering;auth.elements.code.required=registering;el('submit').textContent=registering?'注册':'登录';el('toggle').textContent=registering?'已有账号，去登录':'注册账号';auth.elements.password.autocomplete=registering?'new-password':'current-password';}
 function run(button,work){return async e=>{e.preventDefault();button.disabled=true;el('status').textContent='';try{await work();}catch(error){el('status').textContent=error.message;}finally{button.disabled=false;}};}
 async function refresh(){

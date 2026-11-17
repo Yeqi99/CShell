@@ -147,3 +147,34 @@
 .api-client-card:not([open]){padding-bottom:0}
 .api-client-card > summary { padding:10px 0; min-height:32px; }
 .api-client-card > summary button { float:right; padding:4px 10px; min-height:28px; }
+
+/* Keep category navigation stable when the agent occupies the adjacent pane. */
+@container category-workspace (min-width: 461px) and (max-width: 720px) {
+  .workspace-category-container .preferences-page.settings-studio {
+    grid-template-columns: 156px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+  .workspace-category-container .settings-studio .settings-nav {
+    display: block; grid-row: 1; padding: 16px 8px;
+    border-right: 1px solid var(--border); border-bottom: 0;
+    overflow-x: hidden; overflow-y: auto;
+  }
+  .workspace-category-container .settings-studio .settings-nav h2 { display: block; margin: 0 8px 14px; }
+  .workspace-category-container .settings-studio .settings-nav > button {
+    width: 100%; padding: 9px 8px; margin: 3px 0; gap: 7px;
+    font-size: calc(var(--ui-font-size, 14px) * 12 / 14);
+  }
+  .settings-studio .settings-nav > button[aria-current='page'] { box-shadow: inset 3px 0 var(--accent); }
+  .settings-studio .settings-search { width: auto; margin: 0 0 14px; padding: 0 8px; }
+  .settings-studio .settings-content { padding: 20px 18px; }
+  .settings-studio .settings-category-heading { margin-bottom: 20px; }
+  .settings-studio .settings-category-heading h1 { font-size: 22px; }
+  .settings-studio .settings-savebar { grid-column: 1 / -1; }
+}
+@container category-workspace (max-width: 460px) {
+  .workspace-category-container .settings-studio .settings-nav {
+    flex-wrap: wrap; max-height: 174px; overflow-x: hidden; overflow-y: auto;
+  }
+  .settings-studio .settings-search { width: 100%; flex: 1 0 100%; margin: 0; box-sizing: border-box; }
+  .workspace-category-container .settings-studio .settings-nav > button { flex: 1 0 42%; }
+}

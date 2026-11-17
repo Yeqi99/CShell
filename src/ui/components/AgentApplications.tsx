@@ -38,6 +38,8 @@ export function AgentApplications({
     [task, setTask] = useState<z.infer<typeof appTaskSchema>>();
   const [policy, setPolicy] = useState<z.infer<typeof appPolicySchema>>(),
     [controllers, setControllers] = useState('');
+  const [category, setCategory] = useState(nativeCapabilities && !target.id.startsWith('ssh:') ? 'apps' : 'development');
+  const [refreshToken, setRefreshToken] = useState(0);
   const [port, setPort] = useState('');
   const [detail, setDetail] = useState(false);
   const [wslOpen, setWslOpen] = useState(false);
@@ -104,21 +106,22 @@ export function AgentApplications({
           {target.name} · {catalog?.platform ?? '检查中'}
         </p>
       </header>
-      <div hidden={detail}>
-        {target.id.startsWith('ssh:')&&<SshApplicationMarket key={target.id} sessionId={target.id.slice(4)} name={target.name}/>}
-        <DevelopmentMarket
+      <div className="market-controls">
+        <label className="market-search"><Search size={16}/><input aria-label="搜索应用市场" placeholder="搜索当前分类" value={query} onChange={e=>setQuery(e.target.value)}/></label>
+        <button title="刷新应用市场" aria-label="刷新应用市场" disabled={busy} onClick={()=>{setRefreshToken(n=>n+1);void run(refresh);}}><RefreshCw size={16}/></button>
+      </div>
+      <nav className="market-categories" aria-label="应用分类">
+        {[['apps','智能体应用'],['development','开发工具'],['system','数据库与环境']].filter(([id])=>id!=='apps'||nativeCapabilities&&!target.id.startsWith('ssh:')).map(([id,label])=><button key={id} aria-pressed={category===id} onClick={()=>setCategory(id)}>{label}</button>)}
+      </nav>
+      <div hidden={category==='system'}>
+        
+        <div hidden={category!=='development'}><DevelopmentMarket embedded query={query} refreshToken={refreshToken}
           call={call}
           onOpen={onDevelopmentOpen}
           onChanged={onDevelopmentChanged}
-        />
+        /></div>
         {nativeCapabilities && !target.id.startsWith('ssh:') && (
-          <AgentCapabilityMarket onChanged={onDevelopmentChanged} onOpen={onDevelopmentOpen} key={target.id} target={target} call={call} />
-        )}
-        {nativeCapabilities && catalog?.platform === 'win32' && (
-          <details className="agent-system-apps" onToggle={(e) => setWslOpen(e.currentTarget.open)}>
-            <summary>Linux 虚拟机 · WSL</summary>
-            {wslOpen && <AgentWsl target={target.id} call={call} />}
-          </details>
+          <div hidden={category!=='apps'}><AgentCapabilityMarket embedded query={query} refreshToken={refreshToken} onChanged={onDevelopmentChanged} onOpen={onDevelopmentOpen} key={target.id} target={target} call={call} /></div>
         )}
       </div>
       {error && (
@@ -126,7 +129,15 @@ export function AgentApplications({
       )}
       {compatibility&&<p role="status">{compatibility}</p>}
       {busy && <p role="status">正在处理应用操作…</p>}
-      <div className="machine-app-catalog">
+      <div className="machine-app-catalog" hidden={category!=='system'}>
+        {target.id.startsWith('ssh:')&&<SshApplicationMarket key={target.id} sessionId={target.id.slice(4)} name={target.name}/>}
+        {nativeCapabilities && catalog?.platform === 'win32' && (
+          <details className="agent-system-apps" onToggle={(e) => setWslOpen(e.currentTarget.open)}>
+            <summary>Linux 虚拟机 · WSL</summary>
+            {wslOpen && <AgentWsl target={target.id} call={call} />}
+          </details>
+        )}
+
         {policy && !detail && !target.id.startsWith('ssh:') && (
           <details className="machine-app-permissions">
             <summary>应用安装权限</summary>
@@ -174,23 +185,6 @@ export function AgentApplications({
             </span>
           </div>
         )}
-        <div className="agent-toolbar" hidden={detail}>
-          <Search size={16} aria-hidden="true" />
-          <input
-            aria-label="搜索应用"
-            placeholder="搜索应用"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <button
-            title="刷新应用"
-            aria-label="刷新应用"
-            disabled={busy}
-            onClick={() => void run(refresh)}
-          >
-            <RefreshCw size={16} />
-          </button>
-        </div>
         <div className="agent-app-grid" hidden={detail}>
           {catalog?.applications
             .filter((a) => nativeCapabilities || a.id !== 'browser')

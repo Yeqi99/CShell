@@ -4,9 +4,10 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import assert from 'node:assert/strict';
 const data = await mkdtemp(join(tmpdir(), 'cshell-settings-'));
-const env = { ...process.env, CSHELL_TEST_DATA: data };
+const env = { ...process.env, CSHELL_TEST_DATA: data, CSHELL_TEST_START_GATE: '1' };
 delete env.ELECTRON_RUN_AS_NODE;
-const app = await electron.launch({ args: ['.'], env });
+const app = await electron.launch({ ...(process.env.CSHELL_EXECUTABLE ? {executablePath:process.env.CSHELL_EXECUTABLE,args:[]} : {args:['.']}), env });
+await app.evaluate(()=>{(globalThis as any).__cshellPackagedTestAttached=true;});
 try {
   const page = await app.firstWindow();
   await page.getByRole('heading', { name: '工作台', exact: true }).waitFor();
@@ -25,6 +26,10 @@ try {
   ]);
   await mkdir('test-results', { recursive: true });
   await page.getByText(/本机已安装字体/).waitFor();
+  await page.locator('.workspace-category-container:has(.settings-studio)').evaluate(el=>{(el as HTMLElement).style.width='666px';});
+  assert.equal(await nav.evaluate(el=>getComputedStyle(el).display),'block');
+  assert(await nav.evaluate(el=>el.scrollWidth<=el.clientWidth+1));
+
   await page.screenshot({ animations: 'disabled', path: 'test-results/settings-appearance.png' });
   await nav.getByRole('button', { name: '终端', exact: true }).click();
   await page.getByLabel('终端字号', { exact: true }).fill('17');

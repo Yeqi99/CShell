@@ -66,13 +66,13 @@ try {
     await page.locator('#test-workspace').evaluate((element, value) => { (element as HTMLElement).style.width = value + 'px'; }, width);
     await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
   };
-  for (const width of [320, 400, 700]) {
+  for (const width of [320, 400, 666, 700]) {
     await resize(width);
     for (const mode of ['extensions', 'settings']) {
       await page.evaluate(mode => (window as any).setMode(mode), mode);
       const nav = page.locator(mode === 'extensions' ? '.extension-nav' : '.settings-nav');
       await nav.waitFor({state:'visible'});
-      assert.equal(await nav.evaluate(element => getComputedStyle(element).display), 'flex');
+      assert.equal(await nav.evaluate(element => getComputedStyle(element).display), mode === 'settings' && width > 460 ? 'block' : 'flex');
       assert(await nav.locator('button').evaluateAll(buttons => buttons.every(button => getComputedStyle(button).whiteSpace === 'nowrap' && button.clientHeight < 50)), 'Labels must stay on one line');
       const panel = page.locator(mode === 'extensions' ? '.extension-workbench' : '.categorized-settings');
       assert(await panel.evaluate(element => element.scrollWidth <= element.clientWidth + 1), `${mode} ${width}: workspace horizontal overflow`);
@@ -125,12 +125,12 @@ try {
   await page.getByRole('button',{name:'撤销运行权限',exact:true}).click();await grant.waitFor();
   assert.deepEqual(errors, []);
   const actions = await page.evaluate(() => (window as any).actions);
-  assert.equal(actions.filter((action:any) => action.type==='rdp').length, 3);
-  assert.equal(actions.filter((action:any) => action.type==='download').length, 3);
+  assert.equal(actions.filter((action:any) => action.type==='rdp').length, 4);
+  assert.equal(actions.filter((action:any) => action.type==='download').length, 4);
   assert(actions.filter((action:any)=>action.type==='download').every((action:any)=>action.platform==='windows'));
   assert.deepEqual(actions.filter((action:any)=>action.type==='authorize').map((action:any)=>action.allowed),[true,false]);
   assert(actions.filter((action:any) => action.type==='copy').every((action:any)=>action.text==='https://shell.canp.ai/downloads.html?product=cagent&system=windows'));
-  console.log('PASS actual extension/settings/RDP guide components: 320/400/700 panel widths beside agent pane, draft retention, focus scrolling, no SSH picker, fixed download entry, no install execution');
+  console.log('PASS actual extension/settings/RDP guide components: 320/400/666/700 panel widths beside agent pane, draft retention, focus scrolling, no SSH picker, fixed download entry, no install execution');
 } finally {
   await browser.close();
   server.closeAllConnections();
