@@ -1,0 +1,50 @@
+name: POSIX 1.0.11
+on:
+  push:
+    branches: ['codex/build-oss-context-111']
+permissions: {contents: write}
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: ubuntu-24.04, platform: linux, arch: x64}
+          - {runner: ubuntu-24.04-arm, platform: linux, arch: arm64}
+          - {runner: macos-latest, platform: mac, arch: arm64}
+          - {runner: macos-15-intel, platform: mac, arch: x64}
+    runs-on: ${{ matrix.runner }}
+    env:
+      CSHELL_EDITION: opensource
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - uses: pnpm/action-setup@v4
+        with: {version: 11.25.0}
+      - uses: actions/setup-node@v4
+        with: {node-version: 24.19.0, cache: pnpm}
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/prepare-pty.mjs
+      - run: pnpm exec tsc --noEmit
+      - run: node scripts/agent-build.mjs && pnpm exec tsx scripts/agent-package-smoke.ts && node scripts/package-agent.mjs
+      - run: pnpm exec vite build && node scripts/build.mjs
+      - run: pnpm exec electron-builder  --${{ matrix.platform }} --${{ matrix.arch }} --publish never
+      - name: Upload validated packages to the draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          find release -type f \( -name '*.AppImage' -o -name '*.deb' -o -name '*.dmg' -o -name 'CAgent-1.0.11-*.tar.gz' \) -print0 | xargs -0 gh release upload v1.0.11
+      - uses: actions/upload-artifact@v4
+        with:
+          name: opensource-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            release/**/*.AppImage
+            release/**/*.deb
+            release/**/*.dmg
+            release/**/CAgent-1.0.11-*.tar.gz
+          if-no-files-found: error
+
