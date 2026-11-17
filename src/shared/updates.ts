@@ -21,6 +21,7 @@ export interface UpdateBridge {
   usageRead?():Promise<{enabled:boolean}>;
   usageConsent?(enabled:boolean):Promise<{enabled:boolean}>;
   agentDownloadList():Promise<Omit<import('./agent-downloads').AgentDownload,'url'>[]>;
+  agentInstallLocal():Promise<void>;
   agentDownloadOpen(id:string):Promise<void>;
   updateState(): Promise<UpdateState>;
   checkUpdate(): Promise<UpdateState>;
@@ -32,7 +33,7 @@ export interface UpdateBridge {
 export const releasesPage = downloadPage;
 export const releaseApi = downloadManifest;
 export function compareVersion(a: string, b: string): number {
-  const parse = (v: string) => /^v?(\d+)\.(\d+)\.(\d+)$/.exec(v);
+  const parse = (v: string) => /^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.exec(v);
   const x = parse(a),
     y = parse(b);
   if (!x || !y) throw new Error('Invalid release version');
@@ -40,7 +41,20 @@ export function compareVersion(a: string, b: string): number {
     const diff = Number(x[i]) - Number(y[i]);
     if (diff) return Math.sign(diff);
   }
-  return 0;
+  if (!x[4] || !y[4]) return x[4] ? -1 : y[4] ? 1 : 0;
+  const left = x[4].split('.'), right = y[4].split('.');
+  for (let i = 0; i < Math.min(left.length, right.length); i++) {
+    const l = left[i], r = right[i];
+    if (l === r) continue;
+    const ln = /^\d+$/.test(l), rn = /^\d+$/.test(r);
+    if (ln && rn) {
+      if (BigInt(l) === BigInt(r)) continue;
+      return BigInt(l) < BigInt(r) ? -1 : 1;
+    }
+    if (ln !== rn) return ln ? -1 : 1;
+    return l < r ? -1 : 1;
+  }
+  return Math.sign(left.length - right.length);
 }
 export interface ReleaseAsset {
   name: string;

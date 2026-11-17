@@ -4,13 +4,13 @@ import {copyFile,mkdtemp,rm,realpath} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join,relative,isAbsolute} from 'node:path';
 
-export async function readAccountSource(source:string,edition:'opensource'|'pro'){
+export async function readAccountSource(source:string,edition:'opensource'|'pro',probe=false){
  const temporary=await mkdtemp(join(tmpdir(),'cshell-source-reader-'));
  const base=await realpath(tmpdir()),resolved=await realpath(temporary),rel=relative(base,resolved);
  if(rel.startsWith('..')||isAbsolute(rel))throw Error('临时读取目录不正确');
  try{
   await copyFile(join(source,'Local State'),join(temporary,'Local State')).catch(error=>{if(error.code!=='ENOENT')throw error;});
-  const args=[...(app.isPackaged?[]:[join(__dirname,'main.cjs')]),'--account-source-export',source,temporary,edition];
+  const args=[...(app.isPackaged?[]:[join(__dirname,'main.cjs')]),'--account-source-export',source,temporary,edition,...(probe?['probe']:[])];
   const env={...process.env};delete env.ELECTRON_RUN_AS_NODE;delete env.CSHELL_TEST_DATA;
   return await new Promise<unknown>((resolve,reject)=>{
    const child=spawn(process.execPath,args,{env,windowsHide:true,stdio:['ignore','pipe','pipe']});

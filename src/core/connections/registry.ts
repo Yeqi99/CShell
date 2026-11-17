@@ -121,6 +121,11 @@ export class ConnectionRegistry {
       return false;
     }
   }
+  async packageCatalog(id:string,signal:AbortSignal,policy:object,cachedOnly:boolean){
+    const connection=this.connection(id);
+    if(connection.packageCatalog)return connection.packageCatalog(signal,policy,cachedOnly);
+    return cachedOnly?[]:this.agent(id)({method:'packages.tools'},signal);
+  }
   agent(id:string){
     const connection=this.connection(id);
     if(!connection.agent)throw new Error('此连接没有 CAgent 管理能力');

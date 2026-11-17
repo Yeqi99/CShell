@@ -1,6 +1,8 @@
 import './settings-surfaces.css';
 import { ErrorNotice } from './ErrorNotice';
 import {isOfficialModel} from '../../shared/official-models';
+import {CloudConversationHistory} from './CloudConversationHistory';
+import type {ChatDocument} from '../../shared/cloud-conversations';
 import { conversationHistory, conversationStatus } from '../ai-history';
 import { usePermissionNavigation } from '../permission-navigation';
 import {AiExtensionModelSelect, AiExtensionProviderStatus} from './AiExtensionModelSelect';
@@ -9,7 +11,7 @@ import { AiGoals } from './AiWork';
 import { AiEventSubscriptions } from './AiEventSubscriptions';
 import type { AiEventSnapshot } from '../../shared/ai-events';
 import { Target } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { startTransition, useEffect, useRef, useState } from 'react';
 import {
   Plus,
   History,
@@ -100,6 +102,7 @@ export function AiPanel({
       setSettingsTab('permissions');
     }
   }, [permissionRequest]);
+  const [cloudShown,showCloud]=useState(false),[cloudId,setCloudId]=useState('');
   const [historySearch, setHistorySearch] = useState('');
   const [error, setError] = useState(''),
     [busy, setBusy] = useState(false);
@@ -116,15 +119,15 @@ export function AiPanel({
   }, [editing?.id, editing?.url, editing?.model, key]);
   useEffect(
     () =>
-      window.cshell.onAiThread((next) => {
-        setSnapshot((previous) => ({
+      visible ? window.cshell.onAiThread((next) => {
+        startTransition(() => setSnapshot((previous) => ({
           ...previous,
           threads: previous.threads.some((t) => t.id === next.id)
             ? previous.threads.map((t) => (t.id === next.id ? next : t))
             : [...previous.threads, next],
-        }));
-      }),
-    [],
+        })));
+      }) : undefined,
+    [visible],
   );
   const refresh = async () => setSnapshot(await window.cshell.aiSnapshot());
   const run = async (fn: () => Promise<unknown>) => {
@@ -151,7 +154,7 @@ export function AiPanel({
       }
     };
     void poll();
-    const timer = setInterval(() => void poll(), 800);
+    const timer = setInterval(() => void poll(), 10000);
     return () => {
       disposed = true;
       clearInterval(timer);
@@ -210,8 +213,8 @@ export function AiPanel({
     window.addEventListener('cshell:analyze-selection', handler);
     return () => window.removeEventListener('cshell:analyze-selection', handler);
   }, []);
-  const create = async (extensionModel?: string) => {
-    const t = await window.cshell.aiThreadCreate(location, providerId, mode, sessionId, extensionModel);
+  const create = async (extensionModel?: string, cloudHistory?:ChatDocument) => {
+    const t = await window.cshell.aiThreadCreate(location, providerId, mode, sessionId, extensionModel, cloudHistory);
     setThreadId(t.id);
     return t;
   };
@@ -348,10 +351,11 @@ export function AiPanel({
           }}
         />
       </div>
+      {window.cshell.cloudConversations&&<CloudConversationHistory bridge={window.cshell.cloudConversations} documents={snapshot.threads.filter(t=>!t.parentId&&t.state!=='running'&&t.state!=='approval').map(t=>({id:t.cloudId??t.id,title:t.title,target:t.target??'CShell',messages:t.messages.filter(m=>m.role!=='tool'&&m.content&&!m.eventGenerated).map(m=>({role:m.role as 'user'|'assistant',text:m.content}))})).filter(d=>d.messages.length)} shown={cloudShown&&page==='history'} selected={cloudId} onClose={()=>showCloud(false)} onContinue={async (d:ChatDocument)=>{await create(undefined,d);showCloud(false);setPage('chat');}}/>}
       {page === 'history' && (
         <div className="agent-history">
           <div className="ai-section-heading">
-            <h3>会话记录</h3>
+            <h3>会话记录</h3><button onClick={()=>{setCloudId('');showCloud(true);}}>云对话</button>
             <span>{snapshot.threads.length} 条</span>
           </div>
           <input
@@ -366,7 +370,7 @@ export function AiPanel({
           )}
           {conversationHistory(snapshot.threads, historySearch)
             .map((t) => (
-              <div className="agent-history-row" key={t.id}>
+              <div className="agent-history-row" key={t.id} onContextMenu={e=>{e.preventDefault();setCloudId(t.cloudId??t.id);showCloud(true);}}>
                 <button
                   onClick={() => {
                     setThreadId(t.id);
@@ -632,7 +636,7 @@ export function AiPanel({
                   />
                 </label>
                 </>}
-                <details><summary>持续执行预算</summary><small>按时间、累计上下文字节和重复无进展停止；字节预算不是计费金额。</small>{(['minutes','contextBytes','noProgress'] as const).map((field,i)=><label key={field}>{['每轮最多分钟','累计上下文预算（字节）','相同结果停止次数'][i]}<input type="number" min={[1,10000,2][i]} max={[240,20000000,20][i]} value={(editing.runBudget??{minutes:30,contextBytes:2000000,noProgress:5})[field]} onChange={e=>setEditing({...editing,runBudget:{minutes:30,contextBytes:2000000,noProgress:5,...editing.runBudget,[field]:Number(e.target.value)}})}/></label>)}</details>
+                <details><summary>持续执行预算</summary><small>时间和累计上下文默认不限（0）。设置字节上限时至少填 10000。重复无进展的操作仍会停止。</small>{(['minutes','contextBytes','noProgress'] as const).map((field,i)=><label key={field}>{['每轮最多分钟','累计上下文预算（字节）','相同结果停止次数'][i]}<input type="number" min={[0,0,2][i]} max={[240,20000000,20][i]} value={(editing.runBudget??{minutes:0,contextBytes:0,noProgress:5})[field]} onChange={e=>setEditing({...editing,runBudget:{minutes:0,contextBytes:0,noProgress:5,...editing.runBudget,[field]:Number(e.target.value)}})}/></label>)}</details>
                 <div className="ai-form-actions">
                   <button
                     type="button"

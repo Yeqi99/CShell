@@ -1,1 +1,56 @@
 .account-traffic>header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px}.account-traffic h2{display:flex;align-items:center;gap:8px;margin-bottom:4px}.account-traffic header small,.account-traffic-note{color:var(--muted);font-size:12px}.account-traffic-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}.account-traffic-grid article{min-width:0;padding:14px 16px;background:var(--hover,rgba(100,130,170,.06));border-radius:12px}.account-traffic-title{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:13px}.account-traffic-title>span{color:var(--muted);font-size:11px}.account-traffic-amount{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin:12px 0}.account-traffic-amount b{font-size:21px;font-variant-numeric:tabular-nums}.account-traffic-amount>span{font-size:12px;color:var(--muted)}.account-traffic progress{display:block;width:100%;height:4px;accent-color:var(--accent);margin:8px 0 14px}.account-traffic dl{display:grid;gap:8px;margin:0}.account-traffic dl>div{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px}.account-traffic dt{display:flex;align-items:center;gap:5px;color:var(--muted)}.account-traffic dd{margin:0;white-space:nowrap;font-variant-numeric:tabular-nums}.account-traffic-note{line-height:1.6;margin:12px 0 0}.account-traffic .icon{display:grid;place-items:center;width:30px;height:30px;border-radius:8px}@media(max-width:620px){.account-traffic-grid{grid-template-columns:1fr;gap:10px}}
+
+.member-wallet{margin:12px 0 20px;padding:16px;border-radius:12px;background:var(--hover);line-height:1.5}.member-wallet small,.member-wallet p{color:var(--muted);font-size:12px}.member-wallet progress{margin:4px 0}.member-wallet button{margin-top:5px}
+
+.account-section.account-traffic {container-type:inline-size;background:var(--surface,var(--panel));padding:clamp(14px,2vw,22px)}
+.account-section.account-traffic >header {margin-bottom:16px}
+.account-section.account-traffic >header>div {display:flex;align-items:baseline;flex-wrap:wrap;gap:8px 14px}
+.account-section.account-traffic >header h2 {margin:0;font-size:16px;font-weight:650;color:var(--text)}
+.account-traffic .member-wallet {display:grid;grid-template-columns:minmax(135px,.83fr) minmax(190px,1.2fr);gap:0;margin:0;border:1px solid var(--border);border-radius:12px;padding:0;overflow:hidden;background:var(--surface,var(--panel))}
+.wallet-balance {position:relative;isolation:isolate;overflow:hidden;padding:18px;color:#f4f8ff;background:linear-gradient(120deg,#173857,#245b80)}
+.wallet-balance::after {content:"";position:absolute;z-index:-1;inset:0;background:repeating-radial-gradient(ellipse at 120% 120%,transparent 0 15px,rgba(177,223,255,.11) 16px,transparent 17px 30px);mask-image:linear-gradient(105deg,transparent 15%,black)}
+.wallet-label,.wallet-week-title,.wallet-actions {display:flex;align-items:center;gap:7px}
+.wallet-label {font-size:12px;color:#d9eaf5}
+.wallet-figure {display:flex;align-items:baseline;gap:6px;margin:9px 0 10px;overflow-wrap:anywhere}
+.wallet-figure strong {font:600 clamp(28px,6cqw,42px)/1.05 "Segoe UI",sans-serif;letter-spacing:-.035em;font-variant-numeric:tabular-nums}
+.wallet-figure span {font-size:12px}
+.wallet-balance {display:flex;flex-direction:column;justify-content:center}
+.wallet-week {min-width:0;padding:17px 18px}
+.wallet-week-title {justify-content:space-between;flex-wrap:wrap;font-size:13px}
+.wallet-week-title span {font-size:11px;color:var(--muted)}
+.wallet-week-title b {color:var(--accent);font:650 19px/1.2 "Segoe UI",sans-serif}
+.wallet-week progress {appearance:none;width:100%;height:5px;margin:11px 0 7px;border:0;border-radius:8px;overflow:hidden}
+.wallet-week progress::-webkit-progress-bar {background:var(--border)}
+.wallet-week progress::-webkit-progress-value {background:var(--accent);border-radius:8px}
+.wallet-actions {flex-wrap:wrap;font-size:12px;margin-top:8px}
+.member-wallet .wallet-actions button {width:auto;margin:0;padding:4px 9px;min-height:26px;border:1px solid var(--border);border-radius:6px;background:transparent;color:var(--text);font-size:12px}
+.member-wallet .wallet-actions button:disabled {color:var(--muted);opacity:.7}
+.member-wallet>p {grid-column:1/-1;margin:0;padding:8px 16px}
+.account-traffic h3 {margin:20px 0 12px;font-size:14px}
+.account-traffic-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0}
+.account-traffic-grid article {padding:0 15px 0 0;background:transparent;border-radius:0}
+.account-traffic-grid article+article {padding:0 0 0 15px;border-left:1px solid var(--border)}
+.account-traffic-amount {margin:7px 0 12px}
+.account-traffic-amount b {font-weight:600;letter-spacing:-.03em}
+.account-traffic dl {gap:5px}
+.account-traffic .account-traffic-note {margin-top:14px;padding-top:9px;border-top:1px solid var(--border);font-size:11px}
+@container (max-width:380px) {
+  .account-traffic .member-wallet,.account-traffic-grid {grid-template-columns:1fr}
+  .account-traffic-grid article,.account-traffic-grid article+article {padding:10px 0;border-left:0}
+  .account-traffic-grid article+article {border-top:1px solid var(--border)}
+}
+.wallet-purchase {display:grid;justify-items:start;gap:6px;margin-top:10px}
+.wallet-purchase>div {display:flex;gap:6px;flex-wrap:wrap}
+.wallet-purchase button {min-height:30px;padding:3px 10px;background:#fff;color:#173857;border:0;border-radius:5px}
+.wallet-purchase button:disabled {opacity:.7}
+.wallet-purchase small {color:#e3eff9}
+.wallet-spending {margin-top:4px;padding-top:10px;border-top:1px solid #ffffff38}
+.member-wallet .wallet-spending>button {width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:3px 0;margin:0;background:transparent;border:0;color:#f4f8ff;font:inherit;font-size:13px;text-align:start;cursor:pointer}
+.wallet-spending>button i {flex:none;box-sizing:border-box;width:32px;height:18px;padding:2px;background:#112f49;border:1px solid #a4c1d6;border-radius:12px}
+.wallet-spending>button i::after {display:block;content:"";width:12px;height:12px;background:white;border-radius:50%;transition:transform .15s}
+.wallet-spending>button[aria-checked=true] i {background:#82dfc3;border-color:#82dfc3}
+.wallet-spending>button[aria-checked=true] i::after {transform:translateX(14px);background:#123d3b}
+.wallet-spending>button:focus-visible {outline:2px solid white;outline-offset:3px;border-radius:3px}
+.member-wallet .wallet-spending small {display:block;color:#d9eaf5;font-size:11px;margin-top:4px}
+
+.wallet-rewards{font-size:12px;margin:6px 0}.wallet-rewards summary{cursor:pointer}.wallet-rewards form{display:flex;gap:4px;align-items:center}.wallet-rewards input{width:100%;min-width:0}.wallet-rewards button{white-space:nowrap}

@@ -7,6 +7,7 @@ import type { AgentApplicationService } from './applications';
 import { CapabilityPackages, parseCapabilityManifest } from './capability-packages';
 import { capabilityCatalog, capabilityDigest, type CapabilityCatalogEntry } from './capability-catalog';
 import { capabilityInstallInput, stageCapabilityBundle } from './capability-installer';
+import { managedWechatCatalog } from './managed-wechat-catalog';
 import type { AgentCapabilityManifest, CapabilityPackageRecord } from '../shared/agent-capability-packages';
 
 export interface TrustedCapabilityAdapter {
@@ -109,7 +110,7 @@ export class CapabilityRuntime {
         const manifest=this.manifestFor(item.id),config=manifest?this.adapters.get(manifest.adapterId)?.portableConfiguration:undefined;
         let validated:unknown;
         if(item.configuration!==undefined){if(!config)throw Error('此扩展没有声明可同步的配置');validated=config.validate(item.configuration);}
-        await this.install({id:item.id,confirm:true});
+        await this.installCatalogEntry({id:item.id,confirm:true},new AbortController().signal,false);
         if(item.configuration!==undefined)await config!.import(validated);
       }catch{pending.push({...item,retryAvailable:true,reason:'能力包恢复未完成，可在应用市场重试'});}
     }
@@ -119,13 +120,15 @@ export class CapabilityRuntime {
   catalog(){return this.entries.map(({bundle:_,url:__,manifestSha256:___,bundleSha256:____,bundleBytes:_____,manifestJson:______,maxBundleBytes:_______,...entry})=>{
     const installed=this.manager.list().find(item=>item.id===entry.id);return {...entry,installed:!!installed,status:installed?.status??'not-installed',reason:installed?.reason,grants:installed?.grants??[]};
   });}
-  install(input:unknown,signal:AbortSignal=new AbortController().signal){return this.mutate(async()=>{
+  install(input:unknown,signal:AbortSignal=new AbortController().signal,localMarket=false){return this.installCatalogEntry(input,signal,true,localMarket);}
+  private installCatalogEntry(input:unknown,signal:AbortSignal,manualInstall:boolean,localMarket=false){return this.mutate(async()=>{
     const {id}=capabilityInstallInput.parse(input),entry=this.entries.find(item=>item.id===id);if(!entry)throw new Error('Package not in trusted catalog');
     const existing=this.manager.list().find(item=>item.id===id);if(existing?.version===entry.version&&this.installedManifestDigests.get(id)===entry.manifestSha256&&existing.status!=='fault')return this.manager.refresh(id);
     const oldRoot=this.roots.get(id);
     const staged=await stageCapabilityBundle(join(this.options.directory,'capability-packages'),entry,signal);
     let result;
-    try{result=await this.manager.stage(staged.manifestJson,staged.root,staged.manifestSha256);}
+    const grantWechatDefaults = manualInstall && managedWechatCatalog.some(pin => pin.id === id && pin.manifestSha256 === staged.manifestSha256);
+    try{result=await this.manager.stage(staged.manifestJson,staged.root,staged.manifestSha256,localMarket||grantWechatDefaults);}
     catch(error){if(this.roots.get(id)!==staged.root)await this.removeRoot(staged.root);throw error;}
     if(oldRoot&&oldRoot!==staged.root)await this.cleanupRetiredRoot(oldRoot);return result;
   });}

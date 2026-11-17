@@ -53,7 +53,7 @@ for (const filename of [
   'LICENSE',
   'LICENSE.node.txt',
   'THIRD_PARTY_NOTICES.txt',
-  ...(os === 'win' ? ['Cagent.exe'] : []),
+  ...(os === 'win' ? ['Cagent.exe', 'cagent-vault.exe'] : []),
 ])
   if (!(await stat(join(staged, filename))).isFile())
     throw new Error(`Missing runtime file ${filename}`);

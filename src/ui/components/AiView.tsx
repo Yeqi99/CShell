@@ -22,8 +22,11 @@ export function AiView({ threadId }: { threadId: string }) {
       finally { pending = false; }
     };
     void refresh();
-    const timer = setInterval(() => void refresh(), 800);
-    return () => { alive = false; clearInterval(timer); };
+    const unsubscribe = window.cshell.onAiThread(thread => {
+      if (thread.id === threadId) setSnapshot(old => old && ({ ...old, threads: old.threads.map(t => t.id === threadId ? thread : t) }));
+    });
+    const timer = setInterval(() => void refresh(), 10000);
+    return () => { alive = false; unsubscribe(); clearInterval(timer); };
   }, [threadId]);
   const thread = snapshot?.threads.find(t => t.id === threadId);
   const run = async (fn: () => Promise<unknown>) => {

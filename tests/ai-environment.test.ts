@@ -90,7 +90,7 @@ test('runtime context, bounded progress continuation and private base configurat
   };
   const send = async () => {
     const t = await ai.create('terminal', base.id, 'allow', sessionId);
-    await ai.send(t.id, '执行请求');
+    await ai.send(t.id, '配置基座');
     return t.id;
   };
   try {
@@ -145,8 +145,8 @@ test('runtime context, bounded progress continuation and private base configurat
     callName = 'list_ai_providers';
     args = {};
     const denied = await send();
-    await wait(denied, 'idle');
-    assert.ok(!requests.at(-2).tools?.some((t: any) => t.function.name === 'list_ai_providers'));
+    assert.match((await wait(denied, 'error')).error!,/不可用|未提供/);
+    assert.ok(!requests.at(-1).tools?.some((t: any) => t.function.name === 'list_ai_providers'));
     assert.equal(JSON.stringify(requests).includes('existing-private-key'), false);
   } finally {
     ai.dispose();

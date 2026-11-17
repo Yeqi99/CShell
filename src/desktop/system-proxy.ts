@@ -20,6 +20,12 @@ export class WindowsSystemProxy{
  private file(){return join(this.directory,'system-proxy-recovery.enc');}
  private async read():Promise<SystemProxyState>{return stateSchema.parse(JSON.parse(await this.run(`$p=Get-ItemProperty -LiteralPath '${key}';@{ProxyEnable=$p.ProxyEnable;ProxyServer=$p.ProxyServer;ProxyOverride=$p.ProxyOverride;AutoConfigURL=$p.AutoConfigURL;AutoDetect=$p.AutoDetect}|ConvertTo-Json -Compress`)));}
  private async write(value:SystemProxyState){const encoded=Buffer.from(JSON.stringify(value)).toString('base64');await this.run(`$p=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${encoded}'))|ConvertFrom-Json;$key='${key}';foreach($name in @('ProxyEnable','ProxyServer','ProxyOverride','AutoConfigURL','AutoDetect')){if($null -eq $p.$name){Remove-ItemProperty -LiteralPath $key -Name $name -ErrorAction SilentlyContinue}else{$kind=if($name -in @('ProxyEnable','AutoDetect')){'DWord'}else{'String'};New-ItemProperty -LiteralPath $key -Name $name -Value $p.$name -PropertyType $kind -Force|Out-Null}};${notify}`);}
+ async ownsSystemSettings(){
+   if(!this.listener)return false;
+   const state=await this.read();
+   const endpoint='127.0.0.1:'+this.listener.port;
+   return state.ProxyEnable===1 && !state.AutoConfigURL && state.ProxyServer==='http='+endpoint+';https='+endpoint;
+ }
  async recover(){if(this.platform!=='win32')return;try{const saved=z.object({previous:stateSchema,applied:stateSchema}).strict().parse(JSON.parse(await this.store.decryptPrivate(await readFile(this.file(),'utf8'))));const current=await this.read();if(JSON.stringify(current)===JSON.stringify(saved.applied))await this.write(saved.previous);await unlink(this.file());this.error='';}catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT'){this.error='系统代理恢复未完成，请在 Windows 网络设置检查原代理';throw error;}}}
  status(){return {supported:this.platform==='win32',enabled:!!this.listener,error:this.error};}
  async set(enabled:boolean){const task=this.queue.catch(()=>{}).then(async()=>{if(this.platform!=='win32')throw Error('此平台暂不支持系统代理接管');if(enabled===!!this.listener)return this.status();

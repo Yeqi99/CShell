@@ -22,7 +22,7 @@ const result = await build({
   platform: 'node',
   format: 'cjs',
   bundle: true,
-  define: { __CSHELL_PRO__: JSON.stringify(process.env.CSHELL_EDITION === 'pro') },
+  define: { __CSHELL_PRO__: JSON.stringify(process.env.CSHELL_EDITION === 'pro'), __CAGENT_NATIVE_VAULT__: JSON.stringify(process.platform === 'win32') },
   target: 'node22',
   external: ['node-pty'],
   metafile: true,
@@ -87,6 +87,12 @@ await cp(join(output, launcher),join(output,process.platform==='win32'?'cagent.c
 if(process.platform==='win32'){
   const framework=join(process.env.SystemRoot||'C:\\Windows','Microsoft.NET','Framework64','v4.0.30319');
   const versionSource=join(output,'Cagent.Version.cs');
+  await new Promise((resolveBuild, reject) => {
+    const child = spawn(join(framework, 'csc.exe'), ['/nologo', '/target:exe', '/r:System.Security.dll',
+      '/out:' + join(output, 'cagent-vault.exe'), join(root, 'src/agent/native/VaultKey.cs')], { stdio: 'inherit', windowsHide: true });
+    child.once('error', reject);
+    child.once('exit', code => code === 0 ? resolveBuild() : reject(new Error('CAgent vault helper build failed')));
+  });
   await writeFile(versionSource,nativeVersionSource(version));
   try { await new Promise((resolveBuild,reject)=>{
     const child=spawn(join(framework,'csc.exe'),['/nologo','/target:winexe','/win32icon:'+join(root,'assets/cagent-icon.ico'),'/out:'+join(output,'Cagent.exe'),...['WindowsBase','PresentationCore','PresentationFramework'].map(name=>'/r:'+join(framework,'WPF',name+'.dll')),'/r:System.Windows.Forms.dll','/r:System.Drawing.dll','/r:System.Xaml.dll','/r:System.Web.Extensions.dll',versionSource,join(root,'src/agent/native/CagentWindow.cs')],{stdio:'inherit',windowsHide:true});
@@ -110,7 +116,7 @@ if(process.platform==='win32'){
     await nativeBuild('desktop.cpp','cagent-desktop.exe',['-ld3d11','-ldxgi','-lmfplat','-lmfuuid','-lmf','-lole32','-loleaut32','-luuid','-lwmcodecdspuuid','-luser32','-lgdi32','-ladvapi32','-lshell32','-lgdiplus','-lwtsapi32'],['-DCAGENT_EXPERIMENTAL_SYSTEM_BROKER']);
     await nativeBuild('desktop-broker.cpp','cagent-desktop-broker.exe',['-ladvapi32','-luserenv','-lole32','-lwtsapi32']);
     for(const name of ['install-system-service.ps1','system-desktop-status.ps1'])await cp(join(root,'tools/cagent-desktop',name),join(output,name));
-    await new Promise((done,reject)=>{const child=spawn(process.execPath,[join(root,'scripts/build-virtual-display.mjs'),join(output,'CAgentVirtualDisplay.exe')],{cwd:root,stdio:'inherit',windowsHide:true});child.once('error',reject);child.once('exit',code=>code===0?done():reject(new Error('Virtual display helper build failed')));});
+    await new Promise((done,reject)=>{const child=spawn(process.execPath,[join(root,'scripts/build-virtual-display.mjs'),join(output,'CAgentVirtualDisplay.exe'),'--stage-driver'],{cwd:root,stdio:'inherit',windowsHide:true});child.once('error',reject);child.once('exit',code=>code===0?done():reject(new Error('Virtual display helper build failed')));});
     await cp(join(root,'tools/cagent-desktop/licenses/nlohmann-json.txt'),join(output,'LICENSE.desktop-json.txt'));
     const compilerLicense=join(dirname(dirname(compiler)),'LICENSE.TXT');
     if(!existsSync(compilerLicense))throw new Error('LLVM-MinGW LICENSE.TXT must accompany the selected compiler');

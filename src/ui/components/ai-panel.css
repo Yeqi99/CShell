@@ -997,3 +997,48 @@
   .ai-panel > header { padding-inline: 10px; gap: 8px; }
   .ai-panel .ai-toolbar { gap: 2px; }
 }
+
+.agent-conversation .agent-messages { min-width: 0; padding-inline: clamp(12px, 3%, 24px); }
+.agent-message .agent-byline { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.agent-message.assistant { font-size: max(13px, 1em); line-height: 1.7; margin-block: 18px; }
+.agent-message.assistant .agent-byline svg { color: var(--accent); }
+.agent-activity, .agent-conversation .agent-tool {
+  font-size: 12px; color: var(--muted); margin: 6px 0; min-width: 0;
+}
+.agent-conversation .agent-tool { border: 0; padding: 0; }
+.agent-activity > summary, .agent-conversation .agent-tool > summary {
+  display: flex; align-items: center; gap: 8px; padding: 5px 6px;
+  min-height: 28px; cursor: pointer; border-radius: 5px; list-style: none;
+}
+.agent-activity summary::-webkit-details-marker { display: none; }
+.agent-activity > summary strong { font-weight: 550; color: var(--text); white-space: nowrap; }
+.agent-activity > summary span, .agent-tool > summary span {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.agent-activity > summary:hover, .agent-conversation .agent-tool > summary:hover { background: var(--panel); }
+.agent-activity .activity-chevron { margin-left: auto; flex-shrink: 0; }
+.agent-activity[open] > summary .activity-chevron { transform: rotate(90deg); }
+.activity-steps { margin-inline-start: 12px; border-inline-start: 1px solid var(--border); padding-inline-start: 8px; }
+.activity-steps .agent-tool { margin-block: 0; }
+.agent-conversation .tool-failure, .agent-conversation .agent-tool .tool-failure { color: var(--red); }
+.agent-conversation .agent-tool[open] { background: var(--panel); border-radius: 6px; }
+.agent-checkpoint { color: var(--muted); font-size: 12px; margin-block: 10px; }
+.agent-checkpoint > summary { cursor: pointer; }
+.agent-notice-line { color: var(--muted); font-size: .9em; line-height: 1.65; margin-block: .5rem; }
+.agent-notice-line > button, .agent-notice-line summary { font: inherit; color: inherit; cursor: pointer; }
+.agent-notice-line > button { background: transparent; border: 0; padding: 0; min-height: 0; margin-inline-start: .7rem; text-decoration: underline; text-underline-offset: .2em; }
+.agent-notice-line > details { display: inline; margin-inline-start: .7rem; }
+.agent-notice-line summary { display: inline; text-decoration: underline dotted; text-underline-offset: .2em; }
+.agent-notice-detail { margin-block-start: .5rem; }
+.agent-notice-detail pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.agent-composer[data-file-drag] { outline: 2px dashed var(--accent); outline-offset: -2px; }
+.agent-file-list { display: flex; gap: 5px; flex-wrap: wrap; list-style: none; padding: 4px; margin: 0; }
+.agent-file-list li { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; padding: 2px 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; font-size: 12px; }
+.agent-file-list li span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-file-list li .icon { width: 22px; height: 22px; }
+.agent-message-actions,.agent-reask > div{display:inline-flex;align-items:center;gap:6px}
+.agent-message.user:has(.agent-reask){width:min(92%,32rem)}
+.agent-reask{display:grid;gap:8px}
+.agent-reask textarea{width:100%;min-height:5em;resize:vertical;color:inherit;font:inherit}
+.agent-reask small{color:var(--muted)}
+.agent-reask > div{justify-content:flex-end}

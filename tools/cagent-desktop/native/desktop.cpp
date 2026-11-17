@@ -1,6 +1,8 @@
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
+#include <wtsapi32.h>
+#include <sddl.h>
 #include <d3d11.h>
 #include <d3d10.h>
 #include <dxgi1_2.h>
@@ -46,7 +48,27 @@ void pauseMicros(uint64_t us){
 }
 std::string utf8(const wchar_t*s){int n=WideCharToMultiByte(CP_UTF8,0,s,-1,nullptr,0,nullptr,nullptr);std::string result(n,'\0');WideCharToMultiByte(CP_UTF8,0,s,-1,&result[0],n,nullptr,nullptr);if(!result.empty())result.pop_back();return result;}
 bool systemWorker=false;
+bool signInOnly=false;
+std::wstring consoleOwner;
 HDESK systemDesktop=nullptr;
+void checkSignInConsole(){
+ if(!signInOnly&&consoleOwner.empty())return;
+ DWORD session=0,bytes=0;LPWSTR name=nullptr;
+ bool available=ProcessIdToSessionId(GetCurrentProcessId(),&session)&&session!=0&&session==WTSGetActiveConsoleSessionId();
+ if(available&&signInOnly)available=WTSQuerySessionInformationW(WTS_CURRENT_SERVER_HANDLE,session,WTSUserName,&name,&bytes)&&name&&bytes>=sizeof(wchar_t)&&name[0]==0;
+ else if(available){
+   HANDLE token=nullptr;available=false;
+   if(WTSQueryUserToken(session,&token)){
+     GetTokenInformation(token,TokenUser,nullptr,0,&bytes);
+     if(bytes>0&&bytes<65536){std::vector<BYTE> data(bytes);LPWSTR sid=nullptr;
+       if(GetTokenInformation(token,TokenUser,data.data(),bytes,&bytes)&&ConvertSidToStringSidW(((TOKEN_USER*)data.data())->User.Sid,&sid)){available=consoleOwner==sid;LocalFree(sid);}
+     }
+     CloseHandle(token);
+   }
+ }
+ if(name)WTSFreeMemory(name);
+ if(!available)throw std::runtime_error("CAPTURE_DESKTOP_CHANGED");
+}
 void bindSystemDesktop(){
  HANDLE token=nullptr;if(!OpenProcessToken(GetCurrentProcess(),TOKEN_QUERY,&token))throw std::runtime_error("System desktop token unavailable");
  DWORD n=0;GetTokenInformation(token,TokenUser,nullptr,0,&n);std::vector<BYTE> buffer(n);BOOL ok=GetTokenInformation(token,TokenUser,buffer.data(),n,&n);CloseHandle(token);
@@ -54,10 +76,19 @@ void bindSystemDesktop(){
  // Request playback on the already-authorized input desktop; do not change its ACL or token.
  // The optional clipboard owner uses a message-only window on this desktop.
  // Without CREATEWINDOW capture itself works but clipboard initialization fails.
- systemDesktop=OpenInputDesktop(0,FALSE,DESKTOP_READOBJECTS|DESKTOP_WRITEOBJECTS|DESKTOP_CREATEWINDOW|DESKTOP_JOURNALPLAYBACK|DESKTOP_SWITCHDESKTOP);
+ DWORD access=DESKTOP_READOBJECTS|DESKTOP_WRITEOBJECTS|DESKTOP_CREATEWINDOW|DESKTOP_JOURNALPLAYBACK|DESKTOP_SWITCHDESKTOP;
+ systemDesktop=signInOnly?OpenDesktopW(L"Winlogon",0,FALSE,access):OpenInputDesktop(0,FALSE,access);
+ if(!systemDesktop&&!signInOnly)systemDesktop=OpenInputDesktop(0,FALSE,MAXIMUM_ALLOWED);
  if(!systemDesktop||!SetThreadDesktop(systemDesktop))throw std::runtime_error("CAPTURE_DESKTOP_UNAVAILABLE");systemWorker=true;
+ if(signInOnly){
+  checkSignInConsole();
+  SetThreadExecutionState(ES_CONTINUOUS|ES_DISPLAY_REQUIRED);
+  DWORD_PTR unused=0;
+  SendMessageTimeoutW(HWND_BROADCAST,WM_SYSCOMMAND,SC_MONITORPOWER,(LPARAM)-1,SMTO_ABORTIFHUNG,200,&unused);
+ }
 }
 void checkCaptureDesktop(){
+ checkSignInConsole();
  auto name=[](HDESK d){DWORD bytes=0;GetUserObjectInformationW(d,UOI_NAME,nullptr,0,&bytes);if(!bytes)throw std::runtime_error("CAPTURE_DESKTOP_UNAVAILABLE");std::vector<wchar_t> n(bytes/sizeof(wchar_t)+1);if(!GetUserObjectInformationW(d,UOI_NAME,n.data(),bytes,&bytes))throw std::runtime_error("CAPTURE_DESKTOP_UNAVAILABLE");return std::wstring(n.data());};
  HDESK input=OpenInputDesktop(0,FALSE,DESKTOP_READOBJECTS);if(!input)throw std::runtime_error("CAPTURE_SECURE_OR_INACCESSIBLE_DESKTOP");
  struct Close{HDESK p;~Close(){CloseDesktop(p);}}close{input};
@@ -146,6 +177,7 @@ struct NativeInput {
   if(!GetUserObjectInformationW(desktop,UOI_NAME,name.data(),bytes,&bytes))throw std::runtime_error("INPUT_DESKTOP_UNAVAILABLE");return name.data();
  }
  static void checkDesktop(){
+  checkSignInConsole();
   HDESK active=OpenInputDesktop(0,FALSE,DESKTOP_READOBJECTS);
   if(!active)throw std::runtime_error("INPUT_SECURE_OR_INACCESSIBLE_DESKTOP");
   struct Close{HDESK value;~Close(){CloseDesktop(value);}} close{active};
@@ -272,6 +304,14 @@ struct Encoder{
 // The host owns authentication, authorization and network IO. This helper only
 // accepts a private inherited pipe. One frame credit bounds the output queue.
 void workerTrace(const wchar_t* message){if(!systemWorker)return;HANDLE log=RegisterEventSourceW(nullptr,L"CAgentDesktopBroker");if(log){ReportEventW(log,EVENTLOG_INFORMATION_TYPE,0,1,nullptr,1,0,&message,nullptr);DeregisterEventSource(log);}}
+// A headless Winlogon surface can return successful GDI reads containing only
+// black pixels. A rendered sign-in screen has visible foreground content.
+static bool signInSurfacePainted(const std::vector<uint8_t>& pixels){
+ size_t visible=0;
+ for(size_t i=0;i+3<pixels.size();i+=16)
+  if(std::max({pixels[i],pixels[i+1],pixels[i+2]})>=32&&++visible>=32)return true;
+ return false;
+}
 void stream(){workerTrace(L"Worker stream entered");
  _setmode(_fileno(stdout),_O_BINARY);
  HANDLE input=GetStdHandle(STD_INPUT_HANDLE);DWORD mode=0;
@@ -290,10 +330,11 @@ void stream(){workerTrace(L"Worker stream entered");
   }
  };
  std::vector<uint8_t>bgra,yuv,encoded;
+ uint64_t blankSince=0;
  while(!stop){commands();if(stop)break;if(settings.empty()){Sleep(2);continue;}
   if(active!=settings){
    if(initialized)throw std::runtime_error("configuration changed; restart helper with fresh stream generation");
-   UINT display=settings.value("display",0u);if(settings.value("forceGdi",0u)){checkCaptureDesktop();capture.fallback="DXGI capture invalid call; recovered with GDI";capture.openGdi(display);}else capture.open(display);
+   UINT display=settings.value("display",0u);if(signInOnly||settings.value("forceGdi",0u)){checkCaptureDesktop();capture.fallback=signInOnly?"Windows sign-in desktop":"DXGI capture unavailable";capture.openGdi(display);}else capture.open(display);
    UINT w=std::min(settings.value("width",capture.width),capture.width)&~1u,h=std::min(settings.value("height",capture.height),capture.height)&~1u;
    UINT fps=settings.value("fps",(UINT)std::max(1.0,capture.hz)),bitrate=settings.value("bitrate",0u);
    uint64_t memory=settings.value("memoryBudgetBytes",(uint64_t)256*1024*1024);
@@ -310,9 +351,19 @@ void stream(){workerTrace(L"Worker stream entered");
   auto now=micros();if(last&&now-last<1000000/encoder.fps){pauseMicros(std::min<uint64_t>(1000,1000000/encoder.fps-(now-last)));continue;}
   auto started=micros(),captured=started;
   if(gpu){if(!capture.acquire([&](ID3D11Texture2D*t){captured=micros();converter.convert(t);},5))continue;}
-  else{if(!capture.frame(bgra,5))continue;captured=micros();nv12(bgra,capture.width,capture.height,yuv,encoder.width,encoder.height);}
+  else{
+   if(!capture.frame(bgra,5))continue;
+   captured=micros();
+   if(signInOnly&&!signInSurfacePainted(bgra)){
+    if(frame|| (blankSince&&captured-blankSince>=1000000))throw std::runtime_error("CAPTURE_SIGNIN_DISPLAY_BLANK");
+    if(!blankSince)blankSince=captured;
+    Sleep(50);continue;
+   }
+   blankSince=0;nv12(bgra,capture.width,capture.height,yuv,encoder.width,encoder.height);
+  }
   auto converted=micros();bool key=false;
   if(encoder.encode(yuv,encoded,key,force,gpu?converter.texture.p:nullptr)){
+   if(signInOnly||!consoleOwner.empty())checkCaptureDesktop();
    auto finished=micros();packet({{"type","frame"},{"id",frame++},{"key",key},{"timestampUs",captured},{"captureUs",captured-started},{"convertUs",converted-captured},{"encodeUs",finished-converted}},encoded);
    credit=false;force=false;last=started;
   }
@@ -326,7 +377,12 @@ int wmain(int argc,wchar_t**argv){
    auto number=[](const wchar_t* s){std::wstring text(s);if(text.empty()||text.size()>10||!std::all_of(text.begin(),text.end(),[](wchar_t c){return c>=L'0'&&c<=L'9';}))throw std::runtime_error("Invalid recovery plan");return (DWORD)std::stoul(text);};
    std::cout<<brokerControl(5,number(argv[2]),number(argv[3]))<<std::endl;return 0;
   }
-  if(argc>2&&std::wstring(argv[1])==L"--system-pipe"){bindSystemDesktop();connectSystemWorker(argv[2]);}
+  if(argc>=3&&std::wstring(argv[1])==L"--system-pipe"){
+    if(argc==4&&std::wstring(argv[3])==L"--signin-only")signInOnly=true;
+    else if(argc==5&&std::wstring(argv[3])==L"--owner-console"&&*argv[4])consoleOwner=argv[4];
+    else if(argc!=3)throw std::runtime_error("Unknown worker desktop policy");
+    bindSystemDesktop();connectSystemWorker(argv[2]);
+  }
   else if(argc>1&&std::wstring(argv[1])==L"--stream"&&brokerStream())return 0;
 #else
   if(argc>1&&std::wstring(argv[1])==L"--system-pipe")throw std::runtime_error("System broker is not enabled in this build");

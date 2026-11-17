@@ -13,11 +13,16 @@ test('CAgent build pins update channel to its edition',async()=>{
 });
 
 test('desktop bundled Agent uses the actual edition define in both builds',async()=>{
- const script=(await readFile('scripts/build.mjs','utf8')).replace("import { build } from 'esbuild';",'');
- const AsyncFunction=Object.getPrototypeOf(async()=>{}).constructor;
+ const source=await readFile('scripts/build.mjs','utf8');
  for(const pro of [false,true]){
   const calls:any[]=[];
-  await new AsyncFunction('build','process',script)(async(options:any)=>{calls.push(options);},{env:{CSHELL_EDITION:pro?'pro':'opensource'}});
+  // Run the real ESM recipe with a recorder instead of writing desktop bundles.
+  const recipe=await build({stdin:{contents:source,resolveDir:process.cwd()},bundle:true,platform:'node',format:'esm',write:false,
+   define:{'process.env.CSHELL_EDITION':JSON.stringify(pro?'pro':'opensource'),'process.platform':'"linux"'},
+   plugins:[{name:'capture-build',setup(ctx){ctx.onResolve({filter:/^esbuild$/},()=>({path:'esbuild',namespace:'capture'}));ctx.onLoad({filter:/.*/,namespace:'capture'},()=>({contents:'export const build = options => capturedOptions.push(options)'}));}}],
+   banner:{js:'const capturedOptions=[];'},footer:{js:'export default capturedOptions;'}});
+  const {default:optionsList}=await import('data:text/javascript;base64,'+Buffer.from(recipe.outputFiles[0].contents).toString('base64'));
+  calls.push(...optionsList);
   for(const output of ['dist/main/main.cjs','dist/agent/agent.cjs','dist/cli/cshell.mjs']){
    const options=calls.find(call=>call.outfile===output);assert.ok(options,output);
    assert.equal(options.define?.__CSHELL_PRO__,String(pro),output);

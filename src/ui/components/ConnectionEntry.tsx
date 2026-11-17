@@ -1,3 +1,5 @@
+import {CloudRentals} from './CloudRentals';
+import {isPro} from '../../shared/edition';
 import {ErrorNotice} from './ErrorNotice';
 import { RdpConnectionForm } from './RdpConnectionForm';
 import { ConnectionImport } from './ConnectionImport';
@@ -6,6 +8,8 @@ import { useI18n } from '../i18n';
 import type { LocalShell, LocalConnectionTarget } from '../../shared/local-terminal';
 import { useState, type ReactNode } from 'react';
 import {
+  Cloud,
+  FileInput,
   Search,
   Server,
   ArrowLeft,
@@ -18,7 +22,7 @@ import {
 } from 'lucide-react';
 import type { Profile } from '../../shared/contracts';
 import './connection-entry.css';
-type ConnectionKind = 'ssh' | 'rdp' | 'client' | 'http' | 'sftp' | 'ftp' | 'ftps';
+type ConnectionKind = 'rental' | 'ssh' | 'rdp' | 'client' | 'http' | 'sftp' | 'ftp' | 'ftps';
 export function ConnectionEntry({
   onSaved,
   profiles,
@@ -52,6 +56,8 @@ export function ConnectionEntry({
   const [importing, setImporting] = useState(false);
   const windows = window.cshell.platform === 'win32';
   const kinds = [
+    ...(isPro ? [{id:'rental' as const,title:cn?'租赁云服务器':'Rent a cloud server',
+      description:cn?'选择配置，用点数开通新机器':'Choose a plan and rent with points',icon:Cloud}] : []),
     ...(http
       ? [
           {
@@ -116,9 +122,8 @@ export function ConnectionEntry({
       <div hidden={kind !== null} className="connection-start">
         <header className="connection-start-heading">
           <h1>{cn ? '新建连接' : 'New connection'}</h1>
-          <p>{cn ? '你想连接什么？' : 'What would you like to connect to?'}</p>
+          {window.cshell.connectionImportText && <button className="import-shortcut" onClick={() => setImporting(true)}><FileInput size={15}/>{cn ? '批量导入' : 'Bulk import'}</button>}
         </header>
-        {window.cshell.connectionImportText && <button className="secondary" onClick={() => setImporting(true)}>{cn ? '批量导入连接' : 'Import connections'}</button>}
         <div className="connection-kind-grid">
           {kinds.map(({ id, title, description, icon: Icon }) => (
             <button
@@ -209,6 +214,7 @@ export function ConnectionEntry({
           </div>
         </header>
         <div className="protocol-form">
+          <div hidden={kind !== 'rental'}>{visited.includes('rental') && <CloudRentals member={false} storefront/>}</div>
           <div hidden={kind !== 'http'}>{visited.includes('http') && http}</div>
           <div hidden={kind !== 'ssh'}>{visited.includes('ssh') && children}</div>
           {(['sftp', 'ftp', 'ftps'] as const).map(protocol => <div key={protocol} hidden={kind !== protocol}>{visited.includes(protocol) && fileConnections?.[protocol]}</div>)}

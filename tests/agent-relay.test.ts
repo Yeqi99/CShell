@@ -246,8 +246,11 @@ test('Relay enforces connection, total traffic and rate bounds; cancellation and
     const abort = new AbortController();
     const first = await openRelayTunnel({ ...f.options(), signal: abort.signal });
     await assert.rejects(openRelayTunnel(f.options()));
+    const cancelErrors: Error[] = [];
+    first.on('error', error => cancelErrors.push(error));
     abort.abort();
     await closed(first);
+    assert.deepEqual(cancelErrors, []);
     await f.relay.stop();
     await f.relay.configure({ ...f.config, maxBytesPerTunnel: 1024 });
     await f.relay.start();
@@ -302,7 +305,8 @@ test('Relay cannot convert forwarding credentials to target authorization and co
 
 test('Account relay authorizes dynamic targets and keeps registration credentials separate from forwarding leases', async()=>{
  const f=await fixture();const registration='c'.repeat(64),lease='d'.repeat(64);let member=true;
- const relay=new AgentRelayService({vault:f.vault,identity:f.identity,authorize:async q=>member&&q.targetId==='owned'&&q.credential===(q.operation==='forward'?lease:registration)});
+ let allowance=true;const directions=new Set<string>();
+ const relay=new AgentRelayService({vault:f.vault,identity:f.identity,authorize:async q=>member&&q.targetId==='owned'&&q.credential===(q.operation==='forward'?lease:registration),accountTraffic:async q=>{assert.ok(q.bytes>0);directions.add(q.direction);if(!allowance)throw Error('Quota exhausted');}});
  const reverse=new AgentReverseRelayService({vault:f.vault});
  try{
   await relay.load();await relay.configure({...f.config,targets:[]});await relay.start();
@@ -315,6 +319,8 @@ test('Account relay authorizes dynamic targets and keeps registration credential
   const outer=await openRelayTunnel(options),inner=tlsConnect({socket:outer,rejectUnauthorized:false});inner.on('error',()=>{});await once(inner,'secureConnect');
   assert.equal(new X509Certificate(inner.getPeerCertificate().raw).fingerprint256,fingerprint(f.targetIdentity.certificate));
   const response=once(inner,'data');inner.write('account reverse tunnel');assert.equal((await response)[0].toString(),'account reverse tunnel');inner.destroy();
+  assert.deepEqual([...directions].sort(),['egress','ingress']);
+  allowance=false;const denied=await openRelayTunnel(options);const done=closed(denied);denied.write('must not forward');await done;
   member=false;await assert.rejects(openRelayTunnel(options),/unauthorized/);
  }finally{await reverse.stop();await relay.stop();await f.close();}
 });

@@ -2,8 +2,18 @@ import { useI18n } from './i18n';
 
 // Product chrome only: never pass user machine, group or application names here.
 export const desktopEnglish: Record<string, string> = {
+  "打开 Windows 会话": "Open Windows session",
+  "已保存的 RDP 连接": "Saved RDP connection",
+  "选择连接": "Choose a connection",
+  "核验并打开": "Verify and open",
+  "正在核对证书…": "Checking certificate\u2026",
+  "打开连接": "Open connection",
+  "通过内置 RDP 标签页登录，可用于没有显示器的 Windows。": "Sign in using the RDP tab, including on a Windows machine without a monitor.",
+  "远端版本尚未提供证书核验。可单独打开下方地址，按 Windows 提示核对服务器。": "This version of CAgent cannot verify the certificate. Open the saved address below and check the server identity in Windows.",
+  "RDP 证书与当前机器不匹配，请重新选择。": "The RDP certificate belongs to a different machine. Choose another connection.",
+  "无法核对目标证书。请检查 RDP 地址、网络和远端查看权限。": "Could not verify the certificate. Check the RDP address, network and remote viewing permission.",
   '查看会员域名与 DNS':'Read member domains and DNS','只读取当前账号拥有的域名。':'Read only domains owned by the signed-in account.','管理会员域名与 DNS':'Manage member domains and DNS','认领、改名和修改解析；服务器仍核验会员与账号归属。':'Claim, rename and edit DNS; membership and ownership are checked by the server.',
-  '状态未知':'Status unknown','离线':'Offline','同账号设备':'Account devices','账号设备':'Account device','此设备来自当前登录账号':'Device discovered from the signed-in account',
+  '状态未知':'Status unknown','离线':'Offline','云端主机':'Cloud servers','同账号设备':'Account devices','账号设备':'Account device','此设备来自当前登录账号':'Device discovered from the signed-in account',
   '新建和修改连接配置':'Create and edit connection profiles','不会自动连接或扩大机器授权。':'Does not connect automatically or expand machine access.',
   '保存和更换连接凭据':'Save and replace connection credentials','仅写入加密存储，不读取或返回密码、私钥。':'Write-only encrypted storage. Passwords and private keys are not returned.',
   '接受 SSH 主机身份':'Accept SSH host identity','先探测真实指纹，再显式确认；已改变的主机密钥不会自动接受。':'Probe the real fingerprint, then explicitly accept it. Changed host keys are never accepted automatically.',
@@ -24,7 +34,7 @@ export const desktopEnglish: Record<string, string> = {
   '查询、添加与测试 AI 基座':'List, add and test AI providers','基座地址、模型与密钥来源需确认；密钥不会返回对话。':'Confirm the endpoint, model and key source. Keys are never returned in chat.',
   '读取本机微信状态、联系人与授权消息':'Read local WeChat status, contacts and authorized messages','向授权联系人发送微信文本':'Send WeChat text to authorized contacts','领取本机微信转账或红包':'Receive local WeChat transfers or red packets','另需开启对应领取功能。':'The corresponding receive feature must also be enabled.','修改授权微信联系人的备注':'Edit authorized WeChat contact remarks',
   '机器信息':'Machine info','代码编辑器':'Code editor','浏览器':'Browser','应用':'Apps','文件':'Files','终端':'Terminal','应用市场':'App market','设置':'Settings',
-  '桌面外观':'Appearance','原生桌面':'Native desktop','桌面检测':'Desktop check','安装 CAgent':'Install CAgent','远程控制':'Remote control','远程桌面':'Remote desktop','智能体':'Assistant','设置与权限':'Settings & permissions',
+  '桌面外观':'Appearance','原生桌面':'Native desktop','桌面检测':'Desktop check','安装 CAgent':'Install CAgent','连接 CAgent':'Connect to CAgent','远程控制':'Remote control','远程桌面':'Remote desktop','智能体':'Assistant','设置与权限':'Settings & permissions',
   '工作台桌面':'Workbench desktop','机器桌面':'Machine desktop','桌面应用':'Desktop apps','双击打开':'Double-click to open ','工作台':'Workbench','设备':'Device','窗口':' window',
   '最小化':'Minimize','还原':'Restore','最大化':'Maximize','收起窗口，保留会话':'Hide window and keep session','关闭':'Close','调整':'Resize ','调整窗口大小（方向键微调）':'Resize window (arrow keys to adjust)','窗口大小':' window',
   '打开 SSH 终端':'Open SSH terminal','进入 SSH 终端':'Open SSH terminal','SSH 终端':'SSH terminal','桌面设置分类':'Desktop settings categories','个性化':'Personalization','显示与操作':'Display & interaction','系统信息':'System info',

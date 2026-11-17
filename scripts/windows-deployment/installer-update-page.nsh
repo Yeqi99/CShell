@@ -30,6 +30,9 @@ Function ShowInstallSummary
   StrCpy $InstallAction "安装"
   StrCpy $InstallSummary "版本：${VERSION}$\r$\n$\r$\n安装目录：$INSTDIR"
   show:
+  !ifdef CAGENT_INSTALLER
+    StrCpy $InstallSummary "$InstallSummary$\r$\n$\r$\n若当前 Windows 控制台没有显示器，将申请管理员权限安装虚拟显示器。"
+  !endif
   !insertmacro MUI_HEADER_TEXT "$InstallAction ${PRODUCT_NAME}" "确认程序目录与版本"
   nsDialogs::Create 1018
   Pop $0

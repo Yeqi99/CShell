@@ -3,6 +3,7 @@ import {ErrorNotice} from './ErrorNotice';
 import '../account.css';
 import {AccountMemory} from './AccountMemory';
 import {MachineLending} from './MachineLending';
+import {CloudRentals} from './CloudRentals';
 import {MemberDomains} from './MemberDomains';
 import {AccountImports} from './AccountImports';
 import { useEffect, useState } from 'react';
@@ -15,6 +16,9 @@ const readable = (error: unknown) => {
   return message.replace(/^Error: /, '') || '暂时无法完成，请稍后重试。';
 };
 export function CloudSettings({shareRequest}:{shareRequest?:{id:string;name:string;nonce:number}}={}) {
+  const [tab,setTab]=useState<'wallet'|'sync'|'memory'|'services'>('wallet');
+  const [visited,setVisited]=useState(new Set(['wallet']));
+  const select=(key:typeof tab)=>{setTab(key);setVisited(v=>new Set([...v,key]));};
   const [status, setStatus] = useState<CloudStatus>();
   const [discovery,setDiscovery]=useState<AccountDiscoveryStatus>();
   const [registering,setRegistering]=useState(false),[verification,setVerification]=useState('');
@@ -33,6 +37,7 @@ export function CloudSettings({shareRequest}:{shareRequest?:{id:string;name:stri
   const run=async(action:()=>Promise<unknown>)=>{setBusy(true);setError('');setNotice('');try{await action();setStatus(await window.cshell.cloudStatus());}catch(e){setError(readable(e));}finally{setBusy(false);}};
   const backToLogin=()=>{setRegistering(false);setPasswordMode(true);setSecret('');setVerification('');setError('');setNotice('');};
   const login=()=>run(async()=>{if(registering)await window.cshell.cloudRegister(email,verification,secret);else await window.cshell.cloudLogin(status?.email || email,secret,passwordMode || !!status?.email);setSecret('');setVerification('');});
+  useEffect(()=>{setVisited(new Set([shareRequest?'services':'wallet']));setTab(shareRequest?'services':'wallet');},[status?.email,shareRequest?.nonce]);
   const member=status?.membership;
   const active=!!member?.active && !!member.expiresAt && member.expiresAt*1000>Date.now();
   const offline=status?.state==='error', syncing=status?.state==='syncing';
@@ -60,18 +65,20 @@ export function CloudSettings({shareRequest}:{shareRequest?:{id:string;name:stri
     </div> : <>
       <div className="account-page-heading"><span>个人中心</span><span className="account-product">CShell Pro</span></div>
       <div className="account-identity"><div className="account-avatar">{status.email.slice(0,1).toUpperCase()}</div><div><h1>{status.email.split('@')[0]}{active&&<span className="account-pro-mark"><Crown size={12}/> PRO</span>}</h1><p>{status.email}</p></div></div>
-      <div className={'account-sync-strip '+(offline?'offline':syncing?'syncing':'')} role="status"><span className="account-sync-icon">{offline||syncing?<Cloud size={17}/>:<Check size={17}/>}</span><div><strong>{syncLabel}</strong><p>{offline?'你的更改已保存在本机，网络恢复后自动同步。':status.lastSync?'最近同步于 '+new Date(status.lastSync).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+' · 自动同步已开启':'正在自动恢复你的连接与设置'}</p></div></div>
-      <div className="account-section"><h2>账户信息</h2><div className="account-detail-row"><span>邮箱</span><strong>{status.email}</strong></div><div className="account-detail-row"><span>当前方案</span>{member?<strong>{active?'Pro 会员':'免费账号'}{active&&<Crown size={14}/>}</strong>:<span className="account-loading-line" aria-label="正在获取方案"/>}</div>{active&&<div className="account-detail-row"><span>有效期</span><strong>{new Date(member!.expiresAt!*1000).toLocaleDateString()}</strong></div>}</div>
-      <div className="account-section"><h2>跨设备同步 <ShieldCheck size={14}/></h2><div className="account-detail-row"><span>连接与已保存凭据</span><span className="account-included"><Check size={14}/> 自动同步</span></div><div className="account-detail-row"><span>基座模型与个人设置</span><span className="account-included"><Check size={14}/> 自动同步</span></div></div>
-      {status.unlocked&&discovery&&<div className="account-section"><h2>同账号设备</h2><label className="account-detail-row"><span>自动发现设备</span><input type="checkbox" checked={discovery.enabled} disabled={busy} onChange={e=>{const enabled=e.target.checked;void run(async()=>setDiscovery(await window.cshell.cloudDiscovery(enabled)));}}/></label><p>随账号同步此设置，自动加入同账号设备。首次放入“同账号设备”分组，移动后保留你的分组；离线设备不会被删除。</p>{discovery.enabled&&discovery.pending>0&&<p role="status">有 {discovery.pending} 台设备正在等待加密连接信息同步。</p>}</div>}
       {!status.unlocked&&<form className="account-exception" onSubmit={e=>{e.preventDefault();void login();}}><p>输入账号密码，恢复此设备上的加密配置。</p><input aria-label="账号密码" type="password" autoComplete="current-password" required value={secret} onChange={e=>setSecret(e.target.value)}/><button className="auth-submit" disabled={busy}>继续</button></form>}
       {status.state==='conflict'&&<div className="account-exception"><p>两台设备同时修改了配置。请选择保留哪一份；另一份会先备份。</p><button onClick={()=>setDirection('download')}>保留云端更改</button><button onClick={()=>setDirection('upload')}>保留此设备更改</button>{direction&&<div><p>确认使用{direction==='download'?'云端':'此设备'}配置？</p><button disabled={busy} onClick={()=>void run(async()=>{await window.cshell.cloudSync(direction);setDirection(undefined);})}>确认</button><button onClick={()=>setDirection(undefined)}>取消</button></div>}</div>}
+<nav className="account-sections" aria-label="账号栏目">{([["wallet","会员与点数"],["sync","设备与同步"],["memory","智能体记忆"],["services","域名与机器"]] as const).map(([key,label])=><button type="button" aria-pressed={key===tab} key={key} onClick={()=>select(key)}>{label}</button>)}</nav>
+{visited.has("wallet")&&<div className="account-pane" key={status.email+"-wallet"} hidden={tab!=="wallet"}>      {status.unlocked&&<AccountTraffic key={'traffic-'+status.email} email={status.email} active={active}/>}
+      <div className="account-section"><h2>账户信息</h2><div className="account-detail-row"><span>邮箱</span><strong>{status.email}</strong></div><div className="account-detail-row"><span>当前方案</span>{member?<strong>{active?'Pro 会员':'免费账号'}{active&&<Crown size={14}/>}</strong>:<span className="account-loading-line" aria-label="正在获取方案"/>}</div>{active&&<div className="account-detail-row"><span>有效期</span><strong>{new Date(member!.expiresAt!*1000).toLocaleDateString()}</strong></div>}</div></div>}
+{visited.has("sync")&&<div className="account-pane" key={status.email+"-sync"} hidden={tab!=="sync"}>      <div className={'account-sync-strip '+(offline?'offline':syncing?'syncing':'')} role="status"><span className="account-sync-icon">{offline||syncing?<Cloud size={17}/>:<Check size={17}/>}</span><div><strong>{syncLabel}</strong><p>{offline?'你的更改已保存在本机，网络恢复后自动同步。':status.lastSync?'最近同步于 '+new Date(status.lastSync).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+' · 自动同步已开启':'正在自动恢复你的连接与设置'}</p></div></div>
+      <div className="account-section"><h2>跨设备同步 <ShieldCheck size={14}/></h2><div className="account-detail-row"><span>连接与已保存凭据</span><span className="account-included"><Check size={14}/> 自动同步</span></div><div className="account-detail-row"><span>基座模型与个人设置</span><span className="account-included"><Check size={14}/> 自动同步</span></div></div>
+      {status.unlocked&&discovery&&<div className="account-section"><h2>同账号设备</h2><label className="account-detail-row"><span>自动发现设备</span><input type="checkbox" checked={discovery.enabled} disabled={busy} onChange={e=>{const enabled=e.target.checked;void run(async()=>setDiscovery(await window.cshell.cloudDiscovery(enabled)));}}/></label><p>随账号同步此设置，自动加入同账号设备。设备集中显示在置顶的“同账号设备”中，也可在自定义分组整理；离线设备不会被删除。</p>{discovery.enabled&&discovery.pending>0&&<p role="status">有 {discovery.pending} 台设备正在等待加密连接信息同步。</p>}</div>}
       {status.storage&&<div className="account-section account-storage"><h2>云空间</h2><div className="account-detail-row"><span>连接、模型、扩展偏好与浏览器记录</span><strong>{(status.storage.usedBytes/1048576).toFixed(2)} / {Math.round(status.storage.limitBytes/1048576)} MiB</strong></div><progress aria-label="云空间用量" max={status.storage.limitBytes} value={status.storage.usedBytes}/><p>仅同步配置与记录，浏览器 Cookie、缓存和登录状态保留在本机。</p></div>}
-      {status.unlocked&&<AccountTraffic key={'traffic-'+status.email}/>}
-      {status.unlocked&&<AccountImports key={status.email}/>}
-      <AccountMemory/>
-      {status.unlocked&&<MemberDomains key={'domains-'+status.email}/>}
-      {status.unlocked&&<MachineLending key={'lending-'+status.email} request={shareRequest}/>}
+      {status.unlocked&&<AccountImports key={status.email}/>}</div>}
+{visited.has("memory")&&<div className="account-pane" key={status.email+"-memory"} hidden={tab!=="memory"}>      <AccountMemory/></div>}
+{visited.has("services")&&<div className="account-pane" key={status.email+"-services"} hidden={tab!=="services"}>      {status.unlocked&&<MemberDomains key={'domains-'+status.email}/>}
+      {status.unlocked&&<CloudRentals key={'rentals-'+status.email} member={!!status.membership?.active}/>}
+      {status.unlocked&&<MachineLending key={'lending-'+status.email} request={shareRequest}/>}</div>}
       <div className="account-footer"><span><ShieldCheck size={14}/> 配置已加密保护</span><button className="account-signout" onClick={()=>setLogoutConfirm(true)}><LogOut size={14}/>退出登录</button></div>
       {logoutConfirm&&<div className="account-exception"><p>退出后重新打开未登录工作区。账号数据保留，不会混入未登录数据。</p><button disabled={busy} onClick={()=>void run(async()=>{await window.cshell.cloudLogout();setLogoutConfirm(false);})}>确认退出</button><button onClick={()=>setLogoutConfirm(false)}>取消</button></div>}
       {error&&<ErrorNotice title="操作未完成" error={error}/>}

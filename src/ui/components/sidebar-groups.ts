@@ -1,4 +1,4 @@
-export const ACCOUNT_DEVICE_GROUP = '同账号设备';
+export {ACCOUNT_DEVICE_GROUP} from '../../shared/system-groups';
 export function orderSidebarGroups(names: string[], locale: string, preferred?: string) {
   return [...new Set(names)].sort((a,b)=>a===preferred?-1:b===preferred?1:a.localeCompare(b,locale));
 }

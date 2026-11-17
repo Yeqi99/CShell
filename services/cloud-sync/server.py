@@ -3,6 +3,9 @@
 Run behind HTTPS reverse proxy on loopback. CF token is scoped to Email Sending.
 """
 from devices import Devices
+from agent_spending import AgentSpending
+from rewards import Rewards
+from rentals import Rentals
 from models import Models
 from quotas import Quotas, MAX_STORAGE
 from metering import Metering
@@ -30,6 +33,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 FREE_BYTES = 2 * 1024 * 1024
 MEMBER_BYTES = 64 * 1024 * 1024
+PRO_PRICE_POINTS = 3990
+PRO_TERM_DAYS = 30
 MAX_BODY = int(MAX_STORAGE * 4 / 3) + 65536
 VAULT_SLOTS = threading.BoundedSemaphore(1)
 
@@ -43,6 +48,7 @@ class Service:
     def __init__(self, path, pepper, send_mail):
         self.path, self.pepper, self.send_mail = path, pepper, send_mail
         self.lock = threading.RLock()
+        self.admin_password_cache = {}
         with self.db() as db:
             db.executescript('''
             PRAGMA journal_mode=WAL;
@@ -50,10 +56,20 @@ class Service:
             CREATE TABLE IF NOT EXISTS usage_accounts(account TEXT PRIMARY KEY,seen REAL NOT NULL);
             CREATE TABLE IF NOT EXISTS usage_devices(digest TEXT PRIMARY KEY,seen REAL NOT NULL);
             CREATE TABLE IF NOT EXISTS accounts(id TEXT PRIMARY KEY,email TEXT UNIQUE NOT NULL);
+            CREATE TABLE IF NOT EXISTS cloud_chats(account TEXT NOT NULL, id TEXT NOT NULL, revision INTEGER NOT NULL, envelope TEXT NOT NULL, PRIMARY KEY(account,id));
             CREATE TABLE IF NOT EXISTS passwords(account TEXT PRIMARY KEY,salt TEXT NOT NULL,digest TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS keyboxes(account TEXT PRIMARY KEY,box TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS memberships(account TEXT PRIMARY KEY,expires REAL NOT NULL);
+            CREATE TABLE IF NOT EXISTS member_plans(name TEXT PRIMARY KEY,weekly_cents INTEGER,storage_mib INTEGER,machine TEXT);
+            CREATE TABLE IF NOT EXISTS member_assignments(account TEXT PRIMARY KEY,plan TEXT,expires REAL);
+            INSERT OR IGNORE INTO member_plans VALUES('Pro',NULL,NULL,'*');
+            CREATE TABLE IF NOT EXISTS membership_grants(request TEXT PRIMARY KEY,payload TEXT);
+            CREATE TABLE IF NOT EXISTS pro_purchases(
+                account TEXT NOT NULL, request_id TEXT NOT NULL, created REAL NOT NULL,
+                price INTEGER NOT NULL, days INTEGER NOT NULL, expires REAL NOT NULL,
+                balance INTEGER NOT NULL, PRIMARY KEY(account,request_id));
             CREATE TABLE IF NOT EXISTS admin_audit(id INTEGER PRIMARY KEY,at REAL,account TEXT,action TEXT,detail TEXT);
+            CREATE TABLE IF NOT EXISTS admin_accounts_by_id(account TEXT PRIMARY KEY REFERENCES accounts(id));
             CREATE TABLE IF NOT EXISTS codes(email TEXT PRIMARY KEY,digest TEXT,expires REAL,attempts INTEGER);
             CREATE TABLE IF NOT EXISTS sessions(digest TEXT PRIMARY KEY,account TEXT,expires REAL);
             CREATE TABLE IF NOT EXISTS vaults(account TEXT PRIMARY KEY,revision INTEGER,envelope TEXT,mutation TEXT);
@@ -72,9 +88,35 @@ class Service:
         self.bridges=Bridges(self,Failure)
         self.mcp_clients=McpClients(self,Failure)
         self.vault_chunks=VaultChunks(self,Failure)
+        self.rentals=Rentals(self,Failure)
+        self.rewards=Rewards(self,Failure)
+        self.agent_spending=AgentSpending(self,Failure,PRO_PRICE_POINTS)
         self.devices=Devices(self,Failure)
         self.models=Models(self,Failure)
         self.domains=Domains(self,Failure)
+
+    def conversations(self, account, body=None):
+        with self.db() as db:
+            if body is None:
+                return {'records':[dict(id=i,revision=r,envelope=json.loads(e)) for i,r,e in
+                    db.execute('SELECT id,revision,envelope FROM cloud_chats WHERE account=?',(account,))]}
+            chat=body.get('id'); base=body.get('revision')
+            if not isinstance(chat,str) or not re.fullmatch(r'[a-f0-9-]{36}',chat) or type(base) is not int or base<0:
+                raise Failure(400,'对话标识或版本无效')
+            db.execute('BEGIN IMMEDIATE')
+            row=db.execute('SELECT revision,envelope FROM cloud_chats WHERE account=? AND id=?',(account,chat)).fetchone()
+            if (row[0] if row else 0)!=base:raise Failure(409,'云端对话已变化，请刷新后继续')
+            if body.get('remove') is True:
+                db.execute('DELETE FROM cloud_chats WHERE account=? AND id=?',(account,chat))
+                return {'revision':0}
+            e=body.get('envelope')
+            if not isinstance(e,dict) or e.get('format')!=1 or not isinstance(e.get('nonce'),str) or len(e['nonce'])!=16 or not isinstance(e.get('ciphertext'),str) or not 24<=len(e['ciphertext'])<=1000000:
+                raise Failure(400,'加密对话格式或大小无效')
+            encoded=json.dumps({k:e[k] for k in ('format','nonce','ciphertext')},separators=(',',':'))
+            count,size=db.execute('SELECT COUNT(*),COALESCE(SUM(length(envelope)),0) FROM cloud_chats WHERE account=?',(account,)).fetchone()
+            if (not row and count>=100) or size+len(encoded)-(len(row[1]) if row else 0)>6000000:raise Failure(413,'云对话空间已满')
+            db.execute('INSERT OR REPLACE INTO cloud_chats VALUES(?,?,?,?)',(account,chat,base+1,encoded))
+            return {'revision':base+1}
 
     @contextmanager
     def db(self):
@@ -97,16 +139,82 @@ class Service:
         active=expires>time.time()
         with self.db() as db:
             allowance=self.quotas.allowance(db,account,MEMBER_BYTES if active else FREE_BYTES)
-        return {'email':email[0], 'membership':{'active':active,'expiresAt':expires or None},'storage':{'usedBytes':used,'limitBytes':allowance},'entitlements':{'relay':active,'officialModels':bool(self.models.entries)}}
+            plan=(db.execute('SELECT plan FROM member_assignments WHERE account=? AND expires>?',(account,time.time())).fetchone() or ('Pro',))[0] if active else None
+        return {'email':email[0], 'membership':{'active':active,'plan':plan,'expiresAt':expires or None},'storage':{'usedBytes':used,'limitBytes':allowance},'entitlements':{'relay':active,'officialModels':bool(self.models.entries)}}
+
+    def purchase_pro(self, account, body):
+        request = body.get('requestId')
+        if not isinstance(request, str) or not re.fullmatch(r'[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}', request):
+            raise Failure(400, '购买请求编号无效')
+        request = request.lower()
+        with self.db() as db:
+            db.execute('BEGIN IMMEDIATE')
+            receipt = db.execute(
+                'SELECT price,days,expires,balance FROM pro_purchases WHERE account=? AND request_id=?',
+                (account, request)).fetchone()
+            if receipt is None:
+                balance = self.rentals.balance(db, account)
+                if balance < PRO_PRICE_POINTS:
+                    raise Failure(409, '可用点数不足，购买 30 天 Pro 会员需要 3990 点')
+                now = time.time()
+                current = db.execute('SELECT expires FROM memberships WHERE account=?', (account,)).fetchone()
+                expires = max(now, current[0] if current else 0) + PRO_TERM_DAYS * 86400
+                receipt = (PRO_PRICE_POINTS, PRO_TERM_DAYS, expires, balance - PRO_PRICE_POINTS)
+                db.execute('INSERT INTO rental_points(account,reference,delta) VALUES(?,?,?)',
+                           (account, 'pro-purchase:' + request, -PRO_PRICE_POINTS))
+                db.execute('INSERT INTO memberships(account,expires) VALUES(?,?) ON CONFLICT(account) DO UPDATE SET expires=excluded.expires',
+                           (account, expires))
+                db.execute('INSERT INTO pro_purchases(account,request_id,created,price,days,expires,balance) VALUES(?,?,?,?,?,?,?)',
+                           (account, request, now, *receipt))
+        return dict(ok=True, pricePoints=receipt[0], days=receipt[1], expiresAt=receipt[2], balancePoints=receipt[3])
 
     def admin_accounts(self):
         with self.db() as db:
             rows = db.execute('SELECT a.id,a.email,COALESCE(v.revision,0),COALESCE(m.expires,0),COALESCE(v.byte_size,0) FROM accounts a LEFT JOIN vaults v ON v.account=a.id LEFT JOIN memberships m ON m.account=a.id ORDER BY a.email LIMIT 1000').fetchall()
             audit = db.execute('SELECT at,account,action,detail FROM admin_audit ORDER BY id DESC LIMIT 50').fetchall()
+            plans=[dict(name=n,weeklyCents=w if w is not None else 500,storageMiB=s if s is not None else MEMBER_BYTES//1048576,machine=m) for n,w,s,m in db.execute('SELECT * FROM member_plans ORDER BY name')]
+            machines=[json.loads(r[0]) for r in db.execute('SELECT details FROM rental_plans')]
+            machines=[dict(id=m['id'],name=m['name'],cpu=m['cpu'],memory=m['memory'],disk=m['disk']) for m in machines if m['enabled'] and m['included']]
+            assigned=dict(db.execute('SELECT account,plan FROM member_assignments WHERE expires>?',(time.time(),)))
             allowances={r[0]:self.quotas.allowance(db,r[0],MEMBER_BYTES if r[3]>time.time() else FREE_BYTES) for r in rows}
-        return {'accounts': [{'id': r[0], 'email': r[1], 'revision': r[2], 'storage':{'usedBytes':r[4],'limitBytes':allowances[r[0]]}, 'membership': {'active': r[3] > time.time(), 'expiresAt': r[3] or None}} for r in rows], 'audit': [{'at': r[0], 'account': r[1], 'action': r[2], 'detail': r[3]} for r in audit]}
+        return {'plans':plans,'machines':machines,'accounts': [{'plan':assigned.get(r[0]),'id': r[0], 'email': r[1], 'revision': r[2], 'storage':{'usedBytes':r[4],'limitBytes':allowances[r[0]]}, 'membership': {'active': r[3] > time.time(), 'expiresAt': r[3] or None}} for r in rows], 'audit': [{'at': r[0], 'account': r[1], 'action': r[2], 'detail': r[3]} for r in audit]}
 
     def admin_membership(self, body):
+        action=body.get('action')
+        if action in ('savePlan','grantPlan'):
+            name=body.get('plan')
+            if not isinstance(name,str) or not 1<=len(name.strip())<=60:
+                raise Failure(400,'请输入有效套餐名')
+            name=name.strip()
+            with self.db() as db:
+                db.execute('BEGIN IMMEDIATE')
+                if action=='savePlan':
+                    cents,space,machine=(body.get(k) for k in ('weeklyCents','storageMiB','machine'))
+                    if type(cents) is not int or not 1<=cents<=10000000 or type(space) is not int or not 1<=space<=256:
+                        raise Failure(400,'请核对周额度和云空间')
+                    if machine and (machine!='*' or name!='Pro'):
+                        row=db.execute('SELECT details FROM rental_plans WHERE id=?',(machine,)).fetchone()
+                        if not row or not all(json.loads(row[0])[k] for k in ('enabled','included')):
+                            raise Failure(400,'请选择已启用的会员机器规格')
+                    db.execute('INSERT OR REPLACE INTO member_plans VALUES(?,?,?,?)',(name,cents,space,machine or ''))
+                else:
+                    account,days,request=body.get('account'),body.get('days'),body.get('request')
+                    if type(days) is not int or not 1<=days<=3660 or not isinstance(request,str) or not re.fullmatch(r'[a-f0-9-]{36}',request):
+                        raise Failure(400,'发放参数无效')
+                    payload=json.dumps([account,name,days])
+                    prior=db.execute('SELECT payload FROM membership_grants WHERE request=?',(request,)).fetchone()
+                    if prior:
+                        if prior[0]!=payload:raise Failure(409,'发放编号已使用')
+                        return {'ok':True}
+                    if not db.execute('SELECT 1 FROM accounts WHERE id=?',(account,)).fetchone() or not db.execute('SELECT 1 FROM member_plans WHERE name=?',(name,)).fetchone():
+                        raise Failure(404,'账号或套餐不存在')
+                    current=db.execute('SELECT expires FROM memberships WHERE account=?',(account,)).fetchone()
+                    expires=max(time.time(),current[0] if current else 0)+days*86400
+                    db.execute('INSERT OR REPLACE INTO memberships VALUES(?,?)',(account,expires))
+                    db.execute('INSERT OR REPLACE INTO member_assignments VALUES(?,?,?)',(account,name,expires))
+                    db.execute('INSERT INTO membership_grants VALUES(?,?)',(request,payload))
+                db.execute('INSERT INTO admin_audit(at,account,action,detail) VALUES(?,?,?,?)',(time.time(),body.get('account'),action,json.dumps(body,ensure_ascii=False)))
+            return {'ok':True}
         account, expires, reason = body.get('account'), body.get('expiresAt'), body.get('reason')
         if not isinstance(expires, (int, float)) or isinstance(expires, bool) or not 0 <= expires <= time.time() + 3660 * 86400 or not isinstance(reason, str) or not 2 <= len(reason.strip()) <= 300:
             raise Failure(400, '请填写有效到期时间及操作原因')
@@ -216,6 +324,7 @@ class Service:
                     digest = hashlib.scrypt(password.encode(), salt=bytes.fromhex(salt), n=16384, r=8, p=1).hex()
                     token = secrets.token_urlsafe(32)
                     db.execute('INSERT INTO accounts VALUES(?,?)', (account, email))
+                    self.rewards.attribute(db,account,body.get('invite'))
                     db.execute('INSERT INTO passwords VALUES(?,?,?)', (account, salt, digest))
                     db.execute('INSERT INTO keyboxes VALUES(?,?)', (account, json.dumps(box)))
                     db.execute('INSERT INTO vaults(account,revision,envelope,mutation,byte_size) VALUES(?,?,?,?,?)', (account, 1, vault, secrets.token_hex(16),len(base64.b64decode(body['envelope']['ciphertext']))-16))
@@ -254,6 +363,38 @@ class Service:
             db.execute('INSERT INTO sessions VALUES(?,?,?)', (self.digest(token), row[0], time.time() + 30 * 86400))
             box = db.execute('SELECT box FROM keyboxes WHERE account=?', (row[0],)).fetchone()
         return {'accountId': row[0], 'email': email, 'token': token, 'keybox': json.loads(box[0]) if box else None}
+
+    def authorize_admin_account(self, credential, ip):
+        if credential.startswith('Bearer '):
+            account = self.authenticate(credential[7:])
+            with self.db() as db:
+                if db.execute('SELECT 1 FROM admin_accounts_by_id WHERE account=?', (account,)).fetchone():
+                    return {'ok': True}
+            raise Failure(403, '此账号没有后台权限')
+        if not credential.startswith('Basic ') or len(credential) > 2048:
+            raise Failure(401, '请使用管理员账号登录')
+        try:
+            email, password = base64.b64decode(credential[6:], validate=True).decode().split(':', 1)
+        except (ValueError, UnicodeError):
+            raise Failure(401, '登录凭据无效')
+        with self.db() as db:
+            row = db.execute('''SELECT a.id,p.salt,p.digest FROM accounts a
+                JOIN admin_accounts_by_id m ON m.account=a.id JOIN passwords p ON p.account=a.id
+                WHERE a.email=?''', (email.strip().lower(),)).fetchone()
+        if row:
+            key = self.digest(credential + ':' + row[2])
+            with self.lock:
+                cached = self.admin_password_cache.get(row[0])
+            if cached and cached[1] > time.monotonic() and hmac.compare_digest(key, cached[0]):
+                return {'ok': True}
+        self.limit('admin-login:' + self.digest(ip), 30, 600)
+        if row and 8 <= len(password) <= 128:
+            actual = hashlib.scrypt(password.encode(), salt=bytes.fromhex(row[1]), n=16384, r=8, p=1).hex()
+            if hmac.compare_digest(actual, row[2]):
+                with self.lock:
+                    self.admin_password_cache[row[0]] = (key, time.monotonic() + 60)
+                return {'ok': True}
+        raise Failure(401, '邮箱或密码不正确')
 
     def authenticate(self, token):
         if not isinstance(token, str) or len(token) != 43:
@@ -392,6 +533,9 @@ def handler(service):
             self.connection.settimeout(25)
 
         def dispatch(self):
+            # Caddy forwards the resource's query string to the auth subrequest.
+            if self.path.partition('?')[0] == '/v1/admin/account-check':
+                self.path = '/v1/admin/account-check'
             acquired=False
             self.streaming=False
             try:
@@ -413,12 +557,14 @@ def handler(service):
                         raise Failure(403, '管理员认证失败')
                     if self.headers.get('Origin') not in (None, 'https://admin-shell.canp.ai'):
                         raise Failure(403, '来源不允许')
-                if not admin and self.headers.get('Origin'):
+                supplier=self.path=='/v1/rentals/supplier'
+                portal=self.path in ('/v1/auth/code','/v1/auth/register','/v1/auth/password-login','/v1/account/rewards','/v1/account/redeem','/v1/account/plan-offers','/v1/account/points-trace')
+                if not admin and self.headers.get('Origin') and not ((supplier or portal) and self.headers.get('Origin')=='https://shell.canp.ai'):
                     raise Failure(403, '仅允许原生客户端')
                 ip = self.headers.get('X-Real-IP', self.client_address[0])
                 if not admin:
                     bearer=self.headers.get('Authorization','').removeprefix('Bearer ')
-                    if bearer and not self.path.startswith('/v1/auth/'):
+                    if bearer and not supplier and not self.path.startswith('/v1/auth/'):
                         service.authenticate(bearer);bucket=service.digest(bearer)
                     else:bucket=service.digest(ip)
                     service.limit(('vault-chunks:' if self.path=='/v1/vault/chunks' else 'api:') + bucket, 1200 if self.path=='/v1/vault/chunks' else 240, 60)
@@ -441,7 +587,9 @@ def handler(service):
                     body = json.loads(self.rfile.read(size))
                     if not isinstance(body, dict):
                         raise Failure(400, '请求格式不正确')
-                if admin and self.path == '/v1/admin/mcp/authorize' and self.command == 'POST':
+                if admin and self.path == '/v1/admin/account-check' and self.command == 'GET':
+                    value=service.authorize_admin_account(self.headers.get('Authorization',''), ip)
+                elif admin and self.path == '/v1/admin/mcp/authorize' and self.command == 'POST':
                     value=service.mcp_clients.authorize(body.get('token'))
                 elif admin and self.path == '/v1/admin/mcp/invoke' and self.command == 'POST':
                     value=service.mcp_clients.invoke(body)
@@ -481,8 +629,35 @@ def handler(service):
                 elif admin and self.path == '/v1/admin/traffic' and self.command == 'POST':
                     try:value=service.metering.admin_change(body)
                     except ValueError:raise Failure(400,'流量配置或对账数据无效')
+                elif admin and self.path == '/v1/admin/model-pool' and self.command in ('GET','POST'):
+                    value=service.models.pool.view() if self.command=='GET' else service.models.pool.change(body)
                 elif admin and self.path == '/v1/admin/model-usage' and self.command == 'GET':
                     value=service.models.usage()
+                elif admin and self.path == '/v1/admin/rentals/settings' and self.command in ('GET','POST'):
+                    value=service.rentals.configure(body) if self.command=='POST' else service.rentals.settings()
+                elif admin and self.path == '/v1/admin/rentals/machines' and self.command in ('GET','POST'):
+                    value=service.rentals.supplier(None,body if self.command=='POST' else None)
+                elif admin and self.path == '/v1/admin/rentals/operators' and self.command in ('GET','POST'):
+                    value=service.rentals.operators(body if self.command=='POST' else None)
+                elif supplier and self.command in ('GET','POST'):
+                    value=service.rentals.supplier(self.headers.get('Authorization','').removeprefix('Bearer '),body if self.command=='POST' else None)
+                elif admin and self.path == '/v1/admin/rentals/plan' and self.command == 'POST':
+                    value=service.rentals.plan(body)
+                elif admin and self.path == '/v1/admin/points-trace' and self.command == 'POST':
+                    value=service.rewards.trace(body.get('account'),body.get('reference'))
+                elif admin and self.path == '/v1/admin/points-ledger' and self.command == 'GET':
+                    with service.db() as db:
+                        value=dict(entries=[dict(account=a,email=e,reference=r,points=n) for a,e,r,n in db.execute('SELECT p.account,a.email,p.reference,p.delta FROM rental_points p LEFT JOIN accounts a ON a.id=p.account ORDER BY p.rowid DESC LIMIT 500')])
+                elif admin and self.path == '/v1/admin/plan-offers' and self.command in ('GET','POST'):
+                    value=service.rewards.offers(body if self.command=='POST' else None)
+                elif admin and self.path == '/v1/admin/gift-cards' and self.command == 'POST':
+                    value=service.rewards.issue(body)
+                elif admin and self.path == '/v1/admin/settled-recharges' and self.command == 'POST':
+                    value=service.rewards.settle(body)
+                elif admin and self.path == '/v1/admin/rentals/credit' and self.command == 'POST':
+                    value=service.rentals.credit(body)
+                elif self.path == '/v1/rentals/enroll' and self.command == 'POST':
+                    value=service.rentals.enroll(body)
                 elif admin and self.path == '/v1/admin/lending' and self.command == 'GET':
                     value=service.devices.lending.admin_list()
                 elif admin and self.path == '/v1/admin/lending/revoke' and self.command == 'POST':
@@ -508,7 +683,15 @@ def handler(service):
                 else:
                     token = self.headers.get('Authorization', '').removeprefix('Bearer ')
                     account = service.authenticate(token)
-                    if self.path == '/v1/mcp/clients' and self.command in ('GET','POST'):
+                    if self.path == '/v1/account/rewards' and self.command == 'GET':
+                        value=service.rewards.account(account)
+                    elif self.path == '/v1/account/points-trace' and self.command == 'POST':
+                        value=service.rewards.trace(account,body.get('reference'))
+                    elif self.path == '/v1/account/plan-offers' and self.command in ('GET','POST'):
+                        value=service.rewards.buy_plan(account,body) if self.command=='POST' else dict(offers=[o for o in service.rewards.offers()['offers'] if o['enabled']])
+                    elif self.path == '/v1/account/redeem' and self.command == 'POST':
+                        value=service.rewards.redeem(account,body)
+                    elif self.path == '/v1/mcp/clients' and self.command in ('GET','POST'):
                         value=service.mcp_clients.manage(account,body if self.command=='POST' else None)
                     elif self.path == '/v1/mcp/bridges' and self.command == 'GET':
                         value=service.bridges.list(account)
@@ -519,22 +702,44 @@ def handler(service):
                     elif self.path == '/v1/network' and self.command in ('GET','POST'):
                         value=service.devices.network(account,body if self.command=='POST' else None)
                     elif self.path == '/v1/models' and self.command == 'GET':
-                        value=service.models.catalog()
+                        value=service.models.catalog(account)
+                    elif self.path=='/v1/account/phone-chat' and self.command=='POST':
+                        value=service.agent_spending.phone_reply(account,body,self.stream_event if body.get('stream') is True else None)
+                        if self.streaming:return
                     elif self.path == '/v1/models/chat/completions' and self.command == 'POST':
                         value=service.models.complete(account,body,self.stream_event if body.get('stream') is True else None)
                         if self.streaming:
                             return
                     elif self.path == '/v1/domains' and self.command == 'GET':
                         value=service.domains.list(account)
-                    elif self.path in ('/v1/domains/claim','/v1/domains/rename','/v1/domains/records','/v1/domains/records/update','/v1/domains/records/delete') and self.command=='POST':
+                    elif self.path in ('/v1/domains/buy','/v1/domains/claim','/v1/domains/rename','/v1/domains/records','/v1/domains/records/update','/v1/domains/records/delete') and self.command=='POST':
                         service.limit('domain-write:'+account,30,60)
-                        if self.path.endswith('/claim') or self.path.endswith('/rename'):value=service.domains.claim(account,body)
+                        if self.path.endswith('/buy'):value=service.domains.buy(account,body)
+                        elif self.path.endswith('/claim') or self.path.endswith('/rename'):value=service.domains.claim(account,body)
                         elif self.path.endswith('/delete'):value=service.domains.delete(account,body)
                         else:value=service.domains.write(account,body)
                     elif self.path == '/v1/devices' and self.command == 'GET':
                         value=service.devices.list(account)
                     elif self.path == '/v1/devices/register' and self.command == 'POST':
                         value=service.devices.register(account,body)
+                    elif self.path == '/v1/account/agent-spending' and self.command in ('GET','POST'):
+                        value=service.agent_spending.policy(account,body if self.command=='POST' else None)
+                    elif self.path == '/v1/account/agent-services' and self.command=='POST':
+                        value=service.agent_spending.run(account,body)
+                    elif self.path == '/v1/conversations' and self.command in ('GET','POST'):
+                        value=service.conversations(account,body if self.command=='POST' else None)
+                    elif self.path == '/v1/rentals' and self.command == 'GET':
+                        value=service.rentals.catalog(account)
+                    elif self.path == '/v1/account/model-refill' and self.command == 'POST':
+                        value=service.models.pool.refill(account,body)
+                    elif self.path == '/v1/account/pro-purchase' and self.command == 'POST':
+                        value=service.purchase_pro(account,body)
+                    elif self.path == '/v1/rentals/order' and self.command == 'POST':
+                        value=service.rentals.order(account,body)
+                    elif self.path == '/v1/rentals/change' and self.command == 'POST':
+                        value=service.rentals.change(account,body)
+                    elif self.path == '/v1/rentals/connect' and self.command == 'POST':
+                        value=service.rentals.connection(account,body.get('id'))
                     elif self.path == '/v1/lending' and self.command == 'GET':
                         value=service.devices.lending.list(account)
                     elif self.path == '/v1/lending/create' and self.command == 'POST':
@@ -551,8 +756,11 @@ def handler(service):
                         value=service.devices.lease(account,body)
                     elif self.path == '/v1/devices/remove' and self.command == 'POST':
                         value=service.devices.remove(account,body)
-                    elif self.path == '/v1/account/traffic' and self.command == 'GET':
+                    elif self.path in ('/v1/account/traffic','/v1/account/traffic/v2') and self.command == 'GET':
                         value=service.metering.account_view(account)
+                        value['modelWeek']=service.models.pool.view(account)
+                        if not self.path.endswith('/v2'):
+                            for pool in value['modelWeek']['pools']:pool['models']=[]  # Legacy clients require exact multipliers; preserve totals only.
                     elif self.path == '/v1/account' and self.command == 'GET':
                         value = service.profile(account)
                     elif self.path == '/v1/auth/keybox' and self.command == 'POST':
@@ -586,6 +794,13 @@ def handler(service):
                         raise Failure(404, '接口不存在')
                 self.respond(200, value)
             except Failure as error:
+                if self.path == '/v1/admin/account-check' and error.status == 401:
+                    self.send_response(401)
+                    self.send_header('WWW-Authenticate', 'Basic realm="CShell Admin", charset="UTF-8"')
+                    self.send_header('Cache-Control','no-store')
+                    self.send_header('Content-Length','0')
+                    self.end_headers()
+                    return
                 if self.streaming:
                     self.stream_event(json.dumps({'error': {'message': error.message}}, ensure_ascii=False))
                 else:
@@ -658,4 +873,7 @@ if __name__ == '__main__':
     if len(pepper) != 32:
         raise RuntimeError('AUTH_PEPPER must contain 32 random bytes')
     service = Service(os.environ.get('SYNC_DB', '/var/lib/cshell-sync/sync.sqlite'), pepper, send_mail)
+    service.rentals.run()
+    threading.Thread(target=service.domains.expire,daemon=True,name="domain-expiry").start()
+    threading.Thread(target=service.models.pool.refresh_balances,daemon=True,name="pool-balances").start()
     BoundedServer(('127.0.0.1', int(os.environ.get('SYNC_PORT', '8789'))), handler(service)).serve_forever()

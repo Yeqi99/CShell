@@ -1,7 +1,11 @@
 import {linuxBrowserInstall} from './linux-browser-install';
 import { execFile, spawn, type ChildProcess } from 'node:child_process';
 import { promisify } from 'node:util';
-import { randomUUID } from 'node:crypto';
+import { databaseRecipes, isDatabaseApp, type DatabaseApp } from '../shared/database-apps';
+import {installNative,nativePort,restoreNative} from './native-database';
+import {nativeArch,nativeVersions} from './native-database-install';
+import { databaseHost, databasePort, installDatabase } from './database-apps';
+import { createHash, randomUUID } from 'node:crypto';
 import { access } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { join } from 'node:path';
@@ -116,8 +120,9 @@ export class AgentApplicationService {
   private closing = new AbortController();
   private policy = appPolicySchema.parse({});
   private tasks = new Map<string, { owner: string; task: Task }>();
+  private starting = false;
   private active?: {
-    child: ChildProcess;
+    child?: ChildProcess;
     task: Task;
     done: Promise<void>;
     stop: (reason: string) => void;
@@ -142,6 +147,13 @@ export class AgentApplicationService {
         entry.task.logs += '\nAgent 已重启，安装结果未知；先检查系统再决定是否重试。';
       }
       this.tasks.set(entry.task.id, entry);
+    }
+    if(nativeArch && this.policy.enabled){
+      for(const app of Object.keys(nativeVersions) as DatabaseApp[]){
+        void restoreNative(this.nativeRoot(app),app,this.closing.signal).catch(error=>{
+          if(!this.closing.signal.aborted)console.warn('数据库恢复失败',app,String(error));
+        });
+      }
     }
   }
   private persist() {
@@ -173,15 +185,33 @@ export class AgentApplicationService {
     return structuredClone(policy);
   }
   async list(owner: string) {
-    const detected = await this.manager();
+    const [detected, dockerProblem] = await Promise.all([
+      this.manager(),
+      nativeArch ? Promise.resolve('') : databaseHost(this.closing.signal).then(()=>'',error=>String(error.message).includes('ENOENT')?'请先安装并启动 Docker 和 Compose':String(error.message).slice(0,200)),
+    ]);
     return {
       platform: process.platform,
       manager: detected?.manager ?? null,
       enabled: this.allowed(owner),
-      applications: detected
+      applications: [...Object.entries(databaseRecipes).map(([id, recipe]) => ({id, package:nativeArch?nativeVersions[id as DatabaseApp]:recipe.name,...(dockerProblem?{unavailable:dockerProblem}:{})})), ...(detected
         ? Object.entries(recipes[detected.manager]).map(([id, pkg]) => ({ id, package: pkg }))
-        : [],
+        : [])],
     };
+  }
+  private nativeRoot(app:DatabaseApp){return join(this.vault.storageDirectory,'database-apps',app);}
+  private project(app: DatabaseApp) {
+    const scope = createHash('sha256').update(this.vault.storageDirectory).digest('hex').slice(0,12);
+    return 'cagent-' + app + '-' + scope;
+  }
+  private async savePlan(owner: string, task: Task) {
+    this.authorize(owner);
+    if (this.tasks.size >= 50) {
+      const oldest = [...this.tasks].find(([, entry]) => entry.task.state !== 'running');
+      if (oldest) this.tasks.delete(oldest[0]);
+    }
+    this.tasks.set(task.id,{owner,task});
+    await this.persist();
+    return structuredClone(task);
   }
   private manager() {
     this.closing.signal.throwIfAborted();
@@ -199,6 +229,33 @@ export class AgentApplicationService {
   private async createPlan(input: unknown, owner: string, signal?: AbortSignal) {
     this.authorize(owner);
     const { app } = appPlanInput.parse(input);
+    if (isDatabaseApp(app)) {
+      const guard = signal ? AbortSignal.any([signal,this.closing.signal]) : this.closing.signal;
+      let legacy=[...this.tasks.values()].some(({task})=>task.app===app && task.manager==='docker' && task.state==='completed');
+      if(nativeArch && !legacy && !await nativePort(this.nativeRoot(app))){
+        const socket=process.env.DOCKER_HOST?.startsWith('unix://')?process.env.DOCKER_HOST.slice(7):'/var/run/docker.sock';
+        if(await access(socket).then(()=>true,()=>false)){
+          const host=await databaseHost(guard).catch(()=>undefined);
+          if(host)legacy=!!await databasePort(host,this.project(app),app,guard);
+        }
+      }
+      if(nativeArch && !legacy){
+        if(app==='milvus')await exec('dpkg-deb',['--version'],{signal:guard}).catch(()=>{throw Error('原生 Milvus 需要 dpkg-deb 解包工具，请在 Debian 或 Ubuntu 环境安装');});
+        const root=this.nativeRoot(app),current=await nativePort(root);
+        return this.savePlan(owner,{id:randomUUID(),app,manager:'native',executable:nativeVersions[app],args:[],platform:process.platform,
+          port:current??databaseRecipes[app].port,expires:Date.now()+900000,state:'planned',exitCode:null,
+          logs:'原生安装目录：'+root+(current?'，已配置端口 '+current:''),
+          warning:(app==='milvus'?'Milvus 监听所选业务端口和内部 RPC 端口，请使用隔离的机器网络。启用账号认证；不会创建公网端口映射。':'数据库仅监听 127.0.0.1。')+' 原生安装，无需 Docker、systemd 或 sudo。换端口会短暂重启服务并保留数据。'});
+      }
+      const host = await databaseHost(guard);
+      const current = await databasePort(host,this.project(app),app,guard);
+      return this.savePlan(owner,{
+        id:randomUUID(), app, manager:'docker', executable:'docker', args:[host], platform:process.platform,
+        port:current ?? databaseRecipes[app].port, expires:Date.now()+900000, state:'planned',
+        logs:current ? '已检测到此商城管理的实例，当前端口 '+current : '将创建独立容器和持久化数据卷',
+        warning:'仅监听目标机器的 127.0.0.1。更换端口将重建容器并短暂中断连接，保留数据卷。优先使用缓存，其次尝试 DaoCloud 和 Docker Hub。',
+      });
+    }
     const detected = await this.manager();
     this.authorize(owner);
     if (!detected) throw new Error('未检测到支持的系统包管理器；不会自动安装或修改软件源');
@@ -223,10 +280,6 @@ export class AgentApplicationService {
       env: { ...process.env, HOMEBREW_NO_AUTO_UPDATE: '1' },
     });
     this.authorize(owner);
-    if (this.tasks.size >= 50) {
-      const removable = [...this.tasks].find(([, entry]) => entry.task.state !== 'running');
-      if (removable) this.tasks.delete(removable[0]);
-    }
     const task: Task = {
       id: randomUUID(),
       app,
@@ -239,9 +292,7 @@ export class AgentApplicationService {
       warning: app==='browser' ? '将添加 Google 官方签名软件源，安装 Chrome、中文字体和浏览器专用用户。不会关闭沙箱或开放端口。取消后已安装的软件和资料保留。' :
         '执行会接受所列软件包和软件源协议，可能安装依赖或更新已有系统包。可能需要系统管理员批准；不会自动提权、重启或新增软件源。断线后任务继续；撤权会停止受管进程，但已安装部分及安装器子进程可能保留。',
     };
-    this.tasks.set(task.id, { owner, task });
-    await this.persist();
-    return structuredClone(task);
+    return this.savePlan(owner, task);
   }
   private get(input: unknown, owner: string) {
     const { id } = appTaskInput.parse(input);
@@ -275,21 +326,38 @@ export class AgentApplicationService {
     await this.persist();return structuredClone(task);
   }
   async install(input: unknown, owner: string) {
-    const { id } = appInstallInput.parse(input);
+    const { id, port } = appInstallInput.parse(input);
     this.authorize(owner);
     const task = this.get({ id }, owner);
     // Same plan cannot submit twice, even if a reply was lost.
     if (task.state !== 'planned') return structuredClone(task);
     if (task.expires < Date.now()) throw new Error('安装计划已过期');
-    if (this.active) throw new Error('包管理器正忙，请等待当前安装完成');
+    if (this.active || this.starting) throw new Error('包管理器正忙，请等待当前安装完成');
+    if (port !== undefined && !isDatabaseApp(task.app)) throw Error('此应用不支持端口设置');
+    if (port !== undefined) task.port = port;
+    this.starting = true;
     task.state = 'running';
-    await this.persist();
+    try { await this.persist(); } catch (error) { task.state='planned'; throw error; }
+    finally { this.starting=false; }
     try {
       this.authorize(owner);
     } catch (error) {
       task.state = 'interrupted';
       await this.persist();
       throw error;
+    }
+    if (isDatabaseApp(task.app)) {
+      const controller = new AbortController();
+      const stop = (reason: string) => controller.abort(new Error(reason));
+      const log = (line: string) => { task.logs=(task.logs+'\n'+line).slice(-32768); };
+      const check=setInterval(()=>{if(!this.allowed(owner))stop('安装授权已撤销');},500);
+      const done=(task.manager==='native' ? installNative(this.nativeRoot(task.app),task.app,task.port!,controller.signal,log) : installDatabase(task.args[0],this.project(task.app),task.app,task.port!,controller.signal,log))
+        .then(()=>{task.state='completed';task.exitCode=0;})
+        .catch(error=>{task.state=controller.signal.aborted?'interrupted':'failed';log(String(controller.signal.reason??error));})
+        .finally(async()=>{clearInterval(check);try{await this.persist();}finally{this.active=undefined;}});
+      this.active={task,done,stop};
+      void done.catch(()=>{task.state='interrupted';log('任务状态保存失败');});
+      return structuredClone(task);
     }
     const child = spawn(task.executable, task.args, {
       windowsHide: true,

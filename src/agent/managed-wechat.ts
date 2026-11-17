@@ -1,3 +1,4 @@
+import {friendActionReceipt} from './wechat-friend-receipt';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { createReadStream } from 'node:fs';
@@ -9,7 +10,7 @@ import { z } from 'zod';
 
 const configSchema = z.object({host:z.literal('127.0.0.1'),port:z.number().int().min(1).max(65535),apiToken:z.string().min(32).max(4096),dataDir:z.string().refine(isAbsolute),permissions:z.record(z.string(),z.unknown()),subscription:z.record(z.string(),z.unknown()).optional(),webhook:z.record(z.string(),z.unknown()).optional(),tls:z.unknown().optional()});
 const exited = (child:ChildProcess) => child.exitCode !== null || child.signalCode != null;
-export const managedWechatMethods = ['status','capabilities','contacts','conversations','history','moments','moment_detail','moments_interactions','send','send_file','receive','remark_read','remark_set','moments_publish','payment_parse','transfer_receive','red_packet_receive','payment_result'] as const;
+export const managedWechatMethods = ['address_book','resolve_contact','groups','group_info','group_members','sessions','search_history','send_mention','send_quote','status','capabilities','contacts','conversations','history','moments','moment_detail','moments_interactions','send','send_file','receive','remark_read','remark_set','moments_publish','payment_parse','transfer_receive','red_packet_receive','payment_result'] as const;
 export type ManagedWechatOptions = {
   executable:string; configPath:string; files:Record<string,string>; authorize:()=>boolean;
   /** Dependency injection is private to the backend; never accepted from an extension manifest. */
@@ -71,19 +72,38 @@ export class ManagedWechatService {
     this.child=undefined;this.config=undefined;
     if(owned.exitCode!==0)throw Error('WECHAT_SERVICE_EXITED_WITHOUT_CLEANUP_CONFIRMATION');
   }
-  private async call(path:string,body?:unknown):Promise<unknown>{
+  private async call(path:string,body?:unknown,friendActionId?:string):Promise<unknown>{
     this.guard();const cfg=this.config;if(!cfg||!this.child||exited(this.child))throw Error('WECHAT_SERVICE_NOT_RUNNING');
     const payload=body===undefined?undefined:Buffer.from(JSON.stringify(body));if(payload&&payload.length>131072)throw Error('WECHAT_REQUEST_TOO_LARGE');
     return new Promise((ok,fail)=>{
       const req=request({host:'127.0.0.1',port:cfg.port,path,method:payload?'POST':'GET',agent:false,headers:{Authorization:'Bearer '+cfg.apiToken,...(payload?{'Content-Type':'application/json','Content-Length':payload.length}:{})}},res=>{
         let bytes=0;const chunks:Buffer[]=[];res.on('data',(b:Buffer)=>{bytes+=b.length;if(bytes>2*1024*1024)req.destroy(Error('WECHAT_RESPONSE_TOO_LARGE'));else chunks.push(b);});
-        res.on('end',()=>{try{this.guard();if(res.statusCode!==200&&res.statusCode!==202)throw Error('WECHAT_HTTP_'+res.statusCode);ok(JSON.parse(Buffer.concat(chunks).toString('utf8')));}catch(e){fail(e);}});
-        res.on('error',()=>fail(Error('WECHAT_RESPONSE_INTERRUPTED')));
+        res.on('end',()=>{try{
+          this.guard();
+          if(friendActionId && [200,202,409,501].includes(res.statusCode??0)){
+            ok(friendActionReceipt(res.statusCode!,JSON.parse(Buffer.concat(chunks).toString('utf8')),friendActionId,path.endsWith('/invite')?'invite':'accept'));
+            return;
+          }
+          if(res.statusCode!==200&&res.statusCode!==202)throw Error('WECHAT_HTTP_'+res.statusCode);
+          ok(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+        }catch(e){fail(e);}});
+        res.on('error',()=>friendActionId ? ok({requestId:friendActionId,status:'requires-reconciliation',nextAction:'read',replay:false}) : fail(Error('WECHAT_RESPONSE_INTERRUPTED')));
       });
-      const timer=setTimeout(()=>req.destroy(Error('WECHAT_HTTP_TIMEOUT')),10000);timer.unref();req.once('close',()=>clearTimeout(timer));req.once('error',()=>fail(Error('WECHAT_TRANSPORT_FAILED')));req.end(payload);
+      const timer=setTimeout(()=>req.destroy(Error('WECHAT_HTTP_TIMEOUT')),10000);timer.unref();req.once('close',()=>clearTimeout(timer));req.once('error',()=>friendActionId ? ok({requestId:friendActionId,status:'requires-reconciliation',nextAction:'read',replay:false}) : fail(Error('WECHAT_TRANSPORT_FAILED')));req.end(payload);
     });
   }
   health(){return this.call('/v1/health');}
+  private friendRequestPath(id:string){return '/v1/friend-requests/'+z.string().regex(/^[a-f0-9]{64}$/).parse(id);}
+  friendRequest(id:string,groupId?:string){
+    const query=groupId===undefined?'':'?groupId='+encodeURIComponent(z.string().regex(/^[0-9]{1,32}@chatroom$/).parse(groupId));
+    return this.call(this.friendRequestPath(id)+query);
+  }
+  acceptFriendRequest(id:string){return this.call(this.friendRequestPath(id)+'/accept',{},id);}
+  inviteFriendRequest(id:string,groupId:string){
+    return this.call(this.friendRequestPath(id)+'/invite',{groupId:z.string().regex(/^[0-9]{1,32}@chatroom$/).parse(groupId)},id);
+  }
+  selectContact(alias:string){return this.call('/v1/contact-selection',{alias});}
+  selectedContact(id:string){return this.call('/v1/contact-selection/'+z.string().regex(/^[a-f0-9]{32}$/).parse(id));}
   capabilities(){return this.call('/v1/capabilities');}
   submit(method:string,params:Record<string,unknown>,idempotencyKey:string){
     if(!managedWechatMethods.includes(method as typeof managedWechatMethods[number])||!params||Array.isArray(params)||!/^[\x21-\x7e]{8,128}$/.test(idempotencyKey))throw Error('WECHAT_OPERATION_INVALID');

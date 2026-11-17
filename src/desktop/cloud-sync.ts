@@ -1,9 +1,11 @@
+import {spendingTool} from '../core/account-spending';
 import {accountTrafficTool} from '../core/account-traffic-tool';
 import {identityRulesSchema} from '../shared/identity-network';
 import {AccountDiscovery} from '../core/account-discovery';
 import { syncClientProfiles } from '../core/client/profiles';
 import { importCloudStages, type CloudImportStage } from '../core/cloud-import';
-import { app, net } from 'electron';
+import { app, net, shell } from 'electron';
+import { spawn } from 'node:child_process';
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -228,11 +230,90 @@ export async function registerCloudHandlers(
     const discovery=await cloud.accountRequest('/v1/devices');
     return {...result,devices:(discovery.devices??[]).filter((d:any)=>!d.borrowed).map((d:any)=>({id:d.deviceId,name:d.name}))};
   });
+    const pair=async(id:string,expectedDevice?:string)=>{
+      const lease=await cloud.accountRequest('/v1/rentals/connect',{id});
+      const info=await client.probe({host:lease.host,port:lease.port});
+      const {fingerprint}=await import('../core/client/identity');
+      if((expectedDevice && info.deviceId!==expectedDevice) || info.deviceId!==lease.deviceId || fingerprint(info.certificate)!==lease.fingerprint)
+        throw Error('机器身份与开通记录不一致');
+      await client.pairPassword(info,lease.password);
+      await syncClientProfiles(store,client.list());
+      publish();
+    }
+  client.recoverRentalPairing=async deviceId=>{
+    if(!cloud.accountId())return false;
+    const catalog=await cloud.accountRequest('/v1/rentals');
+    const machine=catalog.machines?.find((m:{state:string;deviceId:string})=>m.state==='ready' && m.deviceId===deviceId);
+    if(!machine)return false;
+    await pair(machine.id,deviceId);
+    return true;
+  };
+  handle('cloud:rental-device-ids', async () => {
+    const account = cloud.accountId();
+    if (!account) return [];
+    const catalog = await cloud.accountRequest('/v1/rentals');
+    if (account !== cloud.accountId()) throw Error('账号已切换');
+    return catalog.machines.flatMap((m:{deviceId?:string}) => m.deviceId ? [m.deviceId] : []);
+  });
+  handle('cloud:rentals',async input=>{
+    const cmd=z.discriminatedUnion('action',[
+      z.object({action:z.literal('list')}),
+      z.object({action:z.literal('order'),plan:z.string().max(40),included:z.boolean(),points:z.number().int(),days:z.number().int(),request:z.string().uuid()}),
+      z.object({action:z.literal('ports'),id:z.string().uuid()}),
+      z.object({action:z.literal('connect'),id:z.string().uuid()}),
+      z.object({action:z.literal('change'),id:z.string().uuid(),kind:z.enum(['expand','cpu','memory','port','renew']),request:z.string().uuid(),quote:z.boolean(),maxPoints:z.number().int().optional(),units:z.number().int().min(1).max(100)})
+    ]).parse(input);
+    if(cmd.action==='ports')await cloud.accountRequest('/v1/rentals/change',{kind:'ports',id:cmd.id});
+    if(cmd.action==='order') await cloud.accountRequest('/v1/rentals/order',cmd);
+    let quote;
+    if(cmd.action==='change')quote=await cloud.accountRequest('/v1/rentals/change',cmd);
+    if(cmd.action==='connect')await pair(cmd.id);
+    const catalog=await cloud.accountRequest('/v1/rentals');
+    if(cmd.action==='list')for(const m of catalog.machines??[]){if(m.state==='ready'&&m.deviceId&&!client.list().some(d=>d.deviceId===m.deviceId))await pair(m.id);}
+    return {...catalog,...(cmd.action==='change'&&cmd.quote?{quote}:{})};
+  });
+  handle('cloud:pro-purchase',(email,requestId)=>cloud.purchasePro(z.string().email().parse(email),z.string().uuid().parse(requestId)));
+  handle('cloud:invite-poster',async()=>{
+    const result=await cloud.accountRequest('/v1/account/rewards');
+    const invite=z.string().regex(/^[a-f0-9]{24}$/).parse(result.invite);
+    await (await import('electron')).shell.openExternal('https://shell.canp.ai/rewards/#invite='+invite+'&preview=1');
+  });
+  handle('cloud:redeem-gift',(email,code)=>{
+    if(cloud.status().email!==email)throw Error('账号已切换，请重新打开账号页');
+    return cloud.accountRequest('/v1/account/redeem',{code:z.string().regex(/^[a-f0-9]{32}$/i).parse(code)});
+  });
+  handle('cloud:model-refill',(quote,request)=>cloud.accountRequest('/v1/account/model-refill',{quote,request}));
+  const samples=new Map<string,{planCores:number|null;planMemory:number|null;disk:number|null;used:number|null;checked:number;scanned:number}>();
+  handle('cloud:rental-sample',async(input:unknown)=>{
+    const {id,container}=z.object({id:z.string().uuid(),container:z.boolean()}).parse(input);
+    const account=cloud.accountId();
+    const key=JSON.stringify([account,id]);
+    const cache=samples.get(key)??{planCores:null,planMemory:null,disk:null,used:null,checked:0,scanned:0};
+    const now=Date.now();
+    if(now-cache.checked>=30000){
+      const catalog=account?await cloud.accountRequest('/v1/rentals').catch(()=>null):null;
+      const record=catalog?.machines?.find((m:{deviceId?:string})=>m.deviceId===id);
+      if(!record&&!container)return null;
+      cache.disk=Number.isFinite(record?.appliedDisk)?record.appliedDisk*1024**2:null;
+      cache.planCores=record?.cores??null;
+      cache.planMemory=Number.isFinite(record?.memory)?record.memory*1024**2:null;
+      cache.checked=now;
+    }
+    const {readRentalSample}=await import('./rental-sample');
+    const scan=now-cache.scanned>=60000;
+    const result=await readRentalSample(client,id,scan);
+    if(!result)return null;
+    if(scan){cache.used=result.diskUsed;cache.scanned=now;}
+    samples.set(key,cache);
+    return {...result,planMemory:cache.planMemory,planCores:cache.planCores,disk:cache.disk,diskUsed:cache.used};
+  });
   handle('cloud:traffic',()=>cloud.traffic());
   handle('cloud:domains',input=>cloud.domains(input));
+  handle('cloud:agent-spending',enabled=>cloud.accountRequest('/v1/account/agent-spending',enabled===undefined?undefined:{enabled:z.boolean().parse(enabled)}));
+  const accountService=spendingTool((input,signal)=>cloud.accountRequest('/v1/account/agent-services',input,signal));
   const domainTools=[...createMemberDomainTools({accountId:()=>cloud.accountId(),domains:(input,signal)=>cloud.domains(input,signal)}),accountTrafficTool({accountId:()=>cloud.accountId(),traffic:()=>cloud.traffic()})];
   const previousExtensionTools=ai.extensionTools;
-  ai.extensionTools=()=>[...(previousExtensionTools?.()??[]),...domainTools];
+  ai.extensionTools=()=>[...(previousExtensionTools?.()??[]),...domainTools,accountService];
   handle('cloud:lending',async(input:any)=>{
     const action=z.enum(['list','create','redeem','revoke']).parse(input?.action);
     const result=await cloud.accountRequest(action==='list'?'/v1/lending':'/v1/lending/'+action,action==='list'?undefined:input.body);
@@ -247,7 +328,21 @@ export async function registerCloudHandlers(
     }
     return result;
   });
+  handle('cloud:conversations',input=>cloud.conversations(input));
   handle('cloud:memory',()=>ai.memory());
+  handle('cloud:memory-open',async()=>{
+    const path=ai.openMemoryFile();
+    if(process.platform==='win32'){
+      await new Promise<void>((resolve,reject)=>{
+        const editor=spawn(join(process.env.SystemRoot || 'C:\\Windows','System32','notepad.exe'),[path],{detached:true,stdio:'ignore'});
+        editor.once('error',reject);
+        editor.once('spawn',()=>{editor.unref();resolve();});
+      });
+    }else{
+      const error=await shell.openPath(path);
+      if(error)throw new Error(error);
+    }
+  });
   handle('cloud:remember',input=>ai.remember(input));
   handle('cloud:forget',id=>ai.forget(id));
   const workspaceRecovered=await readFile(join(directory,'account-recovery.json'),'utf8').then(()=>true,()=>false);
@@ -274,7 +369,7 @@ export async function registerCloudHandlers(
   },publish);
   handle('cloud:discovery',async enabled=>{if(enabled===undefined)return discovery.get();return discovery.set(z.boolean().parse(enabled));});
   let refreshing=false,modelsChecked=0;
-  const tick=async()=>{if(refreshing||cloud.activationDeferred())return;refreshing=true;try{await cloud.autoSync();await discovery.refresh();if(!cloud.activationDeferred()&&cloud.status().email&&Date.now()-modelsChecked>60000){const catalog=await cloud.accountRequest('/v1/models');if(await ai.ensureOfficialModels(catalog.models.map((m:{id:string})=>m.id)))publish();modelsChecked=Date.now();}}catch{}finally{refreshing=false;}};
+  const tick=async()=>{if(refreshing||cloud.activationDeferred())return;refreshing=true;try{await cloud.autoSync();await discovery.refresh();if(!cloud.activationDeferred()&&cloud.status().email&&Date.now()-modelsChecked>60000){const catalog=await cloud.accountRequest('/v1/models');if(await ai.ensureOfficialModels(catalog.models))publish();modelsChecked=Date.now();}}catch{}finally{refreshing=false;}};
   void tick();
   const timer = setInterval(() => { void tick(); }, 15000);
   timer.unref();

@@ -1,6 +1,7 @@
 import {MachineHome,type MachineApp} from './machine-home';
 import {mobilePreferences} from './account-preferences';
 import {MobileCoding} from './coding';
+import {openPhoneChat} from './phone-chat';
 import {MobileCloud} from './cloud';
 import {MobileIde} from './ide';
 import { Terminal } from '@xterm/xterm';
@@ -13,6 +14,7 @@ import {MobileDesktop} from './desktop';
 declare global {
   interface Window {
     CShellNative: {
+      stopPhoneChat?():void;
       cloudRequest?(json:string):void;
       browserSupported?(): boolean;
       browserOpen?(id:string,name:string,url:string):void;
@@ -59,11 +61,11 @@ declare global {
 const $ = (id: string) => document.getElementById(id)!;
 const desktop=new MobileDesktop(window.CShellNative);
 const mobileIde=new MobileIde(window.CShellNative);
-const mobileCoding=new MobileCoding(window.CShellNative,(id,apps)=>{machineApps.set(id,{...machineApps.get(id),...apps});updateMachineApps(id);});
+const mobileCoding=new MobileCoding(window.CShellNative,command=>mobileCloud.conversations(command),(id,apps)=>{machineApps.set(id,{...machineApps.get(id),...apps});updateMachineApps(id);});
 const machineHomes=new Map<string,MachineHome>();
 const machineShells=new Map<string,{label:string;index:number}[]>();
 const openedShells=new Map<string,number>();
-const machineApps=new Map<string,{browser?:boolean;ide?:boolean;codex?:boolean;claude?:boolean;market?:boolean;files?:boolean}>();
+const machineApps=new Map<string,{browser?:boolean;assistant?:boolean;ide?:boolean;codex?:boolean;claude?:boolean;market?:boolean;files?:boolean}>();
 const desktopStatus=new Map<string,{packageReady?:boolean;viewAllowed?:boolean;controlAllowed?:boolean;inputFeatures?:string[];qualityModes?:string[]}>();
 const icons: Record<string, string> = {
   browser: '<circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/>',
@@ -508,6 +510,7 @@ $('auth-key').onclick = () => setAuth('key');
 for (const id of ['new', 'empty-new', 'session-new', 'home-new']) $(id).onclick = () => openForm();
 $('back').onclick = () => {if(page==='files'&&machineHomes.has(active)){select(active);machineHomes.get(active)!.show();}else navigate(page === 'cagent' ? 'extensions' : 'home');};
 window.mobileBack = () => {
+  if(document.querySelector('.phone-chat')){window.dispatchEvent(new Event('phone-chat-close'));return true;}
   if(mobileCoding.visible){mobileCoding.close();return true;}
   if(mobileIde.visible){mobileIde.close();return true;}
   if(desktop.visible){desktop.close();return true;}
@@ -644,6 +647,7 @@ function updateMachineApps(id:string){
  if(s.profile.protocol!=='agent')apps.push({id:'terminal',name:'SSH 终端',detail:'命令与终端历史',run:()=>{home.hide();s.terminal.focus();resize();}});
  else for(const choice of machineShells.get(id)||[]){if(shell!==undefined&&choice.index!==shell)continue;apps.push({id:'terminal',name:choice.label,detail:shell!==undefined?'继续当前终端':'打开终端',run:()=>{if(openedShells.has(id)){home.hide();s.terminal.focus();resize();return;}s.state='正在打开终端';$('status').textContent=s.state;window.CShellNative.openAgent(id,choice.index);openedShells.set(id,choice.index);}});}
  if(s.profile.protocol!=='agent'||cap.files)apps.push({id:'files',name:'文件',detail:'浏览、预览与传输',run:()=>{fileSource='remote';fileSession=id;navigate('files');syncFileSessions();}});
+ if(cap.assistant)apps.push({id:'assistant',name:'智能体',detail:'任务对话与执行记录',run:()=>mobileCoding.open(id,s.profile.name,'assistant')});
  if(cap.market)apps.push({id:'market',name:'应用市场',detail:'安装与管理远端应用',run:()=>mobileCoding.open(id,s.profile.name,'market',()=>void mobileIde.open(id,s.profile.name))});
  if(cap.ide)apps.push({id:'ide',name:'代码编辑器',detail:'项目文件与集成终端',run:()=>void mobileIde.open(id,s.profile.name)});
  const remote=desktopStatus.get(id);if(remote?.packageReady)apps.push({id:'remote',name:'远程控制',detail:remote.viewAllowed?'查看和操作远端桌面':'等待远端共享或授权',disabled:!remote.viewAllowed,run:()=>desktop.open(id,remote)});
@@ -652,6 +656,7 @@ function updateMachineApps(id:string){
 }
 function updateAgentDesktopEntry(id:string){updateMachineApps(id);}
 window.receive = (id, type, value) => {
+  if(type==='phone-chat-delta'){window.dispatchEvent(new CustomEvent('phone-chat-delta',{detail:value}));return;}
   if(type==='cloud-result'){mobileCloud.receive(value);return;}
   if(type==='ssh-workspace'){const s=sessions.get(id);if(s&&s.state!=='已断开'&&value==='ready')showMachine(id);return;}
 
@@ -749,6 +754,7 @@ window.updateEvent = (json) => {
   ($('update-progress') as HTMLProgressElement).value = state.progress || 0;
 };
 render();
+$('home-chat').onclick=()=>openPhoneChat((action,args)=>mobileCloud.phone(action,args),command=>mobileCloud.conversations(command),()=>window.CShellNative.stopPhoneChat?.());
 const mobileCloud=new MobileCloud(window.CShellNative,()=>({profiles,theme:dark?'dark':'light',preferences:readAccountPreferences(),extensions:accountExtensions}),data=>{
   localStorage.removeItem('profiles-before-cloud');
   profiles=data.profiles;localStorage.setItem('profiles',JSON.stringify(profiles));

@@ -38,6 +38,7 @@ export function AgentApplications({
     [task, setTask] = useState<z.infer<typeof appTaskSchema>>();
   const [policy, setPolicy] = useState<z.infer<typeof appPolicySchema>>(),
     [controllers, setControllers] = useState('');
+  const [port, setPort] = useState('');
   const [detail, setDetail] = useState(false);
   const [wslOpen, setWslOpen] = useState(false);
   const [query, setQuery] = useState(''),
@@ -197,10 +198,11 @@ export function AgentApplications({
             .map((a) => (
               <button
                 key={a.id}
-                disabled={busy || !catalog.enabled || task?.state === 'running'}
+                disabled={busy || !!a.unavailable || !catalog.enabled || task?.state === 'running'}
                 onClick={() =>
                   void run(async () => {
-                    setTask(appTaskSchema.parse(await call('applications.plan', { app: a.id })));
+                    const plan=appTaskSchema.parse(await call('applications.plan', { app: a.id }));
+                    setTask(plan);setPort(String(plan.port??''));
                     setDetail(true);
                   })
                 }
@@ -217,7 +219,7 @@ export function AgentApplications({
                   )}
                 </span>
                 <strong>{a.id === 'browser' ? 'Linux 图形环境' : a.id}</strong>
-                <small>{a.id === 'browser' ? '原生应用兼容 · 含 Chrome' : a.package}</small>
+                <small>{a.id === 'browser' ? '原生应用兼容 · 含 Chrome' : a.unavailable ?? a.package}</small>
               </button>
             ))}
         </div>
@@ -227,6 +229,7 @@ export function AgentApplications({
               {task.app} · {stateLabel(task.state)}
             </h3>
             <p>安装目标：{target.name}</p>
+            {task.port !== undefined && <label>目标机器端口<input type="number" min={1} max={65535} value={port} disabled={task.state!=='planned'} onChange={e=>setPort(e.target.value)}/></label>}
             <code>
               {task.app === 'browser'
                 ? 'Google Chrome · 官方签名软件源'
@@ -243,7 +246,7 @@ export function AgentApplications({
                   void run(async () =>
                     setTask(
                       appTaskSchema.parse(
-                        await call('applications.install', { id: task.id, confirm: true }),
+                        await call('applications.install', { id: task.id, confirm: true, ...(task.port===undefined?{}:{port:Number(port)}) }),
                       ),
                     ),
                   )

@@ -26,7 +26,22 @@ export interface CloudStatus {
   error?: string;
 }
 export interface AccountDiscoveryStatus {enabled:boolean;devices:{id:string;online:boolean|null}[];pending:number}
+export interface RentalCatalog {
+  balance:number;
+  quote?:{points:number;expires:number};
+  plans:{id:string;name:string;system:string;cpu:number;memory:number;disk:number;points:number;days:number;included:boolean;dedicatedIp?:boolean;portCount?:number}[];
+  machines:{id:string;name:string;included:boolean;state:string;expires:number|null;disk:number;updating:boolean;ports?:{host:string;port:number}[];portCount?:number}[];
+}
 export interface CloudBridge extends importAccountBridge {
+  cloudAgentSpending(enabled?:boolean):Promise<{enabled:boolean}>;
+  cloudConversations:import('./cloud-conversations').ChatBridge;
+  cloudRentalSample(id:string,container:boolean):Promise<import('../desktop/rental-sample').RentalSample|null>;
+  cloudRentalDeviceIds():Promise<string[]>;
+  cloudRentals(input:{action:'list'|'order'|'connect'|'change'|'ports';id?:string;plan?:string;included?:boolean;request?:string;points?:number;days?:number;kind?:'expand'|'cpu'|'memory'|'port'|'renew';quote?:boolean;maxPoints?:number;units?:number}):Promise<RentalCatalog>;
+  cloudPurchasePro(email:string,requestId:string):Promise<{expiresAt:number;balancePoints:number}>;
+  cloudInvitePoster():Promise<void>;
+  cloudRedeemGift(email:string,code:string):Promise<{kind:string;quantity:number;plan:string}>;
+  cloudRefill(quote:string,request:string):Promise<unknown>;
   cloudTraffic():Promise<import('./account-traffic').AccountTraffic>;
   cloudDomains(input?:import('./member-domains').MemberDomainCommand):Promise<import('./member-domains').MemberDomainState>;
   cloudMcpClients(input?:{action:'create'|'revoke';id?:string;name?:string;bridgeId?:string;scopes?:string[]}):Promise<{endpoint?:string;bridges?:{id:string;name:string}[];clients?:{id:string;name:string;bridgeId:string;expiresAt:number;revoked:boolean}[];token?:string}>;
@@ -34,6 +49,7 @@ export interface CloudBridge extends importAccountBridge {
   cloudNetwork(input?:{source:string;target:string|null}):Promise<{mode:'applications';routes:{source:string;target:string}[];devices:{id:string;name:string}[]}>;
   cloudLending(input:{action:'list'|'create'|'redeem'|'revoke';body?:Record<string,unknown>}):Promise<{devices?:{id:string;name:string}[];loans?:{id:string;owned:boolean;accepted?:boolean;deviceIds:string[];email?:string;expiresAt:number;maxUses:number;revoked:boolean;uses:number}[];shareCode?:string;id?:string}>;
   cloudMemory():Promise<import('./account-memory').AccountHabit[]>;
+  cloudOpenMemoryFile():Promise<void>;
   cloudRemember(input:{id?:string;text:string}):Promise<import('./account-memory').AccountHabit[]>;
   cloudForget(id:string):Promise<import('./account-memory').AccountHabit[]>;
   onCloudChanged(listener: () => void): () => void;

@@ -13,9 +13,9 @@ test('CAgent progresses beyond sixteen rounds and resumes with owned checkpoint 
  const vault={read:async(k:string)=>structuredClone(data.get(k)),write:async(k:string,v:unknown)=>{data.set(k,structuredClone(v));}} as unknown as ClientVault;
  const request=(async(_url:any,init:any)=>{requests.push(JSON.parse(init.body));return ++step<=20?{tool_calls:[{id:'c'+step,type:'function',function:{name:'command',arguments:JSON.stringify({shell:'cmd',command:'echo '+step,timeoutMs:120000})}}]}:{content:'verified'};}) as typeof requestAiReply;
  const service=new CagentAssistant(vault,{shells:async()=>[],applications:async()=>[],execute:async()=>({exitCode:0,result:++executed}),allowed:()=>true},request);
- try{await service.load();await service.configure({...config,review:false});const t=await service.start({prompt:'complete all steps',requestId:randomUUID()},'a'.repeat(64));await until(()=>service.get(t,'local').state==='completed');assert.equal(executed,20);
+ try{await service.load();await service.configure({...config,review:false});const t=await service.start({prompt:'complete all steps in the SSH terminal',requestId:randomUUID()},'a'.repeat(64));await until(()=>service.get(t,'local').state==='completed');assert.equal(executed,20);
  await assert.rejects(service.start({resumeId:t.id,prompt:'continue',requestId:randomUUID()},'b'.repeat(64)),/不存在/);
- const resumed=await service.start({resumeId:t.id,prompt:'check state',requestId:randomUUID()},'a'.repeat(64));await until(()=>service.get(resumed,'local').state==='completed');assert.match(JSON.stringify(requests.at(-1).messages),/complete all steps/);assert.match(JSON.stringify(requests.at(-1).messages),/never replay/);assert.equal(executed,20);
+ const resumed=await service.start({resumeId:t.id,prompt:'check state',requestId:randomUUID()},'a'.repeat(64));await until(()=>service.get(resumed,'local').state==='completed');assert.match(JSON.stringify(requests.at(-1).messages),/complete all steps in the SSH terminal/);assert.match(JSON.stringify(requests.at(-1).messages),/never replay/);assert.equal(executed,20);
  }finally{await service.close();}
 });
 async function fixture(){
@@ -47,9 +47,9 @@ test('new signed-in workspace retains fresh assistant defaults without importing
 test('cagent fresh defaults, explicit opt-out, approval, task ownership, live revocation and encrypted-store contract',async()=>{
  const f=await fixture();try{
  assert.equal(f.service.snapshot().commands,true);assert.equal(f.service.snapshot().model,'');await f.service.configure({...config,commands:false,delegates:[]});assert(!('key' in f.service.snapshot()));
- await assert.rejects(f.service.start({prompt:'test',requestId:randomUUID()},'a'.repeat(64)),/未授权/);
+ await assert.rejects(f.service.start({prompt:'在终端执行测试命令',requestId:randomUUID()},'a'.repeat(64)),/未授权/);
  await f.service.configure(config);
- const t=await f.service.start({prompt:'test',requestId:randomUUID()},'a'.repeat(64));
+ const t=await f.service.start({prompt:'在终端执行测试命令',requestId:randomUUID()},'a'.repeat(64));
  await until(()=>f.service.get(t,'local').state==='approval');
  assert.equal(f.executions,0);assert.throws(()=>f.service.get(t,'b'.repeat(64)),/不存在/);
  await assert.rejects(f.service.start({prompt:'second',requestId:randomUUID()},'local'),/已有任务/);
@@ -58,13 +58,13 @@ test('cagent fresh defaults, explicit opt-out, approval, task ownership, live re
 });
 test('approved command runs once; restart does not replay tasks; configure cancels pending approval',async()=>{
  const f=await fixture();try{
- await f.service.configure(config);const t=await f.service.start({prompt:'test',requestId:randomUUID()},'local');
+ await f.service.configure(config);const t=await f.service.start({prompt:'在终端执行测试命令',requestId:randomUUID()},'local');
  await until(()=>f.service.get(t,'local').state==='approval');f.service.approve({...t,allow:true});
  assert.throws(()=>f.service.approve({...t,allow:true}));
  await until(()=>f.service.get(t,'local').state==='completed');assert.equal(f.executions,1);
  await f.service.load();assert.equal(f.executions,1);
  }finally{await f.service.close();}
- const g=await fixture();try{await g.service.configure(config);const t=await g.service.start({prompt:'test',requestId:randomUUID()},'local');await until(()=>g.service.get(t,'local').state==='approval');await g.service.configure({...config,commands:false});await until(()=>g.service.get(t,'local').state==='cancelled');assert.equal(g.executions,0);}finally{await g.service.close();}
+ const g=await fixture();try{await g.service.configure(config);const t=await g.service.start({prompt:'在终端执行测试命令',requestId:randomUUID()},'local');await until(()=>g.service.get(t,'local').state==='approval');await g.service.configure({...config,commands:false});await until(()=>g.service.get(t,'local').state==='cancelled');assert.equal(g.executions,0);}finally{await g.service.close();}
 });
 test('local app checks host, origin, bearer token and fixed method surface',async()=>{
  let calls=0;const app=await startCagentApp('unused',async()=>{calls++;return {ok:true};});
@@ -91,7 +91,9 @@ test('installed capability tools require side-effect approval and are rechecked 
  const request=(async(_url,init)=>{
   const body=JSON.parse(String(init.body));
   if(body.messages.at(-1).role==='user'){
-   assert.equal(body.tools.some((tool:any)=>tool.function.name==='capability_call'),granted);
+   const alias=body.tools.find((tool:any)=>tool.function.name.startsWith('package_'));
+   if(granted && !alias)return {tool_calls:[{id:randomUUID(),type:'function',function:{name:'load_task_context',arguments:JSON.stringify({group:'fixture.app'})}}]};
+   if(alias)return {tool_calls:[{id:randomUUID(),type:'function',function:{name:alias.function.name,arguments:'{}'}}]};
    return {content:null,tool_calls:[{id:randomUUID(),type:'function',function:{name:'capability_call',arguments:JSON.stringify({packageId:'fixture.app',toolId:'fixture_write',args:{}})}}]};
   }
   return {content:'done'};
@@ -110,7 +112,7 @@ test('installed capability tools require side-effect approval and are rechecked 
   granted=false;
   const fourth=await service.start({prompt:'unauthorized fixture',requestId:randomUUID()},'local');
   await until(()=>service.get(fourth,'local').state==='failed');assert.equal(executions,2);
-  assert.match(service.get(fourth,'local').error!,/未知工具|未安装或未授权/);
+  assert.match(service.get(fourth,'local').error!,/未知工具|未安装或未授权|当前不可用|未提供/);
  }finally{await service.close();}
 });
 

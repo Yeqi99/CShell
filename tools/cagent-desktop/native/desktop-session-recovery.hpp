@@ -20,10 +20,10 @@ static json recoveryPlan(const Identity& identity){
  if(WTSQuerySessionInformationW(WTS_CURRENT_SERVER_HANDLE,identity.session,WTSClientProtocolType,&raw,&size)&&size>=sizeof(protocol))protocol=*(USHORT*)raw;
  if(raw)WTSFreeMemory(raw);raw=nullptr;
  bool occupied=true;
- if(console!=0xffffffff&&WTSQuerySessionInformationW(WTS_CURRENT_SERVER_HANDLE,console,WTSUserName,&raw,&size))occupied=raw&&raw[0]!=0;
+ if(console!=0xffffffff&&WTSQuerySessionInformationW(WTS_CURRENT_SERVER_HANDLE,console,WTSUserName,&raw,&size)&&raw&&size>=sizeof(wchar_t))occupied=raw[0]!=0;
  if(raw)WTSFreeMemory(raw);
  const bool unlocked=recoverySupportedWindows()&&sessionUnlocked(identity.session);
- std::string reason=!recoverySupportedWindows()?"UNSUPPORTED_WINDOWS":console==identity.session?"ALREADY_CONSOLE":(console==0xffffffff||console==0)?"NO_CONSOLE":occupied?"CONSOLE_OCCUPIED":protocol!=2?"NOT_RDP":state!=WTSActive?"SESSION_NOT_ACTIVE":!unlocked?"SESSION_LOCKED_OR_UNKNOWN":"READY_TO_ATTEMPT";
+ std::string reason=!recoverySupportedWindows()?"UNSUPPORTED_WINDOWS":console==identity.session?"ALREADY_CONSOLE":(console==0xffffffff||console==0)?"NO_CONSOLE":occupied?"CONSOLE_OCCUPIED":!unlocked?"SESSION_LOCKED_OR_UNKNOWN":protocol!=2?"NOT_RDP":(state!=WTSActive&&state!=WTSDisconnected)?"SESSION_NOT_ACTIVE":"READY_TO_ATTEMPT";
  return {{"sessionId",identity.session},{"consoleSessionId",console},{"sourceState",(int)state},{"protocol",protocol},{"sourceUnlocked",unlocked},{"consoleOccupied",occupied},{"canAttempt",reason=="READY_TO_ATTEMPT"},{"reason",reason}};
 }
 static json recoverConsole(const Identity& identity,DWORD expectedSession,DWORD expectedConsole){

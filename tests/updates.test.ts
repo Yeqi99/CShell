@@ -15,6 +15,15 @@ const release = (version: string, suffix = 'win-x64.exe') => ({
   })),
 });
 
+test('installed previews can upgrade to the stable release without selecting another preview', () => {
+  const update = selectRelease([release('1.0.11-beta.1'), release('1.0.10')], 'win32', 'x64');
+  assert.equal(update?.version, '1.0.10');
+  assert.equal(compareVersion(update!.version, '1.0.10-beta.5'), 1);
+  assert.equal(compareVersion('1.0.10-beta.10', '1.0.10-beta.5'), 1);
+  assert.equal(compareVersion('1.0.10+build.2', 'v1.0.10'), 0);
+  assert.equal(compareVersion('1.0.9', '1.0.10-beta.5'), -1);
+  assert.throws(() => compareVersion('1.0.10-', '1.0.10'));
+});
 test('Pro and base applications select only their own release assets', () => {
   const base = release('0.8.2');
   const pro = JSON.parse(JSON.stringify(base).replaceAll('CShell-0.8.2', 'CShell-Pro-0.8.2').replaceAll('/opensource/', '/pro/'));

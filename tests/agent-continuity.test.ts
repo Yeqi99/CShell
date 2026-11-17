@@ -8,6 +8,11 @@ test('compression preserves early constraints and entire tool exchanges; failed 
  assert.match(history,/Never delete original files/);assert.match(saved,/remaining/);assert.equal(messages.at(-1).role,'tool');assert.equal(messages.at(-2).role,'assistant');
  const before=structuredClone(messages);await assert.rejects(compactContext(messages,async()=>{throw Error('offline');},async()=>{},100),/offline|过大/);assert.deepEqual(messages,before);
 });
+test('default runs can progress past the former cumulative byte ceiling',()=>{
+ const budget=new RunBudget();
+ for(let i=0;i<40;i++)budget.reserve({content:'x'.repeat(60000)});
+ assert.equal(budget.used,0);
+});
 test('budget stops repeated unchanged work and excessive context, not at sixteen model calls',()=>{
  const budget=new RunBudget(100000);for(let i=0;i<50;i++){budget.reserve({step:i});budget.observe('read',{path:i},'new data '+i);}
  for(let i=0;i<4;i++)budget.observe('read','same','unchanged');assert.throws(()=>budget.observe('read','same','unchanged'),/重复/);assert.throws(()=>budget.reserve('x'.repeat(100000)),/预算/);

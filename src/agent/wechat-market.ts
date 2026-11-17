@@ -1,17 +1,24 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
-export function wechatSupport(versions:readonly string[]){
- const installable=versions.length===1&&['4.1.15.56','4.2.0.12'].includes(versions[0]);
- const reason=installable?'支持聊天发送与消息订阅；安装后仍需绑定并核验本机微信。':versions.includes('4.1.15.50')?'微信 4.1.15.50 已因原生组件稳定性问题隔离，不能安装或调用。':versions.length>1?'检测到多个微信版本，请仅运行一个支持版本。':versions.length?'当前微信版本尚未验证，不能安装或调用。':'请先打开本机微信，再刷新应用市场。';
- return {installable,reason,capabilities:installable?['发送文本','接收消息与事件订阅']:[],unavailable:['通讯录与历史查询','朋友圈与文件发送','转账与红包操作']};
+const supportedVersions = ['4.1.15.56','4.2.0.12','4.2.0.50'];
+const features = [
+  ['wechat.contacts.read','查询通讯录'], ['wechat.send','发送文本'], ['wechat.events.read','接收消息与事件订阅'],
+  ['wechat.history.read','历史查询'], ['wechat.moments.read','读取朋友圈'], ['wechat.files.send','发送文件'],
+  ['wechat.transfers.receive','接收转账'], ['wechat.redpackets.receive','接收红包'],
+] as const;
+export function wechatSupport(versions:readonly string[], permissions:readonly string[]=[]){
+ const installable=versions.length===1&&supportedVersions.includes(versions[0]);
+ const reason=installable?'安装后绑定并核验本机微信。':versions.includes('4.1.15.50')?'微信 4.1.15.50 已因原生组件稳定性问题隔离，不能安装或调用。':versions.length>1?'检测到多个微信版本，请仅运行一个支持版本。':versions.length?'当前微信版本尚未验证，不能安装或调用。':'请先打开本机微信，再刷新应用市场。';
+ const available = (permission:string) => installable && permissions.includes(permission);
+ return {installable,reason,capabilities:features.filter(([permission])=>available(permission)).map(([,label])=>label), unavailable:features.filter(([permission])=>!available(permission)).map(([,label])=>label)};
 }
-export function selectWechatMarket<T extends {id:string;name:string;description:string;installed?:boolean}>(entries:T[], versions:readonly string[]):Array<T & {wechatSupport?:ReturnType<typeof wechatSupport>} >{
+export function selectWechatMarket<T extends {id:string;name:string;description:string;installed?:boolean;permissions?:readonly string[]}>(entries:T[], versions:readonly string[]):Array<T & {wechatSupport?:ReturnType<typeof wechatSupport>} >{
   const wechat=entries.filter(x=>x.id==='cagent.wechat'||/^cagent\.wechat\.v\d+$/.test(x.id));
   if(!wechat.length)return entries;
-  const support=wechatSupport(versions);
-  const matched=support.installable?wechat.find(x=>x.id==='cagent.wechat.v'+versions[0].replaceAll('.','')):undefined;
-  const selected=matched??wechat.find(x=>/^cagent\.wechat\.v(?:411556|42012)$/.test(x.id))??wechat[0];
+  const matched=versions.length===1?wechat.find(x=>x.id==='cagent.wechat.v'+versions[0].replaceAll('.','')):undefined;
+  const support=wechatSupport(versions,matched?.permissions);
+  const selected=matched??wechat.find(x=>x.id!=='cagent.wechat')??wechat[0];
   if(!matched&&support.installable){support.installable=false;support.reason='当前目录缺少匹配版本的能力包，请更新应用目录。';support.capabilities=[];}
   return entries.filter(x=>!wechat.includes(x)).concat([{...selected,name:'微信工具',description:support.reason,wechatSupport:support}]);
 }

@@ -94,3 +94,61 @@ test('network failures report actionable proxy guidance without leaking the tran
  const transport=(async()=>{throw new TypeError('fetch failed',{cause:{code:'ECONNREFUSED',message:'secret'}})}) as typeof fetch;
  await assert.rejects(requestAiReply('https://example.invalid/v1/chat/completions',{body:JSON.stringify({model:'fixture',messages:[]})},new AbortController().signal,()=>{},undefined,transport),error=>{assert.match(String(error),/网络出口或系统代理/);assert.doesNotMatch(String(error),/secret|fetch failed/);return true;});
 });
+
+test('a transient model gateway failure retries the same request and route', async () => {
+  const attempts: string[] = [];
+  const transport: typeof fetch = async (url, init) => {
+    attempts.push(String(url) + init?.body);
+    if (attempts.length === 1) return new Response(null, {status: 503});
+    return Response.json({choices: [{message: {content: 'recovered'}}]});
+  };
+  const out = await requestAiReply('https://fixture.invalid/chat', {body: '{}'}, new AbortController().signal, () => {}, undefined, transport);
+  assert.equal(out.content, 'recovered');
+  assert.equal(attempts.length, 2);
+  assert.equal(attempts[0], attempts[1]);
+});
+
+test('credential rejection is returned after one model request', async () => {
+  let calls = 0;
+  await assert.rejects(requestAiReply('https://fixture.invalid/chat', {}, new AbortController().signal, () => {}, undefined, async () => {
+    calls++;
+    return new Response(null, {status:401});
+  }), /401/);
+  assert.equal(calls, 1);
+});
+
+test('unfinished event stream before visible output recovers on the same route', async () => {
+  let attempts = 0;
+  const events: string[] = [];
+  const reply = await requestAiReply('https://fixture.invalid/chat', {}, new AbortController().signal,
+    value => events.push(value), undefined, async () => new Response(++attempts === 1 ? ': heartbeat\n\n' : done,
+      { headers: { 'Content-Type': 'text/event-stream' } }));
+  assert.equal(attempts, 2);
+  assert.equal(reply.content, 'ok');
+  assert.deepEqual(events, ['ok']);
+});
+
+test('interrupted visible output is preserved without duplicate generation', async () => {
+  let attempts = 0;
+  const events: string[] = [];
+  await assert.rejects(requestAiReply('https://fixture.invalid/chat', {}, new AbortController().signal,
+    value => events.push(value), undefined, async () => {
+      attempts++;
+      return new Response('data: {"choices":[{"delta":{"content":"partial"}}]}\n\n',
+        { headers: { 'Content-Type': 'text/event-stream' } });
+    }), /响应中断/);
+  assert.equal(attempts, 1);
+  assert.deepEqual(events, ['partial']);
+});
+
+test('Chromium timeout errors recover before any visible output', async () => {
+  for (const code of ['ERR_TIMED_OUT', 'ERR_CONNECTION_TIMED_OUT']) {
+    let attempts = 0;
+    const result = await requestAiReply('https://fixture.invalid/chat', {}, new AbortController().signal, () => {}, undefined, async () => {
+      if (++attempts === 1) throw new Error('net::' + code);
+      return Response.json({ choices: [{ message: { content: 'recovered' } }] });
+    });
+    assert.equal(attempts, 2);
+    assert.equal(result.content, 'recovered');
+  }
+});

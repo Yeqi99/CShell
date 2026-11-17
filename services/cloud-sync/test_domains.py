@@ -10,6 +10,8 @@ class DNS:
         self.calls.append(('put',operation));identity=identity or operation
         self.records[identity]=record
         return identity
+    def move(self,patches):
+        for patch in patches:self.records[patch['id']].update({k:v for k,v in patch.items() if k!='id'})
     def delete(self,identity):self.calls.append(('delete',identity));self.records.pop(identity,None)
 
 class DomainTests(unittest.TestCase):
@@ -21,6 +23,10 @@ class DomainTests(unittest.TestCase):
     def tearDown(self):self.tmp.cleanup()
     def claim(self,account='alice',prefix='Alice',req='claim-0001'):return self.d.claim(account,dict(prefix=prefix,requestId=req))
     def record(self,**kw):return dict(prefix='alice',name='@',type='A',content='192.0.2.1',requestId='dns-create-01',**kw)
+    def test_relative_dns_names_remain_scoped(self):
+        for name in ("www","_acme-challenge","*"):
+            self.assertEqual(self.d._record("alice",dict(self.record(),name=name))["name"],name+".alice.canp.site")
+        with self.assertRaises(Failure):self.d._record("alice",dict(self.record(),name="www.bob.canp.site"))
     def test_atomic_unique_and_case_normalization(self):
         def run(account):
             try:return self.claim(account)['domain']
@@ -29,6 +35,13 @@ class DomainTests(unittest.TestCase):
         self.assertCountEqual(results,['alice.canp.site',409])
         for prefix in ('WWW','xn--domain','a.b','ab','-bad','bad-','x'*33):
             with self.assertRaises(Failure):self.claim('other',prefix)
+    def test_platform_reservations_apply_to_claim_and_rename_only(self):
+        self.claim()
+        for prefix in (' MC ', 'Admin', 'ADMINISTRATOR', 'Console', 'sysadmin'):
+            for account in ('alice','new-member'):
+                with self.assertRaisesRegex(Failure,'平台保留'):self.claim(account,prefix,'reserved-001')
+        self.assertTrue(self.d.list('alice')['renameAvailable'])
+        self.assertEqual(self.d.write('alice',dict(self.record(),name='admin'))['name'],'admin.alice.canp.site')
     def test_idempotency_and_natural_month_rename(self):
         first=self.claim();self.assertEqual(first,self.claim())
         with self.assertRaises(Failure):self.claim(prefix='other')
@@ -54,6 +67,8 @@ class DomainTests(unittest.TestCase):
     def test_expired_and_retired_keep_dns_but_block_writes(self):
         self.claim();result=self.d.write('alice',self.record());self.claim(prefix='second',req='rename-001')
         with self.assertRaises(Failure):self.d.write('alice',dict(self.record(),requestId='new-old-record'))
+        self.assertEqual(self.d.list('alice')['records'][0]['name'],'second.canp.site')
+        self.assertEqual(next(iter(self.dns.records.values()))['name'],'second.canp.site')
         self.active=False;state=self.d.list('alice');self.assertEqual(len(state['records']),1)
         with self.assertRaises(Failure):self.claim(prefix='third',req='rename-002')
         with self.assertRaises(Failure):self.d.write('alice',dict(self.record(),id=result['id'],requestId='edit-expired'))

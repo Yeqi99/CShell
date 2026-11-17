@@ -32,6 +32,26 @@ test('WeChat grants are independent and disabled by default',()=>{
   assert(aiPolicySchema.parse({...p,application:['wechat.read','wechat.send']}));
   assert(!p.application.includes('wechat.contacts.manage'));
 });
+test('contacts search preserves paging on older list-only runtimes',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'cshell-contact-search-'));
+  const service=new WechatService(dir,{plugins:()=>[{manifest:wechatManifest,enabled:true,source:'bundled'}]} as unknown as Store);
+  const pages:unknown[]=[];
+  (service as any).run=async(req:any)=>{
+    if(req.method==='discover')return {processes:[{pid:42,binding:{pid:42}}],readProtocolVersion:2};
+    pages.push(req.params);
+    return {hasMore:true,nextCursor:'page2',items:[
+      {id:'one',name:'CANPER',deleteFlag:'0'},{id:'two',alias:'Canper',deleteFlag:'1'},
+      {id:'three',remark:'another Canper',deleteFlag:'0'}]};
+  };
+  try{
+    await service.save({enabled:true,experimental:true,pid:42,readContacts:true,send:[],receive:[]});
+    const tool=service.tools().find(t=>t.name==='wechat_contacts')!;
+    const result=JSON.parse(await tool.invoke(tool.input.parse({query:'Canper',limit:3}),new AbortController().signal));
+    assert.deepEqual(result.items.map((x:any)=>x.id),['one']);
+    assert.equal(result.nextCursor,'page2');assert.equal(result.hasMore,true);
+    assert.deepEqual(pages,[{limit:3}]);
+  }finally{await rm(dir,{recursive:true,force:true});}
+});
 test('Active reads reject an older runtime before requesting native data',async()=>{
   if(process.platform!=='win32')return;
   const directory=await mkdtemp(join(tmpdir(),'cshell-wechat-runtime-'));

@@ -1,10 +1,56 @@
 import tempfile
 import unittest
 import secrets
+import time
+import uuid
+from concurrent.futures import ThreadPoolExecutor
 from server import Service, Failure
 
 
 class ServiceTest(unittest.TestCase):
+    def test_purchase_pro_idempotent_and_renews_existing_expiry(self):
+        account = self.login('member@example.com', 'purchase')['accountId']
+        with self.service.db() as db:
+            db.execute('INSERT INTO rental_points VALUES(?,?,?)', (account, 'credit', 7980))
+        request = {'requestId': str(uuid.uuid4())}
+        before = time.time()
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            receipts = list(pool.map(lambda _: self.service.purchase_pro(account, request), range(4)))
+        self.assertEqual(receipts, [receipts[0]] * 4)
+        first = receipts[0]
+        self.assertEqual(first['balancePoints'], 3990)
+        self.assertLessEqual(before + 30 * 86400, first['expiresAt'])
+        self.assertLessEqual(first['expiresAt'], time.time() + 30 * 86400)
+        second = self.service.purchase_pro(account, {'requestId': str(uuid.uuid4())})
+        self.assertEqual(second['balancePoints'], 0)
+        self.assertEqual(second['expiresAt'], first['expiresAt'] + 30 * 86400)
+        with self.assertRaises(Failure) as insufficient:
+            self.service.purchase_pro(account, {'requestId': str(uuid.uuid4())})
+        self.assertEqual(insufficient.exception.status, 409)
+        self.assertEqual(self.service.profile(account)['membership']['expiresAt'], second['expiresAt'])
+        self.assertEqual(self.service.purchase_pro(account, request), first)
+
+    def test_admin_role_revocation_covers_password_cache_and_session(self):
+        import base64
+        email = 'operator@example.com'
+        account = self.login(email, 'admin-test')
+        password = secrets.token_urlsafe(24)
+        self.service.set_password(account['accountId'], password)
+        basic = 'Basic ' + base64.b64encode((email + ':' + password).encode()).decode()
+        bearer = 'Bearer ' + account['token']
+        for credential in (basic, bearer):
+            with self.assertRaises(Failure):
+                self.service.authorize_admin_account(credential, 'test')
+        with self.service.db() as db:
+            db.execute('INSERT INTO admin_accounts_by_id VALUES(?)', (account['accountId'],))
+        for credential in (basic, basic, bearer):
+            self.assertEqual(self.service.authorize_admin_account(credential, 'test'), {'ok': True})
+        with self.service.db() as db:
+            db.execute('DELETE FROM admin_accounts_by_id WHERE account=?', (account['accountId'],))
+        for credential in (basic, bearer):
+            with self.assertRaises(Failure):
+                self.service.authorize_admin_account(credential, 'test')
+
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.mail = {}

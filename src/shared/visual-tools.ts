@@ -15,7 +15,7 @@ export const browserSnapshotInput = browserTabInput.extend({
 });
 export const browserCaptureInput = browserTabInput.extend({
   maxWidth: z.number().int().min(320).max(1920).default(1440),
-  quality: z.number().int().min(20).max(90).default(75),
+  quality: z.number().int().min(0).max(100).default(75),
 });
 const element = {
   tabId: z.string().uuid(),
@@ -62,7 +62,7 @@ export const browserInteractInput = z.discriminatedUnion('action', [
     })
     .strict(),
   z
-    .object({ action: z.enum(['back', 'forward', 'reload', 'close']), tabId: z.string().uuid() })
+    .object({ action: z.enum(['back', 'forward', 'reload', 'close', 'handoff']), tabId: z.string().uuid() })
     .strict(),
   z
     .object({
@@ -87,6 +87,8 @@ export const screenshotOutput = z
     height: z.number().int().positive().max(1920),
     target: z.string().max(200),
     frameId: z.string().max(100),
+    capturedAt: z.number().int().positive().optional(),
+    tabId: z.string().uuid().optional(),
   })
   .strict();
 export const browserSnapshotOutput = z
@@ -95,6 +97,10 @@ export const browserSnapshotOutput = z
     frameId: z.string().max(200).optional(),
     snapshotId: z.string().uuid(),
     url: z.string().max(8192),
+    viewport: z.object({
+      width: z.number(), height: z.number(), scrollY: z.number(), documentHeight: z.number(),
+      headings: z.array(z.string().max(200)).max(24),
+    }).optional(),
     title: z.string().max(1000),
     text: z.string().max(100000),
     truncated: z.boolean(),
@@ -108,6 +114,7 @@ export const browserSnapshotOutput = z
             tag: z.string(),
             href: z.string().optional(),
             disabled: z.boolean(),
+            checked: z.boolean().optional(),
           })
           .strict(),
       )

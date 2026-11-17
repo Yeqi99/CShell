@@ -1,3 +1,4 @@
+import {WindowsRdpTunnel} from './windows-rdp-tunnel';
 import {DirectFileTransfer} from './file-transfer';
 import {executeHttp} from '../core/http-transport';
 import {AgentNetworkProxy} from './network-proxy';
@@ -36,6 +37,8 @@ import { AgentApplicationService } from './applications';
 import { CagentAutomation } from './automation';
 import { createManagedWechatCapability } from './managed-wechat-capability';
 import { managedWechatCatalog } from './managed-wechat-catalog';
+import { detectWechatAccount } from './managed-wechat-account';
+import { readWechatHealth, wechatHealthTools } from './managed-wechat-health';
 import { runningWechatVersions, selectWechatMarket, requireWechatVersion } from './wechat-market';
 import { CagentAssistant } from './assistant';
 import { CapabilityRuntime } from './capability-runtime';
@@ -126,12 +129,17 @@ export async function createAgentRuntime(
       label: s.label,
       ...(s.distribution ? { distribution: s.distribution } : {}),
     }));
+  const rdpTunnel=new WindowsRdpTunnel();
   server = new ClientServer(vault, terminal, {
     fileTransferReset:()=>directFiles.close(),
     fileTransfer:(input,recipient,signal)=>directFiles.read(input,recipient,signal),
     delegation:async(credential,fingerprint,continuation=false)=>{try{return (await account.sync.accountRequest('/v1/devices/delegation/verify',{deviceId:(await vault.identity()).id,credential,fingerprint,continuation})).allowed===true;}catch{return false;}},
     http:(request,signal)=>networkProxy.configured?executeHttp(request,signal,(host,port,abort)=>networkProxy.open(host,port,abort),65536):accountNetwork.http(request,signal),
     manage: (method, params, signal, owner) => dispatch(method, params, signal, false, owner),
+    rdpStream:(socket,owner,authorized)=>rdpTunnel.accept(socket,()=>{
+      const access=desktop.service.status(owner);
+      return !updateAdmissionClosed && authorized() && access.enabled && access.viewAllowed && access.controlAllowed;
+    }),
     desktopStream: async (socket,owner) => {if(updateAdmissionClosed){socket.destroy();return;}await desktop.service.acceptAuthenticated(socket,owner);},
     shells,
     execute: (input, signal) => terminal.execute(input, signal),
@@ -155,6 +163,29 @@ export async function createAgentRuntime(
   const customProcesses=await loadProcessExtensions(undefined,id=>process.stderr.write(`CAgent: custom extension ${id} failed verification; reinstall its package.\n`));
   const packages=new CapabilityRuntime({directory,vault,applications,agentVersion,extraPackages:[...desktop.extraPackages,...managedWechat,...(wechat?.extraPackages??[]),...customProcesses,...options.extraPackages??[]]});
   await packages.load();
+  let stopWechatWatch = false;
+  let wechatTimer: ReturnType<typeof setTimeout> | undefined;
+  const wechatBackoff = new Map<string, { failures: number; after: number }>();
+  const pollWechat = async () => {
+    try {
+      for (const pack of managedWechat) {
+        const id = pack.entry.id;
+        if (stopWechatWatch || !packages.list().some(record => record.id === id)) continue;
+        const prior = wechatBackoff.get(id);
+        if (prior && Date.now() < prior.after) continue;
+        try {
+          if (await pack.reconcile() && !stopWechatWatch) await packages.refresh({id});
+          wechatBackoff.delete(id);
+        } catch {
+          const failures = Math.min((prior?.failures ?? 0) + 1, 5);
+          wechatBackoff.set(id, {failures, after: Date.now() + 15000 * 2 ** failures});
+        }
+      }
+    } finally {
+      if (!stopWechatWatch) wechatTimer = setTimeout(() => void pollWechat(), 15000).unref();
+    }
+  };
+  wechatTimer = setTimeout(() => void pollWechat(), 15000).unref();
   const processProvisioned=await vault.read('process-provisioned',z.record(z.string(),z.string()))??{};
   for(const pack of customProcesses){
     // Import stages bytes; separate grants are required. Do not undo explicit uninstalls.
@@ -197,7 +228,7 @@ export async function createAgentRuntime(
     return terminal.execute(input,signal,output);
   },automation:async(action,input,owner)=>{if(action==='list')return {...automation.list(owner),sources:packages.events()};if(action==='create')return automation.create(input,owner);return automation.change({...z.record(z.string(),z.unknown()).parse(input),action},owner);},allowed:owner=>server.managementAllowed(owner),capabilityTools:()=>packages.tools(),capabilityInvoke:(input,signal,owner)=>packages.invoke(input,owner,signal)});
   await assistant.load();
-  const account=new CagentCloud(directory,codec,vault,assistant);account.setCapabilities(packages);
+  const account=new CagentCloud(directory,codec,vault,assistant);account.setCapabilities(packages);assistant.accountServices=(input,signal)=>account.sync.accountRequest('/v1/account/agent-services',input,signal);
   automation=new CagentAutomation(vault,assistant);await automation.load();
   await automation.emit('agent','started',crypto.randomUUID(),{startedAt:new Date().toISOString()});
   const coding=new CodingService(vault,directory,owner=>owner==='local'||(server.managementAllowed(owner)&&server.status().peers.some(p=>p.fingerprint===owner&&p.shells.some(s=>server.status().allowedShells?.includes(s)))));
@@ -370,12 +401,20 @@ export async function createAgentRuntime(
     }
     if(method.startsWith('managedWechat.')){
       if(!local)throw Error('微信服务配置需在受控端本机操作');
-      const input=z.object({id:z.string(),settings:z.unknown().optional(),pid:z.number().int().positive().optional()}).strict().parse(params);
+      const input=z.object({id:z.string(),requestId:z.string().optional(),groupId:z.string().optional(),alias:z.string().max(32).optional(),selectionId:z.string().regex(/^[a-f0-9]{32}$/).optional(),settings:z.unknown().optional(),pid:z.number().int().positive().optional()}).strict().parse(params);
       const pack=managedWechat.find(p=>p.entry.id===input.id);if(!pack)throw Error('没有此已验证微信能力包');
-      if(method==='managedWechat.status')return pack.status();
+      if(method==='managedWechat.status'){
+        const state=pack.status();
+        const listener=state.running&&state.settings.subscriptionEnabled?await pack.listenerState().catch(()=>undefined):undefined;
+        return {...state,listener:listener==='listening'||listener==='starting'||listener==='cleanup-unconfirmed'?listener:undefined};
+      }
       if(!packages.list().some(p=>p.id===input.id))throw Error('请先安装此能力包');
+      if(method==='managedWechat.requestLookup')return pack.requestLookup(input.requestId??'',input.groupId);
+      if(method==='managedWechat.contactSelect' && input.alias)return pack.pickContact(input.alias);
+      if(method==='managedWechat.contactResult' && input.selectionId)return pack.pickContact(undefined,input.selectionId);
+      if(method==='managedWechat.detectAccount')return detectWechatAccount(await pack.processes());
       if(method==='managedWechat.processes')return pack.processes();
-      if(method==='managedWechat.configure'){const result=await pack.configure(input.settings);await packages.refresh({id:input.id});return result;}
+      if(method==='managedWechat.configure')return pack.configure(input.settings,()=>packages.refresh({id:input.id}));
       if(method==='managedWechat.bind'){if(!input.pid)throw Error('请选择实际微信进程');const result=await pack.bind(input.pid);await packages.refresh({id:input.id});return result;}
       if(method==='managedWechat.validate'){if(!input.pid)throw Error('请选择实际微信进程');const result=await pack.validate(input.pid);await packages.refresh({id:input.id});return result;}
       throw Error('未知微信配置操作');
@@ -393,14 +432,22 @@ export async function createAgentRuntime(
       if(!local&&(owner==='local'||!server.managementAllowed(owner)))throw new Error('未授权控制端管理能力包');
       if(method==='packages.catalog')return selectWechatMarket(packages.catalog(),await runningWechatVersions().catch(()=>[]));
       if(method==='packages.list')return packages.list();
-      if(method==='packages.tools')return packages.tools();
+      if(method==='packages.tools')return [...packages.tools(),...wechatHealthTools(packages.list(),managedWechat)];
       if(method==='packages.invoke'){
         const controller=new AbortController();
         const guard=setInterval(()=>{if(!local&&!server.managementAllowed(owner))controller.abort(new Error('控制端授权已撤销'));},100);
-        try{return await packages.invoke(params,owner,AbortSignal.any([signal,controller.signal]));}finally{clearInterval(guard);}
+        try{
+          const abort=AbortSignal.any([signal,controller.signal]);
+          const health=await readWechatHealth(packages.list(),managedWechat,params,abort);
+          if(health){
+            if(!wechatHealthTools(packages.list(),managedWechat).some(t=>t.packageId===(params as {packageId:string}).packageId))throw Error('WeChat health grant revoked');
+            return health;
+          }
+          return await packages.invoke(params,owner,abort);
+        }finally{clearInterval(guard);}
       }
       if(!admin)throw new Error('未授权管理能力包');
-      if(method==='packages.install'){const id=z.object({id:z.string()}).parse(params).id;if(id==='cagent.wechat'||id.startsWith('cagent.wechat.v'))requireWechatVersion(id,await runningWechatVersions());const result=await packages.install(params,signal);await account.setCapabilitySelection(id,true);return result;}
+      if(method==='packages.install'){const id=z.object({id:z.string()}).parse(params).id;if(id==='cagent.wechat'||id.startsWith('cagent.wechat.v'))requireWechatVersion(id,await runningWechatVersions());const result=await packages.install(params,signal,local);await account.setCapabilitySelection(id,true);return result;}
       if(method==='packages.grant')return packages.grant(params);
       if(method==='packages.uninstall'){const result=await packages.uninstall(params);await account.setCapabilitySelection(z.object({id:z.string()}).parse(params).id,false);return result;}
       if(method==='packages.refresh')return packages.refresh(params);
@@ -419,7 +466,7 @@ export async function createAgentRuntime(
     if(method.startsWith('assistant.')){
       if(!local&&owner==='local')throw new Error('缺少控制端身份');
       if(method==='assistant.start')return assistant.start(params,owner);
-      if(method==='assistant.tasks')return assistant.list(owner);
+      if(method==='assistant.tasks')return assistant.list(owner,(params as {compact?:boolean})?.compact===true);
       if(method==='assistant.task')return structuredClone(assistant.get(params,owner));
       if(method==='assistant.cancel')return assistant.cancel(params,owner);
       if(!admin)throw new Error('未授权管理智能体配置');
@@ -674,7 +721,7 @@ export async function createAgentRuntime(
     // A failed optional service must not leave the authenticated control socket
     // or listener half alive when an update needs to restore the old runtime.
     for(const stop of [()=>lanRegistration.close(),()=>visual.dispose(),()=>{directFiles.close();return files.close();},()=>networkProxy.dispose(),()=>accountNetwork.close(),()=>account.close(),()=>accountReverse.stop(),()=>browserNetwork.close(),()=>coding.close(),()=>ide.close(),
-      ()=>managedScripts.close(),()=>automation.close(),()=>assistant.close(),()=>control?.close(),()=>mutation,()=>packages.dispose(),...managedWechat.map(pack=>()=>pack.shutdown()),()=>wechat?.shutdown(),()=>desktop.shutdown(),
+      ()=>{stopWechatWatch=true;clearTimeout(wechatTimer);},()=>managedScripts.close(),()=>automation.close(),()=>assistant.close(),()=>control?.close(),()=>mutation,()=>packages.dispose(),...managedWechat.map(pack=>()=>pack.shutdown()),()=>wechat?.shutdown(),()=>desktop.shutdown(),
       ()=>applications.dispose(),()=>wsl.dispose(),()=>hosting.dispose(),()=>reverseRelay.stop(),()=>relay.stop(),()=>server.stop(),
       ()=>terminal.dispose(),()=>vault.flush(),()=>options.onClose?.()])try{await stop();}catch(error){failures.push(error);}
     if(failures.length)throw new AggregateError(failures,'部分后台服务清理失败');

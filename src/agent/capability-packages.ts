@@ -108,7 +108,7 @@ export class CapabilityPackages {
     if (!this.host.hasAdapter(manifest.adapterId)) return '此运行时尚未实现该能力适配器';
     return undefined;
   }
-  async stage(manifestJson: string, root: string, trustedManifestSha256: string) {
+  async stage(manifestJson: string, root: string, trustedManifestSha256: string, grantOnFirstInstall = false) {
     return this.lock(async () => {
       this.check();
       const manifest = parseCapabilityManifest(manifestJson, trustedManifestSha256);
@@ -120,8 +120,7 @@ export class CapabilityPackages {
         catch (error) { previous.status = 'fault'; previous.reason = '无法停止旧版本任务；升级未完成'; await this.persist(); throw error; }
       }
       this.records.set(manifest.id, { id: manifest.id, version: manifest.version, root: canonicalRoot, manifestJson, manifestSha256: trustedManifestSha256,
-        grants: previous?.grants.filter(grant => manifest.permissions.includes(grant)) ?? [], status: 'not-configured' });
-      // Stage never installs a system app and never grants new capabilities.
+        grants: previous?.grants.filter(grant => manifest.permissions.includes(grant)) ?? (grantOnFirstInstall ? [...manifest.permissions] : []), status: 'not-configured' });
       await this.persist(); await this.inspectAndRegister(manifest.id); return this.list().find(record => record.id === manifest.id)!;
     });
   }

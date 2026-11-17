@@ -7,6 +7,28 @@ export class MobileCloud {
   private offline=false;
   private conflict=false;
   private owner=localStorage.getItem('cloud-active-owner')||'';
+  private walletOwner='';
+  private async wallet(owner:string){
+    const button=document.querySelector<HTMLButtonElement>('#cloud-spend')!;
+    const amount=document.getElementById('cloud-balance')!;
+    button.disabled=true;amount.textContent='—';
+    try{
+      const apply=(value:{enabled:boolean;balance:number})=>{
+        amount.textContent=value.balance.toLocaleString()+' 点';
+        button.setAttribute('aria-checked',String(value.enabled));
+        button.textContent=value.enabled?'已开启':'已关闭';
+      };
+      const policy=await this.phone('agent-spending');
+      if(this.state?.email!==owner)return;
+      apply(policy);button.disabled=false;
+      button.onclick=async()=>{
+        button.disabled=true;
+        try{const next=await this.phone('agent-spending',{account:policy.account,enabled:button.getAttribute('aria-checked')!=='true'});if(this.state?.email===owner)apply(next);}
+        catch(error){if(this.state?.email===owner)amount.textContent=String(error);}
+        finally{if(this.state?.email===owner)button.disabled=false;}
+      };
+    }catch(error){if(this.state?.email===owner){amount.textContent=String(error);this.walletOwner='';}}
+  }
   private retainLocal=false;
   private stash(){if(!this.owner)return;localStorage.setItem('cloud-workspace:'+this.owner,JSON.stringify({data:this.snapshot(),hash:localStorage.getItem('cloud-snapshot-hash')}));}
   private adopt(state:CloudState){
@@ -30,7 +52,7 @@ export class MobileCloud {
     <div class="cloud-auth-note">登录后自动同步连接、模型与设置</div><p class="cloud-auth-switch"><span id="cloud-switch-description">还没有账号？</span><button type="button" id="cloud-register-toggle">创建账号</button></p></div>
     <div id="cloud-profile" hidden><div class="cloud-page-heading"><span>个人中心</span><small>CShell Pro</small></div><div class="cloud-identity"><div id="cloud-avatar"></div><div><h1 id="cloud-name"></h1><p id="cloud-account"></p></div><span id="cloud-membership" hidden>PRO</span></div>
     <div class="cloud-sync-strip"><span id="cloud-sync-dot"></span><div><strong id="cloud-sync-title"></strong><p id="cloud-sync-state"></p></div></div>
-    <section class="cloud-info"><h2>账户信息</h2><div><span>当前方案</span><span id="cloud-plan"></span></div><div id="cloud-expiry-row" hidden><span>有效期</span><span id="cloud-expiry"></span></div></section>
+    <section class="cloud-info"><h2>点数余额</h2><strong id="cloud-balance">—</strong><div><span>智能体自动消费</span><button id="cloud-spend" role="switch" aria-label="智能体自动消费" aria-checked="false" disabled>读取中</button></div></section><section class="cloud-info"><h2>账户信息</h2><div><span>当前方案</span><span id="cloud-plan"></span></div><div id="cloud-expiry-row" hidden><span>有效期</span><span id="cloud-expiry"></span></div></section>
     <section class="cloud-info"><h2>跨设备同步</h2><div><span>连接与已保存凭据</span><small>✓ 自动同步</small></div><div><span>基座模型与个人设置</span><small>✓ 自动同步</small></div></section>
     <div id="cloud-unlock" hidden><p>使用账号密码，恢复此设备上的加密配置。</p><input id="cloud-key" type="password" autocomplete="current-password" aria-label="账号密码"><button id="cloud-unlock-button">继续</button></div>
     <div id="cloud-conflict" hidden><p>两台设备同时修改了配置，请选择保留哪一份。另一份会先备份。</p><button id="cloud-download">保留云端更改</button><button id="cloud-upload">保留此设备更改</button></div>
@@ -90,7 +112,14 @@ export class MobileCloud {
     const autoSync=async()=>{if(this.busy||this.conflict)return;if(!this.state)await run('status');if(!this.state?.unlocked)return;this.stash();const previous=localStorage.getItem('cloud-snapshot-hash');await run(previous&&previous!==await digest()?'upload':previous?'refresh':'download',this.snapshot());};
     void run('status').then(autoSync);setInterval(()=>void autoSync(),15000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)void autoSync();});window.addEventListener('online',()=>void autoSync());
   }
-  private request(action: string, args: any): Promise<any> {
+  phone(action:string,args:Record<string,unknown>={}){return this.request(action,args);}
+  conversations(command:import('../../src/shared/cloud-conversations').ChatCommand){return this.request('conversations',{command});}
+  private chain:Promise<unknown>=Promise.resolve();
+  private request(action:string,args:any):Promise<any>{
+    const job=this.chain.catch(()=>{}).then(()=>this.dispatch(action,args));
+    this.chain=job;return job;
+  }
+  private dispatch(action: string, args: any): Promise<any> {
     if (!this.native.cloudRequest)
       return Promise.reject(new Error('请更新 Android 应用后使用云同步'));
     const id = crypto.randomUUID();
@@ -98,7 +127,7 @@ export class MobileCloud {
       const timer = setTimeout(() => {
         this.pending.delete(id);
         reject(new Error('云同步超时，请重试；上传请求不会重复写入'));
-      }, 45000);
+      }, action==='phone-chat'?300000:45000);
       this.pending.set(id, { resolve, reject, timer });
       this.native.cloudRequest!(JSON.stringify({ request: id, action, ...args }));
     });
@@ -115,6 +144,7 @@ export class MobileCloud {
     const state=this.state;if(!state)return;
     const $=(id:string)=>document.getElementById(id)!;
     const signed=!!state.email;
+    if(this.walletOwner!==state.email){this.walletOwner=state.email;if(signed)void this.wallet(state.email);}
     const guest=JSON.parse(localStorage.getItem('cloud-workspace:guest')||'null');const count=guest?.data?.profiles?.length||0;
     $('cloud-guest-summary').textContent=count?`${count} 条未登录连接，可选择载入。CAgent 连接需重新配对。`:'没有未登录连接';
     ($('cloud-import-guest') as HTMLButtonElement).disabled=this.busy||!count||!state.unlocked;

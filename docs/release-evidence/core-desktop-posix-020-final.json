@@ -1,0 +1,102 @@
+{
+  "version": "0.8.20",
+  "status": "private-verified",
+  "files": [
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.20-mac-arm64.zip",
+      "path": "/opt/cshell-release-staging/0.8.20-final/opensource/CShell-0.8.20-mac-arm64.zip",
+      "bytes": 142202944,
+      "sha256": "578d84b545be45b41d930b8524c16d2f95771bd57bbd63e11188d33ac1449b5f",
+      "archiveSha256": "7d0c644f12a74fb7a9d6fbc7e5d8c79c12123b12ce7a714334377a4a07e3877b",
+      "archiveBytes": 283953217,
+      "artifactId": 13132011744,
+      "source": "49639202f679072ae8cfb754160ee58f443f84d5",
+      "status": "private-archive-digest-verified-not-published"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.20-mac-arm64.dmg",
+      "path": "/opt/cshell-release-staging/0.8.20-final/opensource/CShell-0.8.20-mac-arm64.dmg",
+      "bytes": 142338468,
+      "sha256": "235631f5dfae89a13f749217eae1c3dd4a5edc213f7a61c521f89dbbb585e153",
+      "archiveSha256": "7d0c644f12a74fb7a9d6fbc7e5d8c79c12123b12ce7a714334377a4a07e3877b",
+      "archiveBytes": 283953217,
+      "artifactId": 13132011744,
+      "source": "49639202f679072ae8cfb754160ee58f443f84d5",
+      "status": "private-archive-digest-verified-not-published"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.20-linux-arm64.deb",
+      "path": "/opt/cshell-release-staging/0.8.20-final/opensource/CShell-0.8.20-linux-arm64.deb",
+      "bytes": 103062100,
+      "sha256": "7814b3743be4931c389ee4a537fd8357569676ca071cc00653afced1e8f14780",
+      "archiveSha256": "fc579e27c2a43547b6b6eac85468bb809c0c7af8de8dd1c33b544e89068e6026",
+      "archiveBytes": 243279456,
+      "artifactId": 13131832527,
+      "source": "49639202f679072ae8cfb754160ee58f443f84d5",
+      "status": "private-archive-digest-verified-not-published"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.20-linux-arm64.AppImage",
+      "path": "/opt/cshell-release-staging/0.8.20-final/opensource/CShell-0.8.20-linux-arm64.AppImage",
+      "bytes": 140747965,
+      "sha256": "125d23805b3e0c4ac5bbdb4756eb1744b764d176b3bcd13376161b3e6781bca2",
+      "archiveSha256": "fc579e27c2a43547b6b6eac85468bb809c0c7af8de8dd1c33b544e89068e6026",
+      "archiveBytes": 243279456,
+      "artifactId": 13131832527,
+      "source": "49639202f679072ae8cfb754160ee58f443f84d5",
+      "status": "private-archive-digest-verified-not-published"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.20-linux-amd64.deb",
+      "path": "/opt/cshell-release-staging/0.8.20-final/opensource/CShell-0.8.20-linux-amd64.deb",
+      "bytes": 108862388,
+      "sha256": "d6be790b9ca765c247657413bdbc9ed4cd154c0fa0f7e7bd3f94720b69e40d43",
+      "archiveSha256": "10b2bfc657fc2093f14b4698a0130f599c68dc7695d9f31fd0595b0c26f445a0",
+      "archiveBytes": 247855431,
+      "artifactId": 13132281023,
+      "source": "49639202f679072ae8cfb754160ee58f443f84d5",
+      "status": "private-archive-digest-verified-not-published"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.20-mac-x64.dmg",
+      "path": "/opt/cshell-release-staging/0.8.20-final/opensource/CShell-0.8.20-mac-x64.dmg",
+      "bytes": 146178171,
+      "sha256": "a56205baa4071f0143ac9f533c659ae7d2d29730347b8b6c0175cfff565a8bf4",
+      "archiveSha256": "bdb3dd8b10b233e36f82056d596b754d46a7ed1d289a4489a45bab481f88f4ed",
+      "archiveBytes": 291665265,
+      "artifactId": 13131488711,
+      "source": "49639202f679072ae8cfb754160ee58f443f84d5",
+      "status": "private-archive-digest-verified-not-published"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.20-mac-x64.zip",
+      "path": "/opt/cshell-release-staging/0.8.20-final/opensource/CShell-0.8.20-mac-x64.zip",
+      "bytes": 146044395,
+      "sha256": "5e6f68c61701ba542bf0cd43595dc1b2db6ce31067087608667cdc08b8c29301",
+      "archiveSha256": "bdb3dd8b10b233e36f82056d596b754d46a7ed1d289a4489a45bab481f88f4ed",
+      "archiveBytes": 291665265,
+      "artifactId": 13131488711,
+      "source": "49639202f679072ae8cfb754160ee58f443f84d5",
+      "status": "private-archive-digest-verified-not-published"
+    },
+    {
+      "edition": "opensource",
+      "name": "CShell-0.8.20-linux-x86_64.AppImage",
+      "path": "/opt/cshell-release-staging/0.8.20-final/opensource/CShell-0.8.20-linux-x86_64.AppImage",
+      "bytes": 139492755,
+      "sha256": "c1389c3cb04d9fce1742e0d97840694c7e9805b75792ca51696114ba9fc824ea",
+      "archiveSha256": "10b2bfc657fc2093f14b4698a0130f599c68dc7695d9f31fd0595b0c26f445a0",
+      "archiveBytes": 247855431,
+      "artifactId": 13132281023,
+      "source": "49639202f679072ae8cfb754160ee58f443f84d5",
+      "status": "private-archive-digest-verified-not-published"
+    }
+  ]
+}

@@ -28,8 +28,8 @@ export function MonitorAiAssist() {
     window.addEventListener('cshell:analyze-selection',analyze);
     return()=>window.removeEventListener('cshell:analyze-selection',analyze);
   },[]);
-  useEffect(()=>{if(!visible)return;let alive=true;const timer=setInterval(()=>{void window.cshell.aiSnapshot().then(next=>{if(alive)setSnapshot(next);}).catch(e=>{if(alive)setError(String(e));});},1000);return()=>{alive=false;clearInterval(timer);};},[visible]);
-  useEffect(()=>window.cshell.onAiThread(thread=>setSnapshot(old=>({...old,threads:[...old.threads.filter(t=>t.id!==thread.id),thread]}))),[]);
+  useEffect(()=>{if(!visible)return;let alive=true;const timer=setInterval(()=>{void window.cshell.aiSnapshot().then(next=>{if(alive)setSnapshot(next);}).catch(e=>{if(alive)setError(String(e));});},10000);return()=>{alive=false;clearInterval(timer);};},[visible]);
+  useEffect(()=>visible ? window.cshell.onAiThread(thread=>setSnapshot(old=>({...old,threads:[...old.threads.filter(t=>t.id!==thread.id),thread]}))) : undefined,[visible]);
   const thread=snapshot.threads.find(t=>t.id===id);
   const run=async(fn:()=>Promise<unknown>)=>{setBusy(true);setError('');try{await fn();await refresh();}catch(e){setError(String(e));}finally{setBusy(false);}};
   return <><TextAssist/><aside className="ai-panel monitor-context-assistant" hidden={!visible} aria-label="视图终端智能体" style={{position:'fixed',right:8,top:44,bottom:8,height:'auto',width:'min(480px, calc(100vw - 16px))',zIndex:40,boxShadow:'0 8px 32px #0002',borderRadius:10,background:'var(--panel)'}}>

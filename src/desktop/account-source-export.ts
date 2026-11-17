@@ -2,6 +2,8 @@ import {app,safeStorage} from 'electron';
 import {readFile,readdir,stat} from 'node:fs/promises';
 import {join,isAbsolute} from 'node:path';
 import {z} from 'zod';
+import {isDeepStrictEqual} from 'node:util';
+import {newInstallationAiPolicy} from '../shared/ai';
 import {Store} from '../core/store';
 import {OpenCodeExtension} from '../extensions/opencode/service';
 import {TavilyExtension} from '../extensions/tavily/service';
@@ -28,7 +30,8 @@ export async function runSourceExport(){
   const desktopRaw=await encrypted('desktop-looks.enc',undefined);
   const desktopLooks=desktopRaw===undefined?undefined:new DesktopLooks(source,store).cloudValidate(desktopRaw);
   const rawAi=await encrypted('ai.enc',emptySharedAi());
-  const ai={...(rawAi.policy?{policy:rawAi.policy}:{}),providers:rawAi.providers??[],habits:rawAi.habits??[],extractionProviderId:rawAi.extractionProviderId??null,textProviderIds:rawAi.textProviderIds??{translate:null,compose:null}};
+  const seededPolicy=rawAi.untouchedInstallationPolicy===true && isDeepStrictEqual(rawAi.policy,newInstallationAiPolicy());
+  const ai={...(rawAi.policy&&!seededPolicy?{policy:rawAi.policy}:{}),providers:rawAi.providers??[],habits:rawAi.habits??[],extractionProviderId:rawAi.extractionProviderId??null,textProviderIds:rawAi.textProviderIds??{translate:null,compose:null}};
   const extension=new OpenCodeExtension({directory:join(source,'extensions','opencode'),enabled:()=>false,...codec,saveProvider:async()=>{},open:async()=>{}});
   await bounded(join(source,'extensions','opencode','opencode.enc')).catch(error=>{if(error.code!=='ENOENT')throw error;});
   await extension.load();
@@ -47,7 +50,20 @@ export async function runSourceExport(){
     const value=await bounded(join(source,'appearance',asset.id));if(value.length>8*1024*1024)throw Error();assets[asset.id]=value.toString('base64');
    }
   }
-  const result=JSON.stringify({format:1,store:configuration,ai,opencode:await extension.cloudExport(),tavily:await tavily.cloudExport(),...(desktopLooks===undefined?{}:{desktopLooks}),devices,http,browser,assets});
+  const payload={format:1,store:configuration,ai,opencode:await extension.cloudExport(),tavily:await tavily.cloudExport(),...(desktopLooks===undefined?{}:{desktopLooks}),devices,http,browser,assets};
+  const probe=process.argv[index+4]==='probe';
+  const hasData=probe && (
+   !isDeepStrictEqual(configuration,await new Store(source,codec).cloudExport()) ||
+   !!ai.policy || ai.providers.length>0 || ai.habits.length>0 || !!ai.extractionProviderId ||
+   Object.values(ai.textProviderIds).some(Boolean) || payload.opencode.accounts.length>0 ||
+   (payload.tavily?.accounts.length??0)>0 || devices.length>0 || http.length>0 ||
+   Object.values(desktopLooks?.looks??{}).some(Boolean) ||
+   Object.values(browser).some(value=>{
+    const library=browserLibrarySchema.parse(value);
+    return library.history.length>0 || library.bookmarks.length>0 || library.tabs.some(tab=>tab.url!=='about:blank');
+   })
+  );
+  const result=JSON.stringify(probe?hasData:payload);
   if(Buffer.byteLength(result)>90*1024*1024)throw Error();
   await new Promise<void>((resolve,reject)=>process.stdout.write('CSHELL_SOURCE_V1\n'+result,error=>error?reject(error):resolve()));
   app.quit();

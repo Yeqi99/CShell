@@ -77,7 +77,8 @@ export interface ClientBridge {
     relay?: AgentRelayConnection;
   }): Promise<ClientInfo>;
   clientPasswordPair(info: ClientInfo, password: string): Promise<ClientDevice>;
-  openRdp(profileId: string, sessionId?: string): Promise<unknown>;
+  verifyAgentRdp(target:string, profileId:string):Promise<boolean>;
+  openRdp(profileId: string, sessionId?: string, expected?:{host:string;port:number;username:string}): Promise<unknown>;
   rdpStatus(id:string):Promise<{state:string;message:string}>;
   rdpClose(id:string):Promise<void>;
   rdpBounds(id:string,bounds:{x:number;y:number;width:number;height:number;visible:boolean}):Promise<void>;

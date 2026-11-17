@@ -1,0 +1,61 @@
+{
+  "_comment": "CShell managed Linux container",
+  "meta": {
+    "version": "PTDL_v2",
+    "update_url": null
+  },
+  "name": "CShell CAgent · Ubuntu 24.04 x64",
+  "author": "support@canp.ai",
+  "description": "CAgent Pro 1.0.10 with persistent identity and a dedicated connection port.",
+  "features": null,
+  "docker_images": {
+    "Ubuntu 24.04 x64": "ghcr.io/parkervcp/yolks@sha256:3ac7672afa1841a6ee73a4f797d0b7681d5a778579806b9d533894ef49470010"
+  },
+  "file_denylist": [],
+  "startup": "/home/container/.cagent-1.1.1/node /home/container/.cagent-start.cjs",
+  "config": {
+    "files": "{}",
+    "startup": "{\"done\":\"CAgent ready \"}",
+    "logs": "{}",
+    "stop": "^C"
+  },
+  "scripts": {
+    "installation": {
+      "script": "#!/bin/bash\nset -euo pipefail\ncd /mnt/server\ntest \"$(uname -m)\" = x86_64\nwork=$(mktemp -d /mnt/server/.cagent-install.XXXXXX)\ntrap 'rm -rf -- \"$work\"' EXIT\ncurl -fsSL --retry 3 https://shell.canp.ai/downloads/pro/v1.1.1/CAgent-1.1.1-linux-x64.tar.gz -o \"$work/agent.tar.gz\"\necho \"e148bb617c0087ee122c904a50d93f6e7996abd5b5a75d031f27dc818369cf30  $work/agent.tar.gz\" | sha256sum -c -\nmkdir \"$work/runtime\"\ntar -xzf \"$work/agent.tar.gz\" -C \"$work/runtime\"\ntest -x \"$work/runtime/cagent\"\nif [ ! -d .cagent-1.1.1 ]; then mv \"$work/runtime\" .cagent-1.1.1; fi\ncat > \"$work/start.cjs\" <<'CAGENT_BOOT'\n'use strict';\nconst {spawn, execFile} = require('node:child_process');\nconst {promisify} = require('node:util');\nconst {setTimeout: delay} = require('node:timers/promises');\nconst agent='/home/container/.cagent-1.1.1/cagent';\nprocess.umask(0o077);\nprocess.env.CSHELL_AGENT_DATA='/home/container/.cshell-agent';\nasync function call(args, payload) {\n  const output = await new Promise((resolve,reject)=>{\n    const proc=execFile(agent,args,{timeout:20000},(err,out)=>err?reject(new Error('CAgent '+args[0]+' failed')):resolve(out));\n    proc.stdin.on('error',()=>{});\n    proc.stdin.end(JSON.stringify(payload??{}));\n  });\n  return JSON.parse(output);\n}\nasync function main(){\n  const os=require('node:fs').readFileSync('/etc/os-release','utf8');\n  if(!/^ID=ubuntu$/m.test(os)||!/^VERSION_ID=\"24.04\"$/m.test(os))throw Error('Ubuntu 24.04 required');\n  const port=Number(process.env.SERVER_PORT);\n  if(!Number.isInteger(port)||port<1||port>65535)throw Error('Invalid port');\n  let password=process.env.CAGENT_PASSWORD;\n  const id=process.env.CSHELL_RENTAL_ID, token=process.env.CSHELL_ENROLL_TOKEN;\n  for(const key of ['CAGENT_PASSWORD','CSHELL_RENTAL_ID','CSHELL_ENROLL_TOKEN']) delete process.env[key];\n  const child=spawn(agent,['run'],{stdio:['ignore','inherit','inherit']});\n  const exited=new Promise(resolve=>child.on('exit',resolve));\n  process.on('SIGTERM',()=>child.kill('SIGTERM'));\n  process.on('SIGINT',()=>child.kill('SIGINT'));\n  try{\n    let state;\n    for(let n=0;n<60&&!state;n++){\n      if(child.exitCode!==null||child.signalCode)throw Error('CAgent exited');\n      try{state=await call(['status']);}catch{await delay(500);}\n    }\n    if(!state)throw Error('CAgent control unavailable');\n    if(!state.passwordConfigured){\n      if(!password||password.length<24)throw Error('Set an instance-specific CAGENT_PASSWORD');\n      await call(['call','client.access'],{password,shells:['bash','sh']});\n    }\n    password=undefined;\n    if(!state.running||state.port!==port||state.bind!=='0.0.0.0'){\n      if(state.running)await call(['stop']);\n      await call(['start'],{bind:'0.0.0.0',port});\n    }\n    state=await call(['status']);\n    if(!state.running||state.port!==port)throw Error('Listener unavailable');\n    console.log('CAgent ready',state.deviceId,state.fingerprint);\n    while(id&&token&&child.exitCode===null&&!child.signalCode){\n      try{\n        const res=await fetch('https://shell.canp.ai/api/v1/rentals/enroll',{method:'POST',redirect:'error',signal:AbortSignal.timeout(10000),headers:{'Content-Type':'application/json'},body:JSON.stringify({id,token,identity:{deviceId:state.deviceId,fingerprint:state.fingerprint}})});\n        if(res.ok && (await res.json()).ok)break;\n      }catch{}\n      await Promise.race([exited,delay(15000,undefined,{ref:false})]);\n    }\n    process.exitCode=await exited || 0;\n  }finally{if(child.exitCode===null&&!child.signalCode)child.kill('SIGTERM');}\n}\nmain().catch(err=>{console.error(err.message);process.exitCode=1;});\nCAGENT_BOOT\nmv -f \"$work/start.cjs\" .cagent-start.cjs\n",
+      "container": "ghcr.io/parkervcp/installers:debian",
+      "entrypoint": "bash"
+    }
+  },
+  "variables": [
+    {
+      "name": "CAgent connection password",
+      "description": "Unique per instance. Applied only on first setup.",
+      "env_variable": "CAGENT_PASSWORD",
+      "default_value": "",
+      "user_viewable": false,
+      "user_editable": false,
+      "rules": "required|string|min:24|max:128",
+      "field_type": "text"
+    },
+    {
+      "name": "CSHELL_RENTAL_ID",
+      "description": "Assigned by CShell for managed rentals.",
+      "env_variable": "CSHELL_RENTAL_ID",
+      "default_value": "",
+      "user_viewable": false,
+      "user_editable": false,
+      "rules": "nullable|string|max:128",
+      "field_type": "text"
+    },
+    {
+      "name": "CSHELL_ENROLL_TOKEN",
+      "description": "Assigned by CShell for managed rentals.",
+      "env_variable": "CSHELL_ENROLL_TOKEN",
+      "default_value": "",
+      "user_viewable": false,
+      "user_editable": false,
+      "rules": "nullable|string|max:128",
+      "field_type": "text"
+    }
+  ]
+}

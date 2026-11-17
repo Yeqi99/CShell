@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { LinuxWorkspaceService } from '../src/core/linux-workspace';
-import { linuxWorkspaceInstallScript } from '../src/core/linux-workspace-install';
+import { linuxWorkspaceInstallScript, linuxInstallTools } from '../src/core/linux-workspace-install';
 const mock = (missing = '') => {
   const service = new LinuxWorkspaceService({ get: () => ({}) } as any, 'unused');
   const calls: string[] = [];
@@ -28,7 +28,7 @@ test('invalid directories and missing build tools stop before any upload or pack
     await assert.rejects(service.plan('s', path));
     assert.equal(calls.length, 0);
   }
-  const { service, calls } = mock('missing:g++');
+  const { service, calls } = mock('missing:tar');
   await assert.rejects(service.plan('s', '/data/cagent'), /不会修改系统/);
   assert.equal(calls.length, 2);
 });
@@ -45,5 +45,9 @@ test('installer quotes custom paths and confines dependency environment to insta
   assert.doesNotMatch(launcher, /export PATH/);
   assert.match(launcher, /CSHELL_AGENT_DATA/);
   assert.match(script, /安装目录必须为空/);
-  assert.match(script, /node-pty integrity mismatch/);
+  assert.doesNotMatch(script, /npm install|npm rebuild|nodejs.org|make|g\+\+/);
+  assert.deepEqual([...linuxInstallTools], ['curl','tar','gzip','sha256sum']);
+  assert.match(script, /CAgent-0.8.21-linux-x64.tar.gz/);
+  assert.match(script, /require\("node-pty"\)/);
+  assert.match(linuxWorkspaceInstallScript('aarch64','b'.repeat(64),'/tmp/test'), /CAgent-0.8.21-linux-arm64.tar.gz/);
 });

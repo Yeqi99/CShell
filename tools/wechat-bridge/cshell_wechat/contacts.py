@@ -4,7 +4,16 @@ from .contracts import require,fingerprint
 from .database_read import query_database
 
 def prepare(params):
-    require(isinstance(params,dict) and not set(params)-{'limit','cursor'},'INVALID_REQUEST','Only limit and cursor are supported')
+    require(isinstance(params,dict) and not set(params)-{'limit','cursor','query'},'INVALID_REQUEST','Expected limit, cursor or query')
+    query=params.get('query')
+    predicate=''
+    if 'query' in params:
+        require(isinstance(query,str) and query.strip() and '\0' not in query and len(query.encode('utf8'))<=256,'INVALID_QUERY','Expected a nonempty contact name or identifier')
+        # The native read service accepts SQL text only. Encode as a blob literal
+        # so apostrophes, wildcards and non-ASCII names stay literal.
+        literal="CAST(X'"+query.encode('utf8').hex()+"' AS TEXT)"
+        fields=('username','alias','remark','nick_name')
+        predicate=' AND delete_flag=0 AND ('+' OR '.join(field+'='+literal+' COLLATE NOCASE' for field in fields)+')'
     limit=params.get('limit',50)
     require(type(limit) is int and 1<=limit<=100,'INVALID_LIMIT','Use 1..100 records')
     cursor=None
@@ -15,8 +24,9 @@ def prepare(params):
         require(isinstance(cursor,dict) and cursor.get('version')==1 and cursor.get('scope')=='contacts','INVALID_CURSOR','Invalid contact cursor')
         require(isinstance(cursor.get('id'),str) and cursor['id'].isdigit() and len(cursor['id'])<=19 and int(cursor['id'])<=9223372036854775807,'INVALID_CURSOR','Invalid record ID')
         require(isinstance(cursor.get('database'),str) and len(cursor['database'])==64,'INVALID_CURSOR','Database scope required')
+        require(cursor.get('query')==(fingerprint(query) if query is not None else None),'INVALID_CURSOR','Contact query changed')
     last=int(cursor['id']) if cursor else 0
-    return limit,cursor,f'SELECT id,username,alias,remark,nick_name,flag,delete_flag,local_type FROM contact WHERE id>{last} ORDER BY id LIMIT {limit+1}'
+    return limit,cursor,f'SELECT id,username,alias,remark,nick_name,flag,delete_flag,local_type FROM contact WHERE id>{last}{predicate} ORDER BY id LIMIT {limit+1}'
 
 def result_page(raw,params):
     limit,cursor,_=prepare(params)
@@ -26,7 +36,8 @@ def result_page(raw,params):
     require(cursor is None or cursor['database']==database,'CURSOR_SCOPE_CHANGED','Database/account path changed')
     rows=raw['rows'];more=len(rows)>limit;rows=rows[:limit]
     items=[dict(zip(('recordId','id','alias','remark','name','flags','deleteFlag','localType'),row)) for row in rows]
-    token=base64.b64encode(json.dumps({'version':1,'scope':'contacts','database':database,'id':rows[-1][0]}).encode()).decode() if rows else params.get('cursor')
+    scope={'query':fingerprint(params['query'])} if 'query' in params else {}
+    token=base64.b64encode(json.dumps({'version':1,'scope':'contacts','database':database,'id':rows[-1][0],**scope}).encode()).decode() if rows else params.get('cursor')
     return {'items':items,'nextCursor':token,'hasMore':more,'source':'local-contact-database','snapshot':False,
             'complete':False,'pageExhausted':not more,
             'limitations':['Database records include groups, deleted entries and non-friend identities; not a verified friend count',

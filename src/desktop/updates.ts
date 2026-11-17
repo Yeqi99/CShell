@@ -39,6 +39,7 @@ export function registerUpdateHandlers(
   const request = async (url: string, timeout = 30000) => {
     // Follow the OS proxy configuration, like the user's browser.
     const response = await requestUpdateWithFallback(url, candidate => net.fetch(candidate, {
+      cache: url === releaseApi ? 'no-store' : 'default',
       headers: {
         'User-Agent': 'CShell/' + app.getVersion(),
         Accept: 'application/json',
@@ -58,6 +59,11 @@ export function registerUpdateHandlers(
     const channel=isPro?'pro':'opensource';const catalogs=[await(await request('https://shell.canp.ai/downloads/'+channel+'/releases.json')).json()];
     agentPackages=agentDownloads(catalogs,channel);
     return agentPackages.map(({url,...item})=>item);
+  });
+  handle('agent:install-local',async()=>{
+    if(process.platform!=='win32'||!isPro)throw Error('此平台没有内置安装程序');
+    const error=await shell.openPath(join(process.resourcesPath,'cagent','CAgent-Setup.exe'));
+    if(error)throw Error(error);
   });
   handle('agent:download-open',async(id:unknown)=>{
     if(typeof id!=='string')throw Error('请选择安装包');

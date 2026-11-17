@@ -7,7 +7,7 @@ async function verify(directory, version) {
   const info = JSON.parse(await readFile(join(directory, 'build-info.json'), 'utf8'));
   if (info.version !== version || info.platform !== 'win32' || info.arch !== 'x64' || info.electron !== false)
     throw new Error('Bundled CAgent must match the Windows x64 CShell version');
-  for (const name of ['node.exe', 'agent.cjs', 'Cagent.exe', 'cagent-desktop.exe', 'LICENSE.node.txt', 'node_modules/node-pty/package.json'])
+  for (const name of ['node.exe', 'agent.cjs', 'Cagent.exe', 'cagent-vault.exe', 'cagent-desktop.exe', 'LICENSE.node.txt', 'node_modules/node-pty/package.json'])
     if (!(await stat(join(directory, name))).isFile()) throw new Error(`Missing CAgent resource: ${name}`);
   const digest = createHash('sha256').update(await readFile(join(directory, 'cagent-desktop.exe'))).digest('hex');
   if (info.desktopNative?.sha256 !== digest) throw new Error('Bundled desktop helper digest differs');

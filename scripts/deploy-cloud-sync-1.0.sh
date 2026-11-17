@@ -10,6 +10,7 @@ UNIT=${SYNC_UNIT:-cshell-sync}
 case "$MODE" in --check|--apply) ;; *) exit 2;; esac
 test -f "$SOURCE/services/cloud-sync/server.py"
 test -f "$DB"
+python3 -c "from cryptography.fernet import Fernet"
 STAGE=$(mktemp -d /var/tmp/cshell-deploy-XXXXXXXX)
 python3 "$SOURCE/scripts/cloud-sync-migration-check.py" --source-db "$DB" --output "$STAGE/rehearsal" --modules "$SOURCE/services/cloud-sync"
 if [ "$MODE" = --check ]; then printf 'Rehearsal passed; private artifact: %s\n' "$STAGE"; exit 0; fi

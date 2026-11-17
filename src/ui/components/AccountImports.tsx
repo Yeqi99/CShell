@@ -8,13 +8,23 @@ export function AccountImports(){
  const [sources,setSources]=useState<AccountSource[]>([]),[preview,setPreview]=useState<AccountSourcePreview>();
  const [busy,setBusy]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState(''),[settings,setSettings]=useState(false);
  const [choices,setChoices]=useState<Record<string,'account'|'source'>>({});
+ const [guestCache,setGuestCache]=useState(false);
+ const [scanAttempt,setScanAttempt]=useState(0),[scanError,setScanError]=useState('');
+ useEffect(()=>{let alive=true;void window.cshell.hasGuestCache?.().then(value=>{if(alive)setGuestCache(value);}).catch(()=>{});return()=>{alive=false;};},[]);
  const [clear,setClear]=useState(false);
- useEffect(()=>{let alive=true;void window.cshell.accountSources?.().then(value=>{if(alive)setSources(value);}).catch(()=>{if(alive)setError('本机配置检查暂未完成，可稍后重新进入此页。');});return()=>{alive=false;};},[]);
+ useEffect(()=>{
+  let alive=true;
+  setScanError('');
+  void window.cshell.accountSources?.().then(value=>{if(alive)setSources(value);}).catch((cause:Error)=>{
+   if(alive)setScanError(cause.message.replace(/^Error invoking remote method '[^']+': (?:Error: )?/,''));
+  });
+  return()=>{alive=false;};
+ },[scanAttempt]);
  const run=async(fn:()=>Promise<void>)=>{setBusy(true);setError('');setMessage('');try{await fn();}catch(e){setError(String((e as Error).message).replace(/^Error invoking remote method '[^']+': (?:Error: )?/,''));}finally{setBusy(false);}};
- if(!window.cshell.accountSources||(!sources.length&&!error&&!message))return null;
+ if(!window.cshell.accountSources||(!sources.length&&!guestCache&&!error&&!scanError&&!message))return null;
  return <section className="account-section account-imports" aria-label="本机配置">
-  <div className="import-heading"><h2>本机配置</h2><span>由你选择载入</span></div>
-  {!preview?<><p className="import-description">发现其他工作区的配置。查看后再决定是否加入当前账号，原配置会保留。</p><div className="import-sources">{sources.map(source=><button disabled={busy} key={source} onClick={()=>void run(async()=>{const result=await window.cshell.accountSourcePreview!(source);setPreview(result);setChoices({});setSettings(false);})}><FolderInput size={18}/><span><strong>{titles[source]}</strong><small>{busy?'正在检查…':'查看连接、模型与扩展配置'}</small></span><ChevronRight size={16}/></button>)}</div></>:<div className="import-review">
+  <div className="import-heading"><h2>本机配置</h2><span>{sources.length?'由你选择载入':'本机缓存'}</span></div>
+  {!preview?(sources.length>0&&<><p className="import-description">发现其他工作区的配置。查看后再决定是否加入当前账号，原配置会保留。</p><div className="import-sources">{sources.map(source=><button disabled={busy} key={source} onClick={()=>void run(async()=>{const result=await window.cshell.accountSourcePreview!(source);setPreview(result);setChoices({});setSettings(false);})}><FolderInput size={18}/><span><strong>{titles[source]}</strong><small>{busy?'正在检查…':'查看连接、模型与扩展配置'}</small></span><ChevronRight size={16}/></button>)}</div></>):<div className="import-review">
    <button className="auth-link import-back" disabled={busy} onClick={()=>setPreview(undefined)}><ArrowLeft size={14}/>返回来源</button>
    <h3>{titles[preview.source]}</h3><div className="import-counts">{preview.counts.map(c=><span key={c.label}><strong>{c.count}</strong>{c.label}</span>)}</div>
    <label className="import-settings"><input type="checkbox" checked={settings} disabled={busy} onChange={e=>setSettings(e.target.checked)}/>同时使用此来源的外观、扩展偏好和默认模型</label>
@@ -22,7 +32,8 @@ export function AccountImports(){
    <p className="import-description">确认后载入并自动同步。访问权限、浏览器登录状态和应用安装状态不会迁移。</p>
    <div className="import-actions"><button disabled={busy} onClick={()=>setPreview(undefined)}>暂不载入</button><button className="primary" disabled={busy||preview.conflicts.some(c=>!choices[c.id])} onClick={()=>void run(async()=>{await window.cshell.accountSourceImport!(preview.token,settings,choices);setPreview(undefined);setMessage('已载入当前账号，云同步会自动继续。');})}>{busy?'正在处理…':'载入当前账号'}</button></div>
   </div>}
-  {!preview&&sources.includes('guest')&&<div className="import-clear">{!clear?<button className="auth-link" disabled={busy} onClick={()=>setClear(true)}>清除未登录数据…</button>:<><h3>清除 Pro 未登录工作区？</h3><p className="import-description">将删除未登录时保存的连接及凭据、模型、习惯记忆、扩展配置、外观和浏览器数据。当前账号、云端数据、开源版原配置及设备身份会保留。此操作无法撤销。</p><div className="import-actions"><button disabled={busy} onClick={()=>setClear(false)}>取消</button><button disabled={busy} onClick={()=>void run(async()=>{await window.cshell.guestCacheClear!('clear-guest-local-only');setClear(false);setSources(await window.cshell.accountSources!());setMessage('未登录工作区的数据已清除。');})}>确认清除未登录数据</button></div></>}</div>}
+  {!preview&&guestCache&&<div className="import-clear">{!clear?<button className="auth-link" disabled={busy} onClick={()=>setClear(true)}>清除未登录数据…</button>:<><h3>清除 Pro 未登录工作区？</h3><p className="import-description">将删除未登录时保存的连接及凭据、模型、习惯记忆、扩展配置、外观和浏览器数据。当前账号、云端数据、开源版原配置及设备身份会保留。此操作无法撤销。</p><div className="import-actions"><button disabled={busy} onClick={()=>setClear(false)}>取消</button><button disabled={busy} onClick={()=>void run(async()=>{await window.cshell.guestCacheClear!('clear-guest-local-only');setClear(false);setGuestCache(false);setSources(await window.cshell.accountSources!());setMessage('未登录工作区的数据已清除。');})}>确认清除未登录数据</button></div></>}</div>}
+  {scanError&&<p className="import-description" role="status">{scanError} <button className="auth-link" onClick={()=>setScanAttempt(n=>n+1)}>重新检查</button></p>}
   {error&&<ErrorNotice title="操作未完成" error={error}/>}{message&&<p className="import-description" role="status">{message}</p>}
  </section>;
 }

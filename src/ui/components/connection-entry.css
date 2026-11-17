@@ -242,3 +242,37 @@
 }
 
 .rdp-connect-form fieldset{border:0;padding:0;display:grid;gap:14px}.rdp-connect-form label{display:grid;gap:6px}.rdp-connect-form input:not([type=checkbox]){padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--panel);color:var(--text)}
+
+.connection-flow .connection-start-heading,.rental-store header,.rental-store footer {
+  display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+}
+.connection-flow .import-shortcut,.batch-import .batch-upload {
+  display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:33px; padding:0 12px;
+  border:1px solid var(--border); border-radius:7px; background:var(--surface,var(--panel)); color:var(--text); font:inherit; font-size:13px;
+}
+.connection-flow .import-shortcut:hover,.batch-import .batch-upload:hover {border-color:var(--accent);color:var(--accent)}
+.connection-flow button.connection-kind {min-height:112px;padding:16px;gap:5px}
+.connection-flow .connection-kind-grid {margin-top:20px}
+.rental-store {max-width:820px;margin:auto;padding:18px 0}
+.rental-store h2 {font-size:16px;margin:0}
+.rental-store header span,.rental-store footer span,.rental-store small,.rental-store p {font-size:13px;color:var(--muted)}
+.rental-store header strong {color:var(--text);font-variant-numeric:tabular-nums}
+.rental-plans {display:grid;gap:8px;margin:16px 0}
+.rental-plans label {display:flex!important;align-items:center;gap:12px;padding:16px;border-radius:8px;border:1px solid var(--border);cursor:pointer}
+.rental-plans label:has(input:checked) {border-color:var(--accent);background:color-mix(in srgb,var(--accent) 5%,var(--panel))}
+.rental-plans input[type=radio] {width:16px;height:16px;accent-color:var(--accent);flex:none}
+.rental-plans strong,.rental-plans small {display:block}
+.rental-plans small {margin-top:4px}
+.rental-price {margin-left:auto;text-align:right;white-space:nowrap}
+.rental-store footer {border-top:1px solid var(--border);padding:14px 0}
+.sidebar .server-group[data-system-group] .group-title {padding-inline:7px;background:color-mix(in srgb,var(--accent) 6%,transparent);border-radius:6px}
+.sidebar .source-group-icon {color:var(--accent);flex:none}
+.sidebar .server-group[data-system-group="同账号设备"] .source-group-icon {color:var(--muted)}
+
+.rental-port-list {margin:12px 0;border-top:1px solid var(--border);padding:10px 0}
+.rental-port-list summary {cursor:pointer;font-size:13px}
+.rental-port-list code {display:inline-block;margin:3px 8px 3px 0;padding:4px 7px;background:var(--panel);border:1px solid var(--border);border-radius:4px;user-select:all}
+.rental-port-list button {display:block;margin-top:8px}
+
+.rental-periods {display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 4px 28px}
+.rental-periods button[aria-pressed=true] {border-color:var(--accent);color:var(--accent)}

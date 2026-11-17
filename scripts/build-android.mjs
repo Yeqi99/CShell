@@ -3,6 +3,7 @@ import { mkdir, copyFile } from 'node:fs/promises';
 const directory = 'android/app/src/main/assets';
 await mkdir(directory, { recursive: true });
 await build({
+  define: {__ANDROID_MARKDOWN_WORKER__: JSON.stringify('/markdown-worker.js')},
   entryPoints: ['android/web/app.ts'],
   outfile: `${directory}/app.js`,
   bundle: true,
@@ -10,6 +11,7 @@ await build({
   target: 'chrome90',
   jsx: 'automatic',
 });
+await build({entryPoints:['src/ui/markdown-worker.ts'],outfile:`${directory}/markdown-worker.js`,bundle:true,minify:true,target:'chrome90'});
 await copyFile('android/web/index.html', `${directory}/index.html`);
 
 const brandIcon = process.env.CSHELL_EDITION === 'pro' ? 'assets/brand/cshell-pro.png' : 'assets/icon.png';

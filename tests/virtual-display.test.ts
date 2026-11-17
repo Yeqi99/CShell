@@ -26,6 +26,18 @@ test('virtual display operations serialize and never retry unknown outcomes', as
   await assert.rejects(pending, /unknown/);
   assert.equal(calls, 1);
 });
+test('default headless setup rechecks the console and control grant before installing the pinned package',async()=>{
+  const calls:string[][]=[];
+  let state='DISPLAY_PRESENT';
+  const backend=new VirtualDisplayBackend(host,'fixed',async args=>{calls.push(args);return {status:state};});
+  for(const observed of ['DISPLAY_PRESENT','NOT_CONSOLE','DESKTOP_UNAVAILABLE','TOPOLOGY_UNAVAILABLE']){
+    state=observed;await backend.ensureHeadless(()=>true);
+  }
+  state='NO_DISPLAY';
+  await assert.rejects(backend.ensureHeadless(()=>false),/权限/);
+  await backend.ensureHeadless(()=>true);
+  assert.deepEqual(calls.filter(args=>args[0]!=='headless-check'),[['ensure-headless','fixed']]);
+});
 
 test('display preflight fails closed for old helpers and exposes blocked session', async () => {
   const old = new VirtualDisplayBackend(host, '', async () => ({}));

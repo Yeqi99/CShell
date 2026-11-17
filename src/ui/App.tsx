@@ -46,6 +46,7 @@ import {
   HardDrive,
   Monitor,
   LayoutDashboard,
+  PackagePlus,
   Files,
   BarChart3,
   Bot,
@@ -296,7 +297,16 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
   const commandNumber = useRef(0);
   const newCommandTab = () => { const id = crypto.randomUUID(); setCommandTabs(v => [...v, {id, name:`命令台 ${++commandNumber.current}`}]); setCommandId(id); setSurface('command'); };
   const [linuxModes,setLinuxModes]=useState<Record<string,boolean>>({});
-  const [nativeDesktopRequests,setNativeDesktopRequests]=useState<Record<string,number>>({});
+  const [sshAgentInstalled, setSshAgentInstalled] = useState<Record<string, boolean>>({});
+  const rememberSshAgent = useCallback((session: string, installed: boolean) => {
+    setSshAgentInstalled(previous => previous[session] === installed ? previous : {...previous, [session]: installed});
+  }, []);
+  const [workspaceRequests, setWorkspaceRequests] = useState<Record<string, { app: 'install-cagent' | 'native-desktop'; revision: number }>>({});
+  function openSshApp(session: string, app: 'install-cagent' | 'native-desktop') {
+    setLinuxWorkspaces(items => items.includes(session) ? items : [...items, session]);
+    setLinuxModes(modes => ({...modes, [session]: true}));
+    setWorkspaceRequests(requests => ({...requests, [session]: {app, revision: (requests[session]?.revision ?? 0) + 1}}));
+  }
   const linuxRestored=useRef(new Set<string>());
   useEffect(()=>{for(const tab of tabs){if(tab.local||tab.client||linuxRestored.current.has(tab.id))continue;linuxRestored.current.add(tab.id);if(connectionUsesVisual(tab.profile,config.preferences)){setLinuxWorkspaces(v=>v.includes(tab.id)?v:[...v,tab.id]);setLinuxModes(v=>({...v,[tab.id]:true}));}}},[tabs]);
   const [machineConnectionState,setMachineConnectionState]=useState<Record<string,boolean>>({});
@@ -698,7 +708,7 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
           <strong>CShell</strong>
         </div>
         <div className="titlebar-space" />
-        {isPro && <AccountEntry onOpen={()=>{setAccountOpen(true);setSurface("account");}}/>}
+        {<AccountEntry onOpen={()=>{setAccountOpen(true);setSurface("account");}}/>}
         <button className="icon" title="视图" aria-label="视图" onClick={() => { setViewsOpen(true); setSurface('views'); }}><LayoutDashboard size={18}/></button>
         <button
           className="icon"
@@ -1048,14 +1058,16 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
                 </div>
               )}
             </TabStrip>
-            {surface === 'terminal' && current && !current.local && !current.client && !isFileConnection(current.profile) && <details className="local-terminal-menu" onKeyDown={e=>{if(e.key==='Escape')e.currentTarget.open=false;}}>
+            {surface === 'terminal' && current && !current.local && !current.client && !isFileConnection(current.profile) && <>
+              {!linuxModes[active] && !sshAgentInstalled[active] && <button className="workbench-tool ssh-install-action" disabled={!!current.closed} title={config.preferences.locale === 'zh-CN' ? '安装 CAgent' : 'Install CAgent'} aria-label={config.preferences.locale === 'zh-CN' ? '安装 CAgent' : 'Install CAgent'} onClick={() => openSshApp(active, 'install-cagent')}><PackagePlus size={16}/><span>{config.preferences.locale === 'zh-CN' ? '安装 CAgent' : 'Install CAgent'}</span></button>}
+              <details className="local-terminal-menu" onKeyDown={e=>{if(e.key==='Escape')e.currentTarget.open=false;}}>
               <summary title="桌面与显示方式" aria-label="桌面与显示方式"><LayoutDashboard size={17}/></summary>
               <div role="menu">
                 <button role="menuitem" onClick={e=>{e.currentTarget.closest('details')!.open=false;setLinuxModes(v=>({...v,[active]:false}));}}><TerminalIcon size={15}/>SSH 终端</button>
                 <button role="menuitem" onClick={e=>{e.currentTarget.closest('details')!.open=false;setLinuxWorkspaces(v=>v.includes(active)?v:[...v,active]);setLinuxModes(v=>({...v,[active]:true}));}}><LayoutDashboard size={15}/>CShell 可视化桌面</button>
-                <button role="menuitem" disabled={!!current.closed} onClick={e=>{e.currentTarget.closest('details')!.open=false;setLinuxWorkspaces(v=>v.includes(active)?v:[...v,active]);setLinuxModes(v=>({...v,[active]:true}));setNativeDesktopRequests(v=>({...v,[active]:(v[active]??0)+1}));}}><Monitor size={15}/>检测服务器桌面</button>
+                <button role="menuitem" disabled={!!current.closed} onClick={e=>{e.currentTarget.closest('details')!.open=false;openSshApp(active, 'native-desktop');}}><Monitor size={15}/>检测服务器桌面</button>
               </div>
-            </details>}
+            </details></>}
             {navigator.platform.startsWith('Win') && (
               <details
                 className="local-terminal-menu"
@@ -1293,7 +1305,7 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
             </div>
           )}
           {accountOpen && <div className="workspace-editor account-workspace" hidden={surface!=="account"}><CloudSettings shareRequest={shareRequest}/></div>}
-          {viewsOpen && <div className="workspace-editor" hidden={surface !== 'views'}><MonitorViews config={config}/></div>}{machines.map(m=><div key={m.target.id} className="workspace-editor" hidden={surface!=='machine'||machineId!==m.target.id}><AgentMachineWorkspace onConnectionState={connected=>setMachineConnectionState(v=>v[m.target.id]===connected?v:{...v,[m.target.id]:connected})} onDisconnect={()=>closeMachine(m.target.id)} device={m.device} target={m.target} preferences={preferences} onSessionCount={(count,ids)=>{setMachineSessionCounts(v=>v[m.target.id]===count?v:{...v,[m.target.id]:count});setMachineSessionIds(v=>JSON.stringify(v[m.target.id])===JSON.stringify(ids)?v:{...v,[m.target.id]:ids});}} active={surface==='machine'&&machineId===m.target.id}/></div>)}
+          {viewsOpen && <div className="workspace-editor" hidden={surface !== 'views'}><MonitorViews config={config}/></div>}{machines.map(m=><div key={m.target.id} className="workspace-editor" hidden={surface!=='machine'||machineId!==m.target.id}><AgentMachineWorkspace rdpProfiles={config.profiles.filter(p=>p.protocol==='rdp')} openRdp={p=>openSaved(p,false)} onConnectionState={connected=>setMachineConnectionState(v=>v[m.target.id]===connected?v:{...v,[m.target.id]:connected})} onDisconnect={()=>closeMachine(m.target.id)} device={m.device} target={m.target} preferences={preferences} onSessionCount={(count,ids)=>{setMachineSessionCounts(v=>v[m.target.id]===count?v:{...v,[m.target.id]:count});setMachineSessionIds(v=>JSON.stringify(v[m.target.id])===JSON.stringify(ids)?v:{...v,[m.target.id]:ids});}} active={surface==='machine'&&machineId===m.target.id}/></div>)}
           <div className="workspace-editor" hidden={surface !== 'home' && !(surface === 'terminal' && !tabs.length)}>
             <WorkbenchHome config={config} active={surface === 'home' || (surface === 'terminal' && !tabs.length)} currentCount={currentSsh.length + currentDevices.length}
               onView={view=>savePreferences({...config.preferences,workbenchView:view})} onSettings={openSettings} onExtensions={openExtensions} onAgent={()=>setAiVisible(true)} onCommandTab={newCommandTab}
@@ -1343,7 +1355,7 @@ function Workbench({ config, configLoader }: { config: Config; configLoader: Con
             </div>
           )}
 
-          {tabs.filter(tab=>linuxWorkspaces.includes(tab.id)).map(tab=><LinuxWorkspace key={tab.id} nativeDesktopRequest={nativeDesktopRequests[tab.id]} session={tab.id} profileId={tab.profile.id} preferences={preferences} name={tab.profile.name} active={surface==='terminal'&&active===tab.id&&!!linuxModes[tab.id]} closed={!!tab.closed} onRetry={()=>openSaved(tab.profile)} onTerminal={()=>{}} files={visible=><div inert={!!tab.closed} style={{height:"100%"}}><ToolsPanel sessionId={tab.id} sessionName={tab.profile.name} closed={!!tab.closed} active={visible} dockerEnabled={pluginEnabled(config.plugins,'docker')} transfers={transfers.filter(t=>t.sessionId===tab.id)} onError={onError}/></div>} terminal={(visible)=><VisualSshTerminal active={visible} closed={!!tab.closed} tools={toolsActive=><ToolsPanel sessionId={tab.id} sessionName={tab.profile.name} closed={!!tab.closed} active={toolsActive} dockerEnabled={pluginEnabled(config.plugins,'docker')} transfers={transfers.filter(t=>t.sessionId===tab.id)} onError={onError}/>}><TerminalSlot id={tab.id} active={visible}/></VisualSshTerminal>}/>)}
+          {tabs.filter(tab=>linuxWorkspaces.includes(tab.id)).map(tab=><LinuxWorkspace key={tab.id} request={workspaceRequests[tab.id]} onInstalled={rememberSshAgent} session={tab.id} profileId={tab.profile.id} preferences={preferences} name={tab.profile.name} active={surface==='terminal'&&active===tab.id&&!!linuxModes[tab.id]} closed={!!tab.closed} onRetry={()=>openSaved(tab.profile)} onTerminal={()=>setLinuxModes(modes=>({...modes,[tab.id]:false}))} files={visible=><div inert={!!tab.closed} style={{height:"100%"}}><ToolsPanel sessionId={tab.id} sessionName={tab.profile.name} closed={!!tab.closed} active={visible} dockerEnabled={pluginEnabled(config.plugins,'docker')} transfers={transfers.filter(t=>t.sessionId===tab.id)} onError={onError}/></div>} terminal={(visible)=><VisualSshTerminal active={visible} closed={!!tab.closed} tools={toolsActive=><ToolsPanel sessionId={tab.id} sessionName={tab.profile.name} closed={!!tab.closed} active={toolsActive} dockerEnabled={pluginEnabled(config.plugins,'docker')} transfers={transfers.filter(t=>t.sessionId===tab.id)} onError={onError}/>}><TerminalSlot id={tab.id} active={visible}/></VisualSshTerminal>}/>)}
           {tabs.filter(tab=>isFileConnection(tab.profile)).map(tab=><div key={tab.id} className="file-workspace-host" hidden={surface!=='terminal'||active!==tab.id}><FileConnectionWorkspace sessionId={tab.id} profile={tab.profile} closed={!!tab.closed} transfers={transfers.filter(t=>t.sessionId===tab.id)} onError={onError} onRetry={()=>openSaved(tab.profile)}/></div>)}
           <AiExecution enabled={preferences.showAiExecution && !minimal} sessionId={current?.id} />
           {tabs.length ? (

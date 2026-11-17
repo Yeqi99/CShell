@@ -691,8 +691,8 @@ export class OfficialOpenCode {
           },
         ],
         usage: {
-          prompt_tokens: result.info?.tokens?.input ?? 0,
-          completion_tokens: result.info?.tokens?.output ?? 0,
+          prompt_tokens: result.info?.tokens?.input,
+          completion_tokens: result.info?.tokens?.output,
         },
       });
     } finally {

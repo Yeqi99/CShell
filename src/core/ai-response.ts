@@ -33,7 +33,21 @@ function checkFinish(reason: unknown) {
     throw new Error('模型输出达到长度上限，本轮未完成；请继续或调整基座输出限制。');
   if (reason === 'content_filter') throw new Error('基座过滤了响应，本轮未完成。');
 }
-export async function readAiResponse(response: Response, onContent: (content: string) => void, onActivity: () => void = () => {}) {
+type Tokens = NonNullable<import('../shared/activity').Activity['tokens']>;
+const maxResponseChars = 2_000_000;
+function checkResponseSize(length: number, maximum = maxResponseChars) {
+  if (length > maximum) throw new Error('模型单次输出过大，本轮未执行工具调用。请从检查点继续并分段处理。');
+}
+export type UsageCallback = (usage: Tokens) => void;
+function reportedTokens(value: any): Tokens | undefined {
+  const count = (n: unknown) => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0 ? n : undefined;
+  const input = count(value?.prompt_tokens ?? value?.input_tokens);
+  const output = count(value?.completion_tokens ?? value?.output_tokens);
+  const total = count(value?.total_tokens) ?? (input !== undefined && output !== undefined ? input + output : undefined);
+  if (total !== undefined) return { input, output, total };
+}
+
+export async function readAiResponse(response: Response, onContent: (content: string) => void, onActivity: () => void = () => {}, onUsage?: UsageCallback) {
   if (!response.body) throw new Error('AI 返回了空响应');
   const reader = response.body.getReader(),
     decoder = new TextDecoder();
@@ -42,10 +56,13 @@ export async function readAiResponse(response: Response, onContent: (content: st
     pending = '',
     content = '',
     reasoning = '',
-    size = 0,
     finished = false;
+  let usage: Tokens | undefined;
+  let doneMarker = false;
+  let tailTimer: ReturnType<typeof setTimeout> | undefined;
   const calls = new Map<number, any>();
   const event = (block: string) => {
+    checkResponseSize(block.length);
     const data = block
       .split('\n')
       .filter((l) => l.startsWith('data:'))
@@ -53,12 +70,14 @@ export async function readAiResponse(response: Response, onContent: (content: st
       .join('\n');
     if (!data) return;
     if (data.trim() === '[DONE]') {
+      doneMarker = true;
       finished = true;
       return;
     }
     const value = parseAiJson(data, 'sse');
     if (!value || typeof value !== 'object') throw new Error('模型流式响应结构无效（AI_RESPONSE_SCHEMA_INVALID）。');
     if (value.error) throw new Error('AI 流式响应出错，请重试');
+    usage = reportedTokens(value.usage) ?? usage;
     const choice = value.choices?.find((c: any) => c.index === 0) ?? value.choices?.[0];
     if (!choice) return;
     if (choice.finish_reason) {
@@ -67,8 +86,10 @@ export async function readAiResponse(response: Response, onContent: (content: st
     }
     const delta = choice.delta ?? {};
     if (typeof delta.reasoning_content === 'string') reasoning += delta.reasoning_content;
+    checkResponseSize(reasoning.length);
     if (typeof delta.content === 'string') {
       content += delta.content;
+      checkResponseSize(content.length);
       onContent(content);
     }
     if (delta.tool_calls != null) {
@@ -86,6 +107,10 @@ export async function readAiResponse(response: Response, onContent: (content: st
         if(typeof part.providerData==='string')c.providerData=part.providerData;
         if (part.function?.name) c.function.name += part.function.name;
         if (part.function?.arguments) c.function.arguments += part.function.arguments;
+        checkResponseSize(c.id.length, 200);
+        checkResponseSize(c.function.name.length, 80);
+        checkResponseSize(c.function.arguments.length, 32000);
+        checkResponseSize(c.providerData?.length ?? 0, 32000);
         calls.set(part.index, c);
       }
     }
@@ -95,8 +120,6 @@ export async function readAiResponse(response: Response, onContent: (content: st
       const chunk = await reader.read();
       if (chunk.value?.byteLength) onActivity();
       const text = decoder.decode(chunk.value, { stream: !chunk.done });
-      size += text.length;
-      if (size > 2_000_000) throw new Error('AI response too large');
       if (streaming) {
         pending += text;
         let match;
@@ -104,11 +127,19 @@ export async function readAiResponse(response: Response, onContent: (content: st
           event(pending.slice(0, match.index).replace(/\r\n/g, '\n'));
           pending = pending.slice(match.index + match[0].length);
         }
-      } else raw += text;
-      if (chunk.done || (streaming && finished)) break;
+        // Completed SSE envelopes are discarded. Repeated model/usage metadata is not output.
+        checkResponseSize(pending.length);
+      } else {
+        raw += text;
+        checkResponseSize(raw.length);
+      }
+      if (chunk.done || (streaming && finished && (!onUsage || usage || doneMarker))) break;
+      // Some chat providers send cumulative usage after finish_reason, before [DONE].
+      if (finished && !tailTimer) tailTimer = setTimeout(() => { void reader.cancel().catch(() => {}); }, 1000);
     }
     if (!streaming) {
       const value = parseAiJson(raw, 'json');
+      usage = reportedTokens(value?.usage);
       checkFinish(value?.choices?.[0]?.finish_reason);
       return validateReply(value?.choices?.[0]?.message);
     }
@@ -120,6 +151,8 @@ export async function readAiResponse(response: Response, onContent: (content: st
       tool_calls: [...calls.entries()].sort((a, b) => a[0] - b[0]).map(([, c]) => c),
     });
   } finally {
+    clearTimeout(tailTimer);
+    if (usage) onUsage?.(usage);
     await reader.cancel().catch(() => {});
     reader.releaseLock();
   }

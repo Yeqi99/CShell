@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { ApiError } from './api/errors';
 import {
   desktopCaptureInput,
   desktopInteractInput,
@@ -70,7 +71,9 @@ export class DesktopAutomation {
     const abort = () => controller.abort(parent.reason ?? Error('操作已取消'));
     parent.addEventListener('abort', abort, { once: true });
     const timer = setTimeout(
-      () => controller.abort(Error('桌面工具等待真实画面超时')),
+      () => controller.abort(capture && suspended
+        ? new ApiError('UNAVAILABLE', 'Windows 已暂停桌面采集，当前没有可读取的画面。', '恢复目标用户的桌面会话后再截图。')
+        : new ApiError('DEADLINE_EXCEEDED', '等待桌面画面超时。', '检查桌面会话状态后重试。')),
       this.timeoutMs,
     );
     timer.unref();
@@ -79,6 +82,7 @@ export class DesktopAutomation {
       processing = false,
       settled = false,
       inputSent = false,
+      suspended = false,
       waitingRecoveryConfig = true,
       configurationSeen = false,
       generationObserved = false;
@@ -110,7 +114,13 @@ export class DesktopAutomation {
         if(event.generation!==undefined){generation=event.generation;generationObserved=true;}
       }
       if (event.type === 'closed' || event.type === 'error') {
-        if(event.type==='error'&&event.recoverable&&!inputSent){if(event.resumed){if(configurationSeen)waitingRecoveryConfig=false;}else waitingRecoveryConfig=true;return;}
+        if(event.type==='error'&&event.recoverable&&!inputSent){suspended=!event.resumed;if(event.resumed){if(configurationSeen)waitingRecoveryConfig=false;}else waitingRecoveryConfig=true;return;}
+        const reason = event.type === 'closed' ? event.reason : event.message;
+        if (capture && (suspended || /^CAPTURE_[A-Z_]+$/.test(reason))) {
+          controller.abort(new ApiError('UNAVAILABLE', '目标桌面无法提供当前画面。', '检查目标用户是否已登录、会话是否断开，再重新截图。',
+            { reason: /^CAPTURE_[A-Z_]+$/.test(reason) ? reason : 'CAPTURE_SUSPENDED' }));
+          return;
+        }
         const failure=Error(event.type === 'closed' ? event.reason : event.message);
         controller.abort(failure);
         rejectFrame(failure);

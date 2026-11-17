@@ -39,6 +39,16 @@ async function debuggerFor(contents: WebContents) {
   });
   return state;
 }
+export async function captureBrowserView(contents: WebContents, quality: number, guard?: () => void) {
+  await debuggerFor(contents);
+  guard?.();
+  const result = await contents.debugger.sendCommand('Page.captureScreenshot', {
+    format: 'jpeg', quality, fromSurface: true, captureBeyondViewport: false,
+  });
+  if (typeof result.data !== 'string' || result.data.length > 32 * 1024 * 1024)
+    throw Error('浏览器未返回有效的截图');
+  return Buffer.from(result.data, 'base64');
+}
 export async function browserFrames(contents: WebContents) {
   const state = await debuggerFor(contents),
     frames = new Map<string, Frame>();

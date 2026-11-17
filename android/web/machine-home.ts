@@ -1,6 +1,7 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
+  Bot,
   Globe,
   Terminal,
   Folder,
@@ -25,6 +26,7 @@ export type MachineApp = {
   disabled?: boolean;
 };
 const symbols: Record<string, any> = {
+  assistant: Bot,
   browser: Globe,
   terminal: Terminal,
   files: Folder,

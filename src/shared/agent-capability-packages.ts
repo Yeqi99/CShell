@@ -34,7 +34,7 @@ export const agentCapabilityManifestSchema = z.object({
   systemApplication: z.object({ id: name, version: capabilityVersionRangeSchema }).strict().optional(),
   files: z.array(z.object({ path: relativeFile, sha256: z.string().regex(/^[a-f0-9]{64}$/), bytes: z.number().int().min(0).max(2 ** 31) }).strict()).min(1).max(2048),
   permissions: z.array(name).max(64),
-  tools: z.array(z.object({ id: callableName, description: z.string().min(1).max(1000), inputSchema: schema, outputSchema: schema, permissions: z.array(name).max(64), sideEffect: z.boolean() }).strict()).max(100),
+  tools: z.array(z.object({ id: callableName, category:z.string().trim().min(1).max(64).refine(v=>v!=='all').optional(), description: z.string().min(1).max(1000), inputSchema: schema, outputSchema: schema, permissions: z.array(name).max(64), sideEffect: z.boolean() }).strict()).max(100),
   events: z.array(z.object({ id: callableName, description: z.string().min(1).max(1000), payloadSchema: schema, permissions: z.array(name).max(64) }).strict()).max(100).default([]),
 }).strict().superRefine((manifest, ctx) => {
   const prefix = `${manifest.source.repository}/releases/download/${manifest.source.releaseTag}/`;

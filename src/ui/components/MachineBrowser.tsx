@@ -2,6 +2,8 @@ import { browserSuggestions } from '../../core/browser-interactions';
 import { ErrorNotice } from './ErrorNotice';
 import { useEffect, useRef, useState } from 'react';
 import {
+  Hand,
+  ExternalLink,
   ArrowLeft,
   ArrowRight,
   RotateCw,
@@ -334,11 +336,24 @@ export function MachineBrowser({
         >
           <ShieldCheck size={16} />
         </button>
+        <button type="button" aria-pressed={!!state.manualControl}
+          title={state.manualControl ? '恢复智能体操作' : '接管网页，暂停智能体访问'}
+          aria-label={state.manualControl ? '恢复智能体操作' : '接管网页'}
+          onClick={() => void run('manual-control', !state.manualControl)}>
+          <Hand size={15} />{state.manualControl && '恢复智能体操作'}
+        </button>
+        {state.nativeEdge && <button type="button" disabled={!state.connected || !selected?.url?.match(/^https?:\/\//i)}
+          title={`本机 Edge 无痕窗口 · 使用${name}的网络和时区`}
+          aria-label="在本机浏览器模拟打开"
+          onClick={() => void run('open-edge')}>
+          <ExternalLink size={16} /> 本机模拟打开
+        </button>}
         <span className="machine-browser-route" title={'网页请求通过 ' + name}>
           <Server size={14} />
           {name}
         </span>
       </form>
+      {(state.manualControl || state.activity) && <small role="status">{state.manualControl ? '智能体操作已暂停' : '智能体 · ' + state.activity}</small>}
       {suggest && suggestions.length > 0 && (
         <div
           className="machine-browser-suggestions"

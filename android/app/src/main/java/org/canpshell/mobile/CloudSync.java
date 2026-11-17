@@ -129,9 +129,74 @@ final class CloudSync {
     if(identityChange)AndroidAgentService.accountChanged();
     try{return callInternal(request);}catch(Exception error){state=null;accounts=new JSONObject();membership=null;profileChecked=0;load();throw error;}finally{if(identityChange)AndroidAgentService.refreshAccount();}
   }
+  private volatile HttpURLConnection activeChat;
+  void stopChat(){HttpURLConnection c=activeChat;if(c!=null)c.disconnect();}
+  synchronized JSONObject phoneChat(JSONObject request,java.util.function.Consumer<String> partial)throws Exception {
+    load();String account=state.getJSONObject("session").getString("accountId");
+    if(!account.equals(request.getString("account")))throw new IOException("账号已切换");
+    JSONObject doc=request.getJSONObject("document");UUID.fromString(doc.getString("id"));JSONArray messages=doc.getJSONArray("messages"),input=new JSONArray();
+    for(int i=0;i<messages.length();i++){JSONObject m=messages.getJSONObject(i);String role=m.getString("role");if(!role.equals("user")&&!role.equals("assistant"))throw new IOException("对话角色无效");input.put(new JSONObject().put("role",role).put("content",m.getString("text")));}
+    if(input.length()==0||input.length()>300)throw new IOException("对话长度无效");
+    HttpURLConnection c=(HttpURLConnection)new URL("https://shell.canp.ai/api/v1/account/phone-chat").openConnection();activeChat=c;
+    try{c.setInstanceFollowRedirects(false);c.setConnectTimeout(15000);c.setReadTimeout(120000);c.setDoOutput(true);c.setRequestMethod("POST");c.setRequestProperty("Content-Type","application/json");c.setRequestProperty("Authorization","Bearer "+state.getJSONObject("session").getString("token"));
+      try(OutputStream out=c.getOutputStream()){out.write(bytes(new JSONObject().put("model",request.getString("model")).put("stream",true).put("messages",input).toString()));}
+      if(c.getResponseCode()!=200)throw new IOException("模型请求失败（HTTP "+c.getResponseCode()+"）");
+      StringBuilder answer=new StringBuilder();long last=0;boolean complete=false;
+      if(!String.valueOf(c.getContentType()).contains("text/event-stream")){
+        StringBuilder json=new StringBuilder();
+        try(BufferedReader reader=new BufferedReader(new InputStreamReader(c.getInputStream(),StandardCharsets.UTF_8))){String line;while((line=reader.readLine())!=null){json.append(line);if(json.length()>1000000)throw new IOException("回复超过上限");}}
+        answer.append(new JSONObject(json.toString()).getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content"));complete=true;
+      }else
+      try(BufferedReader reader=new BufferedReader(new InputStreamReader(c.getInputStream(),StandardCharsets.UTF_8))){
+        String line;while((line=reader.readLine())!=null){if(!line.startsWith("data:"))continue;String data=line.substring(5).trim();if(data.equals("[DONE]")){complete=true;break;}
+          JSONObject chunk=new JSONObject(data);if(chunk.has("error"))throw new IOException("模型响应中断");
+          JSONArray choices=chunk.optJSONArray("choices");if(choices==null||choices.length()==0)continue;
+          JSONObject choice=choices.getJSONObject(0),delta=choice.optJSONObject("delta");
+          if(delta!=null&&!delta.isNull("content"))answer.append(delta.getString("content"));
+          if(answer.length()>200000)throw new IOException("单条回复超过上限");
+          if(System.currentTimeMillis()-last>=100){partial.accept(answer.toString());last=System.currentTimeMillis();}
+        }}
+      if(!complete||answer.length()==0)throw new IOException("模型响应未完成");
+      messages.put(new JSONObject().put("role","assistant").put("text",answer.toString()));
+      JSONArray history=state.optJSONArray("phoneChats");if(history==null)history=new JSONArray();
+      for(int i=history.length()-1;i>=0;i--)if(history.getJSONObject(i).getString("id").equals(doc.getString("id")))history.remove(i);
+      history.put(doc);state.put("phoneChats",history);save();return doc;
+    }finally{activeChat=null;c.disconnect();}
+  }
   private JSONObject callInternal(JSONObject request)throws Exception{
     load();String action=request.getString("action");JSONObject result=new JSONObject();
     if(Arrays.asList("refresh","download","upload").contains(action))refreshMembership();
+    if(action.equals("agent-spending")){
+      if(!state.has("session"))throw new IOException("请先登录账号");
+      JSONObject body=null;if(request.has("enabled")){
+        if(!state.getJSONObject("session").getString("accountId").equals(request.getString("account")))throw new IOException("账号已切换");
+        body=new JSONObject().put("enabled",request.getBoolean("enabled"));}
+      return api("account/agent-spending",body).put("account",state.getJSONObject("session").getString("accountId"));
+    }
+    if(action.equals("phone-history")){
+      String account=state.getJSONObject("session").getString("accountId");
+      return new JSONObject().put("account",account).put("documents",state.has("phoneChats")?state.getJSONArray("phoneChats"):new JSONArray()).put("models",api("models",null).getJSONArray("models"));
+    }
+    if(action.equals("conversations")){
+      String account=state.getJSONObject("session").getString("accountId"), key=state.getString("key");
+      byte[] raw=Base64.decode(key,Base64.URL_SAFE|Base64.NO_WRAP|Base64.NO_PADDING);
+      JSONObject cmd=request.getJSONObject("command");String op=cmd.getString("action");
+      if(!op.equals("list")){
+        if(!account.equals(cmd.getString("account")))throw new IOException("账号已切换");
+        boolean remove=op.equals("remove");if(!remove&&!op.equals("save"))throw new IOException("操作无效");
+        JSONObject doc=remove?null:cmd.getJSONObject("document");String id=remove?cmd.getString("id"):doc.getString("id");UUID.fromString(id);
+        JSONObject mutation=new JSONObject().put("id",id).put("revision",cmd.getInt("revision"));
+        if(remove)mutation.put("remove",true);
+        else {byte[] nonce=new byte[12];new SecureRandom().nextBytes(nonce);
+          mutation.put("envelope",new JSONObject().put("format",1).put("nonce",b64(nonce)).put("ciphertext",b64(CloudCipher.transform(true,raw,nonce,bytes(doc.toString()),account+"/chat/"+id))));}
+        api("conversations",mutation);
+      }
+      JSONArray items=api("conversations",null).getJSONArray("records"), records=new JSONArray();
+      for(int i=0;i<items.length();i++){JSONObject row=items.getJSONObject(i),env=row.getJSONObject("envelope");String id=row.getString("id");
+        JSONObject doc=new JSONObject(new String(CloudCipher.transform(false,raw,un64(env.getString("nonce")),un64(env.getString("ciphertext")),account+"/chat/"+id),StandardCharsets.UTF_8));
+        if(!id.equals(doc.getString("id")))throw new IOException("云对话标识校验失败");records.put(doc.put("revision",row.getInt("revision")));}
+      return new JSONObject().put("account",account).put("records",records);
+    }
     if(action.equals("register")){
       String account=UUID.randomUUID().toString().replace("-",""),password=request.getString("password");
       if(password.length()<8||password.length()>128)throw new IOException("密码须为 8 至 128 个字符");

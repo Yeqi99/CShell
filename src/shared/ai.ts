@@ -34,7 +34,8 @@ export const aiProviderSchema = z
         );
       }, 'Use HTTPS or a loopback HTTP endpoint, without embedded credentials'),
     model: z.string().trim().min(1).max(200),
-    runBudget:z.object({minutes:z.number().int().min(1).max(240),contextBytes:z.number().int().min(10000).max(20000000),noProgress:z.number().int().min(2).max(20)}).optional(),
+    contextWindowTokens:z.number().int().min(1024).optional(),
+    runBudget:z.object({minutes:z.number().int().min(0).max(240),contextBytes:z.union([z.literal(0),z.number().int().min(10000).max(20000000)]),noProgress:z.number().int().min(2).max(20)}).optional(),
     extension: z.object({id:z.string().regex(/^[a-z][a-z0-9-]*\.[a-z][a-z0-9-]*$/),model:z.string().min(1).max(300)}).strict().optional(),
   })
   .strict();
@@ -109,11 +110,13 @@ export type AiMessage = {
   role: 'user' | 'assistant' | 'tool';
   content: string;
   time: number;
+  attachmentBundle?: string;
   eventGenerated?: boolean;
   reasoning_content?: string;
   tool?: { reasoning_content?: string; name: string; input: string; output: string; target?: string; image?: import('./ai-images').AiImageReference; imageRejected?: boolean };
 };
 export type AiThread = {
+  cloudId?:string;
   checkpoint?: import('./agent-continuity').AgentCheckpoint;
   contextSummary?: string;
   contextThrough?: number;
@@ -138,6 +141,7 @@ export type AiThread = {
   goal?: import('./ai-work').AiGoal;
   messages: AiMessage[];
   state: 'idle' | 'running' | 'approval' | 'error';
+  modelRetry?: number;
   error?: string;
   pending?: { id: string; tool: string; arguments: string; reason: string; target?: string };
 };
@@ -188,12 +192,15 @@ export interface AiBridge {
     providerId: string,
     mode: AiMode,
     sessionId?: string,
-    extensionModel?: string,
+    extensionModel?: string, history?:import('./cloud-conversations').ChatDocument,
   ): Promise<AiThread>;
   aiThreadDelete(id: string): Promise<void>;
-  aiSend(id: string, text: string): Promise<void>;
+  aiSend(id: string, text: string, attachments?: AiAttachment[], steer?: boolean): Promise<void>;
+  aiReask(id:string, index:number, time:number, text:string):Promise<string>;
   aiApprove(id: string, requestId: string, allow: boolean): Promise<void>;
   aiStop(id: string): Promise<void>;
   aiMode(id: string, mode: AiMode): Promise<void>;
   aiThreadProvider(id: string, providerId: string, extensionModel?: string): Promise<void>;
 }
+
+export interface AiAttachment {name:string;mime:string;data:string}

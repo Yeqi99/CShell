@@ -31,7 +31,7 @@ import { frames, send, textChunks } from './wire';
 import { ManagementQueue } from './management-queue';
 import { remoteProcessTools } from '../remote-process-tools';
 import {remoteAutomationTools} from '../remote-automation-tools';
-import { remoteCapabilityTools } from '../remote-capability-tools';
+import { packageDiscovery } from '../remote-capability-tools';
 const deviceSchema = clientInvitationSchema
   .omit({ token: true, expires: true })
   .extend({ relay: agentRelayConnectionSchema.optional(),accountManaged:z.boolean().optional(),accountBorrowed:z.boolean().optional(),accountPassword:clientPasswordSchema.optional() });
@@ -103,7 +103,7 @@ class ClientChannel {
           pending.reject(new Error('Malformed Agent result'));
         }
       } else pending.resolve(value.result);
-      if(pending.upgrade&&(value.result as {desktopStream?:boolean})?.desktopStream===true)return false;
+      if(pending.upgrade && ((value.result as {desktopStream?:boolean})?.desktopStream===true || (value.result as {rdpStream?:boolean})?.rdpStream===true))return false;
     });
   }
   request(op: string, payload?: unknown, timeoutMs = 15000) {
@@ -117,7 +117,7 @@ class ClientChannel {
           this.socket.destroy();
           reject(new Error('Client request timed out; not replayed'));
         }, timeoutMs);
-      this.pending.set(id, { resolve, reject, timer,upgrade:op==='desktop-stream' });
+      this.pending.set(id, { resolve, reject, timer,upgrade:op==='desktop-stream'||op==='rdp-stream' });
       try {
         send(this.socket, { id, op, payload });
       } catch (e) {
@@ -238,6 +238,7 @@ export class ClientProvider implements ManagedProvider {
     .strict();
   private identity?: Promise<ClientIdentity>;
   private devices: Device[] = [];
+  private packageEpoch=new Map<string,number>();
   private explicitDisconnectListeners = new Set<(sessionId:string)=>void>();
   onExplicitDisconnect(listener:(sessionId:string)=>void){this.explicitDisconnectListeners.add(listener);return ()=>this.explicitDisconnectListeners.delete(listener);}
   private sessions = new Map<string, { channel: ClientChannel; connection: ProviderConnection }>();
@@ -247,6 +248,7 @@ export class ClientProvider implements ManagedProvider {
   ) {}
   cloudDelegation?:(id:string,fingerprint:string)=>Promise<string>;
   private async authFields(device:Device){if(device.accountBorrowed){if(!this.cloudDelegation)throw Error('请登录借用账号');const identity=await(this.identity??=this.vault.identity());return {delegation:await this.cloudDelegation(device.deviceId,fingerprint(identity.certificate))};}return device.accountManaged?{password:device.accountPassword}:{};}
+  recoverRentalPairing?: (deviceId: string) => Promise<boolean>;
   cloudLease?:(id:string)=>Promise<AgentRelayConnection>;
   private async cloudDevice(device:Device){if(!device.accountManaged)return device;if(!this.cloudLease)throw Error('请登录 Pro 账号后连接会员机器');return {...device,relay:await this.cloudLease(device.deviceId)};}
   async load() {
@@ -274,6 +276,14 @@ export class ClientProvider implements ManagedProvider {
     const next = this.devices.map(d => d.deviceId === deviceId ? {...d, ...endpoint} : d);
     await this.vault.write('devices', next);
     this.devices = next;
+  }
+  usesDesktopRelay(deviceId: string) {
+    const device = this.devices.find(d => d.deviceId === deviceId);
+    return !!(device?.accountManaged || device?.relay);
+  }
+  matchesIdentity(deviceId: string, identity: string) {
+    const device = this.devices.find(d => d.deviceId === deviceId);
+    return !!device && fingerprint(device.certificate) === identity;
   }
   list(): ClientDevice[] {
     return this.devices.map(({ certificate, relay: _relay, accountPassword:_password, accountManaged:_managed, ...d }) => ({
@@ -406,7 +416,13 @@ export class ClientProvider implements ManagedProvider {
         !auth.capabilities.includes(agentCapability(call.method))
       )
         throw new Error('受控端未授予此管理权限');
-      return await channel.request('manage', call, call.method==='files.transferPull'?15*60_000:60000);
+      try {
+          return await channel.request('manage', call, call.method==='files.transferPull'?15*60_000:60000);
+        } finally {
+          if(['packages.grant','packages.install','packages.uninstall','packages.refresh','client.access'].includes(call.method)){
+            this.packageEpoch.set(deviceId,(this.packageEpoch.get(deviceId)??0)+1);
+          }
+        }
     } finally {
       channel.socket.destroy();
     }
@@ -433,12 +449,22 @@ export class ClientProvider implements ManagedProvider {
     channel.pulse();return {call:async(method:string,params?:unknown)=>{if(!method.startsWith('browser.'))throw Error('浏览器通道操作无效');if(channel.socket.destroyed)throw Error('浏览器通道已断开');return channel.request('manage',agentCallSchema.parse({method,params}),30000);},validate:()=>{if(channel.socket.destroyed)throw Error('浏览器通道已断开');},close:()=>channel.socket.destroy()};
   }
   /** Dedicated TLS channel, same pinned device and optional end-to-end management relay. */
-  async openDesktopStream(deviceId:string,signal:AbortSignal=new AbortController().signal){
+  openDesktopStream(deviceId:string,signal:AbortSignal=new AbortController().signal){return this.openDisplayStream(deviceId,'desktop-stream',signal);}
+  openRdpStream(deviceId:string,signal:AbortSignal){return this.openDisplayStream(deviceId,'rdp-stream',signal);}
+  private async openDisplayStream(deviceId:string,op:'desktop-stream'|'rdp-stream',signal:AbortSignal){
     const device=this.devices.find(d=>d.deviceId===deviceId);if(!device)throw new Error('Agent identity not configured');
     const channel=await dial(
       await this.cloudDevice(device),await(this.identity??=this.vault.identity()),()=>{},signal);
     try{const auth=this.verifyAuth(await channel.request('auth',{name:hostname(),...await this.authFields(device)}),deviceId);if(!auth.capabilities.includes('agent.manage'))throw new Error('Desktop transport management permission denied');
-      const response=await channel.request('desktop-stream');if(!(response as {desktopStream?:boolean})?.desktopStream)throw new Error('Desktop stream unsupported');return channel.socket;
+      const response=await channel.request(op) as {desktopStream?:boolean;rdpStream?:boolean};
+      if(!(op==='rdp-stream'?response?.rdpStream:response?.desktopStream))throw new Error('Desktop stream unsupported');
+      if(op==='rdp-stream'){
+        signal.throwIfAborted();
+        const cancel=()=>channel.socket.destroy();
+        signal.addEventListener('abort',cancel,{once:true});
+        channel.socket.once('close',()=>signal.removeEventListener('abort',cancel));
+      }
+      return channel.socket;
     }catch(error){channel.socket.destroy();throw error;}
   }
   async shells(deviceId: string): Promise<AgentShellOption[]> {
@@ -565,10 +591,16 @@ export class ClientProvider implements ManagedProvider {
       // Custom tools run on the native CAgent host, never a selected WSL environment.
       let processTools: import('../connections/contracts').ConnectionTool[] = [];
       let automationTools: import('../connections/contracts').ConnectionTool[] = [];
-      let packageTools: import('../connections/contracts').ConnectionTool[] = [];
+      const packages=config.shell!=='wsl'&&auth.capabilities.includes('agent.manage')
+        ?packageDiscovery((call,abort)=>this.call(device.deviceId,call,abort),auth.capabilities.includes('commands.execute')):undefined;
+      let catalogCache:{data:unknown;stamp:string;at:number;policy?:object}|undefined;
+      const catalogStamp=()=>String(this.packageEpoch.get(device.deviceId)??0)+'/'+packages?.revision();
       if(config.shell!=='wsl'&&auth.capabilities.includes('agent.manage')){
         try{automationTools=await remoteAutomationTools((call,abort)=>this.call(device.deviceId,call,abort),auth.capabilities.includes('commands.execute'),AbortSignal.any([signal,AbortSignal.timeout(3000)]));}catch{/* Unsupported automation or revoked grants contributes no tools. */}
-        try{packageTools=await remoteCapabilityTools((call,abort)=>this.call(device.deviceId,call,abort),auth.capabilities.includes('commands.execute'),AbortSignal.any([signal,AbortSignal.timeout(3000)]));}catch{/* Unsupported package protocol contributes no tools. */}
+        try{await packages!.refresh(signal,undefined,async(call,abort)=>{abort.throwIfAborted();const stamp=catalogStamp();
+          const data=await channel.request('manage',call);
+          if(stamp===catalogStamp())catalogCache={data,stamp,at:Date.now()};
+          return data;});}catch{/* Keep read-only discovery available after a transient failure. */}
       }
       if(config.shell!=='wsl'&&auth.capabilities.includes('agent.manage')&&auth.capabilities.includes('commands.execute')) {
         try { processTools=await remoteProcessTools((call,abort)=>this.call(device.deviceId,call,abort),AbortSignal.any([signal,AbortSignal.timeout(3000)])); }
@@ -607,10 +639,32 @@ export class ClientProvider implements ManagedProvider {
                 }
               }
             : undefined,
+        packageCatalog:async(abort,policy,cachedOnly)=>{
+          if(!packages)return [];
+          const stamp=catalogStamp();
+          if(catalogCache?.stamp===stamp && Date.now()-catalogCache.at<30000 && (!catalogCache.policy || policy===catalogCache.policy)){
+            catalogCache.policy=policy;
+            return catalogCache.data;
+          }
+          if(cachedOnly)return [];
+          const data=await this.call(device.deviceId,{method:'packages.tools'},abort);
+          abort.throwIfAborted();
+          if(stamp!==catalogStamp())return [];
+          catalogCache={data,stamp,at:Date.now(),policy};
+          return data;
+        },
         agent: (call, abort) => this.call(device.deviceId, call, abort),
-        tools: [
+        get tools(){return packages ? [...baseTools,...packages.tools()] : baseTools;},
+        terminal: config.managementOnly?undefined:{
+          input: (data) => {
+            for (const chunk of textChunks(data)) fire('input', chunk);
+          },
+          resize: (cols, rows) => fire('resize', { cols, rows }),
+          acknowledge,
+        },
+      };
+      const baseTools: import('../connections/contracts').ConnectionTool[] = [
           ...processTools,
-          ...packageTools,
           ...automationTools,
           ...(auth.capabilities.includes('commands.execute')&&auth.shells.includes(config.shell)
             ? [
@@ -752,15 +806,7 @@ export class ClientProvider implements ManagedProvider {
                 return JSON.stringify(result);
               },
             })),
-        ],
-        terminal: config.managementOnly?undefined:{
-          input: (data) => {
-            for (const chunk of textChunks(data)) fire('input', chunk);
-          },
-          resize: (cols, rows) => fire('resize', { cols, rows }),
-          acknowledge,
-        },
-      };
+        ];
       this.sessions.set(id, { channel, connection });
       onReady?.(id);
       ready = true;

@@ -11,6 +11,8 @@ export interface ConnectionTarget {
 }
 export interface ConnectionTool {
   /** Trusted host tools touching saved machines must declare every affected scope. */
+  readonly parallelRead?: true;
+  readonly discovery?: import('../progressive-context').ToolDiscovery;
   readonly applicationTargets?: (input:unknown)=>readonly {id:string;group?:string;capabilities:readonly string[]}[];
   readonly name: string;
   readonly capability: string;
@@ -27,6 +29,7 @@ export interface ConnectionTool {
   invoke(input: unknown, signal: AbortSignal, output?: (text: string) => void, guard?: () => void): Promise<string>;
 }
 export interface ProviderConnection {
+  readonly packageCatalog?: (signal:AbortSignal, policy:object, cachedOnly:boolean)=>Promise<unknown>;
   readonly agent?: (
     call: import('../../shared/agent').AgentCall,
     signal: AbortSignal,

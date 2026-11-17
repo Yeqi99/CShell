@@ -1,3 +1,4 @@
+import { chooseConversationLink } from './conversation-link';
 import {preferencesTool} from '../core/preferences-tool';
 import {providerFileCall} from '../core/provider-file-call';
 import {IdentityNetwork} from './identity-network';
@@ -259,17 +260,21 @@ else
           known = store.host(endpoint);
         if (known === fingerprint) return true;
         if (known) {
-          await dialog.showMessageBox(window, {
+          const replacement = await dialog.showMessageBox(window, {
             signal,
-            type: 'error',
+            type: 'warning',
             title: text('主机密钥已改变', 'Host key changed'),
             message: text(
-              '已阻止连接。请通过可信渠道核实服务器身份。',
-              'Connection blocked. Verify server identity through a trusted channel.',
+              '此地址的 SSH 指纹已改变。如果服务器刚刚重装，可以清除旧指纹，重新验证这台机器。',
+              'The SSH fingerprint for this address has changed. If you reinstalled the server, clear the saved fingerprint to verify it again.',
             ),
             detail: `${endpoint}\n${text('已保存', 'Saved')}: ${known}\n${text('当前', 'Received')}: ${fingerprint}`,
+            buttons: [text('取消', 'Cancel'), text('清除旧指纹，按新机器连接', 'Clear fingerprint and connect as new')],
+            defaultId: 0,
+            cancelId: 0,
           });
-          return false;
+          if (replacement.response !== 1 || signal.aborted || !(await store.forgetHost(endpoint, known))) return false;
+          signal.throwIfAborted();
         }
         const result = await dialog.showMessageBox(window, {
           signal,
@@ -285,6 +290,8 @@ else
           cancelId: 0,
         });
         if (result.response !== 1 || signal.aborted) return false;
+        const current = store.host(endpoint);
+        if (current) return current === fingerprint;
         await store.trust(endpoint, fingerprint);
         return true;
       });
@@ -298,6 +305,12 @@ else
       window.once('closed', () => { void processExtensions.dispose(); });
       const ftp = new FtpService(emit);
       connections = createSshManager(ssh, () => store.snapshot().profiles, extensionServices.tools, target => {
+        if (target.providerId === 'cshell.client') {
+          const profile = store.snapshot().profiles.find(p => p.id === target.resourceId);
+          if (profile?.protocol === 'client' && clientProvider.matchesIdentity(target.resourceId, target.identity))
+            return { id: profile.id, group: profile.group };
+          return;
+        }
         if (target.providerId === 'cshell.rdp') {
           const saved = store.snapshot().profiles.find(p => p.id === target.resourceId);
           if (saved?.protocol === 'rdp' && rdpIdentity(saved) === target.identity) return { id: saved.id, group: saved.group };
@@ -458,8 +471,13 @@ else
         if (error) throw new Error(error);
       });
       handle('views:list', () => store.monitorViews());
+      handle('views:open-ids', () => monitorWindows.openIds());
       handle('views:save', value => store.saveMonitorView(value));
-      handle('views:delete', id => store.deleteMonitorView(idSchema.parse(id)));
+      handle('views:delete', async input => {
+        const id = idSchema.parse(input);
+        await store.deleteMonitorView(id);
+        monitorWindows.close(id);
+      });
       handle('views:displays', () => monitorWindows.displays());
       handle('views:open', id => monitorWindows.open(id));
       handle('views:current', (raw, rawMode) => {
@@ -503,8 +521,12 @@ else
       });
       const embeddedRdp=new EmbeddedRdpService(join(app.getPath('userData'),'rdp-host'));
       app.once('before-quit',()=>embeddedRdp.dispose());
-      handle('connection:rdp', async (value, sessionId) => {
+      handle('connection:rdp', async (value, sessionId,expected) => {
         const profile=rdpProfileSchema.parse(store.profile(idSchema.parse(value)));
+        if(expected!==undefined){
+          const endpoint=z.object({host:z.string(),port:z.number().int(),username:z.string()}).strict().parse(expected);
+          if(endpoint.host!==profile.host||endpoint.port!==profile.port||endpoint.username!==profile.username)throw Error('保存的 RDP 地址或用户已改变，请重新选择连接');
+        }
         const secret=await store.secret(profile.id);
         return embeddedRdp.open(profile,secret?.password||'',window.getNativeWindowHandle(),sessionId===undefined?profile.id:idSchema.parse(sessionId));
       });
@@ -712,6 +734,8 @@ else
         () => [...processExtensions.applicationTools(),...(identityNetwork?.tools()??[])],
         new MachineNetworkRoute(store, clientProvider),
         !accountProfiles || accountProfiles.current() === undefined || accountProfiles.current() === 'guest',
+        (model, tokens) => activity.record({ kind: 'ai', action: 'model.usage', provider: model.slice(0, 80), status: 'success', tokens }),
+        () => new MachineNetworkRoute(store, clientProvider),
       );
       registerPresetHandlers(handle, window, app.getPath('userData'), store, text);
       registerConnectionImport(handle, window, store);
@@ -942,6 +966,7 @@ else
       handle('local-terminal:environment', () => localTerminal.settings());
       handle('local-terminal:environment-save', (rows) => localTerminal.save(rows));
       handle('config', () => store.snapshot());
+      handle('conversation:link', (url, english) => chooseConversationLink(url, english === true));
       handle('clipboard:write', (value) =>
         clipboard.writeText(z.string().max(2_000_000).parse(value)),
       );

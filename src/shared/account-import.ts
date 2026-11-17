@@ -4,6 +4,7 @@ export interface AccountSourcePreview {
  conflicts:{id:string;category:string;name:string}[];
 }
 export interface AccountImportBridge {
+ hasGuestCache?():Promise<boolean>;
  guestCacheClear?(confirmation:'clear-guest-local-only'):Promise<void>;
  accountSources?():Promise<AccountSource[]>;
  accountSourcePreview?(source:AccountSource):Promise<AccountSourcePreview>;

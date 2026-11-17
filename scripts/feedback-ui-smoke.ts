@@ -17,6 +17,14 @@ await new Promise<void>(r=>server.listen(0,'127.0.0.1',r));
 const browser=await chromium.launch({channel:'msedge',headless:true});
 try{
  const page=await browser.newPage();const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.addInitScript(() => {
+   const requestFrame = window.requestAnimationFrame.bind(window);
+   (window as any).frameRequests = 0;
+   window.requestAnimationFrame = callback => {
+     (window as any).frameRequests++;
+     return requestFrame(callback);
+   };
+ });
  await page.goto('http://127.0.0.1:'+(server.address() as any).port);
  await page.getByRole('alert').waitFor();await page.getByRole('button',{name:'重试'}).click();assert.ok(await page.evaluate(()=>(window as any).retried));
  await page.getByText('诊断详情',{exact:true}).click();await page.getByRole('button',{name:'复制内容'}).click();assert.equal(await page.evaluate(()=>(window as any).copied),'AI API HTTP 503');
@@ -38,6 +46,9 @@ try{
  await page.evaluate(text=>(window as any).append(text),text);
  await page.waitForTimeout(50);const partial=await page.locator('#stream').innerText();assert.ok(partial.length>0&&partial.length<text.length,'buffer reveals part of a burst');assert.ok(!/[\uD800-\uDBFF]$/.test(partial));
  await page.evaluate(()=>(window as any).stop());await page.waitForTimeout(40);assert.equal((await page.locator('#stream').innerText()).trim(),text.trim(),'stop shows all received content');
+ const idleFrames = await page.evaluate(() => (window as any).frameRequests);
+ await page.waitForTimeout(250);
+ assert.equal(await page.evaluate(() => (window as any).frameRequests), idleFrames, 'idle transcript must not schedule animation frames');
  await mkdir('.local/feedback-ui',{recursive:true});
  for(const width of [1200,390]){await page.setViewportSize({width,height:820});await page.screenshot({path:'.local/feedback-ui/'+width+'.png',fullPage:true});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'no horizontal overflow');}
  assert.deepEqual(errors,[]);console.log('Feedback, copy, retry, stream smoothing, stop, and narrow layout passed');

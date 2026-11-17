@@ -1,4 +1,12 @@
 import { build } from 'esbuild';
+import { cp } from 'node:fs/promises';
+import { createRequire } from 'node:module';
+import { dirname } from 'node:path';
+if (process.platform === 'win32') {
+  const require = createRequire(import.meta.url);
+  const core = require.resolve('playwright-core/package.json', { paths: [require.resolve('playwright')] });
+  await cp(dirname(core), 'dist/main/machine-edge-runtime', { recursive: true });
+}
 await build({
   entryPoints: ['src/desktop/entry.ts'],
   define: {__CSHELL_PRO__: JSON.stringify(process.env.CSHELL_EDITION === 'pro')},

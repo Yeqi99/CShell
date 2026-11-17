@@ -1,8 +1,11 @@
 import {readdir,unlink} from 'node:fs/promises';
-import { browserPagePermission } from '../core/browser-interactions';
+import { browserPagePermission, storageAccessPair } from '../core/browser-interactions';
 import { agentBrowserStream, type BrowserAgentCall } from '../core/agent-browser-stream';
 import {
   app,
+  clipboard,
+  dialog,
+  Menu,
   safeStorage,
   WebContentsView,
   session,
@@ -20,6 +23,8 @@ import type { MachineBrowserState } from '../shared/machine-browser';
 import { browserOpenInput, browserSnapshotInput, browserCaptureInput, browserInteractInput, browserCrawlInput } from '../shared/visual-tools';
 import { captureBrowser, readBrowserSnapshot, runPageOperation } from './browser-automation';
 import { browserFrames } from './browser-frames';
+import { installedEdge, openMachineEdge, sshBrowserTimezone } from './native-machine-browser';
+const hasMachineEdge = !!installedEdge();
 const urlSchema = z
   .string()
   .max(8192)
@@ -37,6 +42,10 @@ type Tab = {
   fullscreen?: boolean;
 };
 type Workspace = {
+  nativeLifetime: AbortController;
+  readTimezone(): Promise<string>;
+  manualControl?: boolean;
+  activity?: string;
   cloudKey:string;
   key: string;
   validate?: () => void;
@@ -154,6 +163,7 @@ export class MachineBrowser {
     if ([...w.tabs.values()].some((t) => this.alive(t))) this.save(w);
     if (w.monitor) clearInterval(w.monitor);
     w.disposed = true;
+    w.nativeLifetime.abort();
     w.connected = false;
     for (const [id, current] of this.resolved) if (current === w) {
       this.resolved.delete(id);
@@ -263,6 +273,8 @@ export class MachineBrowser {
 
         ses.on('will-download', (event) => event.preventDefault());
         const w: Workspace = {
+          nativeLifetime: new AbortController(),
+          readTimezone: remote ? async () => (await remote.call('browser.status')).timezone : () => sshBrowserTimezone(this.ssh.get(sourceId).client),
           cloudKey:key,
           key,
           library,
@@ -276,11 +288,9 @@ export class MachineBrowser {
           proxy,
         };
         this.resolved.set(id, w);
-        const allow = (contents: Electron.WebContents | null, permission: string) => {
+        const isActivePage = (contents: Electron.WebContents | null) => {
           const t = w.tabs.get(w.selected);
-          return browserPagePermission(
-            permission,
-            !!(
+          return !!(
               w.connected &&
               !w.disposed &&
               t &&
@@ -289,18 +299,52 @@ export class MachineBrowser {
               contents.isFocused() &&
               this.window.isFocused() &&
               browserUrl(contents.getURL())
-            ),
-          );
+            );
         };
-        ses.setPermissionRequestHandler((contents, permission, reply) =>
-          reply(allow(contents, permission)),
-        );
-        ses.setPermissionCheckHandler((contents, permission) => allow(contents, permission));
+        const allow = (contents: Electron.WebContents | null, permission: string) =>
+          browserPagePermission(permission, isActivePage(contents));
+        const grants = new WeakMap<Electron.WebContents, Set<string>>();
+        const pendingStorage = new WeakSet<Electron.WebContents>();
+        ses.setPermissionRequestHandler((contents, permission, reply, details) => {
+          if (permission !== 'storage-access') return reply(allow(contents, permission));
+          const pair = storageAccessPair(contents.getURL(), details.requestingUrl);
+          const tab = w.tabs.get(w.selected);
+          if (!pair || !tab || !tab.view.getVisible() || this.borrowed.has(tab) || !isActivePage(contents)) return reply(false);
+          if (pair.top === pair.embedded || grants.get(contents)?.has(pair.key)) return reply(true);
+          if (pendingStorage.has(contents)) return reply(false);
+          pendingStorage.add(contents);
+          const frame = contents.mainFrame.framesInSubtree.find(f => f.url === details.requestingUrl);
+          const check = () => !!frame && !w.disposed && w.connected && w.tabs.get(w.selected) === tab &&
+            !contents.isDestroyed() && tab.view.getVisible() && !this.borrowed.has(tab) &&
+            contents.mainFrame.framesInSubtree.includes(frame) &&
+            storageAccessPair(contents.getURL(), frame.url)?.key === pair.key;
+          if (!check()) { pendingStorage.delete(contents); return reply(false); }
+          void dialog.showMessageBox(this.window, {
+            type: 'question', title: '允许使用登录状态？',
+            message: `${pair.top} 正在使用 ${pair.embedded} 的登录服务`,
+            detail: '允许后，嵌入页面可以访问它自己在此机器浏览器中保存的登录状态。',
+            buttons: ['取消', '允许此标签页使用'], defaultId: 0, cancelId: 0,
+          }).then(({ response }) => {
+            if (response !== 1 || !check()) return false;
+            const approved = grants.get(contents) ?? new Set<string>();
+            approved.add(pair.key);
+            grants.set(contents, approved);
+            return true;
+          }).catch(() => false).then(allowed => { pendingStorage.delete(contents); reply(allowed); });
+        });
+        ses.setPermissionCheckHandler((contents, permission, origin, details) => {
+          if (permission !== 'storage-access') return allow(contents, permission);
+          if (!contents || contents.isDestroyed() || w.disposed || !w.connected) return false;
+          const pair = storageAccessPair(contents.getURL(), origin);
+          if (!pair || (details.embeddingOrigin && details.embeddingOrigin !== pair.top)) return false;
+          return pair.top === pair.embedded || !!grants.get(contents)?.has(pair.key);
+        });
         this.live.add(w);
         ses.webRequest.onBeforeRequest((details, reply) =>
           reply({
             cancel:
               !w.connected ||
+              !details.url.startsWith('devtools://devtools/') &&
               !['http:', 'https:', 'ws:', 'wss:', 'data:', 'blob:', 'about:'].includes(
                 new URL(details.url).protocol,
               ),
@@ -396,7 +440,34 @@ export class MachineBrowser {
     contents.on('leave-html-full-screen', () => {
       tab.fullscreen = false;
     });
+    const current = () => !w.disposed && !w.closing && w.connected && w.selected === tab.id && this.alive(tab);
+    const openDevTools = () => {
+      if (current()) contents.openDevTools({ mode: 'detach' });
+    };
+    contents.on('context-menu', (_event, params) => {
+      if (!current()) return;
+      const link = params.linkURL;
+      const menu = Menu.buildFromTemplate([
+        ...(link ? [
+          { label: '在新标签页中打开链接', enabled: browserUrl(link) && w.tabs.size < 12, click: () => {
+            if (!current() || w.tabs.size >= 12) return;
+            const next = this.tab(w);
+            this.layout(tab, false);
+            void this.navigate(next, link);
+          } },
+          { label: '复制链接地址', click: () => clipboard.writeText(link) },
+          { type: 'separator' as const },
+        ] : []),
+        { label: '开发者工具', click: openDevTools },
+      ]);
+      menu.popup({ window: this.window });
+    });
     contents.on('before-input-event', (event, input) => {
+      if (input.type === 'keyDown' && input.key === 'F12') {
+        event.preventDefault();
+        if (!input.isAutoRepeat) openDevTools();
+        return;
+      }
       if (input.type !== 'keyDown' || !input.control) return;
       const key = input.key.toLowerCase();
       if (!['l', 't', 'w'].includes(key)) return;
@@ -492,6 +563,9 @@ export class MachineBrowser {
   private state(w: Workspace): MachineBrowserState {
     this.prune(w);
     return {
+      manualControl: !!w.manualControl,
+      nativeEdge: hasMachineEdge,
+      activity: w.activity,
       history: w.library.data.history,
       bookmarks: w.library.data.bookmarks,
       persistenceError: w.persistenceError,
@@ -514,24 +588,43 @@ export class MachineBrowser {
   async automation(id: string, action: string, raw: unknown, signal: AbortSignal, authorize?:()=>void) {
     signal.throwIfAborted();authorize?.();
     const w=await this.workspace(id);
-    const guard=()=>{signal.throwIfAborted();authorize?.();w.validate?.();if(w.disposed||!w.connected)throw Error('机器连接已断开，浏览器不会回退本机网络');};
+    const guard=()=>{if(w.manualControl && action!=='tabs')throw Error('用户正在操作网页，请等待交还控制');signal.throwIfAborted();authorize?.();w.validate?.();if(w.disposed||!w.connected)throw Error('机器连接已断开，浏览器不会回退本机网络');};
     guard();
     const secrets=this.privateInputs.get(w)??new Set<string>();this.privateInputs.set(w,secrets);
     const clean=(value:any):any=>{if(Array.isArray(value))return value.map(clean);if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).map(([key,entry])=>[key,typeof entry==='string'&&['text','name','title','href','url'].includes(key)?[...secrets].sort((a,b)=>b.length-a.length).reduce((s,secret)=>s.split(secret).join('[输入内容已隐藏]'),entry):typeof entry==='object'?clean(entry):entry]));return value;};
     if(this.automationBusy.has(w))throw Error('此机器的浏览器正在执行另一项操作，请稍后重试');
     this.automationBusy.add(w);
+    w.activity = ({ open:'打开网页', snapshot:'读取页面', frames:'定位框架', capture:'查看画面', interact:'操作网页', crawl:'提取网页' } as Record<string,string>)[action];
     const presentations=new Set<Tab>();let background:BrowserWindow|undefined;
     const present=(t:Tab)=>{if(!t.view.getVisible()&&!presentations.has(t)){presentations.add(t);this.borrowed.set(t,{bounds:t.view.getBounds(),visible:false});background??=new BrowserWindow({show:false,width:1280,height:800,webPreferences:{sandbox:true,nodeIntegration:false,contextIsolation:true,backgroundThrottling:false}});this.window.contentView.removeChildView(t.view);background.contentView.addChildView(t.view);t.view.setBounds({x:0,y:0,width:1280,height:800});t.view.setVisible(true);}return t;};
     const tab=(id:string)=>{const t=w.tabs.get(id);if(!t||!this.alive(t))throw Error('标签页不属于此机器或已经关闭');return present(t);};
+    const openSharedTab = () => {
+      const previous = w.tabs.get(w.selected);
+      const visible = previous && previous.view.getVisible() && !this.borrowed.has(previous);
+      const next = this.tab(w, undefined, previous?.id);
+      if (!visible || !previous) return present(next);
+      const bounds = previous.view.getBounds();
+      this.layout(previous, false);
+      this.layout(next, true, bounds);
+      return next;
+    };
     const load=async(t:Tab,url:string)=>{urlSchema.parse(url);guard();t.error=undefined;const abort=()=>t.view.webContents.stop();signal.addEventListener('abort',abort,{once:true});try{await this.navigate(t,url);guard();if(t.error)throw Error(t.error);}finally{signal.removeEventListener('abort',abort);}};
     try {
-      if(action==='tabs')return clean({tabs:this.state(w).tabs,connected:w.connected});
+      if(action==='tabs')return clean({tabs:w.manualControl?[]:this.state(w).tabs,selected:w.selected,manualControl:!!w.manualControl,connected:w.connected});
       if(action==='frames'){const p=z.object({tabId:z.string().uuid()}).strict().parse(raw);const frames=await browserFrames(tab(p.tabId).view.webContents);guard();return clean({frames:frames.map(({session,...frame})=>frame)});}
-      if(action==='open') {const p=browserOpenInput.parse(raw),t=present(this.tab(w));try{await load(t,p.url);return {tabId:t.id,...this.state(w).tabs.find(v=>v.id===t.id)};}catch(error){this.removeTab(w,t);if(this.alive(t))t.view.webContents.close({waitForBeforeUnload:false});throw error;}}
+      if(action==='open') {const p=browserOpenInput.parse(raw),t=openSharedTab();try{await load(t,p.url);return {tabId:t.id,...this.state(w).tabs.find(v=>v.id===t.id)};}catch(error){this.removeTab(w,t);if(this.alive(t))t.view.webContents.close({waitForBeforeUnload:false});throw error;}}
       if(action==='snapshot'){const p=browserSnapshotInput.parse(raw),result=await readBrowserSnapshot(tab(p.tabId).view.webContents,p,guard);guard();return clean(result);}
-      if(action==='capture'){const p=browserCaptureInput.parse(raw),result=await captureBrowser(tab(p.tabId).view.webContents,id,p.maxWidth,p.quality);guard();return result;}
+      if(action==='capture'){const p=browserCaptureInput.parse(raw),result=await captureBrowser(tab(p.tabId).view.webContents,id,p.maxWidth,p.quality,guard,signal);guard();return {...result,tabId:p.tabId,capturedAt:Date.now()};}
       if(action==='interact') {
-        const p=browserInteractInput.parse(raw),t=tab(p.tabId),contents=t.view.webContents;guard();
+        const p=browserInteractInput.parse(raw);
+        if(p.action==='handoff'){
+          const target=w.tabs.get(p.tabId);
+          if(!target || !this.alive(target))throw Error('网页标签已关闭');
+          w.selected=target.id;
+          // Request assistance in chat without changing the user-controlled pause switch.
+          return {awaitingUser:true,tabId:p.tabId,next:'等待用户完成页面验证并在对话中回复，然后重新读取页面。'};
+        }
+        const t=tab(p.tabId),contents=t.view.webContents;guard();
         if(p.action==='fill'||p.action==='select'){const text=p.action==='fill'?p.text:p.value;if(text&&!secrets.has(text)){if(secrets.size>=256||[...secrets].reduce((n,s)=>n+s.length,0)+text.length>1048576)throw Error('当前浏览器输入已达保护容量，请重新连接后再试');secrets.add(text);}}
         if(p.action==='navigate')await load(t,p.url);
         else if(p.action==='close'){this.removeTab(w,t);contents.close({waitForBeforeUnload:false});}
@@ -539,20 +632,29 @@ export class MachineBrowser {
         else if(p.action==='back'){if(!contents.navigationHistory.canGoBack())throw Error('没有上一页');contents.navigationHistory.goBack();}
         else if(p.action==='forward'){if(!contents.navigationHistory.canGoForward())throw Error('没有下一页');contents.navigationHistory.goForward();}
         else if(p.action==='key'){contents.sendInputEvent({type:'keyDown',keyCode:p.key,modifiers:p.modifiers});contents.sendInputEvent({type:'keyUp',keyCode:p.key,modifiers:p.modifiers});}
-        else {const result=await runPageOperation(contents,p,guard);guard();if(p.action==='click'&&!result.clicked){const point={x:Math.round(result.x),y:Math.round(result.y),button:'left' as const,clickCount:1};contents.sendInputEvent({type:'mouseDown',...point});contents.sendInputEvent({type:'mouseUp',...point});}}
+        else {const result=await runPageOperation(contents,p,guard);guard();if(p.action==='scroll')return {completed:true,tabId:p.tabId,...result};if(p.action==='click'&&!result.clicked){const point={x:Math.round(result.x),y:Math.round(result.y),button:'left' as const,clickCount:1};contents.sendInputEvent({type:'mouseDown',...point});contents.sendInputEvent({type:'mouseUp',...point});}}
         guard();this.save(w);return {completed:true,tabId:p.tabId};
       }
       if(action==='crawl') {
         const p=browserCrawlInput.parse(raw),source=tab(p.tabId),origin=urlSchema.parse(source.view.webContents.getURL()).origin;
         const urls=p.urls.map(url=>urlSchema.parse(url));if(urls.some(url=>url.origin!==origin))throw Error('抓取仅支持当前页面同源地址');
-        const selected=w.selected,t=present(this.tab(w));w.selected=selected;
+        const selected=w.selected,t=openSharedTab();
         const prevent=(event:Electron.Event,url:string)=>{if(new URL(url).origin!==origin)event.preventDefault();};
         t.view.webContents.on('will-redirect',prevent);t.view.webContents.on('will-navigate',prevent);
-        try{const pages=[];for(const url of urls){await load(t,url.href);guard();if(new URL(t.view.webContents.getURL()).origin!==origin)throw Error('页面跳转离开允许的来源');pages.push(await runPageOperation(t.view.webContents,{action:'text',maxText:p.maxText},guard));}guard();return clean({pages});}
-        finally{this.removeTab(w,t);if(this.alive(t))t.view.webContents.close({waitForBeforeUnload:false});if(w.tabs.has(selected))w.selected=selected;}
+        try{const pages=[];for(const [index,url] of urls.entries()){w.activity=`提取网页 ${index+1}/${urls.length}`;await load(t,url.href);guard();if(new URL(t.view.webContents.getURL()).origin!==origin)throw Error('页面跳转离开允许的来源');pages.push(await runPageOperation(t.view.webContents,{action:'text',maxText:p.maxText},guard));}guard();return clean({pages});}
+        finally{
+          t.view.webContents.removeListener('will-redirect',prevent);
+          t.view.webContents.removeListener('will-navigate',prevent);
+          if(!w.manualControl){
+            const restore=w.selected===t.id;
+            this.removeTab(w,t);
+            if(this.alive(t))t.view.webContents.close({waitForBeforeUnload:false});
+            if(restore && w.tabs.has(selected))w.selected=selected;
+          }
+        }
       }
       throw Error('未知浏览器工具操作');
-    } finally {for(const t of presentations){const pending=this.borrowed.get(t);this.borrowed.delete(t);if(this.alive(t)){background?.contentView.removeChildView(t.view);if(!this.window.isDestroyed()&&w.tabs.has(t.id)){this.window.contentView.addChildView(t.view);this.layout(t,pending?.visible??false,pending?.bounds);}}}background?.destroy();this.automationBusy.delete(w);}
+    } finally {for(const t of presentations){const pending=this.borrowed.get(t);this.borrowed.delete(t);if(this.alive(t)){background?.contentView.removeChildView(t.view);if(!this.window.isDestroyed()&&w.tabs.has(t.id)){this.window.contentView.addChildView(t.view);this.layout(t,pending?.visible??false,pending?.bounds);}}}background?.destroy();w.activity=undefined;this.automationBusy.delete(w);}
   }
   async action(id: string, action: string, value?: unknown) {
     z.string().min(1).max(100).parse(id);
@@ -571,6 +673,8 @@ export class MachineBrowser {
       'clear-history',
       'remove-history',
       'clear-logins',
+      'manual-control',
+      'open-edge',
       'exit-fullscreen',
       'reload',
       'stop',
@@ -595,6 +699,14 @@ export class MachineBrowser {
     if (!w.connected) throw Error('服务器连接已断开；浏览器未切换到本地网络');
     if (!['status', 'hide', 'bounds'].includes(action)) w.connectionId = id;
     if (action === 'open' && w.tabs.size === 0) this.tab(w);
+    if (action === 'manual-control') w.manualControl=z.boolean().parse(value);
+    if (action === 'open-edge') {
+      const tab = w.tabs.get(w.selected);
+      if (!tab || !this.alive(tab)) throw Error('请先打开网页');
+      const url = tab.url || tab.view.webContents.getURL();
+      if (!browserUrl(url)) throw Error('请先打开 HTTP 或 HTTPS 网页');
+      await openMachineEdge(url, w.proxy.port, w.nativeLifetime.signal, await w.readTimezone());
+    }
     if (action === 'new') this.tab(w);
     if (action === 'select') {
       const key = z.string().uuid().parse(value);

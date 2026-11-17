@@ -10,3 +10,89 @@
 #production-feedback .card-body{padding:24px;overflow-wrap:anywhere}#production-feedback form{display:grid;gap:16px;margin-top:24px}#production-feedback form label{display:grid;gap:8px}#production-feedback td:first-child{max-width:360px;overflow-wrap:anywhere}#production-feedback .page-head button{flex-shrink:0}
 
 #production-traffic>.card{padding:24px;margin-bottom:20px}#production-traffic .card>h2{margin-bottom:16px}#production-traffic form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin-top:20px}#production-traffic form label{display:grid;gap:8px;min-width:0}#production-traffic form details,#production-traffic .grant-status{grid-column:1/-1}#production-traffic form details label{margin-top:14px}#production-traffic form button{justify-self:start}#production-traffic #traffic-status{margin-bottom:16px}@media(max-width:650px){#production-traffic>.card{padding:18px}#production-traffic form{grid-template-columns:1fr}}
+#production-pool .page-head,#production-pool .actions{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+#production-pool .actions{justify-content:flex-start;margin-bottom:18px}
+#production-pool section.card{padding:clamp(16px,3vw,28px);margin-block:14px}
+#production-pool .card p{line-height:1.65;margin:10px 0 16px}
+#production-pool form{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr));align-items:end;gap:16px}
+#production-pool form label.field{display:grid;gap:6px}
+#production-pool .table-wrap{overflow-x:auto}
+#production-pool details{margin-top:18px}
+#production-pool details form{margin-top:14px}
+
+/* Labels belong to their controls; actions align with the input, not its label. */
+#production-pool form .field { margin: 0; min-width: 0 }
+#production-pool form .btn { width: fit-content; min-height: 38px; justify-self: start }
+#production-pool form[data-mode=limit] { grid-template-columns: minmax(12rem,24rem) auto; justify-content:start; gap:12px }
+#production-pool form label:not(.field) { display:flex;align-items:center;gap:8px;min-height:38px }
+#production-pool .actions {gap:6px}
+#production-pool [role=status]:empty {display:none}
+@media(max-width:650px){#production-pool form,#production-pool form[data-mode=limit]{grid-template-columns:minmax(0,1fr)}}
+
+/* Membership plan and grant forms */
+.card:has(> #plan-form), #member-editor {
+  margin-block: 18px;
+  padding: clamp(16px, 2vw, 24px);
+  container-type: inline-size;
+}
+.card:has(> #plan-form) > p {
+  margin-top: 6px;
+  color: var(--muted);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+#plan-form, #grant-form, #member-form {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: end;
+  gap: 16px;
+  margin-top: 18px;
+}
+#grant-form, #member-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+#member-form { padding-top: 18px; border-top: 1px solid var(--line); }
+:is(#plan-form, #grant-form, #member-form) > label {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 500;
+}
+:is(#plan-form, #grant-form, #member-form) :is(input, select) {
+  width: 100%;
+  min-width: 0;
+  height: 38px;
+  padding-inline: 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--ink);
+}
+:is(#plan-form, #grant-form, #member-form) :is(input, select):focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 1px;
+}
+#plan-form label:has([name=machine]) { grid-column: span 2; }
+:is(#plan-form, #grant-form, #member-form) button { width: fit-content; min-height: 38px; }
+#member-form #member-cancel { justify-self: start; }
+:is(#grant-form, #member-form) p, :is(#plan-form, #grant-form) output {
+  grid-column: 1 / -1;
+  color: var(--muted);
+}
+:is(#plan-form, #grant-form) output:empty, #member-result:empty { display: none; }
+@container (max-width: 760px) {
+  #plan-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container (max-width: 480px) {
+  #plan-form, #grant-form, #member-form { grid-template-columns: minmax(0, 1fr); }
+  #plan-form label:has([name=machine]) { grid-column: auto; }
+}
+
+.plan-cards {display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,210px),1fr));gap:12px;margin-top:16px}
+.plan-card {display:grid;gap:7px;text-align:left;padding:16px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink)}
+.plan-card span,.plan-card small {color:var(--muted)}
+.plan-card:hover,.plan-card[aria-expanded=true] {border-color:var(--blue)}
+.plan-add {border-style:dashed;align-content:center;color:var(--blue)}
+#plan-form[hidden] {display:none}
+#plan-form {border-top:1px solid var(--line);padding-top:16px}
+#plan-form h3 {grid-column:1/-1}
+.plan-actions {display:flex;gap:8px}

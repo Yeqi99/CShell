@@ -103,6 +103,7 @@ export const agentApiExcludedMethods = {
   'assistant.tasks': 'Delegated task discovery remains on the authenticated Agent delegation interface until its dedicated API contract exists.',
   'assistant.task': 'Delegated task content remains on the authenticated Agent delegation interface with owner validation.',
   'assistant.cancel': 'Delegated cancellation remains on the authenticated Agent delegation interface with owner validation.',
+  'desktop.rdp.identity': 'RDP listener identity verification is bound to the authenticated Windows desktop viewer.',
   'desktop.recovery.plan': 'Windows session recovery requires the dedicated human-reviewed desktop recovery flow.',
   'desktop.recovery.execute': 'Windows session routing must never be performed by generic tools or silently replayed.',
   'desktop.configure': 'Desktop grants and listener configuration are local-owner-only.',

@@ -1,4 +1,5 @@
 import {connect} from 'node:net';
+import {executeHttp} from '../core/http-transport';
 import ssh2 from 'ssh2';
 import { createHash } from 'node:crypto';
 import type { Store } from '../core/store';
@@ -52,6 +53,24 @@ export class MachineNetworkRoute {
   }catch(e){close();throw e;}
  }
  async tunnel(id:string,host:string,port:number){await this.proxy(id);const current=this.current!;current.validate();return new Promise<import('node:stream').Duplex>((resolve,reject)=>current.forward(host,port,(error,stream)=>{if(error||!stream){reject(error??Error('跳板没有返回传输通道'));return;}try{current.validate();resolve(stream);}catch(e){stream.destroy();reject(e);}}));}
+ async verifyWebExit(id:string){
+   const controller=new AbortController();
+   const timer=setTimeout(()=>controller.abort(),12000);
+   try {
+     // A completed TLS response, including redirects, proves HTTPS works over this machine.
+     await Promise.any(['https://www.microsoft.com/','https://www.cloudflare.com/'].map(url=>
+       executeHttp({url,method:'HEAD',headers:[],body:'',timeoutMs:12000},controller.signal,
+         async(host,port,signal)=>{
+           const opening=this.tunnel(id,host,port);
+           const closed=new Promise<never>((_,reject)=>signal.addEventListener('abort',()=>reject(Error('timeout')),{once:true}));
+           void opening.then(stream=>{if(signal.aborted)stream.destroy();},()=>{});
+           return Promise.race([opening,closed]);
+         })
+     ));
+   } catch {
+     throw Error('机器已连接，但未能通过它访问 HTTPS，请检查机器联网与转发设置。');
+   } finally {clearTimeout(timer);controller.abort();}
+ }
  private release(){const current=this.current;this.current=undefined;current?.proxy.close();current?.close();}
  async close(){this.closed=true;this.release();await this.pending.catch(()=>{});this.release();}
 }

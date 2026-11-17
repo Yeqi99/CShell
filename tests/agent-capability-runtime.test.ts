@@ -31,8 +31,12 @@ test('bundled capability installs actual verified files, grants separately and s
   await runtime.dispose();
   const restored=new CapabilityRuntime(options);await restored.load();assert.equal(restored.list()[0].status,'available');assert.equal(restored.tools().length,5);
   await restored.grant({id:'cagent.system-apps',permissions:[]});assert.equal(restored.tools().length,0);
+  await restored.install({id:'cagent.system-apps',confirm:true},new AbortController().signal,true);
+  assert.equal(restored.tools().length,0,'a local marketplace reinstall preserves explicit revocation');
   await assert.rejects(restored.invoke({packageId:'cagent.system-apps',toolId:'system_apps_catalog',args:{}},'local',new AbortController().signal),/authorized/);
-  await restored.uninstall({id:'cagent.system-apps',confirm:true});assert.equal(restored.catalog()[0].installed,false);await restored.dispose();
+  await restored.uninstall({id:'cagent.system-apps',confirm:true});assert.equal(restored.catalog()[0].installed,false);
+  await restored.install({id:'cagent.system-apps',confirm:true},new AbortController().signal,true);
+  assert.equal(restored.tools().length,5,'fresh local market install enables the verified package permissions');await restored.dispose();
  }finally{await runtime.dispose();await rm(directory,{recursive:true,force:true});}
 });
 

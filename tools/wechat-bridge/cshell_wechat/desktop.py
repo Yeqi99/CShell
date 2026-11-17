@@ -22,7 +22,7 @@ def execute(request):
             except Exception:pass
             finally:
                 if memory:memory.close()
-        return {'processes':processes,'readProtocolVersion':2,'subscriptionProtocolVersion':1,'conversationsProtocolVersion':1,'momentsProtocolVersion':1,'momentsPublishProtocolVersion':1,'momentsInteractionsProtocolVersion':1,'momentsDetailProtocolVersion':1,'fileSendProtocolVersion':1}
+        return {'processes':processes,'readProtocolVersion':2,'contactSearchProtocolVersion':1,'subscriptionProtocolVersion':1,'conversationsProtocolVersion':1,'momentsProtocolVersion':1,'momentsPublishProtocolVersion':1,'momentsInteractionsProtocolVersion':1,'momentsDetailProtocolVersion':1,'fileSendProtocolVersion':1}
     if method=='events':
         from .events import EventJournal
         directory=pathlib.Path(request['directory'])

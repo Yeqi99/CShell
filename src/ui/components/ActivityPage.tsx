@@ -1,3 +1,4 @@
+import { ActivityCalendar } from './ActivityCalendar';
 import {ErrorNotice} from './ErrorNotice';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -33,7 +34,7 @@ export function ActivityPage({ active, servers }: { active: boolean; servers: nu
     since: Date.now(),
     events: [],
   });
-  const [from, setFrom] = useState(date(Date.now() - 29 * 86400000)),
+  const [from, setFrom] = useState(date(Date.now() - 363 * 86400000)),
     [to, setTo] = useState(date(Date.now()));
   const [tab, setTab] = useState('overview'),
     [kind, setKind] = useState('all'),
@@ -86,12 +87,12 @@ export function ActivityPage({ active, servers }: { active: boolean; servers: nu
           e.time >= lower &&
           e.time <= upper &&
           (kind === 'all' || e.kind === kind) &&
-          (!search ||
+          (tab !== 'records' || !search ||
             `${names[e.kind]} ${e.action} ${e.provider}`
               .toLowerCase()
               .includes(search.toLowerCase())),
       ),
-    [snapshot, lower, upper, kind, search],
+    [snapshot, lower, upper, kind, search, tab],
   );
   const days = new Map<string, number>();
   for (const e of events) days.set(date(e.time), (days.get(date(e.time)) || 0) + 1);
@@ -99,14 +100,38 @@ export function ActivityPage({ active, servers }: { active: boolean; servers: nu
   for (const e of events) providers.set(e.provider, (providers.get(e.provider) || 0) + 1);
   const bytes = events.reduce((n, e) => n + (e.bytes || 0), 0),
     success = events.filter((e) => e.status === 'success').length;
-  const tiles = Array.from({ length: 91 }, (_, i) => {
-    const day = date(Date.now() - (90 - i) * 86400000);
-    return { day, count: days.get(day) || 0 };
-  });
-  const peak = Math.max(1, ...tiles.map((t) => t.count));
   const exportFile = (format: 'csv' | 'html') =>
     run(() => window.cshell.activityExport(lower, upper, format));
+  const tokenRecords = events.filter(e => e.tokens);
+  const tokenDays = new Map<string, number>();
+  for (const event of tokenRecords) {
+    const day = date(event.time);
+    tokenDays.set(day, (tokenDays.get(day) || 0) + event.tokens!.total);
+  }
+  let longest = 0;
+  let streak = 0;
+  let previous = -Infinity;
+  for (const key of [...days.keys()].sort()) {
+    const day = Date.parse(key) / 86400000;
+    streak = day === previous + 1 ? streak + 1 : 1;
+    longest = Math.max(longest, streak);
+    previous = day;
+  }
+  const current = previous === Date.parse(to) / 86400000 ? streak : 0;
+  const duration = events.reduce<number | undefined>((max, event) =>
+    event.duration === undefined ? max : Math.max(max ?? 0, event.duration), undefined);
+  const durationText = duration === undefined ? '—' : duration < 1000 ? duration + ' ms'
+    : duration < 60000 ? Math.round(duration / 1000) + (cn ? ' 秒' : ' s')
+    : Math.round(duration / 60000).toLocaleString(locale) + (cn ? ' 分钟' : ' min');
+  const summary = [
+    { label: cn ? '累计 Token 数' : 'Total tokens', value: tokenRecords.length ? [...tokenDays.values()].reduce((a,b) => a+b,0).toLocaleString(locale) : '—' },
+    { label: cn ? '单日 Token 峰值' : 'Peak daily tokens', value: tokenRecords.length ? Math.max(...tokenDays.values()).toLocaleString(locale) : '—' },
+    { label: cn ? '最长操作用时' : 'Longest operation', value: durationText },
+    { label: cn ? '最长连续天数' : 'Longest streak', value: longest },
+    { label: cn ? '期末连续天数' : 'Streak at end date', value: current },
+  ];
   const stats = [
+    { label: cn ? '模型用量 · Token' : 'Model tokens', value: tokenRecords.length ? tokenRecords.reduce((sum, e) => sum + e.tokens!.total, 0).toLocaleString() : '—', Icon: BarChart3 },
     { label: cn ? '记录的操作' : 'Recorded operations', value: events.length, Icon: ActivityIcon },
     {
       label: cn ? '成功连接' : 'Connections',
@@ -169,7 +194,9 @@ export function ActivityPage({ active, servers }: { active: boolean; servers: nu
             </button>
           ))}
         </nav>
-        <div className="activity-filters">
+        <details className="activity-filter-disclosure">
+          <summary>{cn ? '筛选' : 'Filters'} <span>{from} – {to}{kind !== 'all' && (' · ' + (cn ? names[kind as keyof typeof names] : kind))}</span></summary>
+          <div className="activity-filters">
           <label>
             {cn ? '开始日期' : 'From'}
             <input
@@ -205,7 +232,7 @@ export function ActivityPage({ active, servers }: { active: boolean; servers: nu
               </option>
             ))}
           </select>
-        </div>
+        </div></details>
 
         {(error || snapshot.error) && (
           <ErrorNotice title="统计记录暂不可用" error={error || snapshot.error || ''}/>
@@ -220,43 +247,26 @@ export function ActivityPage({ active, servers }: { active: boolean; servers: nu
         {tab === 'overview' ? (
           <>
             <div className="activity-stats">
-              {stats.map(({ label, value, Icon }) => (
+              {summary.map(({ label, value }) => (
                 <article key={label}>
-                  <Icon size={18} />
+                  
                   <div>
-                    <span>{label}</span>
                     <strong>{value}</strong>
+                    <span>{label}</span>
                   </div>
                 </article>
               ))}
             </div>
+            {tokenRecords.length > 0 && <p className="activity-footnote">
+              {cn ? '模型已报告用量' : 'Reported model usage'} · {tokenRecords.length} {cn ? '次请求' : 'requests'}
+              {(['input', 'output'] as const).map(key => {
+                const reported = tokenRecords.filter(event => event.tokens![key] !== undefined);
+                return reported.length > 0 && <span key={key}> · {key === 'input' ? (cn ? '输入' : 'Input') : (cn ? '输出' : 'Output')} {reported.reduce((sum, event) => sum + event.tokens![key]!, 0).toLocaleString()}</span>;
+              })}
+            </p>}
+            <ActivityCalendar unit={tokenRecords.length ? 'Token' : cn ? '次操作' : 'operations'} counts={tokenRecords.length ? tokenDays : days} start={from} end={to} locale={locale} title={tokenRecords.length ? (cn ? 'Token 活动' : 'Token activity') : (cn ? '操作活动' : 'Activity')} />
+            <p className="activity-footnote">{stats.map(s => s.label + ' ' + s.value).join(' · ')}</p>
             <div className="activity-chart-grid">
-              <section className="activity-card">
-                <h2>{cn ? '操作活跃图' : 'Activity calendar'}</h2>
-                <p className="muted">
-                  {cn
-                    ? '最近 13 周 · 所选日期范围内的记录'
-                    : 'Last 13 weeks · Records within selected dates'}
-                </p>
-                <div className="activity-heatmap">
-                  {tiles.map((t) => (
-                    <div
-                      key={t.day}
-                      title={`${t.day} · ${t.count}`}
-                      style={{
-                        background: t.count
-                          ? `color-mix(in srgb, var(--accent) ${25 + (75 * t.count) / peak}%, var(--panel))`
-                          : undefined,
-                      }}
-                    />
-                  ))}
-                </div>
-                <small>
-                  {cn
-                    ? '仅统计 CShell 已记录的操作，不读取终端输入内容。'
-                    : 'Counts recorded operations; terminal input is never collected.'}
-                </small>
-              </section>
               <section className="activity-card">
                 <h2>{cn ? '能力来源' : 'Capability sources'}</h2>
                 {[...providers]
@@ -399,8 +409,8 @@ export function ActivityPage({ active, servers }: { active: boolean; servers: nu
           </button>
           <p>
             {cn
-              ? '导出包含所选日期内所有类型的记录。连接次数为成功建立连接；文件与 AI 为请求次数，未统计手动 Shell 命令或 Token。'
-              : 'Export includes all types in the date range. Connections count successful sessions. File and AI counts are requests, not shell commands or tokens.'}
+              ? '导出包含所选日期内所有类型的记录。Token 取自模型服务返回的用量。未上报用量的请求和旧记录不计入合计。'
+              : 'Export includes all types in the date range. Token totals include requests with provider-reported usage in this period.'}
           </p>
           <button
             className="danger secondary"

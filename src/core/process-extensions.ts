@@ -57,6 +57,7 @@ export class ProcessExtensions {
     const runtime = this.runtime;
     this.tools = runtime ? runtime.tools().filter(tool => this.enabled(tool.packageId)).map(tool => ({
       name: `extension_${createHash('sha256').update(tool.packageId + ':' + tool.toolId).digest('hex').slice(0, 24)}`,
+      discovery:{category:tool.category??tool.packageId,purpose:tool.description,target:'local machine' as const},
       capability: 'plugins.manage',
       description: `[Local custom extension ${tool.packageId} / ${tool.toolId}] ${tool.description} Runs on the CShell host as the current OS user, not on the selected remote machine.`,
       input: z.fromJSONSchema(tool.inputSchema as Parameters<typeof z.fromJSONSchema>[0]),

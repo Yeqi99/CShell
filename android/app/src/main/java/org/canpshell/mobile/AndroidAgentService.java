@@ -20,6 +20,7 @@ public final class AndroidAgentService extends Service {
   private static volatile String lastError="";
   private static volatile boolean starting;
   private final ExecutorService worker=Executors.newSingleThreadExecutor();
+  private PowerManager.WakeLock connectionWakeLock;
   private volatile AndroidAgentHost host;
   private volatile AndroidAccountRelay accountRelay;
   static void resumeConnection(Context context){
@@ -100,19 +101,24 @@ public final class AndroidAgentService extends Service {
       .setContentIntent(open).setOngoing(true).addAction(new Notification.Action.Builder(null,"停止连接",stop).build()).build();
     if(Build.VERSION.SDK_INT>=29)startForeground(7107,notification,ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE|(projecting?ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION:0));
     else startForeground(7107,notification);
+    if(connectionWakeLock==null){
+      connectionWakeLock=getSystemService(PowerManager.class).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,"CAgent:Connection");
+      connectionWakeLock.setReferenceCounted(false);
+      connectionWakeLock.acquire();
+    }
   }
   @Override public IBinder onBind(Intent intent){return null;}
   @Override public int onStartCommand(Intent intent,int flags,int id){
-    if(intent==null||STOP.equals(intent.getAction())){stopSelf();return START_NOT_STICKY;}
-    if(sharing||projection!=null){starting=false;changed(this);return START_NOT_STICKY;}
+    if(intent!=null&&STOP.equals(intent.getAction())){stopSelf();return START_NOT_STICKY;}
+    if(sharing||projection!=null){starting=false;changed(this);return START_STICKY;}
     try{
       JSONObject settings=AndroidAgentSettings.read(this);
       if(!settings.getBoolean("enabled")||settings.getString("password").isEmpty())throw new IllegalStateException("请启用 CAgent 并设置连接密码");
-      Intent consent=intent.getParcelableExtra("consent");
+      Intent consent=intent==null?null:intent.getParcelableExtra("consent");
       if(consent==null){
         foreground(false);
         worker.execute(()->{try{startConnection(settings);starting=false;lastError="";changed(this);}catch(Exception e){fail(e.getMessage());}});
-        return START_NOT_STICKY;
+        return START_STICKY;
       }
       foreground(true);
       projection=getSystemService(MediaProjectionManager.class).getMediaProjection(intent.getIntExtra("result",Activity.RESULT_CANCELED),consent);
@@ -122,7 +128,7 @@ public final class AndroidAgentService extends Service {
         catch(Exception e){fail(e.getMessage());}
       });
     }catch(Exception e){fail(e.getMessage());}
-    return START_NOT_STICKY;
+    return START_STICKY;
   }
   private void startHost(JSONObject settings)throws Exception{
     if(destroying)return;
@@ -179,6 +185,7 @@ public final class AndroidAgentService extends Service {
   @Override public void onDestroy(){
     destroying=true;accountChanged();sharing=false;hostReady=false;starting=false;viewer=null;
     unregisterReceiver(screenState);
+    if(connectionWakeLock!=null&&connectionWakeLock.isHeld())connectionWakeLock.release();
     if(current==this)current=null;
     worker.execute(()->{if(host!=null)host.close();if(capture!=null)capture.stop();if(projection!=null)projection.stop();AndroidControlService.releaseAll();});
     worker.shutdown();stopForeground(STOP_FOREGROUND_REMOVE);changed(this);super.onDestroy();

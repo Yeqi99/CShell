@@ -38,6 +38,8 @@ const modelSchema = z.object({
   id: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/),
   modalities: z.object({ input: modalitySchema.optional() }).optional(),
   input_modalities: modalitySchema.optional(),
+  context_length:z.unknown().optional(),
+  limit:z.unknown().optional(),
 });
 const tierSchema = z.enum(['go', 'zen']);
 export function quotaWindows(raw: any) {
@@ -66,8 +68,8 @@ export function quotaWindows(raw: any) {
 export class OpenCodeExtension implements AiProviderExtension {
   readonly id = 'cshell.opencode';
   private config: z.infer<typeof configSchema> = { accounts: [] };
-  private cache = new Map<string, { at: number; models: { id: string; available: boolean; imageInput?:boolean }[] }>();
-  private modelRequests = new Map<string, Promise<{ id: string; available: boolean; imageInput?:boolean }[]>>();
+  private cache = new Map<string, { at: number; models: { id: string; available: boolean; imageInput?:boolean; contextWindowTokens?:number }[] }>();
+  private modelRequests = new Map<string, Promise<{ id: string; available: boolean; imageInput?:boolean; contextWindowTokens?:number }[]>>();
   private catalogFailures = new Set<string>();
   private catalogEpoch = 0;
   private rejectedModels = new Map<string, string>();
@@ -304,7 +306,7 @@ export class OpenCodeExtension implements AiProviderExtension {
       .parse(await this.json(this.url(tier, 'v1/models')));
     const models = [...new Set(data.data.map((m) => m.id))]
       .sort()
-      .map((id) => {const entry=data.data.find(m=>m.id===id),modalities=entry?.modalities?.input??entry?.input_modalities;return { id, available: !!this.host.official || !!family(id),...(modalities?{imageInput:modalities.includes('image')}:{}) };});
+      .map((id) => {const entry=data.data.find(m=>m.id===id),modalities=entry?.modalities?.input??entry?.input_modalities;const context=entry?.context_length??(entry?.limit as {context?:unknown}|null)?.context;return { id, ...(typeof context==='number'&&Number.isSafeInteger(context)&&context>=1024?{contextWindowTokens:context}:{}),available: !!this.host.official || !!family(id),...(modalities?{imageInput:modalities.includes('image')}:{}) };});
     if (epoch !== this.catalogEpoch) throw Error('OpenCode 账号已同步，请重新加载模型目录');
     this.cache.set(tier, { at: Date.now(), models });
     const recovered = this.catalogFailures.delete(tier);
@@ -746,6 +748,6 @@ export class OpenCodeExtension implements AiProviderExtension {
       if (response.ok && this.rejectedModels.delete(ref)) this.host.changed?.();
       return this.host.official ? response : normalizeResponse(response, kind, !!b.stream);
     };
-    return { url: 'https://model-extension.invalid', model, key: '', transport, imageInput:listed.imageInput };
+    return { url: 'https://model-extension.invalid', model, key: '', transport, contextWindowTokens:listed.contextWindowTokens,contextCatalog:tier==='go'?'opencode-go' as const:'opencode' as const,imageInput:listed.imageInput };
   }
 }

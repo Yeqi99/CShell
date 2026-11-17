@@ -13,8 +13,9 @@ export function MonitorViews({ config }: { config: Config }) {
   const [displays, setDisplays] = useState<ViewDisplay[]>([]);
   const [draft, setDraft] = useState<MonitorView>();
   const drafts = useRef(new Map<string, MonitorView>());
-  const [deletePending, setDeletePending] = useState(false);
-  useEffect(() => { if (draft) drafts.current.set(draft.id, draft); setDeletePending(false); }, [draft]);
+  const [openIds,setOpenIds] = useState<string[]>([]);
+  const [deletePending,setDeletePending] = useState<MonitorView>();
+  useEffect(() => { if (draft) drafts.current.set(draft.id, draft); }, [draft]);
   const [error, setError] = useState(''), [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const [profileId, setProfileId] = useState('');
@@ -23,8 +24,8 @@ export function MonitorViews({ config }: { config: Config }) {
   const [providers,setProviders]=useState<AiProvider[]>([]),[newProvider,setNewProvider]=useState('');
   useEffect(() => { if (sourceKind === 'ai') void window.cshell.aiSnapshot().then(s => {setThreads(s.threads);setProviders(s.providers);}).catch(e => setError(String(e))); }, [sourceKind]);
   const profiles = [...config.profiles.filter(p => !p.protocol || p.protocol === 'ssh' || p.protocol === 'client'),...(window.cshell.platform==='win32'?localViewProfiles:[])];
-  const refresh = async () => { const [v, d] = await Promise.all([window.cshell.monitorViews(), window.cshell.viewDisplays()]); setViews(v); setDisplays(d); };
-  useEffect(() => { void refresh().catch(e => setError(String(e))); }, []);
+  const refresh = async () => { const [v, d, ids] = await Promise.all([window.cshell.monitorViews(), window.cshell.viewDisplays(), window.cshell.openMonitorViewIds()]); setViews(v); setDisplays(d); setOpenIds(ids); };
+  useEffect(() => { const sync = () => void refresh().catch(e => setError(String(e))); sync(); window.addEventListener('focus',sync); return () => window.removeEventListener('focus',sync); }, []);
   const run = async (fn: () => Promise<unknown>) => { setBusy(true); setError(''); setNotice(''); try { await fn(); } catch (e) { setError(String(e)); } finally { setBusy(false); } };
   const update = (id: string, patch: Partial<ViewTile>) => {
     if (!draft) return;
@@ -54,8 +55,10 @@ export function MonitorViews({ config }: { config: Config }) {
       <button onClick={() => { setDraft({ id: crypto.randomUUID(), name: '新视图', tiles: [] }); setNotice(''); }}><Plus size={16}/>新建视图</button></header>
     <div className="view-library">{views.map(v => <article key={v.id}>
       <button onClick={() => setDraft(structuredClone(drafts.current.get(v.id) ?? v))}><Monitor size={18}/><strong>{v.name}</strong><small>{v.tiles.length} 个区域</small></button>
-      <button title={'打开 '+v.name} aria-label={'打开 '+v.name} disabled={busy} onClick={() => void run(() => window.cshell.openMonitorView(v.id))}><Play size={16}/></button>
-      <button title={'关闭 '+v.name+' 的窗口'} aria-label={'关闭 '+v.name+' 的窗口'} onClick={() => void run(() => window.cshell.closeMonitorView(v.id))}><X size={16}/></button>
+      <button title={'打开 '+v.name} aria-label={'打开 '+v.name} disabled={busy} onClick={() => void run(async () => {await window.cshell.openMonitorView(v.id); await refresh();})}><Play size={16}/></button>
+      {openIds.includes(v.id) && <button title={'关闭 '+v.name+' 的窗口'} aria-label={'关闭 '+v.name+' 的窗口'} disabled={busy} onClick={() => void run(async () => {await window.cshell.closeMonitorView(v.id); setOpenIds(ids=>ids.filter(id=>id!==v.id));})}><X size={16}/></button>}
+      <button title={'删除视图 '+v.name} aria-label={'删除视图 '+v.name} disabled={busy} onClick={()=>setDeletePending(v)}><Trash2 size={16}/></button>
+      {deletePending?.id===v.id && <div className="view-delete-confirm" role="alert"><span>删除「{v.name}」的布局？{openIds.includes(v.id) && '此视图的窗口和连接也将关闭。'}</span><button disabled={busy} onClick={()=>setDeletePending(undefined)}>取消</button><button disabled={busy} onClick={()=>void run(async()=>{await window.cshell.deleteMonitorView(v.id); drafts.current.delete(v.id); setDraft(current=>current?.id===v.id?undefined:current); setDeletePending(undefined); await refresh();})}>确认删除</button></div>}
     </article>)}</div>
     {draft && <div className="view-editor">
       {sourceKind === 'ai' && <div className="view-actions">
@@ -70,10 +73,8 @@ export function MonitorViews({ config }: { config: Config }) {
       </div>}
       <div className="view-actions"><label>名称<input value={draft.name} maxLength={80} onChange={e => setDraft({ ...draft, name: e.target.value })}/></label>
         <button disabled={busy} onClick={() => void run(save)}><Save size={16}/>保存</button>
-        <button className="primary" disabled={busy || !draft.tiles.length} onClick={() => void run(async () => { await save(); await window.cshell.openMonitorView(draft.id); })}>保存并打开</button>
-        <button disabled={busy} onClick={() => setDeletePending(true)}><Trash2 size={16}/>删除视图</button>
+        <button className="primary" disabled={busy || !draft.tiles.length} onClick={() => void run(async () => { await save(); await window.cshell.openMonitorView(draft.id); await refresh(); })}>保存并打开</button>
       </div>
-      {deletePending && <div className="view-actions" role="alert"><span>删除此布局并关闭它创建的连接？</span><button onClick={() => setDeletePending(false)}>取消</button><button onClick={() => void run(async () => { await window.cshell.closeMonitorView(draft.id); await window.cshell.deleteMonitorView(draft.id); drafts.current.delete(draft.id); setDraft(undefined); await refresh(); })}>确认删除</button></div>}
       <div className="view-actions"><select aria-label={text('区域来源','Pane source')} value={sourceKind} onChange={e => setSourceKind(e.target.value as 'machine'|'ai')}><option value="machine">{text('机器','Machine')}</option><option value="ai">{text('智能体会话','AI conversation')}</option></select>{sourceKind === 'ai' ? <select aria-label={text('智能体会话','AI conversation')} value={threadId || threads[0]?.id || ''} onChange={e => setThreadId(e.target.value)}>{!threads.length && <option value="">{text('暂无会话，可新建后加入','No conversations yet; create one to add')}</option>}{threads.map(t => <option key={t.id} value={t.id}>{t.title} · {t.target || 'CShell'}</option>)}</select> : <select aria-label="添加机器" value={profileId || profiles[0]?.id || ''} onChange={e => setProfileId(e.target.value)}>{profiles.map(p => <option key={p.id} value={p.id}>{p.name} · {localViewProfiles.some(local => local.id === p.id) ? '本机终端' : p.protocol === 'client' ? 'CAgent 桌面' : 'SSH'}</option>)}</select>}<button disabled={sourceKind === 'ai' ? !threads.length : !profiles.length} onClick={() => add()}><Plus size={16}/>添加区域</button></div>
       <details className="view-source-help"><summary>会话与命令如何恢复</summary><p className="muted">SSH 使用已保存的连接认证；命令需在区域中点击执行，不随视图恢复重复启动。screen 会自动共享附加，不踢出现有终端。关闭视图会断开它创建的会话，长期服务请放在 screen / tmux 中。</p></details>
       <div className="view-actions"><label>视图模式<select value={draft.mode ?? 'tile'} onChange={e => {

@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Net;
 using System.Text;
@@ -302,6 +303,7 @@ public class CagentWindow : Window {
     var identity=new StackPanel();identity.Children.Add(new TextBlock{Text=accountEmail.Split('@')[0],FontSize=24,FontWeight=FontWeights.SemiBold,Margin=new Thickness(0,12,0,4)});identity.Children.Add(Text(accountEmail,12));
     var member=D(value.ContainsKey("membership")?value["membership"]:null);identity.Children.Add(Text(B(member,"active")?"Pro 会员":"免费账号",12));
     p.Children.Add(new Border{Child=identity,Background=Brushes.White,CornerRadius=new CornerRadius(16),Padding=new Thickness(18,8,18,14),Margin=new Thickness(0,8,0,18)});
+    ActionButton(p,"点数余额与消费授权",async()=>{var policy=D(await Api("account.spending"));var wallet=Panel("点数余额");wallet.Children.Add(Text(S(policy,"balance")+" 点",24));var toggle=Check(wallet,"智能体自动消费",B(policy,"enabled"));ActionButton(wallet,"保存",async()=>{await Api("account.spending",Obj("enabled",toggle.IsChecked==true));await Account();});});
     p.Children.Add(Text("你的设备，共享一个工作空间",16));p.Children.Add(Text("在同账号的 CShell 中发现这台机器。Pro 会员可使用免公网 IP 连接。",12));
     string transport=S(value,"transportError");p.Children.Add(Text(transport!=""?transport:S(value,"state")=="error"?"连接暂时中断，恢复网络后自动重试。":"模型与设置在后台自动同步。",12));
     var confirm=new StackPanel{Visibility=Visibility.Collapsed,Margin=new Thickness(0,10,0,0)};
@@ -389,7 +391,7 @@ public class CagentWindow : Window {
     // Only presentation is consumed here: ports, grants, device identity and local runtime stay local.
   }
 
-  async Task History(){var list=new List<Dictionary<string,object>>();foreach(var t in A(await Api("assistant.tasks")))list.Add(D(t));list.Reverse();var p=Panel("会话记录");if(list.Count==0)p.Children.Add(Text("还没有任务记录"));foreach(var t in list){var item=t;ActionButton(p,S(t,"prompt"),async()=>{SelectTask(S(item,"id"));Render(item);ShowChat();await Task.Yield();});}}
+  async Task History(){var list=new List<Dictionary<string,object>>();foreach(var t in A(await Api("assistant.tasks")))list.Add(D(t));list.Reverse();var p=Panel("会话记录");if(list.Count==0)p.Children.Add(Text("还没有任务记录"));foreach(var t in list){var item=t;var row=ActionButton(p,S(t,"prompt"),async()=>{SelectTask(S(item,"id"));Render(item);ShowChat();await Task.Yield();});var menu=new ContextMenu();var sync=new MenuItem{Header="云同步设置"};sync.Click+=async(s,e)=>await Guard(async()=>{var doc=D(await Api("account.conversations",Obj("action","list")));bool exists=A(V(doc,"records")).Cast<object>().Any(x=>S(D(x),"id")==(S(item,"conversationId")==""?S(item,"id"):S(item,"conversationId")));var panel=Panel("云同步设置");ActionButton(panel,exists?"停止同步并移除云副本":"同步此对话到云端",async()=>{await Api("account.conversations",Obj("action","toggle","id",S(item,"id")));await History();});});menu.Items.Add(sync);row.ContextMenu=menu;}ActionButton(p,"云对话",async()=>{var shelf=D(await Api("account.conversations",Obj("action","list")));var view=Panel("云对话");foreach(var raw in A(V(shelf,"records"))){var doc=D(raw);ActionButton(view,S(doc,"title"),async()=>{var detail=Panel(S(doc,"title"));foreach(var m in A(V(doc,"messages")))detail.Children.Add(Text(S(D(m),"role")+" · "+S(D(m),"text")));var follow=Field(detail,"继续对话","",true);ActionButton(detail,"发送",async()=>{var history=D(await Api("account.conversations",Obj("action","continue","id",S(doc,"id"))));var next=D(await Api("assistant.start",Obj("requestId",Guid.NewGuid().ToString(),"prompt",follow.Text,"history",history)));SelectTask(S(next,"id"));ShowChat();});await Task.Yield();});}});}
   async Task Settings(){RenderAssistantSettings(D(await Api("assistant.settings")));}
   string feedbackDraft="",feedbackContact="",feedbackIdentity="",feedbackPayload="";
   void Feedback(){
@@ -407,7 +409,7 @@ public class CagentWindow : Window {
   void RenderAssistantSettings(Dictionary<string,object> s){
     var p=Panel("模型与权限");var models=MarketCard(p,"模型连接","接口与密钥仅用于此账号的智能体请求。");var endpoint=Field(models,"基座完整接口地址",S(s,"endpoint"));var model=Field(models,"模型",S(s,"model"));models.Children.Add(Text(B(s,"keyConfigured")?"API Key（已保存，留空保留）":"API Key"));var key=new PasswordBox{Padding=new Thickness(8),Margin=new Thickness(0,0,0,10)};AutomationProperties.SetName(key,"模型 API Key，留空保留已保存密钥");models.Children.Add(key);
     var permissions=MarketCard(p,"执行与委派","明确选择允许的操作与控制端。");var commands=Check(permissions,"允许本机命令",B(s,"commands"));var review=Check(permissions,"执行前逐次确认",B(s,"review"));var automation=Check(permissions,"允许智能体管理目标与事件订阅",B(s,"automation"));permissions.Children.Add(Text("命令以当前用户权限运行，不是权限沙箱。",11));var ds=new List<string>();foreach(var d in A(V(s,"delegates")))ds.Add(Convert.ToString(d));var delegates=Field(permissions,"允许委派的控制端指纹（每行一个）",string.Join("\n",ds.ToArray()),true);
-    var budgets=MarketCard(p,"运行预算","限定任务时间、上下文与无进展重试。");var minutes=Field(budgets,"每轮时间预算（分钟，1–240）",S(s,"runMinutes"));var bytes=Field(budgets,"累计上下文预算（字节，非计费金额）",S(s,"contextBytes"));var repeated=Field(budgets,"重复无进展停止次数（2–20）",S(s,"noProgress"));
+    var budgets=MarketCard(p,"运行预算","限定任务时间、上下文与无进展重试。");var minutes=Field(budgets,"每轮时间上限（分钟，0 表示不限）",S(s,"runMinutes"));var bytes=Field(budgets,"累计上下文上限（0 不限，或 10000–20000000 字节）",S(s,"contextBytes"));var repeated=Field(budgets,"重复无进展停止次数（2–20）",S(s,"noProgress"));
     ActionButton(p,"保存",async()=>{var value=Obj("runMinutes",int.Parse(minutes.Text),"contextBytes",int.Parse(bytes.Text),"noProgress",int.Parse(repeated.Text),"endpoint",endpoint.Text,"model",model.Text,"commands",commands.IsChecked==true,"automation",automation.IsChecked==true,"review",review.IsChecked==true,"delegates",delegates.Text.Split(new[]{'\r','\n'},StringSplitOptions.RemoveEmptyEntries));if(key.Password.Length>0)value["key"]=key.Password;await Api("assistant.configure",value);key.Clear();ModelLabel(model.Text);ShowChat();status.Text="设置已保存";});
     ActionButton(p,"删除已保存密钥",async()=>{s.Remove("keyConfigured");s["key"]="";await Api("assistant.configure",s);await Settings();});
     var feedback=Button("问题与建议","主动反馈问题");feedback.Click+=(sender,args)=>Feedback();p.Children.Add(feedback);
@@ -451,7 +453,7 @@ public class CagentWindow : Window {
     Action render=()=>{cards.Children.Clear();apps.Children.Clear();string query=search.Text.Trim().ToLowerInvariant();
       foreach(var value in packages){var item=D(value);if(!(S(item,"name")+S(item,"id")).ToLowerInvariant().Contains(query))continue;string id=S(item,"id");AppTile(cards,S(item,"name"),id=="cagent.desktop"?"\uE7F4":id.StartsWith("cagent.wechat")?"\uE8F2":"\uE71D",PackageState(S(item,"status")),async()=>await PackageDetail(item));}
       if(S(catalog,"platform")=="win32"&&("linux wsl ubuntu 虚拟机".Contains(query)))AppTile(apps,"Linux 虚拟机","\uE756","WSL · 检查与安装",Linux);
-      foreach(var value in A(V(catalog,"applications"))){var item=D(value);if(!(S(item,"id")+S(item,"package")).ToLowerInvariant().Contains(query))continue;AppTile(apps,S(item,"id"),"\uE74C","查看安装计划",async()=>await Plan(D(await Api("applications.plan",Obj("app",S(item,"id"))))));}
+      foreach(var value in A(V(catalog,"applications"))){var item=D(value);if(!(S(item,"id")+S(item,"package")).ToLowerInvariant().Contains(query))continue;if(!String.IsNullOrEmpty(S(item,"unavailable"))){apps.Children.Add(Text(S(item,"id")+" · "+S(item,"unavailable"),11));continue;}AppTile(apps,S(item,"id"),"\uE74C","查看安装计划",async()=>await Plan(D(await Api("applications.plan",Obj("app",S(item,"id"))))));}
       if(cards.Children.Count==0)cards.Children.Add(Text("没有匹配的能力工具",11));if(apps.Children.Count==0)apps.Children.Add(Text("没有匹配的系统应用",11));FitMarketTiles(cards);FitMarketTiles(apps);
     };search.TextChanged+=(sender,e)=>render();render();
     var settings=new StackPanel();p.Children.Add(new Expander{Header="安装设置",Content=settings,Margin=new Thickness(0,12,0,0)});var enabled=Check(settings,"允许应用安装",B(policy,"enabled"));ActionButton(settings,"保存",async()=>{policy["enabled"]=enabled.IsChecked==true;await Api("applications.configure",policy);});
@@ -461,11 +463,14 @@ public class CagentWindow : Window {
     string id=S(item,"id");var p=Panel(S(item,"name"));ActionButton(p,"返回应用市场",Apps);p.Children.Add(Text(S(item,"description"),12));p.Children.Add(Text("版本 "+S(item,"version")+" · "+(S(item,"source")=="bundled"?"随 CAgent 提供":"GitHub"),11));p.Children.Add(Text(PackageState(S(installed??item,"status")),14));if(S(installed??item,"reason")!="")p.Children.Add(Text(S(installed??item,"reason"),11));
     var support=D(V(item,"wechatSupport"));bool packageInstallable=!item.ContainsKey("wechatSupport")||B(support,"installable");
     if(item.ContainsKey("wechatSupport")){var scope=MarketCard(p,"此版本的能力",S(support,"reason"));foreach(var capability in A(V(support,"capabilities")))scope.Children.Add(Text("• "+Convert.ToString(capability),12));var missing=new StackPanel();foreach(var capability in A(V(support,"unavailable")))missing.Children.Add(Text(Convert.ToString(capability),11));scope.Children.Add(new Expander{Header="尚未支持",Content=missing});}
-    if(installed==null){p.Children.Add(Text("安装后按应用要求完成配置，可在这里调整工具权限。",11));var installButton=ActionButton(p,"安装并核验能力包",async()=>{var installedNow=D(await Api("packages.install",Obj("id",id,"confirm",true)));await Api("packages.grant",Obj("id",id,"permissions",V(installedNow,"requiredPermissions")));await PackageDetail(item);});installButton.IsEnabled=packageInstallable;return;}
+    if(installed==null){p.Children.Add(Text("安装后按应用要求完成配置，可在这里调整工具权限。",11));var installButton=ActionButton(p,"安装并核验能力包",async()=>{await Api("packages.install",Obj("id",id,"confirm",true));await PackageDetail(item);});installButton.IsEnabled=packageInstallable;return;}
     p.Children.Add(Text(B(installed,"registered")?"工具已注册":"工具未注册",11));var grants=new HashSet<string>();foreach(var grant in A(V(installed,"grants")))grants.Add(Convert.ToString(grant));var choices=new Dictionary<string,CheckBox>();foreach(var value in A(V(installed,"requiredPermissions"))){string permission=Convert.ToString(value);choices[permission]=Check(p,PermissionName(permission),grants.Contains(permission));}
     if(id=="cagent.wechat")ActionButton(p,"微信账号与授权",WechatSettings);
     if(id.StartsWith("cagent.wechat.v",StringComparison.Ordinal))ActionButton(p,"微信服务与消息订阅",async()=>await ManagedWechatSettings(id));
     if(id=="cagent.desktop"){var desktopBody=new StackPanel();var section=new Expander{Header="桌面服务与访问权限",Content=desktopBody,Margin=new Thickness(0,8,0,8)};bool loaded=false;section.Expanded+=async(s,e)=>{if(loaded)return;await Guard(async()=>{await DesktopSettings(desktopBody);loaded=true;});};p.Children.Add(section);}
+    var bulk=new StackPanel{Orientation=Orientation.Horizontal};p.Children.Add(bulk);
+    ActionButton(bulk,"全选",()=>{foreach(var choice in choices.Values)choice.IsChecked=true;return Task.FromResult(0);});
+    ActionButton(bulk,"清空",()=>{foreach(var choice in choices.Values)choice.IsChecked=false;return Task.FromResult(0);});
     p.Children.Add(Text("选择仅修改草稿，保存后生效。系统应用安装还受独立安装权限限制。",11));
     ActionButton(p,"保存工具权限",async()=>{var allowed=new List<string>();foreach(var pair in choices)if(pair.Value.IsChecked==true)allowed.Add(pair.Key);await Api("packages.grant",Obj("id",id,"permissions",allowed.ToArray()));await PackageDetail(item);});
     ActionButton(p,"重新核验",async()=>{await Api("packages.refresh",Obj("id",id));await PackageDetail(item);});
@@ -498,23 +503,61 @@ public class CagentWindow : Window {
   void VerifyDesktopSettings(){var p=Panel("桌面服务设置");RenderDesktopSettings(p,Obj("enabled",false,"bindAddress","127.0.0.1","tcpPort",9998,"udpPort",9999,"local",Obj("view",false,"control",false),"ownerGrants",Obj()),false);UpdateLayout();var checks=new List<CheckBox>();FindChecks(p,checks);if(checks.Count!=4)throw new Exception("Desktop grants missing");foreach(var check in checks)if(check.IsChecked==true)throw new Exception("Desktop permissions default enabled");bool refused=false;try{DesktopPort("0");}catch{refused=true;}if(!refused||DesktopPort("65535")!=65535)throw new Exception("Desktop port validation failed");if(screenshot!=null)File.WriteAllText(screenshot+".json",json.Serialize(Obj("fixture",true,"serviceDefaultOff",true,"viewDefaultOff",true,"controlDefaultOff",true,"portValidation",true,"realDesktopStarted",false)),Encoding.UTF8);}
   async Task ManagedWechatSettings(string id){
     var state=D(await Api("managedWechat.status",Obj("id",id)));var config=D(V(state,"settings"));var p=Panel("微信服务");
+    var permissions=new HashSet<string>();foreach(var permission in A(V(state,"permissions")))permissions.Add(Convert.ToString(permission));
     var service=MarketCard(p,"本机服务",B(state,"running")?"服务运行中 · 已核验":"配置后核验实际微信版本，完成后自动随 CAgent 启动");
+    if(B(state,"subscriptionAccountIssue"))service.Children.Add(Text("请识别当前微信账号并保存，以启用事件订阅。",11));
     if(B(state,"validationUnknown"))service.Children.Add(Text("上次核验结果未知，已停止服务。请检查微信状态，不会自动重放核验。",11));
     var enabled=Check(service,"启动微信 API 服务",B(config,"apiEnabled"));var port=Field(service,"本机端口",S(config,"port"));
     var events=MarketCard(p,"消息事件", "收到消息后交给通用事件订阅处理，规则可指定条件与动作");
-    var subscription=Check(events,"接收消息回调",B(config,"subscriptionEnabled"));var account=Field(events,"微信账号 ID",S(config,"accountId"));
+    if(B(config,"subscriptionEnabled")){var listener=S(state,"listener");events.Children.Add(Text(listener=="listening"?"正在监听消息":listener=="starting"?"正在启动监听":listener=="cleanup-unconfirmed"?"监听已停止，等待确认清理状态。":"尚未开始监听消息",11));}
+    var subscription=Check(events,"接收消息回调",B(config,"subscriptionEnabled"));if(!permissions.Contains("wechat.events.read"))subscription.Visibility=Visibility.Collapsed;var account=Field(events,"微信内部账号 ID",S(config,"accountId"));
+    ActionButton(events,"识别当前账号",async()=>{var found=D(await Api("managedWechat.detectAccount",Obj("id",id)));account.Text=S(found,"accountId");panelStatus.Text="已识别当前微信账号，保存后生效。";});
     var fields=new Dictionary<string,TextBox>();string[] keys={"receiveTargets","sendTargets","historyTargets","remarkTargets"};string[] titles={"接收消息范围","发送消息范围","历史记录范围","修改备注范围"};
     var scopes=new StackPanel();p.Children.Add(new Expander{Header="账号范围与操作",Content=scopes,Margin=new Thickness(0,8,0,8)});
     scopes.Children.Add(Text("填写微信内部 ID，逗号分隔；* 表示全部。",11));
-    for(int i=0;i<keys.Length;i++){var values=new List<string>();foreach(var v in A(V(config,keys[i])))values.Add(Convert.ToString(v));fields[keys[i]]=Field(scopes,titles[i],string.Join(",",values.ToArray()));}
-    var checks=new Dictionary<string,CheckBox>();string[] flags={"readContacts","readSessions","sendFiles","momentsRead","momentsWrite","receiveTransfers","receiveRedPackets"};string[] labels={"读取通讯录","读取最近会话","发送文件","读取朋友圈","发布朋友圈","接收转账","接收红包"};for(int i=0;i<flags.Length;i++)checks[flags[i]]=Check(scopes,labels[i],B(config,flags[i]));
+    string[] scopePermissions={"wechat.events.read","wechat.send","wechat.history.read","wechat.contacts.manage"};
+    for(int i=0;i<keys.Length;i++){if(!permissions.Contains(scopePermissions[i]))continue;var values=new List<string>();foreach(var v in A(V(config,keys[i])))values.Add(Convert.ToString(v));fields[keys[i]]=Field(scopes,titles[i],string.Join(",",values.ToArray()));}
+    if(id=="cagent.wechat.v42012"){
+      var lookup=new StackPanel();p.Children.Add(new Expander{Header="好友申请查询",Content=lookup,Margin=new Thickness(0,8,0,8)});
+      var requestId=Field(lookup,"申请 ID","");var groupId=Field(lookup,"群 ID（可选）","");
+      var result=Text("",12);
+      ActionButton(lookup,"查询",async()=>{
+        result.Text="";
+        var query=Obj("id",id,"requestId",requestId.Text.Trim());
+        if(groupId.Text.Trim().Length>0)query["groupId"]=groupId.Text.Trim();
+        var data=D(await Api("managedWechat.requestLookup",query));var lines=new List<string>();
+        foreach(var line in A(V(data,"lines")))lines.Add(Convert.ToString(line));
+        result.Text=string.Join(Environment.NewLine,lines.ToArray());
+      });lookup.Children.Add(result);
+      var picker=new StackPanel();scopes.Children.Add(new Expander{Header="从微信名片选择发送对象",Content=picker});
+      var alias=Field(picker,"好友资料页的微信号","");var note=Text("",12);picker.Children.Add(note);
+      string selection=null;
+      ActionButton(picker,"开始识别名片",async()=>{
+        selection=null;
+        var pick=D(await Api("managedWechat.contactSelect",Obj("id",id,"alias",alias.Text.Trim())));
+        selection=S(pick,"id");note.Text="请在三分钟内将这位好友的个人名片分享给自己的文件传输助手，然后点击核对。";
+      });
+      ActionButton(picker,"核对名片并填入发送范围",async()=>{
+        if(string.IsNullOrEmpty(selection))throw new Exception("请先开始识别名片");
+        var found=D(await Api("managedWechat.contactResult",Obj("id",id,"selectionId",selection)));
+        string status=S(found,"state");
+        if(status!="matched"){note.Text=status=="waiting"?"尚未收到匹配的微信名片":status=="ambiguous"?"有多个匹配，请重新识别":"识别已过期，请重试";return;}
+        if(!string.Equals(S(found,"alias"),alias.Text.Trim(),StringComparison.Ordinal)){note.Text="微信号已更改，请重新识别";return;}
+        var recipients=new List<string>(fields["sendTargets"].Text.Split(new[]{',','，',' ','\n','\r'},StringSplitOptions.RemoveEmptyEntries));
+        var peer=S(found,"recipient");
+        if(!recipients.Contains(peer))recipients.Add(peer);
+        fields["sendTargets"].Text=string.Join(",",recipients.ToArray());
+        note.Text="已填入 "+S(found,"nickname")+"（"+S(found,"alias")+"）。请核对并保存服务设置。";
+      });
+    }
+    var checks=new Dictionary<string,CheckBox>();string[] flags={"readContacts","readSessions","sendFiles","momentsRead","momentsWrite","receiveTransfers","receiveRedPackets"};string[] labels={"读取通讯录","读取最近会话","发送文件","读取朋友圈","发布朋友圈","接收转账","接收红包"};string[] flagPermissions={"wechat.contacts.read","wechat.sessions.read","wechat.files.send","wechat.moments.read","wechat.moments.publish","wechat.transfers.receive","wechat.redpackets.receive"};for(int i=0;i<flags.Length;i++){if(permissions.Contains(flagPermissions[i]))checks[flags[i]]=Check(scopes,labels[i],B(config,flags[i]));}
     ActionButton(p,"保存服务设置",async()=>{int n=DesktopPort(port.Text);if(n<1024)throw new Exception("端口需要大于或等于 1024");config["apiEnabled"]=enabled.IsChecked==true;config["port"]=n;config["subscriptionEnabled"]=subscription.IsChecked==true;config["accountId"]=account.Text.Trim();foreach(var field in fields)config[field.Key]=field.Value.Text.Split(new[]{',','，',' ','\n','\r'},StringSplitOptions.RemoveEmptyEntries);foreach(var check in checks)config[check.Key]=check.Value.IsChecked==true;await Api("managedWechat.configure",Obj("id",id,"settings",config));panelStatus.Text="设置已保存";});
     var validation=MarketCard(p,"版本与进程核验","仅接受能力包匹配的微信版本，不匹配时不会加载工具");var pid=Field(validation,"微信进程 PID", "");
     ActionButton(validation,"检测本机微信",async()=>{var result=await Api("managedWechat.processes",Obj("id",id));var output=Field(validation,"检测结果",json.Serialize(result),true);output.IsReadOnly=true;output.MaxHeight=140;});
     Func<int> selected=()=>{int n;if(!int.TryParse(pid.Text.Trim(),out n)||n<=0)throw new Exception("请填写检测到的微信 PID");return n;};
     ActionButton(validation,"绑定此微信进程",async()=>{await Api("managedWechat.bind",Obj("id",id,"pid",selected()));panelStatus.Text="已绑定，需通过核验后启用工具";});
-    var confirm=Check(validation,"允许短暂监听文件传输助手以核验连接",false);
-    ActionButton(validation,"核验并启动",async()=>{if(confirm.IsChecked!=true)throw new Exception("请先确认核验消息");await Api("managedWechat.validate",Obj("id",id,"pid",selected()));await ManagedWechatSettings(id);});
+    var confirm=Check(validation,"允许短暂监听文件传输助手以核验连接",false);if(!permissions.Contains("wechat.events.read"))confirm.Visibility=Visibility.Collapsed;
+    ActionButton(validation,"核验并启动",async()=>{if(permissions.Contains("wechat.events.read")&&confirm.IsChecked!=true)throw new Exception("请先确认核验消息");await Api("managedWechat.validate",Obj("id",id,"pid",selected()));await ManagedWechatSettings(id);});
     ActionButton(p,"返回应用市场",Apps);
   }
   async Task WechatSettings(){
@@ -541,8 +584,8 @@ public class CagentWindow : Window {
   async Task DesktopSettings(StackPanel p){var statusValue=D(await Api("desktop.status"));RenderDesktopSettings(p,D(V(statusValue,"config")),B(statusValue,"listening"),D(V(statusValue,"systemDesktop")));}
   void RenderDesktopSettings(StackPanel p,Dictionary<string,object> config,bool listening,Dictionary<string,object> system=null){
     p.Children.Clear();var enabled=Check(p,"启用远程桌面",B(config,"enabled"));var peers=Check(p,"允许已连接的控制端观看和操作",B(config,"authenticatedPeers"));var local=D(V(config,"local"));var view=Check(p,"允许本机观看",B(local,"view"));var control=Check(p,"允许本机控制",B(local,"control"));
-    p.Children.Add(Text("复用 CAgent 连接，无需额外端口。",11));
-    ActionButton(p,"保存",async()=>{config["enabled"]=enabled.IsChecked==true;config["authenticatedPeers"]=peers.IsChecked==true;config["directListener"]=false;config["local"]=Obj("view",view.IsChecked==true,"control",control.IsChecked==true);await Api("desktop.configure",config);await DesktopSettings(p);});
+    var headless=Check(p,"没有显示器时自动创建虚拟屏幕",!config.ContainsKey("headlessDisplay")||B(config,"headlessDisplay"));p.Children.Add(Text("已有显示器时沿用当前画面。虚拟屏幕首次安装需要管理员权限。",11));
+    ActionButton(p,"保存",async()=>{config["headlessDisplay"]=headless.IsChecked==true;config["enabled"]=enabled.IsChecked==true;config["authenticatedPeers"]=peers.IsChecked==true;config["directListener"]=false;config["local"]=Obj("view",view.IsChecked==true,"control",control.IsChecked==true);await Api("desktop.configure",config);await DesktopSettings(p);});
     var systemBody=new StackPanel();RenderSystemDesktop(systemBody,system??Obj());p.Children.Add(new Expander{Header="系统桌面 · 锁屏与登录界面",Content=systemBody,Margin=new Thickness(0,10,0,6)});
     var virtualBody=new StackPanel();bool loaded=false;var virtualSection=new Expander{Header="虚拟显示 · 无显示器主机",Content=virtualBody,Margin=new Thickness(0,6,0,6)};virtualSection.Expanded+=async(sender,e)=>{if(loaded)return;await Guard(async()=>{await VirtualDisplaySettings(virtualBody);loaded=true;});};p.Children.Add(virtualSection);
   }
@@ -608,7 +651,7 @@ public class CagentWindow : Window {
 
   }
 
-  async Task Plan(Dictionary<string,object> plan){var p=Panel(S(plan,"app"));p.Children.Add(Text(S(plan,"state")));p.Children.Add(Text(S(plan,"warning"),11));p.Children.Add(Text(S(plan,"executable")+" "+json.Serialize(V(plan,"args")),11));p.Children.Add(Text(S(plan,"logs"),11));if(S(plan,"state")=="planned")ActionButton(p,"执行此安装计划",async()=>await Plan(D(await Api("applications.install",Obj("id",S(plan,"id"),"confirm",true)))));if(S(plan,"state")=="running")ActionButton(p,"取消安装",async()=>await Plan(D(await Api("applications.cancel",Obj("id",S(plan,"id"))))));ActionButton(p,"刷新进度",async()=>await Plan(D(await Api("applications.status",Obj("id",S(plan,"id"))))));await Task.Yield();}
+  async Task Plan(Dictionary<string,object> plan){var p=Panel(S(plan,"app"));p.Children.Add(Text(S(plan,"state")));p.Children.Add(Text(S(plan,"warning"),11));p.Children.Add(Text(S(plan,"executable")+" "+json.Serialize(V(plan,"args")),11));p.Children.Add(Text(S(plan,"logs"),11));if(S(plan,"state")=="planned"){var port=plan.ContainsKey("port")?Field(p,"目标机器端口",S(plan,"port")):null;ActionButton(p,"确认并安装",async()=>{var input=Obj("id",S(plan,"id"),"confirm",true);if(port!=null)input["port"]=DesktopPort(port.Text);await Plan(D(await Api("applications.install",input)));});}if(S(plan,"state")=="running")ActionButton(p,"取消安装",async()=>await Plan(D(await Api("applications.cancel",Obj("id",S(plan,"id"))))));ActionButton(p,"刷新进度",async()=>await Plan(D(await Api("applications.status",Obj("id",S(plan,"id"))))));await Task.Yield();}
   async Task RestartRemote(){if(timer!=null)timer.Stop();connected=false;try{if(host!=null&&!host.HasExited)host.StandardInput.Close();}catch{}await Start("restart-app-host");await Remote();}
   async Task Remote(){
     var p=Panel("连接与启动");panelStatus.Text="正在读取连接设置…";

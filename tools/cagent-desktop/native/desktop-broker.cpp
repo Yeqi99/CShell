@@ -24,7 +24,7 @@ static SERVICE_STATUS_HANDLE statusHandle=nullptr;
 static std::atomic<int> clients{0};
 static std::mutex threadMutex;
 static std::set<HANDLE> threads;
-struct WorkerIdentity{DWORD session;ULONGLONG created;HANDLE process;ULONGLONG lastSas=0;};
+struct WorkerIdentity{DWORD session;ULONGLONG created;HANDLE process;ULONGLONG lastSas=0;bool vacantConsole=false;std::wstring consoleOwner;};
 static std::mutex workerMutex;
 static std::map<DWORD,WorkerIdentity> liveWorkers;
 static std::set<DWORD> activeSessions;
@@ -79,9 +79,21 @@ static HMODULE sasLibrary(){return LoadLibraryExW(L"sas.dll",nullptr,LOAD_LIBRAR
 static bool sasAvailable(){if(!sasPolicyAllowsServices())return false;HMODULE library=sasLibrary();bool result=library&&GetProcAddress(library,"SendSAS");if(library)FreeLibrary(library);return result;}
 static void sendSas(const Identity& identity){
  need(identity.worker&&sasPolicyAllowsServices(),"Secure attention policy does not allow services");
- {std::lock_guard<std::mutex> lock(workerMutex);auto found=liveWorkers.find(identity.pid);need(found!=liveWorkers.end()&&GetTickCount64()-found->second.lastSas>=2000,"Secure attention request throttled");found->second.lastSas=GetTickCount64();}
+ {std::lock_guard<std::mutex> lock(workerMutex);auto found=liveWorkers.find(identity.pid);need(found!=liveWorkers.end()&&GetTickCount64()-found->second.lastSas>=2000,"Secure attention request throttled");
+  const auto& worker=found->second;
+  if(worker.vacantConsole||!worker.consoleOwner.empty())need(WTSGetActiveConsoleSessionId()==worker.session,"Console changed");
+  if(worker.vacantConsole){
+   LPWSTR user=nullptr;DWORD size=0;
+   const bool vacant=WTSQuerySessionInformationW(WTS_CURRENT_SERVER_HANDLE,worker.session,WTSUserName,&user,&size)&&user&&size>=sizeof(wchar_t)&&!*user;
+   if(user)WTSFreeMemory(user);
+   need(vacant,"Console now occupied");
+  }else if(!worker.consoleOwner.empty()){
+   Handle token;need(WTSQueryUserToken(worker.session,token.put())&&tokenSid(token)==worker.consoleOwner,"Console owner changed");
+  }
+  found->second.lastSas=GetTickCount64();}
  Handle process(OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION,FALSE,identity.pid)),token,impersonation;need(process.h&&OpenProcessToken(process,TOKEN_DUPLICATE|TOKEN_QUERY,token.put())!=0&&tokenSession(token)==identity.session,"Worker session ended");need(DuplicateTokenEx(token,TOKEN_QUERY|TOKEN_IMPERSONATE,nullptr,SecurityImpersonation,TokenImpersonation,impersonation.put())!=0,"SAS token unavailable");
  HMODULE library=sasLibrary();need(library!=nullptr,"SAS library unavailable");auto send=(void(WINAPI*)(BOOL))GetProcAddress(library,"SendSAS");if(!send){FreeLibrary(library);throw std::runtime_error("SAS API unavailable");}
+ if(identity.session==WTSGetActiveConsoleSessionId()){send(FALSE);FreeLibrary(library);return;}
  if(!ImpersonateLoggedOnUser(impersonation)){FreeLibrary(library);throw std::runtime_error("Cannot bind SAS session");}send(FALSE);BOOL reverted=RevertToSelf();FreeLibrary(library);need(reverted,"SAS impersonation cleanup failed");
  // SendSAS returns void. Submission is not proof of a changed login screen.
 }
@@ -101,6 +113,18 @@ static void serve(HANDLE raw,const std::wstring owner,const std::wstring worker)
    DisconnectNamedPipe(pipe);clients--;return;
   }
   if(action!=1){if(action==3)sendSas(identity);controlReply(pipe,{{"version",1},{"secureAttention",sasAvailable()},{"submitted",action==3},{"confirmed",false}});DisconnectNamedPipe(pipe);clients--;return;}
+  // A disconnected login can keep CAgent running while Windows stops drawing
+  // its RDP desktop. The empty console can still present Windows sign-in.
+  const auto placement=recoveryPlan(identity);
+  const DWORD console=placement["consoleSessionId"].get<DWORD>();
+  const bool secureConsole=placement["sourceState"]==WTSDisconnected&&console!=0&&console!=0xffffffff&&
+    console!=session&&placement["consoleOccupied"]==false;
+  bool ownerConsole=false;
+  if(!secureConsole&&placement["sourceState"]==WTSDisconnected&&console!=0&&console!=0xffffffff&&console!=session){
+    Handle consoleToken;
+    ownerConsole=WTSQueryUserToken(console,consoleToken.put())&&tokenSid(consoleToken)==owner;
+  }
+  if(secureConsole||ownerConsole)session=console;
   {std::lock_guard<std::mutex> lock(workerMutex);need(activeSessions.insert(session).second,"A desktop worker already owns this Windows session");}
   struct SessionRelease{DWORD session;~SessionRelease(){std::lock_guard<std::mutex> lock(workerMutex);activeSessions.erase(session);}}sessionRelease{session};
   report("Client authorized");need(WaitForSingleObject(stopped,0)!=WAIT_OBJECT_0,"Service stopping");
@@ -110,11 +134,11 @@ static void serve(HANDLE raw,const std::wstring owner,const std::wstring worker)
   PSECURITY_DESCRIPTOR workerDescriptor=nullptr;need(ConvertStringSecurityDescriptorToSecurityDescriptorW(L"D:P(A;;GA;;;SY)",SDDL_REVISION_1,&workerDescriptor,nullptr)!=0,"Worker pipe ACL unavailable");
   SECURITY_ATTRIBUTES sa{sizeof(sa),workerDescriptor,FALSE};Handle workerPipe(CreateNamedPipeW(workerPipeName.c_str(),PIPE_ACCESS_DUPLEX|FILE_FLAG_OVERLAPPED|FILE_FLAG_FIRST_PIPE_INSTANCE,PIPE_TYPE_BYTE|PIPE_READMODE_BYTE|PIPE_WAIT|PIPE_REJECT_REMOTE_CLIENTS,1,65536,65536,5000,&sa));LocalFree(workerDescriptor);need(workerPipe.h!=INVALID_HANDLE_VALUE,"Worker pipe unavailable");
   STARTUPINFOW startup{};startup.cb=sizeof(startup);startup.lpDesktop=(LPWSTR)L"winsta0\\default";
-  std::wstring command=L"\""+worker+L"\" --system-pipe "+nonce;PROCESS_INFORMATION process{};
+  std::wstring command=L"\""+worker+L"\" --system-pipe "+nonce+(secureConsole?L" --signin-only":ownerConsole?L" --owner-console "+owner:L"");PROCESS_INFORMATION process{};
   need(CreateProcessAsUserW(token,worker.c_str(),command.data(),nullptr,nullptr,FALSE,CREATE_SUSPENDED|CREATE_NO_WINDOW,nullptr,nullptr,&startup,&process)!=0,"Worker launch failed");
   Handle child(process.hProcess),mainThread(process.hThread);struct Kill{HANDLE child,pipe;~Kill(){DisconnectNamedPipe(pipe);if(WaitForSingleObject(child,3000)==WAIT_TIMEOUT){TerminateProcess(child,0);WaitForSingleObject(child,3000);}}}kill{child,workerPipe};
   need(AssignProcessToJobObject(workersJob,child)!=0,"Worker containment failed");
-  {std::lock_guard<std::mutex> lock(workerMutex);liveWorkers.emplace(process.dwProcessId,WorkerIdentity{session,creationTime(child),child,0});}
+  {std::lock_guard<std::mutex> lock(workerMutex);liveWorkers.emplace(process.dwProcessId,WorkerIdentity{session,creationTime(child),child,0,secureConsole,ownerConsole?owner:L""});}
   struct Unregister{DWORD pid;~Unregister(){std::lock_guard<std::mutex> lock(workerMutex);liveWorkers.erase(pid);}}unregister{process.dwProcessId};
   need(ResumeThread(mainThread)!=(DWORD)-1,"Worker resume failed");report("Worker launched");
   Handle connected(CreateEventW(nullptr,TRUE,FALSE,nullptr));OVERLAPPED ov{};ov.hEvent=connected;BOOL ok=ConnectNamedPipe(workerPipe,&ov);DWORD error=ok?0:GetLastError();

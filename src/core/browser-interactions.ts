@@ -17,3 +17,13 @@ export function browserSuggestions(
 export function browserPagePermission(permission: string, active: boolean) {
   return active && ['clipboard-sanitized-write', 'fullscreen'].includes(permission);
 }
+
+export function storageAccessPair(page: string, frame: string) {
+  try {
+    const top = new URL(page), embedded = new URL(frame);
+    if (top.protocol === 'https:' && embedded.protocol === 'https:' &&
+        !top.username && !top.password && !embedded.username && !embedded.password) {
+      return { top: top.origin, embedded: embedded.origin, key: JSON.stringify([top.origin, embedded.origin]) };
+    }
+  } catch { /* Opaque and missing origins cannot receive a grant. */ }
+}

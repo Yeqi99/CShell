@@ -71,6 +71,18 @@ test('installation, configuration and grants are independent lifecycle gates', a
   } finally { await f.cleanup(); }
 });
 
+test('first install defaults grant declared permissions and preserve later revocations', async () => {
+  const f = await setup();
+  try {
+    const raw = rawManifest();
+    const installed = await f.manager.stage(raw, f.root, sha(raw), true);
+    assert.deepEqual(installed.grants, ['fixture.read']);
+    assert.equal(installed.registered, true);
+    await f.manager.setPermissions(installed.id, []);
+    assert.deepEqual((await f.manager.stage(raw, f.root, sha(raw), true)).grants, []);
+  } finally { await f.cleanup(); }
+});
+
 test('platform, host adapter and system version incompatibility never appear available', async () => {
   const f = await setup();
   try {

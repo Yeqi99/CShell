@@ -11,7 +11,7 @@ import {createTransferProgress} from '../shared/transfer-progress';
 import {copyMachineFile} from '../core/machine-file-copy';
 import type {Transfer} from '../shared/contracts';
 import type {LinuxWorkspaceService} from '../core/linux-workspace';
-import { app,dialog } from 'electron';
+import { app,dialog,shell } from 'electron';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {basename} from 'node:path';
@@ -49,7 +49,8 @@ export async function registerAgent(
   fileProviders?: {ssh:SshService;ftp:FtpService},
 ) {
   const directory = process.env.CSHELL_AGENT_DATA;
-  const bundledAvailable = false;
+  const localLauncher=process.platform==='win32'&&process.env.LOCALAPPDATA?join(process.env.LOCALAPPDATA,'Programs','CAgent','Open CAgent.vbs'):undefined;
+  const bundledAvailable=!!localLauncher&&await fileStat(localLauncher).then(s=>s.isFile(),()=>false);
   const guard = () => {
     if (!pluginEnabled(store.plugins(), 'agent')) throw new Error('请先启用 cagent 扩展');
   };
@@ -99,7 +100,8 @@ export async function registerAgent(
       if(input.quality.unlimited){const capabilities=await provider.call(deviceId,{method:'desktop.status'}) as {qualityModes?:string[]};if(!capabilities.qualityModes?.includes('unlimited'))throw new Error('无上限画质需要更新远端 CAgent；可先选择高画质连接。');}
       let ticket: DesktopTicket;
       try {
-        ticket = await provider.call(deviceId, {method:'desktop.open', params:{control:input.control, quality:input.quality, transport:'management', mediaTransport:'udp'}}) as DesktopTicket;
+        const mediaTransport = provider.usesDesktopRelay(deviceId) ? undefined : toolViews.has(input.id) ? 'tcp' : 'udp';
+        ticket = await provider.call(deviceId, {method:'desktop.open', params:{control:input.control, quality:input.quality, transport:'management', ...(mediaTransport ? {mediaTransport} : {})}}) as DesktopTicket;
       } catch (error) {
         if (!/unrecognized|unknown|unsupported/i.test(String(error)) || !/mediaTransport/.test(String(error))) throw error;
         ticket = await provider.call(deviceId, {method:'desktop.open', params:{control:input.control, quality:input.quality, transport:'management'}}) as DesktopTicket;
@@ -198,12 +200,19 @@ export async function registerAgent(
   });
   handle('agent:launch', async () => {
     guard();
-    throw new Error('CAgent 已改为独立应用，请从开始菜单打开 CAgent');
+    if(!localLauncher||!bundledAvailable)throw Error('请先安装本机 CAgent');
+    const error=await shell.openPath(localLauncher);if(error)throw Error(error);
   });
   handle('agent:machine-open',async(raw)=>{
     const id=z.string().uuid().parse(raw),device=provider.list().find(d=>d.deviceId===id);
     if(!device)throw new Error('设备身份不可用，请重新核对并连接');
-    await provider.call(id,{method:'agent.shells'});
+    try {
+      await provider.call(id,{method:'agent.shells'});
+    } catch(error) {
+      if(!(error instanceof Error) || !/配对已失效|^Invalid invitation$/.test(error.message))throw error;
+      if(!await provider.recoverRentalPairing?.(id))throw error;
+      await provider.call(id,{method:'agent.shells'});
+    }
     const target='machine:'+randomUUID();
     machines.set(target,{resourceId:id,fingerprint:device.fingerprint,label:device.name});
     return {id:target,name:device.name,local:false,available:true};
@@ -273,6 +282,20 @@ export async function registerAgent(
     }catch(error){throw new Error((completed.length?'已完成 '+completed.length+' 个文件；':'')+(error as Error).message);}
     finally{progress.finish(finished?'done':controller.signal.aborted?'cancelled':'failed');if(uploadId){await remoteCall(key,{method:'files.uploadCancel',params:{id:uploadId}}).catch(()=>{});}downloads.delete(p.id);}
   });
+  handle('agent:rdp-verify',async(target:unknown,id:unknown)=>{
+    const key=z.string().min(1).parse(target);checkTarget(key);
+    const profile=store.profile(z.string().uuid().parse(id));
+    if(profile?.protocol!=='rdp')throw new Error('请选择已保存的 Windows RDP 连接');
+    const remote=await remoteCall(key,{method:'desktop.rdp.identity',params:{}});
+    const {sha256}=z.object({sha256:z.string().regex(/^[a-f0-9]{64}$/)}).parse(remote);
+    const {rdpCertificate}=await import('../core/rdp-certificate');
+    const peer=await rdpCertificate(profile.host,profile.port);
+    checkTarget(key);
+    const current=store.profile(profile.id);
+    if(!current||current.protocol!=='rdp'||current.host!==profile.host||current.port!==profile.port||current.username!==profile.username)throw new Error('保存的 RDP 连接已改变，请重新核验');
+    if(peer!==sha256)throw new Error('RDP 服务器证书与当前 CAgent 机器不匹配，请检查选择的连接');
+    return true;
+  });
   handle('agent:file-download',async(target:unknown,input:unknown)=>{
     const key=z.string().parse(target),p=z.object({id:z.string().uuid(),root:z.string().uuid(),path:z.string().min(1).max(4096),name:z.string().min(1).max(255)}).strict().parse(input);safeName(p.name);
     checkTarget(key);
@@ -317,17 +340,21 @@ export async function registerAgent(
       return callAgent('client.' + name, params, directory);
     });
   const desktopTools=new DesktopAutomation({
-    validate:key=>{registry.describe(key);checkTarget(key);},
+    validate:key=>{if(key==='local'){guard();return;}registry.describe(key);checkTarget(key);},
     start:async input=>{toolViews.add(input.id);try{targets.bind(input.id,input.target);return await views.start(input);}catch(error){targets.release(input.id);toolViews.delete(input.id);throw error;}},
     stop:async id=>{try{await views.stop(id);}finally{toolViews.delete(id);targets.release(id);}},
     input:(id,input,generation)=>views.inputConfirmed(id,input,generation),release:(id,generation)=>views.release(id,generation),
     ack:(id,sequence,decoded,decodeMs,generation)=>views.ack(id,sequence,decoded,decodeMs,generation),
     subscribe:listener=>{toolListeners.add(listener);return()=>{toolListeners.delete(listener);};},
-    status:async(key,signal)=>{const raw=await registry.agent(key)({method:'desktop.status'},signal);return z.object({enabled:z.boolean(),viewAllowed:z.boolean(),controlAllowed:z.boolean(),busy:z.boolean(),implementation:z.string().max(100).optional(),lastFailure:z.union([z.string().max(2000),z.object({stage:z.string().max(100),code:z.string().max(100),message:z.string().max(2000),at:z.string().max(100)})]).optional()}).parse(raw);},
+    status:async(key,signal)=>{const raw=key==='local'?await callAgent('desktop.status',undefined,directory):await registry.agent(key)({method:'desktop.status'},signal);return z.object({enabled:z.boolean(),viewAllowed:z.boolean(),controlAllowed:z.boolean(),busy:z.boolean(),implementation:z.string().max(100).optional(),lastFailure:z.union([z.string().max(2000),z.object({stage:z.string().max(100),code:z.string().max(100),message:z.string().max(2000),at:z.string().max(100)})]).optional()}).parse(raw);},
     decode:decodeDesktopFrame,
   });
   return {
-    desktopTool:(key:string,action:string,input:unknown,signal:AbortSignal,authorize?:()=>void)=>desktopTools.invoke(key,action,input,signal,authorize),
+    desktopTool:(key:string,action:string,input:unknown,signal:AbortSignal,authorize?:()=>void)=>{
+      if(registry.describe(key).providerId!=='cshell.local-terminal')return desktopTools.invoke(key,action,input,signal,authorize);
+      const check=()=>{authorize?.();if(registry.describe(key).providerId!=='cshell.local-terminal')throw Error('本机目标已断开');guard();};
+      return desktopTools.invoke('local',action,input,signal,check);
+    },
     stopTarget,
     browserTarget: async(key:string)=>{
       if(key==='local'){guard();const s=await callAgent('client.status',undefined,directory) as {deviceId:string};return {key:'agent:'+s.deviceId,call:(method:string,params?:unknown)=>{guard();return callAgent(method,params,directory);},validate:guard};}

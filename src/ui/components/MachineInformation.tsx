@@ -1,4 +1,6 @@
 import {ErrorNotice} from './ErrorNotice';
+import {RentalInformation} from './RentalInformation';
+import type {RentalSample} from '../../desktop/rental-sample';
 import {LargeFileScan} from './LargeFileScan';
 import { useEffect, useRef, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
@@ -9,7 +11,10 @@ import { agentCapabilityError } from '../../shared/agent-compatibility';
 const rate=(n:number)=>n>=1024**2?`${(n/1024**2).toFixed(1)} MB/s`:`${(n/1024).toFixed(1)} KB/s`;
 const size=(bytes:number)=>Number.isFinite(bytes)?`${(bytes/1024**3).toFixed(1)} GB`:'—';
 const sections=[['overview','概览'],['cpu','处理器'],['memory','内存'],['disks','磁盘'],['network','网络'],['gpu','显卡']] as const;
-export function MachineInformation({call,active,closed}:{call:(method:AgentCall['method'],params?:unknown)=>Promise<unknown>;active:boolean;closed:boolean}) {
+export function MachineInformation({call,active,closed,deviceId}:{deviceId?:string;call:(method:AgentCall['method'],params?:unknown)=>Promise<unknown>;active:boolean;closed:boolean}) {
+  const [rental,setRental]=useState<RentalSample>();
+  const rentalScope=useRef<'unknown'|'rental'|'host'>('unknown');
+  const [rentalName,setRentalName]=useState('');
   const [snapshot,setSnapshot]=useState<MachineSnapshot>(),[section,setSection]=useState<string>('overview'),[error,setError]=useState(''),[busy,setBusy]=useState(false),[refresh,setRefresh]=useState(0);
   const previous=useRef<MachineSnapshot | undefined>(undefined),history=useRef<number[]>([]);
   const [load,setLoad]=useState<number[]>();
@@ -22,7 +27,19 @@ export function MachineInformation({call,active,closed}:{call:(method:AgentCall[
     const read=async()=>{
       setBusy(true);
       try{
+        if(deviceId&&rentalScope.current==='rental'){
+          const sample=await window.cshell.cloudRentalSample(deviceId,true);
+          if(!sample)throw Error('当前账号无法读取该租赁实例');
+          if(!disposed){setRental(sample);setError('');}
+          return;
+        }
         const next=await call('machine.snapshot',{}) as MachineSnapshot;
+        if(deviceId&&window.cshell.cloudRentalSample&&rentalScope.current==='unknown'&&next.platform==='linux'&&next.source!=='ssh'){
+          const sample=await window.cshell.cloudRentalSample(deviceId,/^[0-9a-f-]{36}$/i.test(next.hostname));
+          if(disposed)return;
+          if(sample){rentalScope.current='rental';setRentalName(next.hostname);setRental(sample);setError('');return;}
+          rentalScope.current='host';
+        }
         if(disposed)return;
         const old=previous.current;
         const values=old&&next.cpu.length===old.cpu.length?next.cpu.map((c,i)=>{const total=c.total-old.cpu[i].total;return total>0?Math.max(0,Math.min(100,100*(1-(c.idle-old.cpu[i].idle)/total))):0;}):undefined;
@@ -45,6 +62,8 @@ export function MachineInformation({call,active,closed}:{call:(method:AgentCall[
   const cpu=load?.length?load.reduce((a,b)=>a+b,0)/load.length:undefined;
   const current=!closed&&!error;
   const detail=(key:'disks'|'ports'|'processes'|'gpu')=>snapshot?.errors[key]?<ErrorNotice title="采集暂不可用" error={snapshot.errors[key]}/>:<pre>{snapshot?.[key]||'暂无数据'}</pre>;
+  if(rental)return <section className="machine-information"><header><div><strong>{rentalName}</strong><small>Ubuntu · 租赁实例</small></div><button className="icon" title="刷新机器信息" aria-label="刷新机器信息" disabled={busy||closed} onClick={()=>setRefresh(n=>n+1)}><RefreshCw size={16}/></button></header>
+    {error?<ErrorNotice title="实例采集未完成" error={error}/>:<RentalInformation sample={rental} closed={closed} diskTools={<LargeFileScan call={call} active={active&&!closed}/>}/>}</section>;
   return <section className="machine-information">
     <header><div><strong>{snapshot?.hostname??'机器信息'}</strong><small>{snapshot?`${snapshot.platform} · ${snapshot.arch} · ${snapshot.release}`:'正在读取目标机器'}</small></div><button className="icon" title="刷新机器信息" aria-label="刷新机器信息" disabled={busy||closed} onClick={()=>setRefresh(n=>n+1)}><RefreshCw size={16}/></button></header>
     <nav aria-label="机器信息分类">{sections.map(([id,label])=><button key={id} aria-pressed={section===id} onClick={()=>setSection(id)}>{label}</button>)}</nav>

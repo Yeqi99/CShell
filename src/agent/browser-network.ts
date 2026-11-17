@@ -30,7 +30,7 @@ export class AgentBrowserNetwork {
   }
   async call(method: string, raw: unknown, owner: string) {
     this.guard(owner);
-    if (method === 'browser.status') return { available: true, platform: process.platform };
+    if (method === 'browser.status') return { available: true, platform: process.platform, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone };
     if (method === 'browser.open') {
       const p = z
         .object({

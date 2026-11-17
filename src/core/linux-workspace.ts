@@ -5,7 +5,6 @@ import type { SshService } from './ssh';
 import { RemoteJobs, quote } from './remote-jobs';
 import {
   linuxInstallProbe,
-  linuxNodeRuntime,
   linuxWorkspaceInstallScript,
 } from './linux-workspace-install';
 import { agentCallSchema, type AgentCall } from '../shared/agent';
@@ -176,11 +175,9 @@ df -hP "$parent" | tail -n 1`,
         state === 'installed'
           ? ['连接已安装的 cagent，保留设备身份和浏览器资料']
           : [
-              `安装目录：${installDirectory}（程序、私有运行时、构建缓存和新建数据）`,
+              `安装目录：${installDirectory}（程序、私有运行时和新建数据）`,
               `当前系统 Node：${node}，npm：${npm}；保留不变`,
-              `下载并核验私有 Node.js ${linuxNodeRuntime.version}，仅存入 cagent 用户目录`,
-              '复用已检测到的编译工具；不安装系统软件，不修改软件源、全局 PATH 或 Shell 配置',
-              '从固定版本 node-pty 1.1.0 构建原生终端组件',
+              '下载当前渠道和目标架构的官方预编译包，验证 SHA256、私有运行时和原生终端组件',
               '核对上传程序 SHA256，启动仅回环监听的本机控制服务；不开放防火墙',
             ],
     };

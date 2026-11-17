@@ -2,7 +2,7 @@ import {chromium} from 'playwright';
 import {createServer} from 'node:http';
 import {readFile} from 'node:fs/promises';
 import assert from 'node:assert/strict';
-const server=createServer(async(req,res)=>{const path=['/app.js','/feedback.js','/styles.css','/icon.svg'].includes(req.url||'')?req.url!.slice(1):'index.html';res.setHeader('Content-Type',path.endsWith('.js')?'text/javascript':path.endsWith('.css')?'text/css':'text/html; charset=utf-8');res.end(await readFile('services/admin/'+path));});
+const server=createServer(async(req,res)=>{const path=['/app.js','/feedback.js','/traffic.js','/styles.css','/icon.svg'].includes(req.url||'')?req.url!.slice(1):'index.html';res.setHeader('Content-Type',path.endsWith('.js')?'text/javascript':path.endsWith('.css')?'text/css':'text/html; charset=utf-8');res.end(await readFile('services/admin/'+path));});
 await new Promise<void>(r=>server.listen(0,'127.0.0.1',r));
 const browser=await chromium.launch({channel:'msedge'});
 try{

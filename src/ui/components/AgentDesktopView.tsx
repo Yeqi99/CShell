@@ -173,7 +173,7 @@ export function AgentDesktopView({
       }
       if (event.type === 'closed') {
         generation.current++;
-        setError(event.reason==='CAPTURE_ACCESS_DENIED'?'当前没有可采集的用户桌面。请在目标机器登录或解锁原用户；若此前使用 RDP，可在恢复原会话后检查“转为独立远控”，无需长期保持 RDP 窗口可见。':event.reason==='CAPTURE_FAILED'?'远端桌面采集未成功。请检查目标用户是否已登录并解锁，以及远端 CAgent 与桌面组件是否已更新；可展开“转为独立远控”检查会话状态。':event.reason==='CAPTURE_CLOSED'?'远端画面采集退出，请检查远端登录会话后重新连接（CAPTURE_CLOSED）':event.reason);
+        setError(event.reason==='CAPTURE_SIGNIN_DISPLAY_BLANK'?'Windows 登录界面尚未输出可见画面。可以通过已保存的 Windows RDP 连接登录。':event.reason==='CAPTURE_ACCESS_DENIED'?'当前没有可采集的用户桌面。请在目标机器登录或解锁原用户；若此前使用 RDP，可在恢复原会话后检查“转为独立远控”，无需长期保持 RDP 窗口可见。':event.reason==='CAPTURE_FAILED'?'远端桌面采集未成功。请检查目标用户是否已登录并解锁，以及远端 CAgent 与桌面组件是否已更新；可展开“转为独立远控”检查会话状态。':event.reason==='CAPTURE_CLOSED'?'远端画面采集退出，请检查远端登录会话后重新连接（CAPTURE_CLOSED）':event.reason);
         setActive(false);
         setReconnecting('');
         setBusy(false);
@@ -345,7 +345,15 @@ export function AgentDesktopView({
       if (!controlling.current) release();
     } catch (e) {
       if (epoch === generation.current && id.current === key) {
-        setError(String(e));
+        let message = String(e);
+        if (message.includes('CAgent 请求失败：请检查远端权限和服务状态') || message.includes('CAgent 未返回具体失败原因')) {
+          try {
+            const plan = await window.cshell.agentCall(target, {method:'desktop.recovery.plan'}) as {sourceState?:number};
+            if (plan.sourceState === 4) message = '目标 Windows 用户会话已断开。请打开原 Windows 会话，再重新连接远程控制。';
+          } catch { /* Older agents may not expose session diagnostics. */ }
+          if (epoch !== generation.current || id.current !== key) return;
+        }
+        setError(message);
         id.current = '';
         stopDecoder();
       }

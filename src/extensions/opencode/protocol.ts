@@ -54,9 +54,20 @@ export function encodeRequest(kind:Family,b:any){
 export function normalizeResponse(response:Response,kind:Family,stream:boolean):Response {
   if(!response.ok||kind==='chat')return response;
   let content='',done=false,finishReason='stop';const calls=new Map<number,any>();
+  let usage: Record<string, number> = {};
   const consume=(v:any):any[]=>{
     if(v.error||v.type==='error'||v.type==='response.failed')throw Error('OpenCode 返回模型错误');
     const out:any[]=[];
+    if(kind==='responses') usage = v.response?.usage ?? v.usage ?? usage;
+    if(kind==='google' && v.usageMetadata) {
+      const m=v.usageMetadata;
+      usage={prompt_tokens:m.promptTokenCount,completion_tokens:m.candidatesTokenCount === undefined ? undefined : m.candidatesTokenCount+(m.thoughtsTokenCount??0),total_tokens:m.totalTokenCount};
+    }
+    if(kind==='anthropic') {
+      const m=v.message?.usage ?? v.usage;
+      if(m?.input_tokens !== undefined) usage.prompt_tokens=m.input_tokens+(m.cache_read_input_tokens??0)+(m.cache_creation_input_tokens??0);
+      if(m?.output_tokens !== undefined) usage.completion_tokens=m.output_tokens;
+    }
     const text=(s:string)=>{if(s){content+=s;out.push({choices:[{index:0,delta:{content:s}}]});}};
     const tool=(i:number,id:string,name:string,args:string,signature?:string)=>{
       if(i<0||i>=16)throw Error('模型工具调用过多');
@@ -64,7 +75,7 @@ export function normalizeResponse(response:Response,kind:Family,stream:boolean):
       if(id)c.id=id;if(name)c.function.name=name;c.function.arguments+=args;if(signature)c.providerData=signature;calls.set(i,c);
       out.push({choices:[{index:0,delta:{tool_calls:[{index:i,...(id?{id,type:'function'}:{}),function:{...(name?{name}:{}),...(args?{arguments:args}:{})},...(signature?{providerData:signature}:{})}]}}]});
     };
-    const finish=(reason?:string)=>{if(done)return;done=true;finishReason=reason==='max_tokens'||reason==='MAX_TOKENS'||reason==='max_output_tokens'?'length':calls.size?'tool_calls':'stop';out.push({choices:[{index:0,delta:{},finish_reason:finishReason}]});};
+    const finish=(reason?:string)=>{if(done)return;done=true;finishReason=reason==='max_tokens'||reason==='MAX_TOKENS'||reason==='max_output_tokens'?'length':calls.size?'tool_calls':'stop';out.push({usage,choices:[{index:0,delta:{},finish_reason:finishReason}]});};
     if(kind==='anthropic'){
       if(v.type==='content_block_start'&&v.content_block.type==='tool_use')tool(v.index,v.content_block.id,v.content_block.name,'');
       if(v.type==='content_block_delta'){if(v.delta.type==='text_delta')text(v.delta.text);if(v.delta.type==='input_json_delta')tool(v.index,'','',v.delta.partial_json);}
@@ -95,7 +106,7 @@ export function normalizeResponse(response:Response,kind:Family,stream:boolean):
       if(next.done){pending+=decoder.decode();if(!sse)emit(parseAiJson(pending,'json'));break;}if(done)break;
     }
     if(!done)throw Error('模型响应中断，未重试');
-    if(stream)controller.enqueue(encoder.encode('data: [DONE]\n\n'));else controller.enqueue(encoder.encode(JSON.stringify({choices:[{message:{content,tool_calls:[...calls.values()]},finish_reason:finishReason}]})));
+    if(stream)controller.enqueue(encoder.encode('data: [DONE]\n\n'));else controller.enqueue(encoder.encode(JSON.stringify({usage,choices:[{message:{content,tool_calls:[...calls.values()]},finish_reason:finishReason}]})));
     controller.close();
   }catch(e){controller.error(e);}finally{await reader.cancel().catch(()=>{});}},cancel(){return reader.cancel();}}),{headers:{'Content-Type':stream?'text/event-stream':'application/json'}});
 }

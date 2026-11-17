@@ -561,7 +561,7 @@ export function LinuxDesktop({
                 {w.id === 'files' && (typeof files === 'function'
                   ? files(active && visible && front === w.id && !closed)
                   : files ?? (!closed && <AgentMachineFiles target={target} call={call} />))}
-                {w.id === 'machine-info' && <MachineInformation call={call} active={active && visible && front === w.id} closed={closed}/>}
+                {w.id === 'machine-info' && <MachineInformation key={machine.deviceId} deviceId={!machine.sshOnly&&!workbench?machine.deviceId:undefined} call={call} active={active && visible && front === w.id} closed={closed}/>}
                 {w.id === 'applications' && (
                   <AgentApplications
                     onDevelopmentOpen={id=>{void refreshInstalled().then(()=>open(id))}}

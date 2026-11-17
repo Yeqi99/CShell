@@ -5,7 +5,11 @@ export async function fetchAiProtocol(transport: typeof fetch, url: string, init
   const body = typeof init.body === 'string' ? JSON.parse(init.body) : undefined;
   const endpoint = new URL(url);
   const explicit = /\/responses(?:\/chat\/completions)?\/?$/.test(endpoint.pathname);
-  if (!explicit && !(endpoint.hostname === 'api.openai.com' && /^gpt-6(?:[.-]|$)/.test(body?.model ?? ''))) return transport(url, init);
+  if (!explicit && !(endpoint.hostname === 'api.openai.com' && /^gpt-6(?:[.-]|$)/.test(body?.model ?? ''))) {
+    if (body?.stream && ['api.openai.com', 'api.deepseek.com'].includes(endpoint.hostname))
+      return transport(url, { ...init, body: JSON.stringify({ ...body, stream_options: { ...body.stream_options, include_usage: true } }) });
+    return transport(url, init);
+  }
   endpoint.pathname = endpoint.pathname.replace(/\/(?:responses\/)?chat\/completions\/?$/, '/responses');
   const input: any[] = [];
   for (const message of body.messages ?? []) {
@@ -28,7 +32,7 @@ export async function fetchAiProtocol(transport: typeof fetch, url: string, init
     return {content:output.filter((item:any)=>item.type==='message').flatMap((item:any)=>item.content??[]).filter((part:any)=>part.type==='output_text').map((part:any)=>part.text).join(''),
       tool_calls:output.filter((item:any)=>item.type==='function_call').map((item:any)=>({id:item.call_id,type:'function',function:{name:item.name,arguments:item.arguments}}))};
   };
-  if(!body.stream)return Response.json({choices:[{message:reply(await response.json())}]});
+  if(!body.stream){const value=await response.json();return Response.json({usage:value.usage,choices:[{message:reply(value)}]});}
   if(!response.body)throw new Error('Responses 返回空响应');
   const reader=response.body.getReader(),decoder=new TextDecoder(),encoder=new TextEncoder();
   let pending='',size=0,completed=false;
@@ -49,7 +53,7 @@ export async function fetchAiProtocol(transport: typeof fetch, url: string, init
             if(event.type==='response.output_text.delta')controller.enqueue(encoder.encode('data: '+JSON.stringify({choices:[{index:0,delta:{content:event.delta}}]})+'\n\n'));
             if(event.type==='response.completed'){
               const result=reply(event.response);
-              controller.enqueue(encoder.encode('data: '+JSON.stringify({choices:[{index:0,delta:{tool_calls:result.tool_calls.map((call:any,index:number)=>({...call,index}))},finish_reason:'stop'}]})+'\n\n'));
+              controller.enqueue(encoder.encode('data: '+JSON.stringify({usage:event.response.usage,choices:[{index:0,delta:{tool_calls:result.tool_calls.map((call:any,index:number)=>({...call,index}))},finish_reason:'stop'}]})+'\n\n'));
               completed=true;break;
             }
           }

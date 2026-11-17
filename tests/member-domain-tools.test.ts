@@ -52,3 +52,11 @@ test('real MCP HTTP domain tools enforce application grants',async()=>{
   assert.equal((await call('member_site_workflow',{domain:'alice.canp.site',target:'test-machine'})).status,200);
  }finally{await service.stop();await rm(dir,{recursive:true,force:true});}
 });
+
+test('short DNS names use the prefix of the record being edited; switching account cancels the write',async()=>{
+ const id='b9d14623-9ee6-4866-a304-4f00243cbadd', writes:any[]=[];let account='one',switchAtRead=false;
+ const t=createMemberDomainTools({accountId:()=>account,domains:async(input)=>{if(input)writes.push(input);else if(switchAtRead)account='two';return {records:[{id,prefix:'alice'}]} as any;}}).find(t=>t.name==='update_member_dns_record')!;
+ const args={id,name:'www',type:'A',content:'192.0.2.1',requestId:'unique-id-01'};
+ await t.invoke(args,new AbortController().signal);assert.equal(writes[0].name,'www.alice.canp.site');
+ switchAtRead=true;await assert.rejects(t.invoke(args,new AbortController().signal),/账号已切换/);assert.equal(writes.length,1);
+});

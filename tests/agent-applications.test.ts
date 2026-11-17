@@ -1,5 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { AgentApplicationService, installArgs } from '../src/agent/applications';
 import type { ClientVault } from '../src/core/client/identity';
@@ -21,6 +23,7 @@ function fixture(owner = 'local', code = 'console.log("installed-fixture")') {
   });
   const data = new Map<string, unknown>([['applications-tasks', [{ owner, task }]]]);
   const vault = {
+    storageDirectory: join(tmpdir(), id),
     read: async (key: string) => structuredClone(data.get(key)),
     write: async (key: string, value: unknown) => {
       data.set(key, structuredClone(value));
@@ -110,4 +113,15 @@ test('package lifecycle cleanup waits for child close even after installation au
   const result=await f.service.cancelAndWait({id:f.id},owner);
   assert.equal(result.state,'interrupted');assert.ok('exitCode' in result,'close event completed before cleanup returned');
  }finally{await f.service.dispose();}
+});
+
+test('Linux database plans use a private native runtime without a Docker daemon', {skip:process.platform!=='linux' || !['x64','arm64'].includes(process.arch)}, async()=>{
+  const {service}=fixture();
+  try{
+    await service.load();
+    const plan=await service.plan({app:'redis'},'local');
+    assert.equal(plan.manager,'native');
+    assert.equal(plan.port,6379);
+    assert.match(plan.logs,/database-apps/);
+  }finally{await service.dispose();}
 });

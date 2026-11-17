@@ -9,8 +9,7 @@ export function CopyButton({ content }: { content: string }) {
       title={copied ? '已复制' : '复制内容'}
       aria-label="复制内容"
       onClick={() =>
-        void window.cshell
-          .copyText(content)
+        void (window.cshell ? window.cshell.copyText(content) : navigator.clipboard.writeText(content))
           .then(() => setCopied(true))
           .catch(() => setCopied(false))
       }

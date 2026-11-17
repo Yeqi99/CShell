@@ -4,12 +4,14 @@ import { readFile, writeFile, rename, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { networkRouteSchema, type NetworkRoute, type NetworkRouteStatus } from '../shared/network-route';
 import type { Store } from '../core/store';
+import { updateRequest } from '../agent/update-request';
 
 /** Dedicated application requests; never changes the browser or OS proxy. */
 export class ApplicationNetworkRoute {
   private route: NetworkRoute = { mode: 'system' };
   private hasSavedRoute = false;
   private current?: Session;
+  private routeLifetime = new AbortController();
   private control?:Session;
   async captureControlProxy(previous:import('./system-proxy').SystemProxyState){
     const {session}=await import('electron');const isolated=session.fromPartition('cshell-control-'+randomUUID(),{cache:false});
@@ -68,6 +70,8 @@ export class ApplicationNetworkRoute {
       this.route = next;
       this.hasSavedRoute = restoredSaved ?? true;
       const previous = this.current;
+      this.routeLifetime.abort();
+      this.routeLifetime = new AbortController();
       this.current = undefined;
       // Explicit application of a new route invalidates pooled old connections.
       await previous?.closeAllConnections();
@@ -112,11 +116,27 @@ export class ApplicationNetworkRoute {
     });
     this.queue = prepare.then(() => {}, () => {});
     const connection = await prepare;
+    // Some system proxies reset Chromium's HTTP/2 Responses streams. Negotiate
+    // HTTP/1.1 before sending the POST so a broken stream never replays a turn.
+    if (typeof input === 'string' && /^https:\/\/api\.openai\.com\/v1\/responses$/.test(input)
+      && init?.method === 'POST' && typeof init.body === 'string') {
+      const lifetime = this.routeLifetime.signal;
+      const resolved = await connection.resolveProxy(input);
+      const first = resolved.split(';')[0].trim();
+      const proxy = /^(PROXY|HTTPS) ([^\s/]+)$/i.exec(first);
+      if (connection !== this.current || this.closed || lifetime.aborted) throw Error('网络出口已更改，请重新发送请求');
+      if (proxy) return updateRequest(input, {
+        method: 'POST', body: init.body, headers: Object.fromEntries(new Headers(init.headers).entries()),
+        proxy: (proxy[1].toUpperCase() === 'HTTPS' ? 'https://' : 'http://') + proxy[2],
+        signal: init.signal ? AbortSignal.any([init.signal, lifetime]) : lifetime,
+      });
+    }
     // Model keys are explicit headers; browser cookies/cache never participate.
     return connection.fetch(input as string | Request, { ...init, credentials: 'omit', cache: 'no-store' });
   };
   async close() {
     this.closed = true;
+    this.routeLifetime.abort();
     await this.queue.catch(() => {});
     await this.current?.closeAllConnections();
     await this.releaseControlProxy();

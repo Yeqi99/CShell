@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { buildManagedWechatManifest, createManagedWechatCapability, managedWechatConfigureSchema } from '../src/agent/managed-wechat-capability';
 import { capabilityDigest, type CapabilityCatalogEntry } from '../src/agent/capability-catalog';
 
-function entry(){const manifest=buildManagedWechatManifest({wechatVersion:'4.1.15.56',version:'0.1.0',methods:['status','send','contacts'],source:{repository:'https://github.com/Yeqi99/CShell',releaseTag:'toolkit-test',assetUrl:'https://github.com/Yeqi99/CShell/releases/download/toolkit-test/toolkit.json'},files:[{path:'WeixinToolkit.exe',bytes:4,sha256:capabilityDigest('test')}]});const manifestJson=JSON.stringify(manifest);return{manifest,entry:{id:manifest.id,name:manifest.name,description:manifest.description,version:manifest.version,permissions:manifest.permissions,source:'github',url:manifest.source.assetUrl,manifestJson,manifestSha256:capabilityDigest(manifestJson),bundleSha256:capabilityDigest('test'),bundleBytes:4} satisfies CapabilityCatalogEntry};}
+function entry(){const manifest=buildManagedWechatManifest({wechatVersion:'4.1.15.56',version:'0.1.0',methods:['status','send','contacts','receive'],source:{repository:'https://github.com/Yeqi99/CShell',releaseTag:'toolkit-test',assetUrl:'https://github.com/Yeqi99/CShell/releases/download/toolkit-test/toolkit.json'},files:[{path:'WeixinToolkit.exe',bytes:4,sha256:capabilityDigest('test')}]});const manifestJson=JSON.stringify(manifest);return{manifest,entry:{id:manifest.id,name:manifest.name,description:manifest.description,version:manifest.version,permissions:manifest.permissions,source:'github',url:manifest.source.assetUrl,manifestJson,manifestSha256:capabilityDigest(manifestJson),bundleSha256:capabilityDigest('test'),bundleBytes:4} satisfies CapabilityCatalogEntry};}
 test('manifest separates reads, sends, and API grants and settings never infer broad targets',()=>{
  const {manifest}=entry();assert.equal(manifest.compatibility.agentVersion.min,'0.8.17');assert.equal(manifest.tools.find(x=>x.id==='wechat_send')?.sideEffect,true);assert.equal(manifest.tools.find(x=>x.id==='wechat_contacts')?.sideEffect,false);assert.deepEqual(manifest.tools.find(x=>x.id==='wechat_contacts')?.permissions,['wechat.api','wechat.contacts.read']);assert.deepEqual(managedWechatConfigureSchema.parse({}).sendTargets,[]);assert.throws(()=>managedWechatConfigureSchema.parse({subscriptionEnabled:true}));
 });
@@ -83,10 +83,140 @@ test('4.2 exact build only exposes text chat and remains isolated from earlier v
  assertManagedWechatPackage('4.2.0.12',managedWechatModuleHashes['4.2.0.12'],manifest);
  assert.throws(()=>assertManagedWechatPackage('4.2.0.12',managedWechatModuleHashes['4.1.15.56'],manifest),/mismatch/);
  assert.throws(()=>assertManagedWechatPackage('4.1.15.56',managedWechatModuleHashes['4.1.15.56'],manifest),/mismatch/);
- assert.throws(()=>buildManagedWechatManifest({wechatVersion:'4.2.0.12',version:'0.1.1',methods:['contacts'],source:old.manifest.source,files:old.manifest.files}),/text chat only/);
+ const updated=buildManagedWechatManifest({wechatVersion:'4.2.0.12',version:'0.1.1',methods:['contacts'],source:old.manifest.source,files:old.manifest.files});
+ assertManagedWechatPackage('4.2.0.12',managedWechatModuleHashes['4.2.0.12'],updated);
+ updated.tools[0].permissions=['wechat.api'];
+ assert.throws(()=>assertManagedWechatPackage('4.2.0.12',managedWechatModuleHashes['4.2.0.12'],updated),/permission contract/);
  const store=new Map<string,unknown>();const vault={read:async<T>(key:string,schema:z.ZodType<T>)=>store.has(key)?schema.parse(store.get(key)):undefined,write:async(key:string,value:unknown)=>{store.set(key,structuredClone(value));}};
  const directory=await mkdtemp(join(tmpdir(),'wechat-version-'));
  const manifestJson=JSON.stringify(manifest),catalog={...old.entry,id:manifest.id,manifestJson,manifestSha256:capabilityDigest(manifestJson)};
  const a=await createManagedWechatCapability({entry:old.entry,directory,vault,authorize:()=>true});const b=await createManagedWechatCapability({entry:catalog,directory,vault,authorize:()=>true});
  try{await a.configure({port:8765,sendTargets:['old-peer']});await b.configure({port:8766,sendTargets:['new-peer']});assert.deepEqual(a.status().settings.sendTargets,['old-peer']);assert.deepEqual(b.status().settings.sendTargets,['new-peer']);assert.equal(a.status().settings.port,8765);assert.equal(b.status().settings.port,8766);assert.notEqual((store.get('managed-'+old.entry.id) as any).apiToken,(store.get('managed-'+manifest.id) as any).apiToken);}finally{await a.shutdown();await b.shutdown();await rm(directory,{recursive:true,force:true});}
+});
+
+test('replayed incoming messages retain their delivery key across listener and package restarts',async()=>{
+ const {managedWechatDeliveryId:key}=await import('../src/agent/managed-wechat-capability');
+ const data={accountId:'me',conversationId:'peer',messageId:'123'};
+ assert.equal(key('old','message.received','a',data),key('new','message.received','b',data));
+ assert.notEqual(key('old','message.received','a',data),key('old','message.received','a',{...data,accountId:'other'}));
+ assert.equal(key('old','message.received','b',{}),'old:b');
+});
+
+test('auto follow waits for idle evidence and can recover a recycled PID with a different birth',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'wechat-refollow-'));
+ const storage=new Map<string,unknown>(), actions:string[]=[];
+ let idle=false, birth='10', boundBirth='10',fail=true;
+ const {managedWechatModuleHashes}=await import('../src/agent/managed-wechat-capability');
+ const f=await createManagedWechatCapability({
+   entry:entry().entry,directory,authorize:()=>true,getGrants:()=>['wechat.api','wechat.events.read'],
+   vault:{read:async<T>(k:string,s:z.ZodType<T>)=>storage.has(k)?s.parse(storage.get(k)):undefined,write:async(k,v)=>{storage.set(k,v);}},
+   initialize:async(_exe,path)=>writeFile(path,JSON.stringify({dataDir:join(dirname(path),'data'),permissions:{}})),
+   nativeCommand:async(_exe,args)=>{
+     if(args.includes('--validate')){actions.push('validate');if(fail)throw Error('uncertain');return{validated:true};}
+     if(args.includes('--bind')){actions.push('bind');boundBirth=birth;return{};}
+     return{bound:true,boundPid:7,boundCreationTime:boundBirth,liveEnabled:true,nativeWorkersIdle:idle,validation:{valid:false,reason:birth===boundBirth?'local_validation_missing_or_mismatch':'bound_process_not_current'},processes:[{pid:7,version:'4.1.15.56',moduleSha256:managedWechatModuleHashes['4.1.15.56'],creationTime:birth}]};
+   },
+   serviceFactory:()=>({verify:async()=>{},start:async()=>{},stop:async()=>{},health:async()=>({}),capabilities:async()=>({}),submit:async()=>({}),operation:async()=>({})})
+ });
+ try{
+   await f.adapter.inspect(directory);
+   await f.configure({apiEnabled:true,subscriptionEnabled:true,accountId:'me',receiveTargets:['filehelper']});
+   await assert.rejects(f.validate(7),/UNKNOWN/);
+   idle=true;assert.equal(await f.reconcile(),false);
+   birth='11';idle=false;assert.equal(await f.reconcile(),false);
+   idle=true;fail=false;assert.equal(await f.reconcile(),true);
+   assert.deepEqual(actions,['validate','bind','validate']);
+ }finally{await f.shutdown();await rm(directory,{recursive:true,force:true});}
+});
+
+test('friend lookup confines group scope and keeps historical speech separate from membership', async () => {
+  const { managedWechatCatalog } = await import('../src/agent/managed-wechat-catalog');
+  const directory = await mkdtemp(join(tmpdir(), 'wechat-lookup-'));
+  const accountId = 'wxid_fixture', requestId = 'a'.repeat(64), groupId = '123456@chatroom';
+  let reads = 0;
+  const backend = await createManagedWechatCapability({
+    entry: managedWechatCatalog.find(app => app.id === 'cagent.wechat.v42012')!,
+    directory, authorize: () => true, profileReady: async () => true,
+    vault: { read: async () => undefined, write: async () => {} },
+    initialize: async (_, path) => writeFile(path, JSON.stringify({ dataDir: join(dirname(path), 'data'), permissions: {} })),
+    serviceFactory: () => ({
+      verify: async () => {}, start: async () => {}, stop: async () => {},
+      health: async () => ({}), capabilities: async () => ({}), submit: async () => ({}), operation: async () => ({}),
+      friendRequest: async () => {
+        reads++;
+        return { accountId, requestId, applicantId: 'wxid_peer', groupEvidence: { state: 'observed_speaking', messageId: '42' } };
+      }
+    })
+  });
+  try {
+    await backend.configure({ apiEnabled: true, subscriptionEnabled: true, accountId, receiveTargets: ['fmessage', groupId] });
+    await backend.adapter.register!(directory, ['wechat.api', 'wechat.events.read']);
+    await assert.rejects(backend.requestLookup(requestId, '99999@chatroom'), /接收范围/);
+    assert.equal(reads, 0);
+    const { lines } = await backend.requestLookup(requestId, groupId);
+    assert(lines.includes('当前群成员身份 · 未知'));
+    assert(lines.includes('群发言记录 · 曾在此群发言（消息 ID 42）'));
+    assert.equal(reads, 1);
+  } finally {
+    await backend.shutdown();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('send target changes keep listener and callback alive without re-registering the package',async()=>{
+  const directory=await mkdtemp(join(tmpdir(),'wechat-live-targets-'));
+  const storage=new Map<string,unknown>();
+  let starts=0,stops=0,refreshes=0;
+  const f=await createManagedWechatCapability({entry:entry().entry,directory,authorize:()=>true,
+    vault:{read:async<T>(key:string,s:z.ZodType<T>)=>storage.has(key)?s.parse(storage.get(key)):undefined,write:async(key,value)=>{storage.set(key,structuredClone(value));}},
+    initialize:async(_exe,path)=>writeFile(path,JSON.stringify({dataDir:join(dirname(path),'data'),permissions:{}})),
+    profileReady:async()=>true,serviceFactory:()=>({verify:async()=>{},start:async()=>{starts++;},stop:async()=>{stops++;},health:async()=>({listener:'listening'}),capabilities:async()=>({}),submit:async()=>{throw Error('unexpected send');},operation:async()=>({})})});
+  try{
+    const settings={apiEnabled:true,subscriptionEnabled:true,accountId:'wxid_fixture_self',receiveTargets:['filehelper']};
+    await f.configure(settings);
+    await f.adapter.register!(directory,['wechat.api','wechat.events.read','wechat.send']);
+    const file=join(directory,'managed-'+f.entry.id,'config.json');
+    const before=JSON.parse(await readFile(file,'utf8'));
+    await f.configure({...settings,sendTargets:['wxid_fixture_peer']},async()=>{refreshes++;});
+    const after=JSON.parse(await readFile(file,'utf8'));
+    assert.deepEqual(after,{...before,permissions:{...before.permissions,send:['wxid_fixture_peer']}});
+    assert.equal(await f.listenerState(),'listening');
+    assert.deepEqual([starts,stops,refreshes],[1,0,0]);
+    await f.configure({...settings,port:8766},async()=>{refreshes++;});
+    assert.deepEqual([starts,stops,refreshes],[2,1,1]);
+  }finally{await f.shutdown();await rm(directory,{recursive:true,force:true});}
+});
+
+test('4.2.0.50 contact validation runs without a listener grant or receive target', async () => {
+  const { managedWechatCatalog } = await import('../src/agent/managed-wechat-catalog');
+  const catalog = managedWechatCatalog.find(item => item.id === 'cagent.wechat.v42050')!;
+  const directory = await mkdtemp(join(tmpdir(), 'wechat-contacts-only-'));
+  const store = new Map<string, unknown>();
+  const service = await createManagedWechatCapability({
+    entry: catalog, directory, authorize: () => true, getGrants: () => ['wechat.api', 'wechat.contacts.read'],
+    vault: {
+      read: async <T>(key: string, schema: z.ZodType<T>) => store.has(key) ? schema.parse(store.get(key)) : undefined,
+      write: async (key, value) => { store.set(key, value); },
+    },
+    initialize: async (_exe, path) => writeFile(path, JSON.stringify({dataDir: join(dirname(path), 'data'), permissions: {}})),
+    profileReady: async () => true,
+    nativeCommand: async (_exe, args) => {
+      assert.ok(args.includes('--validate'));
+      const config = JSON.parse(await readFile(args[args.indexOf('--config') + 1], 'utf8'));
+      assert.deepEqual(config.permissions.receive, []);
+      assert.equal(config.permissions.readContacts, true);
+      return {validated: true};
+    },
+    serviceFactory: () => ({verify: async () => {}, start: async () => {}, stop: async () => {}, health: async () => ({}),
+      capabilities: async () => ({}), submit: async () => ({}), operation: async () => ({})}),
+  });
+  try {
+    await service.adapter.inspect(directory);
+    await service.configure({apiEnabled: true, readContacts: true});
+    assert.deepEqual(await service.validate(123), {validated: true});
+    assert.equal(service.status().running, true);
+  } finally {
+    await service.shutdown();
+    await rm(directory, {recursive: true, force: true});
+  }
 });

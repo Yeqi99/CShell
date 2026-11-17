@@ -41,7 +41,7 @@ export class MonitorWindows {
     const view = this.windows.get(event.sender.id);
     if (!view) return;
     const allowed = ['config', 'client:connect', 'local-terminal:open', 'connect', 'connect:cancel', 'disconnect', 'input', 'resize', 'acknowledge',
-      'clipboard:write', 'key:pick', 'agent:machine-open', 'agent:call',
+      'conversation:link', 'clipboard:write', 'key:pick', 'agent:machine-open', 'agent:call',
       'desktop:view-start', 'desktop:view-stop', 'desktop:view-input', 'desktop:view-release',
       'desktop:view-ack', 'desktop:view-quality', 'views:save', 'views:list',
       'ai:snapshot', 'ai:create', 'ai:send', 'ai:stop', 'ai:approve', 'ai:thread-provider', 'ai:mode', 'ai:text'];
@@ -199,6 +199,7 @@ export class MonitorWindows {
       }
     } catch (error) { this.close(id); throw error; }
   }
+  openIds() { return [...new Set([...this.windows.values()].map(owner => owner.view.id))]; }
   close(id: string) {
     for (const value of this.windows.values()) if (value.view.id === id) value.window.close();
   }

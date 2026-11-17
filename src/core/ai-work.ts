@@ -1,3 +1,4 @@
+import { EventEmitter, once } from 'node:events';
 import { z } from 'zod';
 import { goalInputSchema, goalIntervalMs } from '../shared/ai-work';
 import type { AiThread } from '../shared/ai';
@@ -12,7 +13,7 @@ interface Host {
   child(parent: AiThread, task: string): Promise<AiThread>;
   send(id: string, text: string): Promise<void>;
   stop(id: string): void;
-  save(): Promise<void>;
+  save(thread: AiThread): Promise<void>;
 }
 /** One host timer; children share the provider transport, never create OS processes. */
 export class AiWork {
@@ -20,7 +21,24 @@ export class AiWork {
   private ticking?: Promise<void>;
   private disposed = false;
   private reports = new Set<string>();
+  private readonly completed = new EventEmitter();
   constructor(private host: Host) {}
+  childSettled(id: string) {
+    this.completed.emit(id);
+  }
+  async waitForChild(id: string, signal: AbortSignal, bounded = true) {
+    signal.throwIfAborted();
+    if (!this.host.busy(id)) return 'finished';
+    const timeout = bounded ? AbortSignal.timeout(45000) : undefined;
+    try {
+      await once(this.completed, id, { signal: timeout ? AbortSignal.any([signal, timeout]) : signal });
+      return 'finished';
+    } catch (error) {
+      signal.throwIfAborted();
+      if (timeout?.aborted) return 'timeout';
+      throw error;
+    }
+  }
   start() {
     if (this.disposed) return;
     this.timer ??= setInterval(() => void this.tick().catch(() => {}), 1000);
@@ -68,7 +86,7 @@ export class AiWork {
       history: previous.goal?.history ?? [],
     };
     try {
-      await this.host.save();
+      await this.host.save(t);
     } catch (error) {
       Object.assign(t, previous);
       throw error;
@@ -86,7 +104,7 @@ export class AiWork {
         t.permissionCeiling = undefined;
         t.boundIdentity = undefined;
       }
-      await this.host.save();
+      await this.host.save(t);
       return;
     }
     if (this.host.busy(t.id)) throw new Error('当前任务仍在运行');
@@ -97,7 +115,7 @@ export class AiWork {
     t.goal.reason = a === 'run' ? '准备检查' : '已恢复';
     t.goal.nextRun = Date.now() + (a === 'run' ? 0 : goalIntervalMs(t.goal));
     try {
-      await this.host.save();
+      await this.host.save(t);
     } catch (error) {
       t.goal = previous;
       throw error;
@@ -151,7 +169,7 @@ export class AiWork {
         t.goal.state = 'blocked';
         t.goal.nextRun = undefined;
         this.note(t, 'blocked', (e as Error).message);
-        await this.host.save();
+        await this.host.save(t);
       }
     }
   }
@@ -178,17 +196,24 @@ export class AiWork {
       if (!child) throw new Error('只能管理本任务的直属子任务');
       return child;
     };
+    const latestResult = (child: AiThread) => {
+      if (this.host.busy(child.id) || child.state !== 'idle') return;
+      for (let i = child.messages.length - 1; i >= 0; i--) {
+        const message = child.messages[i];
+        if (message.role === 'user') break;
+        if (message.role === 'assistant' && message.content) return message.content.slice(-12000);
+      }
+    };
     const status = (c: AiThread) => ({
       id: c.id,
       task: c.title,
       state: c.state,
       error: c.error,
       target: c.target,
-      result: c.messages
-        .filter((m) => m.role === 'assistant')
-        .at(-1)
-        ?.content?.slice(-12000),
+      result: latestResult(c),
     });
+    const parent = t.parentId && this.host.threads().find(thread => thread.id === t.parentId);
+    const canDelegate = !t.parentId || (!!parent && !parent.parentId);
     return [
       tool(
         'spawn_agent',
@@ -199,13 +224,7 @@ export class AiWork {
           const { task } = z.object({ task: z.string() }).parse(input);
           if (this.children(t).filter((c) => this.host.busy(c.id)).length >= 3)
             throw new Error('最多同时运行 3 个直属子任务');
-          let depth = 0,
-            p = t;
-          while (p.parentId) {
-            depth++;
-            p = this.host.threads().find((c) => c.id === p.parentId)!;
-          }
-          if (depth >= 2) throw new Error('子任务最多两层');
+          if (!canDelegate) throw new Error('子任务最多两层');
           const child = await this.host.child(t, task);
           return JSON.stringify(status(child));
         },
@@ -237,24 +256,9 @@ export class AiWork {
         'Wait up to 45 seconds for a direct child. If still running or awaiting approval, inspect or wait again. Do not treat running output as a final result.',
         childId,
         async (input, signal) => {
-          const c = owned(input),
-            end = Date.now() + 45000;
-          while (this.host.busy(c.id) && Date.now() < end) {
-            signal.throwIfAborted();
-            await new Promise<void>((resolve, reject) => {
-              const abort = () => {
-                clearTimeout(timer);
-                reject(new Error('Stopped'));
-              };
-              const timer = setTimeout(() => {
-                signal.removeEventListener('abort', abort);
-                resolve();
-              }, 150);
-              signal.addEventListener('abort', abort, { once: true });
-            });
-          }
-          signal.throwIfAborted();
-          return JSON.stringify(status(c));
+          const child = owned(input);
+          const outcome = await this.waitForChild(child.id, signal);
+          return JSON.stringify({ ...status(child), outcome });
         },
       ),
       tool(
@@ -294,7 +298,7 @@ export class AiWork {
                 const previous=structuredClone(t.goal!);
                 Object.assign(t.goal!,patch);
                 if(t.goal!.nextRun!==undefined)t.goal!.nextRun=Date.now()+goalIntervalMs(t.goal!);
-                try {await this.host.save();} catch(error) {t.goal=previous;throw error;}
+                try {await this.host.save(t);} catch(error) {t.goal=previous;throw error;}
                 return JSON.stringify(t.goal);
               },
             ),
@@ -316,7 +320,7 @@ export class AiWork {
                 t.goal!.nextRun = undefined;
                 for (const child of this.children(t)) this.host.stop(child.id);
                 this.note(t, 'paused', reason);
-                await this.host.save();
+                await this.host.save(t);
                 return 'Goal paused';
               },
             ),
@@ -344,12 +348,12 @@ export class AiWork {
                 t.goal!.state = result.status === 'continue' ? 'active' : result.status;
                 t.goal!.nextRun = undefined;
                 this.note(t, result.status, result.summary);
-                await this.host.save();
+                await this.host.save(t);
                 return JSON.stringify(t.goal);
               },
             ),
           ]
         : []),
-    ];
+    ].filter(entry => entry.name !== 'spawn_agent' || canDelegate);
   }
 }

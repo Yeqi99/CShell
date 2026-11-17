@@ -1,0 +1,17 @@
+.rental-admin{max-width:1180px;color:var(--ink)}
+.rental-admin header,.rental-admin nav,.rental-admin footer,.rental-operator{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.rental-admin header{flex-wrap:wrap}.rental-admin>header span,.rental-state{background:var(--soft);color:var(--blue);border-radius:20px;padding:5px 11px;font-size:12px}
+.rental-admin nav{justify-content:flex-start;overflow:auto;margin:22px 0 18px;border-bottom:1px solid var(--line);gap:4px}
+.rental-admin button,.rental-admin select,.rental-admin input:not([type=checkbox]){border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--ink);padding:8px 12px;font:inherit;min-height:36px}
+.rental-admin button:hover{border-color:var(--blue)}.rental-admin :focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.rental-admin nav button{border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;white-space:nowrap;color:var(--muted);padding:10px 15px}
+.rental-admin nav [aria-pressed=true]{color:var(--blue);border-bottom-color:var(--blue);font-weight:600}
+.rental-admin section{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:24px;margin:0 0 16px}
+.rental-admin form{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:14px 18px;margin-top:18px}
+.rental-admin label{display:grid;gap:6px;color:var(--muted);font-size:13px;min-width:0}
+.rental-admin label.check{display:flex;align-items:center;color:var(--ink)}.rental-admin input,.rental-admin select{max-width:100%;min-width:0}
+.rental-admin h3,.rental-admin footer{grid-column:1/-1}.rental-admin h3{border-top:1px solid var(--line);padding-top:14px}
+.rental-admin footer{justify-content:flex-end;border-top:1px solid var(--line);padding-top:14px}.rental-admin footer button{color:white;background:var(--blue);border-color:var(--blue)}
+.rental-row,.rental-operator{display:grid;grid-template-columns:minmax(180px,1fr) auto auto auto;align-items:center;gap:22px;border-top:1px solid var(--line);margin-top:14px;padding-top:14px}.rental-row small{color:var(--muted);display:block;overflow-wrap:anywhere;margin-top:4px}.rental-state[data-state=ready]{color:var(--green);background:color-mix(in srgb,var(--green) 12%,var(--panel))}
+.rental-operator{display:flex}.rental-admin output:not(:empty),.rental-admin [role=status]:not(:empty){display:block;padding:12px;background:var(--soft);border-radius:7px;margin-top:12px;overflow-wrap:anywhere}
+@media(max-width:700px){.rental-admin section{padding:16px}.rental-row{grid-template-columns:1fr auto;gap:10px}.rental-admin nav button{padding-inline:8px}}

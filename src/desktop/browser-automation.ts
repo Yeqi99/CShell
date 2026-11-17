@@ -5,7 +5,7 @@ import {
   browserSnapshotOutput,
   screenshotOutput,
 } from '../shared/visual-tools';
-import { isolatedFrameOperation } from './browser-frames';
+import { captureBrowserView, isolatedFrameOperation } from './browser-frames';
 
 const WORLD = 987;
 /** This fixed function is the entire page-side protocol. Callers cannot supply code. */
@@ -59,6 +59,9 @@ function pageOperation(args: any) {
       s = getComputedStyle(e);
     return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none';
   };
+  const toggle = (el: Element): el is HTMLInputElement =>
+    el instanceof HTMLInputElement && (el.type === 'radio' || el.type === 'checkbox');
+  const labels = (el: Element) => toggle(el) ? Array.from(el.labels ?? []).filter(visible) : [];
   if (args.action === 'snapshot') {
     state.refs.clear();
     state.id = args.id;
@@ -78,10 +81,10 @@ function pageOperation(args: any) {
     const all = roots
       .flatMap((root) => [
         ...root.querySelectorAll(
-          'a[href],button,input:not([type="hidden"]),textarea,select,[role="button"],[role="link"],[contenteditable="true"]',
+          'a[href],button,input:not([type="hidden"]),textarea,select,[role="button"],[role="link"],[role="tab"],[role="radio"],[role="checkbox"],[contenteditable="true"]',
         ),
       ])
-      .filter(visible);
+      .filter(el => visible(el) || labels(el).length > 0);
     const elements = all.slice(0, args.maxElements).map((e, i) => {
       const ref = 'e' + (i + 1);
       state!.refs.set(ref, e);
@@ -95,7 +98,8 @@ function pageOperation(args: any) {
         '';
       return {
         ref,
-        role: e.getAttribute('role') || e.tagName.toLowerCase(),
+        role: e.getAttribute('role') || (toggle(e) ? e.type : e.tagName.toLowerCase()),
+        ...(toggle(e) ? { checked: e.checked } : {}),
         name: scrub(label.trim()).slice(0, 1000),
         tag: e.tagName.toLowerCase(),
         ...(e.tagName === 'A' ? { href: scrub((e as HTMLAnchorElement).href).slice(0, 8192) } : {}),
@@ -115,6 +119,23 @@ function pageOperation(args: any) {
       tabId: args.tabId,
       ...(args.frameId ? { frameId: args.frameId } : {}),
       snapshotId: args.id,
+      viewport: {
+        width: innerWidth,
+        height: innerHeight,
+        scrollY,
+        documentHeight: document.scrollingElement?.scrollHeight ?? innerHeight,
+        headings: Array.from(document.querySelectorAll<HTMLElement>('h1,h2,h3,[role="heading"]'))
+          .filter(el => {
+            const rect = el.getBoundingClientRect();
+            const x = (Math.max(0, rect.left) + Math.min(innerWidth, rect.right)) / 2;
+            const y = (Math.max(0, rect.top) + Math.min(innerHeight, rect.bottom)) / 2;
+            if (rect.bottom <= 0 || rect.top >= innerHeight || rect.right <= 0 || rect.left >= innerWidth) return false;
+            return el.checkVisibility({checkOpacity: true, checkVisibilityCSS: true}) &&
+              el.contains(document.elementFromPoint(x, y));
+          })
+          .slice(0, 24)
+          .map(el => scrub(el.innerText).trim().slice(0, 200)),
+      },
       url: scrub(location.href).slice(0, 8192),
       title: scrub(document.title).slice(0, 1000),
       text: scrub(text).slice(0, args.maxText),
@@ -129,32 +150,42 @@ function pageOperation(args: any) {
       text: scrub(document.body?.innerText || '').slice(0, args.maxText),
     };
   if (args.action === 'scroll') {
-    window.scrollBy(args.x, args.y);
-    return {};
+    const before = { x: scrollX, y: scrollY };
+    window.scrollBy({ left: args.x, top: args.y, behavior: "instant" });
+    return { scrollX, scrollY, moved: before.x !== scrollX || before.y !== scrollY };
   }
   if (state.id !== args.snapshotId || state.captured !== state.revision)
     throw Error('页面已变化，请重新读取 browser_snapshot');
   const e = state.refs.get(args.ref) as HTMLElement | undefined;
-  if (!e?.isConnected || !visible(e)) throw Error('元素已不可用，请重新读取 browser_snapshot');
+  if (!e?.isConnected || (!visible(e) && !labels(e).length)) throw Error('元素已不可用，请重新读取 browser_snapshot');
   if ((e as HTMLInputElement).disabled || e.getAttribute('aria-disabled') === 'true')
     throw Error('元素已禁用');
   if (args.action === 'click') {
-    e.scrollIntoView({ block: 'center', inline: 'center' });
-    const r = e.getBoundingClientRect();
-    const x = r.x + r.width / 2,
-      y = r.y + r.height / 2;
-    let top = document.elementFromPoint(x, y);
-    while (top?.shadowRoot) {
-      const inner = top.shadowRoot.elementFromPoint(x, y);
-      if (!inner || inner === top) break;
-      top = inner;
+    for (const candidate of [e, ...labels(e)]) {
+      if (!visible(candidate)) continue;
+      candidate.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
+      const r = candidate.getBoundingClientRect();
+      const left = Math.max(0, r.left), right = Math.min(innerWidth, r.right);
+      const upper = Math.max(0, r.top), lower = Math.min(innerHeight, r.bottom);
+      if (right <= left || lower <= upper) continue;
+      for (const [fx, fy] of [[0.5,0.5],[0.2,0.2],[0.8,0.2],[0.2,0.8],[0.8,0.8]]) {
+        const x = left + (right - left) * fx, y = upper + (lower - upper) * fy;
+        let top = document.elementFromPoint(x, y);
+        while (top?.shadowRoot) {
+          const inner = top.shadowRoot.elementFromPoint(x, y);
+          if (!inner || inner === top) break;
+          top = inner;
+        }
+        if (!top || !candidate.contains(top)) continue;
+        if (candidate !== e && top !== e && top.closest('a[href],button,input,textarea,select,[contenteditable="true"]')) continue;
+        if (args.frameId) {
+          candidate.click();
+          return { clicked: true };
+        }
+        return { x, y };
+      }
     }
-    if (!top || !(top === e || e.contains(top))) throw Error('元素被遮挡，请重新读取页面');
-    if (args.frameId) {
-      e.click();
-      return { clicked: true };
-    }
-    return { x, y };
+    throw Error('元素被遮挡，请重新读取页面');
   }
   if (args.action === 'fill') {
     if (
@@ -211,13 +242,51 @@ export async function readBrowserSnapshot(contents: WebContents, raw: unknown, g
     await runPageOperation(contents, { action: 'snapshot', ...p, id: randomUUID() }, guard),
   );
 }
+// Electron may leave capturePage pending when a background view has no compositor frame.
+async function waitForCapture<T>(start: () => Promise<T>, signal: AbortSignal, timeoutMs: number) {
+  signal.throwIfAborted();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let onAbort: (() => void) | undefined;
+  try {
+    const deadline = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error('Browser capture timed out')), timeoutMs);
+      onAbort = () => reject(signal.reason);
+      signal.addEventListener('abort', onAbort, { once: true });
+    });
+    return await Promise.race([start(), deadline]);
+  } finally {
+    clearTimeout(timer);
+    if (onAbort) signal.removeEventListener('abort', onAbort);
+  }
+}
+
 export async function captureBrowser(
   contents: WebContents,
   target: string,
   maxWidth: number,
   quality: number,
+  guard: () => void,
+  signal: AbortSignal,
 ) {
-  const image = await contents.capturePage();
+  let image: Electron.NativeImage;
+  try {
+    image = await waitForCapture(() => contents.capturePage(undefined, { stayAwake: true }), signal, 8_000);
+    if (image.isEmpty()) throw Error('empty capture');
+  } catch (error) {
+    signal.throwIfAborted();
+    if (!/UnknownVizError|display surface|empty capture|failed to capture|capture timed out/i.test(String(error))) throw error;
+    guard?.();
+    const { nativeImage } = await import('electron');
+    try {
+      const frame = await waitForCapture(() => captureBrowserView(contents, quality, guard), signal, 8_000);
+      image = nativeImage.createFromBuffer(frame);
+      if (image.isEmpty()) throw Error('empty capture');
+    } catch (fallbackError) {
+      guard?.();
+      throw Error('网页截图暂不可用；请用 browser_snapshot 检查页面并通过 browser_interact 验证行为，报告截图未取得。', { cause: fallbackError });
+    }
+  }
+  guard?.();
   const original = image.getSize();
   if (!original.width || !original.height) throw Error('网页尚未生成可捕获画面');
   const scale = Math.min(1, maxWidth / Math.max(original.width, original.height));

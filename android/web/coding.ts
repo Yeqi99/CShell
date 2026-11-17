@@ -1,5 +1,6 @@
 import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { AgentMachineAssistant } from '../../src/ui/components/AgentMachineAssistant';
 import { CodingApp } from '../../src/ui/components/CodingApp';
 import { AgentApplications } from '../../src/ui/components/AgentApplications';
 import type { AgentCall } from '../../src/shared/agent';
@@ -26,6 +27,7 @@ export class MobileCoding {
   >();
   constructor(
     private bridge: Bridge,
+    private cloud: import('../../src/shared/cloud-conversations').ChatBridge,
     private changed?: (
       target: string,
       apps: { codex: boolean; claude: boolean; ide: boolean },
@@ -84,7 +86,7 @@ export class MobileCoding {
       );
     });
   }
-  open(target: string, name: string, engine: 'codex' | 'claude' | 'market', openIde?: () => void) {
+  open(target: string, name: string, engine: 'codex' | 'claude' | 'market' | 'assistant', openIde?: () => void) {
     // Only connected machine desktops expose these launch actions. A previous
     // disconnect must not permanently disable the restored machine's apps.
     this.offline.delete(target);
@@ -112,7 +114,7 @@ export class MobileCoding {
         this.call(target, method, params);
       const render = (active: boolean) =>
         root.render(
-          engine === 'market'
+          engine === 'assistant' ? React.createElement(AgentMachineAssistant, { call, name, active, mobile: true, cloud:this.cloud }) : engine === 'market'
             ? React.createElement(AgentApplications, {
                 call,
                 target: { id: target, name, local: false, available: true },

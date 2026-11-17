@@ -1,0 +1,33 @@
+{
+  "date": "2026-11-04",
+  "published": false,
+  "buildInfo": {
+    "version": "1.0.0",
+    "platform": "win32",
+    "arch": "x64",
+    "node": "24.22.1",
+    "electron": false,
+    "edition": "pro",
+    "desktopNative": {
+      "platform": "win32",
+      "architecture": "x64",
+      "sha256": "58e96990c99884d7b8248260f81a57f5f6252d0c45acdee0c582e488c35c0944",
+      "optional": true,
+      "enabledByDefault": false
+    }
+  },
+  "headAtVerification": "d5a5bf882f42c6bea2c23a721fbb828624ba93c7",
+  "checks": [
+    "actual packaged Pro account API",
+    "encrypted guest appearance persists after isolated restart",
+    "no account login or remote listener grants during fixture",
+    "real CMD PTY",
+    "real TLS transport and restricted authorization",
+    "isolated fixture stopped"
+  ],
+  "sha256": {
+    "agent.cjs": "880a6a808204939ce95db97e856791ce3d471fc2c310f733b19f5b7a26a5917c",
+    "cagent-desktop.exe": "58e96990c99884d7b8248260f81a57f5f6252d0c45acdee0c582e488c35c0944",
+    "node.exe": "b59feb2088f80e1fa431c8f9c316861e660e5936f968fd97b802e550fed356c5"
+  }
+}

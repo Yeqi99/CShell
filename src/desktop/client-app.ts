@@ -1,3 +1,4 @@
+import { chooseConversationLink } from './conversation-link';
 import {
   app,
   clipboard,
@@ -86,7 +87,8 @@ export async function startClientApplication() {
       ]),
     ],
   }));
-  handle('clipboard:write', (value) => clipboard.writeText(z.string().max(16384).parse(value)));
+  handle('conversation:link', (url, english) => chooseConversationLink(url, english === true));
+      handle('clipboard:write', (value) => clipboard.writeText(z.string().max(16384).parse(value)));
   handle('client:theme', (value) => {
     const dark = z.enum(['light', 'dark']).parse(value) === 'dark';
     win.setTitleBarOverlay({

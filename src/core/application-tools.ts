@@ -26,6 +26,7 @@ export function applicationTools(
       : []),
     {
       name: 'list_machines',
+        parallelRead: true,
       capability: 'connections.read',
       description:
         'List saved CShell connection targets and groups, including disconnected targets. Returns saved target count, not necessarily unique physical devices. Does not connect or execute commands.',
@@ -48,6 +49,7 @@ export function applicationTools(
     },
     {
       name: 'list_sessions',
+        parallelRead: true,
       capability: 'connections.read',
       description:
         'List currently active CShell sessions. Use list_machines for saved targets, including disconnected ones.',

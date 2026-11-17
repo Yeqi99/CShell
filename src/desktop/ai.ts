@@ -33,8 +33,11 @@ export async function registerAiHandlers(
   customTools?: () => readonly import('../core/connections/contracts').ConnectionTool[],
   machineNetwork?: NonNullable<ApplicationNetworkRoute['machine']>,
   initializeNewAi = false,
+  onUsage?: AiService['onUsage'],
+  createSystemRoute?: () => import('./machine-network-route').MachineNetworkRoute,
 ) {
   const ai = new AiService(directory, store, connections, connectHost, { http, wechat });
+  ai.onUsage = onUsage;
   const drafts = new AiDrafts(directory, store);
   // A damaged draft file must not prevent opening existing conversations.
   let draftLoadError = false;
@@ -54,12 +57,62 @@ export async function registerAiHandlers(
   const network = new ApplicationNetworkRoute(directory, store);
   network.machine = machineNetwork;
   await network.load();
-  const systemProxy=new WindowsSystemProxy(directory,store,(host,port)=>network.systemTunnel(host,port),()=>network.prepareSystemProxy());
+  type SystemExit = {id:string; route:import('./machine-network-route').MachineNetworkRoute};
+  let exit:SystemExit|undefined;
+  let switching:Promise<void>=Promise.resolve();
+  const systemProxy=new WindowsSystemProxy(directory,store,(host,port)=>{
+    if (!exit) throw Error('系统代理出口已关闭');
+    return exit.route.tunnel(exit.id,host,port);
+  },async()=>{});
+  const proxyStatus=()=>({...systemProxy.status(),machineId:exit?.id});
+  async function refreshExit(){
+    if(exit && !(await systemProxy.ownsSystemSettings())){
+      await systemProxy.set(false);
+      await exit.route.close();
+      exit=undefined;
+    }
+    return proxyStatus();
+  }
+  function serializeExit<T>(work:()=>Promise<T>){
+    const task=switching.then(work);
+    switching=task.then(()=>{},()=>{});
+    return task;
+  }
+  async function changeExit(enabled:boolean,selected?:string){
+    await refreshExit();
+    if (!enabled) {
+      await systemProxy.set(false);
+      await exit?.route.close();
+      exit=undefined;
+      return proxyStatus();
+    }
+    const modelRoute=network.cloudExport();
+    const id=selected??(modelRoute.mode==='machine'?modelRoute.id:undefined);
+    if (!id||!createSystemRoute) throw Error('请选择可用的机器出口');
+    if (exit?.id===id) return proxyStatus();
+    const previous=exit;
+    const candidate=createSystemRoute();
+    try {
+      await candidate.proxy(id);
+      // Check forwarding as well as SSH authentication before changing the Windows proxy.
+      await candidate.verifyWebExit(id);
+      exit={id,route:candidate};
+      await systemProxy.set(true);
+    } catch(error) {
+      exit=previous;
+      await candidate.close();
+      throw error;
+    }
+    await previous?.route.close();
+    return proxyStatus();
+  }
   systemProxy.beforeEnable=state=>network.captureControlProxy(state);
   systemProxy.afterDisable=()=>network.releaseControlProxy();
   await systemProxy.recover().catch(()=>{});
-  handle('network:system-status',()=>systemProxy.status());
-  handle('network:system-set',enabled=>systemProxy.set(z.boolean().parse(enabled)));
+  handle('network:system-status',()=>serializeExit(refreshExit));
+  handle('network:system-set',(enabled,selected)=>{
+    return serializeExit(()=>changeExit(z.boolean().parse(enabled),z.string().uuid().optional().parse(selected)));
+  });
   ai.requestTransport = process.versions.electron ? network.fetch : undefined;
   handle('network:status', () => network.status());
   handle('network:save', input => network.save(input));
@@ -71,7 +124,7 @@ export async function registerAiHandlers(
       timer = undefined;
       pending.forEach((t) => publish?.('ai:thread', t));
       pending.clear();
-    }, 40);
+    }, 100);
   };
   await ai.load(initializeNewAi);
   const officialOpenCode=new OfficialOpenCode(join(directory,'extensions','opencode'),ai.requestTransport);
@@ -97,7 +150,7 @@ export async function registerAiHandlers(
   };
   const remoteEvents=new RemoteWechatEvents({
     targets:()=>connections.activeTargets().flatMap(t=>{
-      if(!ai.snapshot().threads.some(thread=>ai.canConsumeRemoteWechatEvent(thread.id,t.sessionId)))return [];
+      if(!ai.hasRemoteWechatConsumer(t.sessionId))return [];
       try{return [{sessionId:t.sessionId,identity:connections.describe(t.sessionId).identity,label:t.label,call:connections.agent(t.sessionId)}];}catch{return [];}
     }),
     ingest:event=>events.ingest(event),
@@ -134,7 +187,7 @@ export async function registerAiHandlers(
     if(rule.enabled&&rule.source==='wechat'&&!ai.canConsumeWechatEvent(rule.threadId))throw new Error('处理会话缺少微信读取权限，请在智能体访问权限中开启后保存');
     if(rule.enabled&&rule.source.startsWith('wechat.remote.')){const session=remoteEvents.session(rule.source);if(!session||!ai.canConsumeRemoteWechatEvent(rule.threadId,session))throw new Error('请选择绑定此 CAgent 且已授权微信读取的智能体会话');}
     return events.save({...rule,bindingKey:bindingKey(rule.threadId)});};
-  ai.eventTools=threadId=>aiEventTools({snapshot:eventSnapshot,save:saveEvent,remove:id=>events.remove(id)},threadId);
+  ai.eventTools=threadId=>aiEventTools({rules:()=>events.list(),snapshot:eventSnapshot,save:saveEvent,remove:id=>events.remove(id)},threadId);
   handle('ai:events-snapshot',eventSnapshot);
   handle('ai:event-save',saveEvent);
   handle('ai:event-remove',(id)=>events.remove(z.string().uuid().parse(id)));
@@ -161,11 +214,12 @@ export async function registerAiHandlers(
     publish?.('ai:providers-changed');
   });
   handle('ai:permission', (p) => ai.permission(p));
-  handle('ai:create', (location, provider, mode, session, model) =>
-    ai.create(location, provider, mode, session, model),
+  handle('ai:create', (location, provider, mode, session, model, history) =>
+    ai.create(location, provider, mode, session, model, history),
   );
   handle('ai:delete', async (id) => { await ai.remove(id); if (!draftLoadError) await drafts.save(id, ''); });
-  handle('ai:send', (id, text) => ai.send(id, text));
+  handle('ai:send', (id, text, attachments, steer) => steer === true ? ai.steer(id, text) : ai.send(id, text, undefined, attachments));
+  handle('ai:reask',(id,index,time,text)=>ai.reask(id,index,time,text));
   handle('ai:approve', (id, request, allow) => ai.approve(id, request, allow));
   handle('ai:stop', (id) => ai.stopAndSave(id));
   handle('ai:mode', (id, mode) => ai.mode(id, mode));
@@ -179,7 +233,7 @@ export async function registerAiHandlers(
     ai.dispose();
     clearTimeout(timer);
     pending.clear();
-    disposal = Promise.all([events.close(),ai.flush(),officialOpenCode.dispose(),remoteClose,systemProxy.close().finally(()=>network.close()),drafts.snapshot()]).then(()=>{});
+    disposal = Promise.all([events.close(),ai.flush(),officialOpenCode.dispose(),remoteClose,switching.then(()=>systemProxy.close()).finally(async()=>{await exit?.route.close();await network.close();}),drafts.snapshot()]).then(()=>{});
     return disposal;
   };
   return Object.assign(dispose, { classroomModels:()=>ai.classroomModels(),classroomModel:(id:string)=>ai.classroomModel(id), hasActiveWork: () => ai.hasActiveWork || officialOpenCode.status().active > 0 });

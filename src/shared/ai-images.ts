@@ -7,6 +7,8 @@ export const aiImageReference = z
     height: z.number().int().positive().max(1920),
     target: z.string().max(200),
     frameId: z.string().max(100),
+    capturedAt: z.number().int().positive().optional(),
+    tabId: z.string().uuid().optional(),
     time: z.number().finite(),
   })
   .strict();

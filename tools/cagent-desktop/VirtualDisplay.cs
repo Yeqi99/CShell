@@ -269,13 +269,30 @@ class VirtualDisplay {
     if(r.executable)r.reason="READY_NOT_FRAME_VERIFIED";
     return r;
   }
-  static object Install(string package,int width,int height) {
+  static string HeadlessState() {
+    uint session;
+    if(!ProcessIdToSessionId(GetCurrentProcessId(),out session)||session==0||session!=WTSGetActiveConsoleSessionId())return "NOT_CONSOLE";
+    IntPtr desktop=OpenInputDesktop(0,false,1);
+    if(desktop==IntPtr.Zero)return "DESKTOP_UNAVAILABLE";
+    CloseDesktop(desktop);
+    try{return Read(2).paths.Length==0?"NO_DISPLAY":"DISPLAY_PRESENT";}
+    catch(System.ComponentModel.Win32Exception){return "TOPOLOGY_UNAVAILABLE";}
+  }
+  static object Install(string package,int width,int height,bool onlyIfHeadless=false) {
     var readiness=Inspect(); if(!readiness.executable)throw new Exception(readiness.reason);
+    if(onlyIfHeadless) {
+      string state=HeadlessState();
+      if(state!="NO_DISPLAY")return new {status=state,changed=false};
+      if(Directory.GetFiles(Root,"*.json").Length!=0)
+        throw new Exception("Inspect the existing virtual display task before retrying");
+    }
     VerifyPackage(package); RejectExistingDriver();
     // Do not overwrite a user's global VDD configuration. The upstream default is used.
     if(Directory.Exists(@"C:\VirtualDisplayDriver") || Microsoft.Win32.Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\MikeTheTech\VirtualDisplayDriver","VDDPATH",null)!=null)
       throw new Exception("Existing global Virtual Display Driver configuration must be reviewed manually");
-    Journal journal=new Journal {id=Guid.NewGuid().ToString("N"),phase="prepared",before=Read(2)}; journal.device=Prefix+journal.id; Save(journal);
+    Journal journal=new Journal {id=Guid.NewGuid().ToString("N"),phase="prepared",before=Read(2)};
+    if(onlyIfHeadless&&journal.before.paths.Length!=0)return new {status="DISPLAY_PRESENT",changed=false};
+    journal.device=Prefix+journal.id; Save(journal);
     string staged=Path.Combine(Root,journal.id+"-driver"); Directory.CreateDirectory(staged);
     foreach(string name in new[]{"MttVDD.inf","MttVDD.dll","mttvdd.cat","vdd_settings.xml"}) File.Copy(Path.Combine(package,name),Path.Combine(staged,name),false);
     VerifyPackage(staged);
@@ -320,6 +337,8 @@ class VirtualDisplay {
     try {
       if(args.Length==1&&args[0]=="self-test") { SelfTest(); return 0; }
       if(!Environment.Is64BitProcess) throw new Exception("Windows x64 helper required");
+      if(args.Length==1&&args[0]=="headless-check") { Console.WriteLine(Json.Serialize(new {status=HeadlessState(),mutated=false})); return 0; }
+      if(args.Length==2&&args[0]=="verify-package") { VerifyPackage(args[1]); Console.WriteLine("{\"verified\":true}"); return 0; }
       if(args.Length==1&&args[0]=="preflight") { Console.WriteLine(Json.Serialize(Inspect())); return 0; }
       if(args.Length==1&&args[0]=="probe") { Snapshot state=Read(2); Console.WriteLine(Json.Serialize(new {activePaths=state.paths.Length,topology=state,mutated=false})); return 0; }
       if(!new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator)) throw new Exception("ADMINISTRATOR_REQUIRED: 请在目标机器以管理员身份运行 CAgent 后查看虚拟显示安装记录或执行安装；本次未读取记录、未安装驱动，不会自动提权");
@@ -331,6 +350,7 @@ class VirtualDisplay {
           if(!entered) throw new Exception("Virtual display operation already running");
           object result;
           if(args.Length==4&&args[0]=="install") result=Install(args[1],Int32.Parse(args[2]),Int32.Parse(args[3]));
+          else if(args.Length==2&&args[0]=="ensure-headless") result=Install(args[1],1920,1080,true);
           else if(args.Length==2&&args[0]=="remove") { Journal j=Load(args[1]); Uninstall(j); result=j; }
           else if(args.Length==2&&args[0]=="recover") { Journal j=Load(args[1]); Rollback(j); result=j; }
           else if(args.Length==2&&args[0]=="status") result=Load(args[1]);

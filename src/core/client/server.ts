@@ -43,6 +43,7 @@ const requestSchema = z
       'http',
       'manage',
       'desktop-stream',
+      'rdp-stream',
       'exec',
     ]),
     payload: z.unknown().optional(),
@@ -74,6 +75,7 @@ export class ClientServer {
       http?: (request:import('../../shared/http').HttpWireRequest,signal:AbortSignal)=>Promise<unknown>;
       fileTransferReset?:()=>void;
       fileTransfer?: (input:unknown,recipient:string,signal:AbortSignal)=>Promise<unknown>;
+      rdpStream?: (socket: TLSSocket, owner:string, authorized:()=>boolean)=>Promise<void>;
       desktopStream?: (socket: TLSSocket, owner: string) => Promise<void>;
       manage?: (method: string, params: unknown, signal: AbortSignal, owner: string) => Promise<unknown>;
       shells?: () => Promise<AgentShellOption[]>;
@@ -328,6 +330,15 @@ export class ClientServer {
       pending = 0;
     frames(socket, (raw) => {
       const req = requestSchema.parse(raw);
+      if(req.op==='rdp-stream'){
+        const owner=cert.fingerprint256;
+        const authorized=()=>c.alive&&!!c.peer&&this.hasPeer(c.peer)&&this.managementAllowed(owner);
+        if(req.payload!==undefined||pending||c.terminal||!authorized()||!this.options.rdpStream){socket.destroy();return false;}
+        socket.setTimeout(0);
+        send(socket,{id:req.id,result:{rdpStream:true}});
+        setImmediate(()=>void this.options.rdpStream!(socket,owner,authorized).catch(()=>socket.destroy()));
+        return false;
+      }
       if(req.op==='desktop-stream'){
         // Dedicated authenticated stream: no pipelined requests/terminal may cross the protocol boundary.
         if(pending||c.terminal||!c.peer||!this.hasPeer(c.peer)||!this.managementAllowed(cert.fingerprint256)||!this.options.desktopStream){socket.destroy();return false;}
@@ -356,7 +367,10 @@ export class ClientServer {
               :code==='ENOENT'?'目标文件或目录不存在，请刷新后重试（NOT_FOUND）'
               :code==='ECONNREFUSED'?'目标服务没有响应，请确认服务已启动（CONNECTION_REFUSED）'
               :error instanceof z.ZodError?'操作参数不完整或格式不正确，请检查输入或更新两端应用（INVALID_PARAMETERS）'
-              :'CAgent 请求失败：请检查远端权限和服务状态';
+              :error instanceof Error && error.message==='DESKTOP_SINGLE_SESSION_BUSY'?'远程桌面已有会话正在连接或使用，请稍后重试'
+              :error instanceof Error && error.message==='DESKTOP_CONTROL_DENIED'?'当前连接没有控制桌面的权限'
+              :error instanceof Error && ['Management permission denied','Management permission revoked'].includes(error.message)?'当前连接缺少远程管理权限'
+              :'CAgent 未返回具体失败原因，请重试。';
             if (c.alive) send(socket, { id: req.id, error: req.op === 'auth'
               ? clientAuthError(error)
               : detail });

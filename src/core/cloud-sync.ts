@@ -1,3 +1,4 @@
+import {chatDocument,chatMutation,type ChatShelf} from '../shared/cloud-conversations';
 import {accountTrafficSchema} from '../shared/account-traffic';
 export function vaultWriteSchema(snapshot:any):number{return snapshot?.store?.accountPreferences?.autoDiscoverDevices!==undefined?4:snapshot?.store?.extensions?.external!==undefined||snapshot?.store?.capabilityPackages!==undefined||snapshot?.identityNetwork!==undefined?3:snapshot?.store?.extensions?.enabled!==undefined?2:1;}
 import { CloudImportConflict } from './cloud-import';
@@ -73,13 +74,15 @@ export class CloudSync {
   private busy = false;
   private profileChecked = 0;
   private profileLoading = false;
+  private profileGeneration = 0;
   async accountStatus() {
     if(this.handedOff)return this.status();
     const session = this.data.session;
     if (session && !this.profileLoading && Date.now() - this.profileChecked > 60000) {
       this.profileLoading = true;
+      const generation = this.profileGeneration;
       void this.api('/v1/account').then(async profile => {
-        if (this.data.session !== session) return;
+        if (this.data.session !== session || generation !== this.profileGeneration) return;
         this.data.membership = profile.membership;
         this.data.storage=profile.storage;
         this.profileChecked = Date.now();
@@ -196,7 +199,7 @@ export class CloudSync {
     let value: any;
     try { value = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { throw new Error('云服务暂时不可用，稍后自动重试'); }
     if (!response.ok) {
-      if (response.status === 409) this.state = 'conflict';
+      if (response.status === 409 && path.startsWith('/v1/vault')) this.state = 'conflict';
       throw Object.assign(new Error(typeof value.error === 'string' ? value.error.slice(0, 300) : '云端请求失败'),{status:response.status});
     }
     return value;
@@ -211,10 +214,41 @@ export class CloudSync {
       this.busy = false;
     }
   }
+  async conversations(input:unknown):Promise<ChatShelf> {
+    const cmd=chatMutation.parse(input);
+    const account=this.data.session?.accountId,key=this.data.key;
+    if(!account||!key)throw Error('请先登录并解锁账号云同步');
+    if(cmd.action!=='list'){
+      if(cmd.account!==account)throw Error('账号已切换，请重新打开对话');
+      const id=cmd.action==='remove'?cmd.id:cmd.document.id;
+      await this.accountRequest('/v1/conversations',{id,revision:cmd.revision,...(cmd.action==='remove'?{remove:true}:{envelope:encryptVault(cmd.document,key,account+'/chat/'+id)})});
+    }
+    if(this.data.session?.accountId!==account)throw Error('账号已切换');
+    const result=await this.accountRequest('/v1/conversations');
+    if(this.data.session?.accountId!==account)throw Error('账号已切换');
+    return {account,records:result.records.map((r:any)=>{
+      const doc=chatDocument.parse(decryptVault(r.envelope,key,account+'/chat/'+r.id));
+      if(doc.id!==r.id)throw Error('云对话标识校验失败');
+      return {...doc,revision:r.revision};
+    })};
+  }
   async accountRequest(path:string,body?:unknown,signal?:AbortSignal){if(this.handedOff)throw Error('正在打开账号工作区，请稍候');if(!this.data.session)throw Error('请先登录');return this.api(path,body,undefined,signal);}
-  async traffic(){return accountTrafficSchema.parse(await this.accountRequest('/v1/account/traffic'));}
+  async purchasePro(email:string,requestId:string){
+    const session=this.data.session;
+    if (!session || session.email!==email) throw Error('当前账号已变更，请重新打开账号页');
+    const receipt=await this.accountRequest('/v1/account/pro-purchase',{requestId});
+    if (receipt.ok!==true || receipt.pricePoints!==3990 || receipt.days!==30 || !Number.isSafeInteger(receipt.expiresAt) || !Number.isSafeInteger(receipt.balancePoints))
+      throw Error('暂未取得购买回执，可重试核对');
+    if (this.data.session===session){
+      this.profileGeneration++;
+      this.data.membership={active:true,expiresAt:receipt.expiresAt};
+      this.profileChecked=0;
+    }
+    return {expiresAt:receipt.expiresAt,balancePoints:receipt.balancePoints};
+  }
+  async traffic(){return accountTrafficSchema.parse(await this.accountRequest('/v1/account/traffic/v2'));}
   async domains(input?:MemberDomainCommand,signal?:AbortSignal){
-    if(input!==undefined){const {action,...body}=memberDomainCommandSchema.parse(input);const route={claim:'claim',rename:'rename',create:'records',update:'records/update',delete:'records/delete'}[action];await this.accountRequest('/v1/domains/'+route,body,signal);}
+    if(input!==undefined){const {action,...body}=memberDomainCommandSchema.parse(input);const route={buy:'buy',claim:'claim',rename:'rename',create:'records',update:'records/update',delete:'records/delete'}[action];await this.accountRequest('/v1/domains/'+route,body,signal);}
     return memberDomainStateSchema.parse(await this.accountRequest('/v1/domains',undefined,signal));
   }
   accountId(){return this.data.session?.accountId;}

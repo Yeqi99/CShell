@@ -68,3 +68,4 @@
 .view-pane-close:hover{background:var(--hover);color:var(--text)}
 .view-pane-close:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .view-empty{grid-column:1/-1;grid-row:1/-1;align-self:center;justify-self:center;max-width:400px;padding:20px;color:var(--muted);line-height:1.6}
+.view-library article{flex-wrap:wrap;align-content:flex-start}.view-delete-confirm{flex:1 0 100%;display:flex;align-items:center;gap:4px;flex-wrap:wrap}.view-delete-confirm span{width:100%;padding:4px 7px}

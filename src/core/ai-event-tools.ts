@@ -4,14 +4,16 @@ import {aiEventRuleSchema,type AiEventRule} from '../shared/ai-events';
 import type {ConnectionTool} from './connections/contracts';
 
 export interface EventToolHost {
+  rules?(): AiEventRule[];
   snapshot(): {rules:AiEventRule[];[key:string]:unknown};
   save(rule:AiEventRule):Promise<unknown>;
   remove(id:string):Promise<unknown>;
 }
 export function aiEventTools(host:EventToolHost,threadId:string):ConnectionTool[]{
-  const captured=host.snapshot().rules;
+  const rules=()=>host.rules?.() ?? host.snapshot().rules;
+  const captured=rules();
   const check=(id:string)=>{
-    const old=captured.find(r=>r.id===id),current=host.snapshot().rules.find(r=>r.id===id);
+    const old=captured.find(r=>r.id===id),current=rules().find(r=>r.id===id);
     if(JSON.stringify(old)!==JSON.stringify(current))throw new Error('订阅已改变，请重新读取后操作');
     return current;
   };

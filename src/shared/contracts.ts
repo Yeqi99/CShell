@@ -398,8 +398,8 @@ export interface Bridge
   networkRemoteSources?():Promise<{id:string;name:string}[]>;
   networkRemoteOpen?(input:{source:string;exit:string}):Promise<{port:number}>;
   networkStatus?(): Promise<import('./network-route').NetworkRouteStatus>;
-  networkSystemStatus?():Promise<{supported:boolean;enabled:boolean;error:string}>;
-  networkSystemSet?(enabled:boolean):Promise<{supported:boolean;enabled:boolean;error:string}>;
+  networkSystemStatus?():Promise<{supported:boolean;enabled:boolean;error:string;machineId?:string}>;
+  networkSystemSet?(enabled:boolean,machineId?:string):Promise<{supported:boolean;enabled:boolean;error:string}>;
   desktopLookGet?(id:string,legacy?:import('./desktop-look').DesktopLook):Promise<import('./desktop-look').DesktopLook|null>;
   desktopLookSave?(id:string,value:import('./desktop-look').DesktopLook|null):Promise<import('./desktop-look').DesktopLook|null>;
   onDesktopLookChanged?(listener:()=>void):()=>void;
@@ -476,6 +476,7 @@ export interface Bridge
   resourceProcessNetwork(sessionId: string): Promise<import('./network-metrics').ProcessNetworkSnapshot>;
   resourceProcesses(sessionId: string): Promise<import('./resources').ProcessSnapshot>;
   droppedFiles(files: File[]): string[];
+  conversationLink(url: string, english: boolean): Promise<void>;
   copyText(text: string): Promise<void>;
   pasteText(): Promise<string>;
   events(listener: (event: SessionEvent) => void): () => void;

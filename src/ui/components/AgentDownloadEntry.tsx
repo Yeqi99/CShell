@@ -1,3 +1,4 @@
+import {isPro} from '../../shared/edition';
 import {ErrorNotice} from './ErrorNotice';
 import {useState} from 'react';
 import {Download,ChevronDown,ArrowUpRight} from 'lucide-react';
@@ -12,6 +13,7 @@ export function AgentDownloadEntry(){
  return <details className="agent-download-entry" onToggle={e=>{if(e.currentTarget.open&&!loaded&&!busy)void load()}}>
   <summary><Download size={14}/><span>{cn?'目标机器还没有 CAgent？':'Need CAgent on your machine?'}</span><span className="agent-download-label">{cn?'下载安装':'Get CAgent'}</span><ChevronDown size={13}/></summary>
   <div className="agent-download-content">
+   {isPro&&window.cshell.platform==='win32'&&<button type="button" onClick={()=>void window.cshell.agentInstallLocal().catch(e=>setError(String(e)))}>{cn?'安装内置 CAgent 到本机':'Install bundled CAgent locally'}</button>}
    <p>{cn?'选择目标机器的系统。安装后，在 CAgent 中复制连接信息回到这里。':'Choose the target system. Once installed, copy the connection details from CAgent.'}</p>
    {busy?<p role="status">{cn?'正在获取安装包…':'Loading packages…'}</p>:<>
     {items.length>0&&<div className="agent-download-controls"><select aria-label={cn?'CAgent 目标系统':'CAgent target system'} value={selected} onChange={e=>setSelected(e.target.value)}>{items.map(x=><option key={x.id} value={x.id}>{x.platform} · {x.arch.toUpperCase()} · {x.version}</option>)}</select><button type="button" disabled={!item} onClick={()=>{setError('');void window.cshell.agentDownloadOpen(selected).catch(()=>setError(cn?'无法打开下载，请重试。':'Unable to open download.'))}}><Download size={14}/>{cn?'下载':'Download'}<ArrowUpRight size={12}/></button></div>}

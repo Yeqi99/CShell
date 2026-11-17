@@ -48,3 +48,10 @@ test('explicit unvalidated outcome does not claim success or poison', async () =
  assert.deepEqual(await runner.run(process.execPath,['-e','console.log(JSON.stringify({validated:false,reason:"profile_quarantined"}))']), {validated:false,reason:'profile_quarantined'});
  assert.equal(runner.unknown,false);
 });
+
+test('nonzero native exit retains a diagnostic without exposing native output or permitting replay', async () => {
+  const runner = new ManagedWechatValidation();
+  const check = (error: Error) => error.message.includes('exited with code 7') && !error.message.includes('private-data');
+  await assert.rejects(runner.run(process.execPath, ['-e', "console.error('private-data');process.exit(7)"]), check);
+  await assert.rejects(runner.run(process.execPath, ['-e', 'process.exit(0)']), check);
+});

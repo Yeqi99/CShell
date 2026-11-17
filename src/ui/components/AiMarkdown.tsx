@@ -1,10 +1,21 @@
-import { Children, isValidElement, type ReactNode } from 'react';
-import Markdown, { type Components } from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import { remarkCjkStrong } from '../markdown-strong';
+import { createElement, memo, useEffect, useRef, useState, Children, isValidElement, type ReactNode } from 'react';
+import type { Components } from 'react-markdown';
+import { parseMarkdown, type ParsedMarkdown } from '../markdown-document';
+import { scheduleMarkdown } from '../markdown-queue';
 import { CopyButton } from './AiCopyButton';
+import { useI18n } from '../i18n';
 import { navigatePermission } from '../permission-navigation';
 import { parsePermissionHref } from '../../shared/permission-links';
+
+function WebLink({ href, children }: {href: string; children: ReactNode}) {
+  const {locale} = useI18n();
+  const [failed, setFailed] = useState(false);
+  return <><a href={href} onClick={event => {
+    event.preventDefault();
+    setFailed(false);
+    void window.cshell.conversationLink(href, locale === 'en-US').catch(() => setFailed(true));
+  }}>{children}</a>{failed && <small role="status">{locale === 'en-US' ? ' Could not open link options.' : ' 暂时无法打开链接选项。'}</small>}</>;
+}
 
 function textContent(children: ReactNode): string {
   return Children.toArray(children)
@@ -19,7 +30,7 @@ const components: Components = {
   a({href,children}) {
     if(href && parsePermissionHref(href))return <a href={href} onClick={event=>{event.preventDefault();navigatePermission(href);}}>{children}</a>;
     if(href?.startsWith('#cshell-permission/'))return <span>{children}（权限链接无效）</span>;
-    return <a href={href}>{children}</a>;
+    return href && /^https?:\/\//i.test(href) ? <WebLink href={href}>{children}</WebLink> : <span>{children}</span>;
   },
   pre({ children }) {
     const code = Children.toArray(children)[0];
@@ -49,12 +60,31 @@ const components: Components = {
     return <span className="agent-image-alt">{alt || '图片'}</span>;
   },
 };
-export function AiMarkdown({ text }: { text: string }) {
-  return (
-    <div className="agent-markdown">
-      <Markdown remarkPlugins={[remarkGfm, remarkCjkStrong]} skipHtml components={components}>
-        {text}
-      </Markdown>
-    </div>
-  );
+function renderTree(tree: ParsedMarkdown, key = 0): ReactNode {
+  if (tree === null || typeof tree === 'string') return tree;
+  if (Array.isArray(tree)) return tree.map(renderTree);
+  const tag = components[tree.tag as keyof Components] ?? tree.tag;
+  const children = renderTree(tree.children);
+  return children == null || (Array.isArray(children) && !children.length)
+    ? createElement(tag as React.ElementType, { ...tree.props, key })
+    : createElement(tag as React.ElementType, { ...tree.props, key }, children);
 }
+
+export const AiMarkdown = memo(function AiMarkdown({ text }: { text: string }) {
+  const key = useRef({});
+  const latestText = useRef(text);
+  latestText.current = text;
+  const mounted = useRef(false);
+  const [parsed, setParsed] = useState<{source: string; view: ReactNode}>();
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+  useEffect(() => scheduleMarkdown(key.current, { text, accept: tree => {
+    if (mounted.current && latestText.current.startsWith(text)) {
+      setParsed({source: text, view: tree === null ? text : renderTree(tree)});
+    }
+  } }), [text]);
+  const content = parsed && text.startsWith(parsed.source) ? parsed.view : text;
+  return <div className="agent-markdown">{typeof window === 'undefined' ? renderTree(parseMarkdown(text)) : content}</div>;
+});

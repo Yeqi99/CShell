@@ -1,3 +1,4 @@
+import {extendsChat} from '../shared/cloud-conversations';
 import {portableCapabilitiesSchema} from '../shared/portable-capabilities';
 import { OpenCodeExtension } from '../extensions/opencode/service';
 import { OfficialOpenCode } from '../extensions/opencode/official-runtime';
@@ -72,6 +73,7 @@ export class CagentCloud {
     this.pending = this.runTick();
     return this.pending;
   }
+  private lastChatSync = 0;
   private lastEnroll = 0;
   private hooks?: {
     deviceId: () => string;
@@ -132,7 +134,7 @@ export class CagentCloud {
         // Model catalog availability must never prevent an authenticated machine coming online.
         try {
           const catalog = await this.sync.accountRequest('/v1/models');
-          await this.assistant.ensureOfficialModels(catalog.models.map((m: { id: string }) => m.id));
+          await this.assistant.ensureOfficialModels(catalog.models);
         } catch { /* Keep the previously verified models and retry on the next tick. */ }
       }
     } catch (e) {
@@ -140,7 +142,17 @@ export class CagentCloud {
     } finally {
       // Relay enrollment/model catalog availability must not block account data.
       // autoSync owns its own error/conflict state, independently of transportError.
-      try { await this.sync.autoSync(); }
+      try { await this.sync.autoSync();
+        if(this.sync.status().unlocked && Date.now()-this.lastChatSync>60000){
+          this.lastChatSync=Date.now();
+          const turns=this.assistant.list('local').filter(t=>t.owner==='local'&&!['running','approval'].includes(t.state));
+          if(turns.length){const shelf=await this.sync.conversations({action:'list'});
+            for(const saved of shelf.records){const last=[...turns].reverse().find(t=>(t.conversationId??t.id)===saved.id);if(!last)continue;
+              const doc=this.assistant.conversation(last.id,'local');
+              if(doc.messages.length>saved.messages.length&&extendsChat(doc,saved))await this.sync.conversations({action:'save',account:shelf.account,document:doc,revision:saved.revision});
+            }}
+        }
+      }catch(error){this.transportError=String(error);}
       finally { this.ticking = false; }
     }
   }
@@ -213,12 +225,26 @@ export class CagentCloud {
     this.timer = setInterval(() => void this.tick(), 15000);
     this.timer.unref();
   }
+  private async conversationCommand(input:unknown){
+    const q=z.object({action:z.enum(['list','toggle','continue']),id:z.string().uuid().optional()}).parse(input);
+    const shelf=await this.sync.conversations({action:'list'});
+    if(q.action==='list')return shelf;
+    if(q.action==='continue'){
+      const doc=shelf.records.find(r=>r.id===q.id);if(!doc)throw Error('云对话不存在');
+      const {revision,...history}=doc;return history;
+    }
+    const document=this.assistant.conversation(q.id!,'local');
+    const saved=shelf.records.find(r=>r.id===document.id);
+    return this.sync.conversations(saved?{action:'remove',account:shelf.account,id:saved.id,revision:saved.revision}:{action:'save',account:shelf.account,document,revision:0});
+  }
   private accountWrites:Promise<unknown>=Promise.resolve();
   call(method:string,input:unknown):Promise<unknown>{
     const next=this.accountWrites.catch(()=>{}).then(()=>this.performCall(method,input));
     this.accountWrites=next;return next;
   }
   private async performCall(method: string, input: unknown) {
+    if(method==='account.spending'){const q=z.object({enabled:z.boolean().optional()}).strict().parse(input??{});return this.sync.accountRequest('/v1/account/agent-spending',q.enabled===undefined?undefined:q);}
+    if(method==='account.conversations')return this.conversationCommand(input);
     if (method === 'account.status')
       return { ...(await this.sync.accountStatus()), transportError: this.transportError,capabilityRestore:this.capabilityRestore };
     if (method === 'account.login') {

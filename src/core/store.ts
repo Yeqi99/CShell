@@ -1,3 +1,4 @@
+import {isSystemGroup} from '../shared/system-groups';
 import {portableCapabilitiesSchema} from '../shared/portable-capabilities';
 import { portablePluginsSchema, portablePlugin, restorePortablePlugins } from './portable-plugins';
 import { defaultMcpPort } from '../shared/mcp-endpoint';
@@ -281,6 +282,9 @@ export class Store {
   }
   async manageGroup(input: GroupAction) {
     const action = groupActionSchema.parse(input);
+    if (isSystemGroup(action.name) || (action.type === 'rename' && isSystemGroup(action.next))) {
+      throw new Error('GROUP_EXISTS');
+    }
     const groups = this.groups();
     if (action.type === 'create') {
       if (groups.includes(action.name)) throw new Error('GROUP_EXISTS');
@@ -438,6 +442,17 @@ export class Store {
   }
   host(endpoint: string) {
     return this.data.hosts[endpoint];
+  }
+  async forgetHost(endpoint: string, expected: string) {
+    if (this.host(endpoint) !== expected) return false;
+    delete this.data.hosts[endpoint];
+    try {
+      await this.persist();
+    } catch (error) {
+      if (!this.host(endpoint)) this.data.hosts[endpoint] = expected;
+      throw error;
+    }
+    return true;
   }
   async trust(endpoint: string, fingerprint: string) {
     this.data.hosts[endpoint] = fingerprint;

@@ -69,7 +69,7 @@ public class MainActivity extends Activity {
       @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
         Uri uri = request.getUrl();
         String path = uri.getPath();
-        if (!"https".equals(uri.getScheme()) || !"cshell.local".equals(uri.getHost()) || path == null || !Arrays.asList("/index.html", "/app.js", "/app.css", "/icon.png").contains(path))
+        if (!"https".equals(uri.getScheme()) || !"cshell.local".equals(uri.getHost()) || path == null || !Arrays.asList("/index.html", "/app.js", "/markdown-worker.js", "/app.css", "/icon.png").contains(path))
           return new WebResourceResponse("text/plain", "UTF-8", 403, "Forbidden", Collections.emptyMap(), new ByteArrayInputStream(new byte[0]));
         try {
           String mime = path.endsWith(".js") ? "application/javascript" : path.endsWith(".css") ? "text/css" : path.endsWith(".png") ? "image/png" : "text/html";
@@ -120,15 +120,16 @@ public class MainActivity extends Activity {
     } catch (Exception e) { return false; }
   }
   public class Bridge {
+    @JavascriptInterface public void stopPhoneChat(){cloud.stopChat();}
     @JavascriptInterface public void cloudRequest(String json){
       if(destroyed||json.length()>2*1024*1024)return;
-      if(!cloudBusy.compareAndSet(false,true))return;
+      if(!cloudBusy.compareAndSet(false,true)){try{event("","cloud-result",new JSONObject().put("request",new JSONObject(json).getString("request")).put("error","账号服务正在处理请求，请稍后重试").toString());}catch(Exception ignored){}return;}
       workers.execute(()->{String request="";try{
         JSONObject input=new JSONObject(json);request=input.getString("request");UUID.fromString(request);
         boolean switching=Arrays.asList("login","password-login","register","logout").contains(input.getString("action"));
         synchronized(accountGate){if(switching){if(!connections.isEmpty()||openingConnections>0||pendingTransfer!=null)throw new IOException("请先关闭连接并等待文件传输结束，再切换账号");accountSwitching=true;}}
         if(switching){CountDownLatch closed=new CountDownLatch(1);runOnUiThread(()->{browser.close();closed.countDown();});if(!closed.await(5,TimeUnit.SECONDS))throw new IOException("正在关闭机器浏览器，请重试");}
-        JSONObject result=cloud.call(input);event("","cloud-result",new JSONObject().put("request",request).put("result",result).toString());
+        JSONObject result=input.optString("action").equals("phone-chat")?cloud.phoneChat(input,text->event(input.optString("request"),"phone-chat-delta",text)):cloud.call(input);event("","cloud-result",new JSONObject().put("request",request).put("result",result).toString());
       }catch(Exception error){try{event("","cloud-result",new JSONObject().put("request",request).put("error",error instanceof javax.crypto.AEADBadTagException?"恢复密钥错误或密文校验失败":error.getMessage()).toString());}catch(Exception ignored){}}
       finally{synchronized(accountGate){accountSwitching=false;}cloudBusy.set(false);}});
     }
@@ -195,7 +196,7 @@ public class MainActivity extends Activity {
     @JavascriptInterface public boolean browserSupported(){return MachineBrowser.supported();}
     @JavascriptInterface public void browserOpen(String id,String name,String url){Connection c=connections.get(id);if(c==null)return;runOnUiThread(()->{if(connections.get(id)!=c)return;browser.account(accountScope());browser.editor(false);if(c.bridge!=null)browser.openSsh(id,name,c.bridge.browserIdentity(),c.session,url);else if(c.agent!=null)browser.open(id,name,c.agent,url);});}
     @JavascriptInterface public void browserOpenApp(String id,String name,String url){Connection c=connections.get(id);if(c==null)return;runOnUiThread(()->{if(connections.get(id)!=c)return;browser.account(accountScope());browser.editor(true);if(c.bridge!=null)browser.openSsh(id,name,c.bridge.browserIdentity(),c.session,url);else if(c.agent!=null)browser.open(id,name,c.agent,url);});}
-    @JavascriptInterface public void machineRequest(String json){if(destroyed||json.length()>131072)return;workers.execute(()->{String request="",id="";try{JSONObject p=new JSONObject(json);request=p.getString("request");UUID.fromString(request);id=p.getString("session");String method=p.getString("method");if(!method.matches("^(ide|coding)\\.[a-zA-Z.]+$")&&!Arrays.asList("applications.list","applications.policy","applications.plan","applications.install","applications.status","applications.cancel","applications.configure").contains(method))throw new IOException("不支持的机器应用操作");Connection c=connections.get(id);if(c==null||(c.agent==null&&c.bridge==null))throw new IOException("机器连接已断开");Object result=c.bridge!=null?c.bridge.manage(method,p.opt("params")):c.agent.manage(method,p.opt("params"));event(id,"machine-result",new JSONObject().put("request",request).put("result",result).toString());}catch(Exception e){try{event(id,"machine-result",new JSONObject().put("request",request).put("error",e.getMessage()).toString());}catch(Exception ignored){}}});}
+    @JavascriptInterface public void machineRequest(String json){if(destroyed||json.length()>131072)return;workers.execute(()->{String request="",id="";try{JSONObject p=new JSONObject(json);request=p.getString("request");UUID.fromString(request);id=p.getString("session");String method=p.getString("method");if(!method.matches("^(ide|coding)\\.[a-zA-Z.]+$")&&!Arrays.asList("assistant.task","assistant.settings","assistant.tasks","assistant.start","assistant.cancel","assistant.configure","applications.list","applications.policy","applications.plan","applications.install","applications.status","applications.cancel","applications.configure").contains(method))throw new IOException("不支持的机器应用操作");Connection c=connections.get(id);if(c==null||(c.agent==null&&c.bridge==null))throw new IOException("机器连接已断开");Object result=c.bridge!=null?c.bridge.manage(method,p.opt("params")):c.agent.manage(method,p.opt("params"));event(id,"machine-result",new JSONObject().put("request",request).put("result",result).toString());}catch(Exception e){try{event(id,"machine-result",new JSONObject().put("request",request).put("error",e.getMessage()).toString());}catch(Exception ignored){}}});}
     @JavascriptInterface public boolean agentSupported() { return android.os.Build.VERSION.SDK_INT >= 29; }
     @JavascriptInterface public String version() { return updates.current(); }
     @JavascriptInterface public void openFeedback() { runOnUiThread(()->startActivity(new Intent(MainActivity.this,FeedbackActivity.class))); }
@@ -322,6 +323,8 @@ public class MainActivity extends Activity {
       event(id,"ssh-workspace","ready");
       JSONObject apps=new JSONObject().put("browser",true);
       if(connections.get(id)==c)event(id,"machine-apps",apps.toString());
+      try{apps.put("market",bridge.manage("applications.list",new JSONObject()) instanceof JSONObject);}catch(Exception unavailable){}
+      try{apps.put("assistant",bridge.manage("assistant.tasks",new JSONObject()) instanceof JSONArray);}catch(Exception unavailable){}
       try{JSONObject ide=(JSONObject)bridge.manage("ide.status",new JSONObject());apps.put("ide",ide.optBoolean("supported")&&ide.optBoolean("ready"));if(ide.optBoolean("supported"))apps.put("market",true);}catch(Exception ignored){}
       try{JSONObject coding=(JSONObject)bridge.manage("coding.status",new JSONObject());if(coding.optBoolean("supported"))apps.put("market",true);JSONArray engines=coding.optJSONArray("engines");if(engines!=null)for(int i=0;i<engines.length();i++){JSONObject e=engines.getJSONObject(i);apps.put(e.getString("engine"),e.optBoolean("ready"));}}catch(Exception ignored){}
       if(connections.get(id)==c)event(id,"machine-apps",apps.toString());

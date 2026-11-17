@@ -1,7 +1,10 @@
 import {ErrorNotice} from './ErrorNotice';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowLeft, Check, ChevronRight, RefreshCw, Search } from 'lucide-react';
+import { ArrowLeft, Check, ChevronRight, Gauge, RefreshCw, Search } from 'lucide-react';
+import { isPooledProvider } from '../../shared/official-models';
+import type { AccountTraffic } from '../../shared/account-traffic';
+import { useI18n } from '../i18n';
 import type { AiProvider } from '../../shared/ai';
 import type { ExtensionModelChoice } from '../use-extension-catalog';
 import './ai-model-menu.css';
@@ -30,7 +33,7 @@ export function AiModelMenu({
   configure: () => void;
 }) {
   const [open, setOpen] = useState(false),
-    [page, setPage] = useState<'bases' | 'opencode'>('bases'),
+    [page, setPage] = useState<'bases' | 'opencode' | 'member'>('bases'),
     [query, setQuery] = useState(''),
     [catalog, setCatalog] = useState<Catalog>(),
     [error, setError] = useState(''),
@@ -43,6 +46,41 @@ export function AiModelMenu({
   const selected = providers.find((p) => p.id === providerId),
     selectedRef = model ?? selected?.extension?.model;
   const search = query.trim().toLowerCase();
+  const [week, setWeek] = useState<AccountTraffic['modelWeek']>();
+  const [isMember, setIsMember] = useState(false);
+  const walletOwner = useRef<string | undefined>(undefined);
+  const chinese = useI18n().locale === 'zh-CN';
+  const memberLabel = chinese ? '会员模型' : 'Member models';
+  const pooled = providers.filter(isPooledProvider);
+  const remaining = week?.percent === undefined ? '—' : Math.floor(week.percent) + '%';
+  const quotaLabel = (chinese ? '本周剩余额度 ' : 'Weekly allowance remaining ') + remaining;
+  const reset = week?.resetAt ? new Date(week.resetAt * 1000).toLocaleString(chinese ? 'zh-CN' : 'en', {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'}) : '';
+  useEffect(() => {
+    if (!window.cshell.cloudStatus || !window.cshell.cloudTraffic) return;
+    let alive = true, generation = 0;
+    const refresh = async () => {
+      const current = ++generation;
+      try {
+        const status = await window.cshell.cloudStatus();
+        if (!alive || current !== generation) return;
+        if (walletOwner.current !== status.email) {
+          walletOwner.current = status.email;
+          setWeek(undefined);
+        }
+        const entitled = !!status.email && !!status.membership?.active;
+        setIsMember(entitled);
+        if (!entitled) { setWeek(undefined); return; }
+        const traffic = await window.cshell.cloudTraffic();
+        if (alive && current === generation) setWeek(traffic.modelWeek);
+      } catch {
+        if (alive && current === generation) setWeek(undefined);
+      }
+    };
+    void refresh();
+    const timer = window.setInterval(() => { if (!document.hidden) void refresh(); }, 60000);
+    const off = window.cshell.onCloudChanged?.(refresh);
+    return () => { alive = false; clearInterval(timer); off?.(); };
+  }, [open, disabled]);
   const visibleAccounts = catalog?.accounts.map(account => ({
     ...account,
     choices: account.choices.filter(choice => choice.available && `${choice.model} ${choice.label ?? ''}`.toLowerCase().includes(search)),
@@ -183,6 +221,11 @@ export function AiModelMenu({
         </span>
         <ChevronRight size={12} />
       </button>
+      {isMember && <button type="button" className="agent-model-quota"
+        aria-label={quotaLabel} title={[quotaLabel, reset && (chinese ? '下次刷新 ' : 'Resets ') + reset].filter(Boolean).join(' · ')}
+        onClick={() => { setPage('member'); setOpen(true); }}>
+        <Gauge size={14} aria-hidden="true"/><span>{remaining}</span>
+      </button>}
       {open &&
         createPortal(
           <div
@@ -203,7 +246,7 @@ export function AiModelMenu({
             }}
           >
             <header>
-              {page === 'opencode' ? (
+              {page !== 'bases' ? (
                 <button
                   type="button"
                   className="icon"
@@ -213,7 +256,7 @@ export function AiModelMenu({
                   <ArrowLeft size={16} />
                 </button>
               ) : null}
-              <strong>{page === 'opencode' ? 'OpenCode' : '选择模型'}</strong>
+              <strong>{page === 'opencode' ? 'OpenCode' : page === 'member' ? memberLabel : '选择模型'}</strong>
               {page === 'opencode' && (
                 <button
                   type="button"
@@ -228,8 +271,11 @@ export function AiModelMenu({
             </header>
             {page === 'bases' ? (
               <div className="agent-model-menu-list">
+                {isMember && <button type="button" className="agent-model-menu-category" onClick={() => setPage('member')}>
+                  <span><b>{memberLabel}</b><small>{quotaLabel}</small></span><ChevronRight size={15}/>
+                </button>}
                 {providers
-                  .filter((p) => p.extension?.id !== 'cshell.opencode')
+                  .filter((p) => p.extension?.id !== 'cshell.opencode' && !isPooledProvider(p))
                   .map((p) => (
                     <button
                       type="button"
@@ -255,6 +301,24 @@ export function AiModelMenu({
                   </span>
                   <ChevronRight size={15} />
                 </button>
+              </div>
+            ) : page === 'member' ? (
+              <div className="agent-model-menu-list">
+                <p>{quotaLabel}{reset && ' · ' + (chinese ? '下次刷新 ' : 'Resets ') + reset}</p>
+                {pooled.map(provider => {
+                  const entry = week?.pools.flatMap(pool => pool.models).find(item => item.id === provider.model);
+                  const tier = entry?.costTier ?? entry?.tier;
+                  const fallback = provider.name.replace(/ · Pro$/, '');
+                  const title = entry?.name ? entry.name + (week?.pools.some(p => p.provider === 'kimi' && p.models.some(m => m.id === entry.id)) ? (chinese ? ' · Kimi 直连' : ' · Kimi direct') : '') : fallback.replace(/ · (?:极低|较高|极高|低|中|高)消耗$/, '');
+                  const cost = tier ? (chinese ? {minimal:'极低消耗',low:'低消耗',medium:'中消耗',elevated:'较高消耗',high:'高消耗',extreme:'极高消耗'} : {minimal:'Very low usage',low:'Low usage',medium:'Medium usage',elevated:'Elevated usage',high:'High usage',extreme:'Very high usage'})[tier] : fallback.match(/(?:极低|较高|极高|低|中|高)消耗$/)?.[0];
+                  const speed = entry?.speed;
+                  const speedLabel = speed && (chinese ? {fast:'速度快',normal:'速度适中',slow:'速度较慢',verySlow:'速度慢'} : {fast:'Fast',normal:'Moderate speed',slow:'Somewhat slow',verySlow:'Slow'})[speed.level];
+                  const speedInfo = speed && (chinese ? `首字 ${speed.first.toFixed(2)} 秒 · ${speed.cps.toFixed(1)} 字/秒 · ${speed.samples} 次实测` : `First text ${speed.first.toFixed(2)} s · ${speed.cps.toFixed(1)} chars/s · ${speed.samples} samples`);
+                  return <button key={provider.id} title={speedInfo} type="button" disabled={selecting || disabled} onClick={() => void choose(provider.id)}>
+                    <span><b>{title}</b>{(cost || speedLabel) && <small>{[cost,speedLabel].filter(Boolean).join(' · ')}</small>}</span>{provider.id === providerId && <Check size={14}/>}
+                  </button>;
+                })}
+                {pooled.length === 0 && <p role="status">{chinese ? '当前没有可选的会员模型。' : 'No member models are currently available.'}</p>}
               </div>
             ) : (
               <>

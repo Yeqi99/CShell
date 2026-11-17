@@ -30,7 +30,7 @@ const manageParams = {
   'wsl.install': z.object({ planId: z.string().uuid(), confirm: z.literal(true) }).strict(),
   'wsl.status': empty, 'wsl.logs': empty, 'wsl.cancel': empty,
   'wsl.account.status': z.object({ distribution }).strict(),
-  'wsl.account.initialize': z.object({ distribution, username: z.string().regex(/^[a-z_][a-z0-9_-]{0,30}$/), password: z.string().min(1).max(1024).regex(/^[^\0\r\n]+$/), confirm: z.literal(true) }).strict(),
+  'wsl.account.initialize': z.object({ distribution, username: z.string().regex(/^[a-z_][a-z0-9_-]{0,30}$/), password: z.string().min(1).max(1024).regex(/^[^\u0000\r\n]+$/), confirm: z.literal(true) }).strict(),
 };
 const relayParams = {
   'relay.status': empty, 'relay.reverse.status': empty,

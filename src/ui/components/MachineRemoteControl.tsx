@@ -3,10 +3,13 @@ import {useEffect, useState} from 'react';
 import {Monitor, RefreshCw, X} from 'lucide-react';
 import type {AgentCall} from '../../shared/agent';
 import {AgentDesktopView} from './AgentDesktopView';
+import type {Profile} from '../../shared/contracts';
+import {WindowsSessionPicker} from './WindowsSessionPicker';
 
-export function MachineRemoteControl({target, call, active, android, optionsOpen, onCloseOptions, onVideoSize}: {
+export function MachineRemoteControl({target, deviceId, call, active, android, optionsOpen, onCloseOptions, onVideoSize,rdpProfiles=[],openRdp}: {
+  rdpProfiles?:Profile[];openRdp?:(profile:Profile)=>void;
   onVideoSize?:(size:{width:number;height:number})=>void;
-  target:string; call:(method:AgentCall['method'], params?:unknown)=>Promise<unknown>; active:boolean; android:boolean; optionsOpen:boolean; onCloseOptions:()=>void;
+  deviceId:string; target:string; call:(method:AgentCall['method'], params?:unknown)=>Promise<unknown>; active:boolean; android:boolean; optionsOpen:boolean; onCloseOptions:()=>void;
 }) {
   const [status,setStatus]=useState<any>();
   const [error,setError]=useState('');
@@ -14,6 +17,7 @@ export function MachineRemoteControl({target, call, active, android, optionsOpen
   const refresh=async()=>{setBusy(true);setError('');try{setStatus(await call('desktop.status'));}catch(e){setError(String(e));}finally{setBusy(false);}};
   useEffect(()=>{void refresh();},[target,call]);
   return <div className="machine-remote-app" data-options={optionsOpen}>
+    {!android&&window.cshell.platform==='win32'&&openRdp&&rdpProfiles.length>0&&<WindowsSessionPicker key={target} target={target} deviceId={deviceId} active={active&&!!status?.controlAllowed} profiles={rdpProfiles} open={openRdp}/>}
     {optionsOpen&&<button className="machine-options-close" title="关闭应用设置" aria-label="关闭应用设置" onClick={onCloseOptions}><X size={16}/></button>}
     {!status?.viewAllowed&&<div className="machine-remote-status"><Monitor size={16}/><span>{busy?'正在检查远程控制…':status?.viewAllowed?'可以连接':'尚未就绪'}</span><button title="刷新远程控制状态" aria-label="刷新远程控制状态" disabled={busy} onClick={()=>void refresh()}><RefreshCw size={15}/></button></div>}
     {error&&<ErrorNotice title="操作未完成" error={error}/>}

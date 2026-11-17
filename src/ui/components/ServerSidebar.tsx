@@ -1,3 +1,5 @@
+import {isPro} from '../../shared/edition';
+import {CLOUD_HOST_GROUP,systemGroups,isSystemGroup} from '../../shared/system-groups';
 import type {AccountDiscoveryStatus} from '../../shared/cloud-sync';
 import {ErrorNotice} from './ErrorNotice';
 import {PingButton} from './PingButton';
@@ -9,6 +11,7 @@ import type { LocalConnectionTarget } from '../../shared/local-terminal';
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
+  Cloud,
   ArrowLeft,
   Check,
   ChevronDown,
@@ -74,7 +77,64 @@ export function ServerSidebar({
   const [query, setQuery] = useState('');
   const [accountDevices,setAccountDevices]=useState<AccountDiscoveryStatus['devices']>([]);
   useEffect(()=>{let alive=true;const refresh=()=>{void window.cshell.cloudDiscovery?.().then(s=>{if(alive)setAccountDevices(s.devices);}).catch(()=>{});};refresh();const timer=setInterval(refresh,15000);return()=>{alive=false;clearInterval(timer);};},[]);
+  const [rentalSources,setRentalSources]=useState<{scope:string;ids:string[]}>({scope:'',ids:[]});
+  const profileIds = profiles.map(p=>p.id).join(',');
+  useEffect(()=>{
+    if(!isPro || groupScope==='signed-out')return;
+    let active=true;
+    const key='cshell.sidebar.rental-devices:'+groupScope;
+    try {
+      const cached=JSON.parse(localStorage.getItem(key) || '[]');
+      if(Array.isArray(cached))setRentalSources({scope:groupScope,ids:cached.filter(id=>typeof id==='string')});
+    }catch{}
+    const refresh=async()=>{
+      try{
+        const ids=await window.cshell.cloudRentalDeviceIds();
+        if(active){setRentalSources({scope:groupScope,ids});localStorage.setItem(key,JSON.stringify(ids));}
+      }catch{}
+    };
+    void refresh();
+    const timer=setInterval(refresh,60000);
+    return ()=>{active=false;clearInterval(timer);};
+  },[groupScope,profileIds]);
+  const rentalIds=new Set(rentalSources.scope===groupScope?rentalSources.ids:[]);
+  const accountIds=new Set(accountDevices.map(d=>d.id));
+  const sourceGroup=(p:Profile)=>p.protocol==='client' && rentalIds.has(p.id)?CLOUD_HOST_GROUP
+    :p.protocol==='client' && accountIds.has(p.id)?ACCOUNT_DEVICE_GROUP:p.group;
   const [menu, setMenu] = useState<Menu | null>(null);
+  const [proxyState,setProxyState]=useState<{supported:boolean;enabled:boolean;machineId?:string}>();
+  const [proxyPending,setProxyPending]=useState('');
+  useEffect(()=>{
+    let mounted=true;
+    let revision=0;
+    const refresh=()=>{
+      const current=++revision;
+      void window.cshell.networkSystemStatus?.().then(state=>{
+        if(mounted && current===revision)setProxyState(state);
+      }).catch(()=>{});
+    };
+    refresh();
+    const timer=setInterval(()=>{if(document.visibilityState==='visible')refresh();},10000);
+    window.addEventListener('system-proxy-changed',refresh);
+    window.addEventListener('focus',refresh);
+    return ()=>{
+      mounted=false;
+      clearInterval(timer);
+      window.removeEventListener('system-proxy-changed',refresh);
+      window.removeEventListener('focus',refresh);
+    };
+  },[groupScope]);
+  const proxyActive=(id:string)=>!!proxyState?.enabled && proxyState.machineId===id;
+  async function toggleProxy(profile:Profile){
+    if(proxyPending || !window.cshell.networkSystemSet)return;
+    setProxyPending(profile.id);
+    setError('');
+    try{
+      setProxyState(await window.cshell.networkSystemSet(!proxyActive(profile.id),profile.id));
+      window.dispatchEvent(new Event('system-proxy-changed'));
+    }catch(error){setError(profile.name+' · '+(error instanceof Error?error.message:String(error)));}
+    finally{setProxyPending('');}
+  }
   const [appearanceExpanded, setAppearanceExpanded] = useState(false);
   const {isCollapsed,toggle:toggleGroup,setCollapsed:setGroupCollapsed}=useSidebarGroups(groupScope,ACCOUNT_DEVICE_GROUP);
   const [editor, setEditor] = useState<{ original?: string; move?: Profile } | null>(null);
@@ -169,6 +229,7 @@ export function ServerSidebar({
   async function saveGroup() {
     if (working) return;
     const next = name.trim();
+    if (isSystemGroup(next)) {setError(t('groupExists'));return;}
     if (!next) {
       setError(t('groupNameRequired'));
       return;
@@ -207,23 +268,25 @@ export function ServerSidebar({
     }
   }
   const filtered = profiles.filter((p) =>
-    `${p.name} ${p.host} ${p.group}`.toLowerCase().includes(query.toLowerCase()),
+    `${p.name} ${p.host} ${p.group} ${sourceGroup(p)}`.toLowerCase().includes(query.toLowerCase()),
   );
   const groupNames = orderSidebarGroups([...groups,...profiles.map(p=>p.group).filter(Boolean)],locale,ACCOUNT_DEVICE_GROUP);
+  const pinned=systemGroups.filter(name=>(isPro && groupScope!=='signed-out') || profiles.some(p=>sourceGroup(p)===name));
   const sections = [
+    ...pinned.map(id=>({id,name:id,items:filtered.filter(p=>sourceGroup(p)===id),favorite:false})),
     {
       id: '__favorites',
       name: t('favorites'),
       items: filtered.filter((p) => p.favorite),
       favorite: true,
     },
-    ...[...groupNames.filter(g=>g===ACCOUNT_DEVICE_GROUP),'',...groupNames.filter(g=>g!==ACCOUNT_DEVICE_GROUP)].map((group) => ({
+    ...['',...groupNames.filter(g=>!isSystemGroup(g))].map((group) => ({
       id: group,
       name: group || t('ungrouped'),
-      items: filtered.filter((p) => p.group === group),
+      items: filtered.filter((p) => p.group === group && (group!=='' || !isSystemGroup(sourceGroup(p)))),
       favorite: false,
     })),
-  ].filter((section) => section.items.length || (!query && !section.favorite && section.id)).sort((a,b)=>a.id===ACCOUNT_DEVICE_GROUP?-1:b.id===ACCOUNT_DEVICE_GROUP?1:0);
+  ].filter((section) => section.items.length || (!query && !section.favorite && section.id));
   const localSection = (!!targets.length && (
           <section className="server-group">
             <div className="group-heading">
@@ -343,11 +406,12 @@ export function ServerSidebar({
         {!sections.length && localSection}
         {sections.map((section,index) => (
           <Fragment key={`${section.favorite ? 'favorite' : 'group'}:${section.id}`}>
-          {index===0 && section.id!==ACCOUNT_DEVICE_GROUP && localSection}
+          {!isSystemGroup(section.id) && (index===0 || isSystemGroup(sections[index-1].id)) && localSection}
           <section
             key={`${section.favorite ? 'favorite' : 'group'}:${section.id}`}
             className={`server-group ${dragging && drop?.group === section.id && !drop.before ? 'group-drop-target' : ''}`}
-            data-group={section.favorite ? undefined : section.id}
+            data-system-group={isSystemGroup(section.id) ? section.id : undefined}
+            data-group={section.favorite || isSystemGroup(section.id) ? undefined : section.id}
           >
             <div className="group-heading">
               <button
@@ -363,10 +427,12 @@ export function ServerSidebar({
                   <ChevronDown size={12} />
                 )}
                 {section.favorite && <Star size={11} />}
-                <span className="group-name">{section.id===ACCOUNT_DEVICE_GROUP?tr(ACCOUNT_DEVICE_GROUP):section.name}</span>
+                {section.id===CLOUD_HOST_GROUP && <Cloud className="source-group-icon" size={15}/>}
+                {section.id===ACCOUNT_DEVICE_GROUP && <Share2 className="source-group-icon" size={14}/>}
+                <span className="group-name">{isSystemGroup(section.id)?tr(section.id):section.name}</span>
                 <small>{section.items.length}</small>
               </button>
-              {!section.favorite && section.id && (
+              {!section.favorite && section.id && !isSystemGroup(section.id) && (
                 <button
                   className="icon group-more"
                   title={`${t('manageGroup')} · ${section.name}`}
@@ -387,7 +453,7 @@ export function ServerSidebar({
                   onClickCapture={e => {if(Date.now()<suppressClickUntil.current){e.preventDefault();e.stopPropagation();}}}
                   onDoubleClickCapture={e => {if(Date.now()<suppressClickUntil.current){e.preventDefault();e.stopPropagation();}}}
                   onPointerDown={e => {
-                    if (!onMove || working || e.button !== 0 || (e.target as HTMLElement).closest('.favorite-button,.server-more,.ping-button')) return;
+                    if (!onMove || working || e.button !== 0 || (e.target as HTMLElement).closest('.favorite-button,.server-more,.ping-button,.machine-proxy-toggle')) return;
                     pointerDrag.current = { id:profile.id, x:e.clientX, y:e.clientY, active:false };
                     ((e.target as HTMLElement).closest<HTMLElement>('.server-open') ?? e.currentTarget).setPointerCapture(e.pointerId);
                   }}
@@ -451,6 +517,15 @@ export function ServerSidebar({
                         <div className="server-metadata"><small title={profile.host}>{profile.protocol === 'http' ? 'HTTP' : profile.host}</small>{accountDevices.some(d=>d.id===profile.id)&&<span className="account-device-badge" title={tr('同账号设备')+' · '+tr(accountDevices.find(d=>d.id===profile.id)?.online===true?'在线':accountDevices.find(d=>d.id===profile.id)?.online===false?'离线':'状态未知')} aria-label={tr('账号设备')}><Share2 size={11} aria-hidden="true" /></span>}</div>
                       </div>
                     </button>
+                    {proxyState?.supported && ['ssh','client'].includes(profile.protocol??'ssh') && (
+                      <button type="button" className="icon machine-proxy-toggle" data-native-tooltip
+                        aria-pressed={proxyActive(profile.id)} aria-busy={proxyPending===profile.id}
+                        aria-label={tr('本机网络代理')+' · '+profile.name}
+                        title={proxyPending===profile.id?tr('正在切换代理'):proxyActive(profile.id)?tr('关闭本机网络代理'):tr('用此机器代理本机网络')}
+                        disabled={!!proxyPending} onClick={()=>void toggleProxy(profile)}>
+                        <Globe size={13} aria-hidden="true"/>
+                      </button>
+                    )}
                     {profile.protocol!=='http'&&<PingButton key={profile.host} profileId={profile.id}/>}
                     <button
                       className={`icon favorite-button ${profile.favorite ? 'starred' : ''}`}
@@ -481,7 +556,7 @@ export function ServerSidebar({
                 <p className="empty-group">{t('emptyGroup')}</p>
               )}
           </section>
-          {index===0 && section.id===ACCOUNT_DEVICE_GROUP && localSection}
+          {index===sections.length-1 && isSystemGroup(section.id) && localSection}
           </Fragment>
         ))}
         {!profiles.length && !groups.length && (
@@ -564,7 +639,7 @@ export function ServerSidebar({
                 </button>
                 <div className="context-divider" />
                 <div className="group-destinations">
-                  {['', ...groupNames].map((group) => (
+                  {['', ...groupNames.filter(g=>!isSystemGroup(g))].map((group) => (
                     <button
                       key={group}
                       role="menuitemradio"
@@ -585,6 +660,13 @@ export function ServerSidebar({
             ) : (
               <>
                 <div className="context-caption">{menu.profile.name}</div>
+                {proxyState?.supported && ['ssh','client'].includes(menu.profile.protocol??'ssh') && (
+                  <button role="menuitemcheckbox" aria-checked={proxyState.enabled && proxyState.machineId===menu.profile.id}
+                    disabled={!!proxyPending} onClick={()=>{closeMenu();void toggleProxy(menu.profile);}}>
+                    {proxyState.enabled && proxyState.machineId===menu.profile.id?<Check size={14}/>:<Globe size={14}/>}
+                    {locale==='zh-CN'?'用此机器代理本机网络':'Use as system proxy'}
+                  </button>
+                )}
                 {onShare&&<button role="menuitem" onClick={()=>{onShare(menu.profile);closeMenu();}}><Share2 size={14}/>{locale==='zh-CN'?'分享机器…':'Share machine…'}</button>}
                 {onVisual && !['http','ftp','ftps','sftp'].includes(menu.profile.protocol??'ssh') && <button role="menuitem" onClick={() => {onVisual(menu.profile);closeMenu();}}><Server size={14}/>{locale === 'zh-CN' ? '打开可视化桌面' : 'Open visual desktop'}</button>}
                 {['ssh','rdp'].includes(menu.profile.protocol??'ssh')&&<button role="menuitemcheckbox" aria-checked={connectionUsesVisual(menu.profile,preferences)} disabled={working} onClick={()=>{setWorking(true);const current=profiles.find(item=>item.id===menu.profile.id)??menu.profile;void onSave({...current,defaultConnectionView:connectionUsesVisual(current,preferences)?'original':'visual'}).then(()=>closeMenu()).catch(report).finally(()=>setWorking(false));}}><span style={{width:14,display:'flex'}}>{connectionUsesVisual(menu.profile,preferences)&&<Check size={14}/>}</span>{locale==='zh-CN'?'默认以可视化打开':'Open in visual mode by default'}</button>}

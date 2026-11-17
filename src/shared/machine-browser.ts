@@ -10,7 +10,7 @@ export type BrowserTab = {
   fullscreen?:boolean;
 };
 export type BrowserEntry={url:string;title:string;at:string};
-export type MachineBrowserState = { tabs: BrowserTab[]; selected: string; connected: boolean; history?:BrowserEntry[]; bookmarks?:BrowserEntry[]; persistenceError?:string };
+export type MachineBrowserState = { nativeEdge?: boolean; manualControl?: boolean; activity?: string; tabs: BrowserTab[]; selected: string; connected: boolean; history?:BrowserEntry[]; bookmarks?:BrowserEntry[]; persistenceError?:string };
 export interface MachineBrowserBridge {
   machineBrowser(id: string, action: string, value?: unknown): Promise<MachineBrowserState>;
   onMachineBrowserFocus(listener: (id: string) => void): () => void;

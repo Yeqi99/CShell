@@ -4,6 +4,7 @@
   [switch]$NoShortcuts,
   [switch]$RefreshExistingShortcuts,
   [switch]$PrepareOnly,
+  [switch]$SkipHeadlessDisplay,
   [string]$ProvisionFile
 )
 $ErrorActionPreference = 'Stop'
@@ -75,6 +76,19 @@ if ($PrepareOnly) {
   return
 }
 # Program discovery metadata only; never touches the identity/configuration directory.
+if (-not $SkipHeadlessDisplay -and -not $NoLaunch -and -not (Test-Path -LiteralPath (Join-Path $root 'Open CAgent.vbs'))) {
+  $helper = Join-Path $versionRoot 'CAgentVirtualDisplay.exe'
+  $driver = Join-Path $versionRoot 'VirtualDisplayDriver'
+  if ((Test-Path -LiteralPath $helper) -and (Test-Path -LiteralPath $driver)) {
+    try {
+      $check = & $helper headless-check | ConvertFrom-Json
+      if ($LASTEXITCODE -eq 0 -and $check.status -eq 'NO_DISPLAY') {
+        $process = Start-Process -FilePath $helper -Verb RunAs -ArgumentList ('ensure-headless "' + $driver + '"') -WindowStyle Hidden -Wait -PassThru
+        if ($process.ExitCode -ne 0) { throw 'Virtual display setup did not finish; inspect the display task in CAgent.' }
+      }
+    } catch { Write-Warning ('CAgent headless display: ' + $_.Exception.Message) }
+  }
+}
 New-Item -Path 'HKCU:\Software\CAgent\Installation' -Force | Out-Null
 Set-ItemProperty -LiteralPath 'HKCU:\Software\CAgent\Installation' -Name InstallLocation -Value $root
 $launcher = Join-Path $root 'Open CAgent.vbs'

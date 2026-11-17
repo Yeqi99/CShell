@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 export const agentAppId = z.enum([
+  'mysql', 'milvus', 'redis',
   'browser',
   'git',
   'nodejs',
@@ -21,15 +22,17 @@ export const appPolicySchema = z
       .default(['*']),
   })
   .strict();
+const port = z.number().int().min(1).max(65535);
 export const appPlanInput = z.object({ app: agentAppId }).strict();
 export const appTaskInput = z.object({ id: z.string().uuid() }).strict();
 export const appInstallInput = z
-  .object({ id: z.string().uuid(), confirm: z.literal(true) })
+  .object({ id: z.string().uuid(), confirm: z.literal(true), port: port.optional() })
   .strict();
 export const appTaskSchema = z
   .object({
     id: z.string().uuid(),
     app: agentAppId,
+    port: port.optional(),
     platform: z.string(),
     manager: z.string(),
     executable: z.string(),
@@ -46,6 +49,6 @@ export const appCatalogSchema = z
     platform: z.string(),
     manager: z.string().nullable(),
     enabled: z.boolean(),
-    applications: z.array(z.object({ id: agentAppId, package: z.string() }).strict()),
+    applications: z.array(z.object({ id: agentAppId, package: z.string(), unavailable: z.string().optional() }).strict()),
   })
   .strict();

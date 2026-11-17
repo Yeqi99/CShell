@@ -37,3 +37,31 @@ test('failed cloud transaction restores fresh default without persisting a forei
  const dir=await mkdtemp(join(tmpdir(),'cshell-route-rollback-'));const codec={encryptPrivate:async(s:string)=>s,decryptPrivate:async(s:string)=>s};const route=new ApplicationNetworkRoute(dir,codec as any);
  try{await route.load();const checkpoint=route.cloudCheckpoint();await route.cloudImport({mode:'machine',id:'88cf3f77-74f1-4201-9920-aa7c8b97d173'});await route.cloudRestore(checkpoint);const restarted=new ApplicationNetworkRoute(dir,codec as any);await restarted.load();assert.deepEqual(restarted.cloudCheckpoint(),{route:{mode:'system'},saved:false});await restarted.close();}finally{await route.close();await rm(dir,{recursive:true,force:true});}
 });
+
+test('Responses does not replay a model request or use DIRECT after proxy rejection', async () => {
+  const {createServer} = await import('node:http');
+  const proxy = createServer();
+  let connects = 0;
+  proxy.on('connect', (request, socket) => {
+    connects++;
+    assert.equal(request.url, 'api.openai.com:443');
+    assert.equal(request.headers.authorization, undefined);
+    socket.end('HTTP/1.1 502 Bad Gateway\r\n\r\n');
+  });
+  await new Promise<void>(resolve => proxy.listen(0, '127.0.0.1', resolve));
+  const route = new ApplicationNetworkRoute('.', {} as any);
+  Object.assign(route, {current: {
+    async resolveProxy() { return 'PROXY 127.0.0.1:' + (proxy.address() as {port:number}).port + '; DIRECT'; },
+    fetch() { throw Error('unexpected fallback'); },
+    closeAllConnections() {},
+  }});
+  try {
+    await assert.rejects(route.fetch('https://api.openai.com/v1/responses', {
+      method:'POST', headers:{Authorization:'Bearer example'}, body:'{}',
+    }), /代理隧道连接失败/);
+    assert.equal(connects, 1);
+  } finally {
+    await route.close();
+    await new Promise<void>(resolve => proxy.close(() => resolve()));
+  }
+});

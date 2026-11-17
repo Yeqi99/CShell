@@ -33,7 +33,7 @@ export const agentMethods = [
   'packages.grant',
   'packages.uninstall',
   'packages.refresh',
-  'desktop.recovery.plan','desktop.recovery.execute',
+  'desktop.rdp.identity','desktop.recovery.plan','desktop.recovery.execute',
   'desktop.status',
   'desktop.configure',
   'desktop.open',

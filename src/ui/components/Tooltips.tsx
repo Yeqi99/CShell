@@ -31,7 +31,7 @@ export function Tooltips() {
           : null;
       if (target === current) return;
       clear();
-      if (!target || target.getAttribute('aria-expanded') === 'true' || target.closest('[role="menu"]')) return;
+      if (!target || target.hasAttribute('data-native-tooltip') || target.getAttribute('aria-expanded') === 'true' || target.closest('[role="menu"]')) return;
       const text = target.dataset.tooltip || target.title || target.getAttribute('aria-label');
       if (!text) return;
       current = target;

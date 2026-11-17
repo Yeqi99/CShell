@@ -92,7 +92,7 @@ const escapeHtml = (v: unknown) =>
   );
 export function exportActivity(events: Activity[], format: 'csv' | 'html') {
   const rows = [
-    ['Time', 'Type', 'Action', 'Status', 'Provider', 'Resource', 'Duration ms', 'Bytes'],
+    ['Time', 'Type', 'Action', 'Status', 'Provider', 'Resource', 'Duration ms', 'Bytes', 'Input tokens', 'Output tokens', 'Total tokens'],
     ...events.map((e) => [
       new Date(e.time).toISOString(),
       e.kind,
@@ -102,6 +102,7 @@ export function exportActivity(events: Activity[], format: 'csv' | 'html') {
       e.resource || '',
       e.duration ?? '',
       e.bytes ?? '',
+      e.tokens?.input ?? '', e.tokens?.output ?? '', e.tokens?.total ?? '',
     ]),
   ];
   if (format === 'csv')

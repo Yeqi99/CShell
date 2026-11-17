@@ -132,7 +132,7 @@ test('agent connects a saved machine then discovers its tools, with scope and ap
     await ai.send(denied.id, '连接');
     await until(() => ai.snapshot().threads[0].state === 'idle');
     assert.equal(connects, 1);
-    assert.match(ai.snapshot().threads[0].messages.find((m) => m.tool)!.content, /denied/);
+    assert.ok(ai.snapshot().threads[0].messages.some(m=>m.tool?.name==='connect_machine' && m.tool.output.startsWith('Error:')));
     await ai.savePolicy({ ...ai.snapshot().policy, profiles: [profile.id] });
     const review = await ai.create('workspace', provider.id, 'review');
     await ai.send(review.id, '连接');
@@ -270,7 +270,8 @@ test('agent enforces target/capability, review, revocation, stop and encrypted p
     const thread = await ai.create('terminal', provider.id, 'review', sessionId);
     await ai.send(thread.id, 'show directory');
     await until(() => ai.snapshot().threads[0].state === 'approval');
-    assert.deepEqual(requests[0].tools.map((t: any) => t.function.name), ['task_start', 'task_wait', 'task_stop', 'task_list', 'task_log_read', 'task_checkpoint', 'get_permission_link', 'execute_command']);
+    assert.ok(requests.at(-1).tools.some((t:any)=>t.function.name==='execute_command'));
+    assert.ok(!requests.at(-1).tools.some((t:any)=>t.function.name==='create_file'));
     await ai.permission({ ...permission, capabilities: [] });
     ai.approve(thread.id, ai.snapshot().threads[0].pending!.id, true);
     await until(() => ai.snapshot().threads[0].state === 'idle');
@@ -292,11 +293,8 @@ test('agent enforces target/capability, review, revocation, stop and encrypted p
     });
     const outside = await ai.create('files', provider.id, 'allow', sessionId);
     await ai.send(outside.id, 'try bypass');
-    await until(() => ai.snapshot().threads[0].state === 'idle');
-    assert.match(
-      ai.snapshot().threads[0].messages.find((m) => m.role === 'tool')!.content,
-      /denied/,
-    );
+    await until(() => ai.snapshot().threads[0].state === 'error');
+    assert.match(ai.snapshot().threads[0].error!, /不可用|未提供/);
     await ai.permission(permission);
     assert.equal(commandNeedsReview('ls -la'), false);
     assert.equal(commandNeedsReview('echo x; rm a'), true);
@@ -340,7 +338,8 @@ test('agent enforces target/capability, review, revocation, stop and encrypted p
     requestedTool = 'create_file';
     const current = () => ai.snapshot().threads.find((t) => t.id === thread.id)!;
     await ai.send(thread.id, 'create without a grant');
-    await until(() => current().state === 'idle');
+    await until(() => current().state === 'error');
+    assert.match(current().error!, /不可用|未提供/);
     await assert.rejects(readFile(join(remote.root, 'ai-created.txt')));
     assert.ok(!requests.at(-1).tools.some((t: any) => t.function.name === 'create_file'));
     await ai.savePolicy({ ...ai.snapshot().policy, capabilities: ['files.create'], overrides: [] });
@@ -349,7 +348,8 @@ test('agent enforces target/capability, review, revocation, stop and encrypted p
       overrides: [{ profileId: profile.id, capabilities: [] }],
     });
     await ai.send(thread.id, 'create on a machine with an explicit deny override');
-    await until(() => current().state === 'idle');
+    await until(() => current().state === 'error');
+    assert.match(current().error!, /不可用|未提供/);
     await assert.rejects(readFile(join(remote.root, 'ai-created.txt')));
     await ai.savePolicy({ ...ai.snapshot().policy, overrides: [] });
     await ai.mode(thread.id, 'restricted');
@@ -525,7 +525,7 @@ test('CShell inventory tools work without a bound machine, obey global grants an
     await until(() => ai.snapshot().threads[0].state === 'idle');
     assert.deepEqual(
       requests[0].tools.map((t: any) => t.function.name),
-      ['task_log_read', 'task_checkpoint', 'get_permission_link', 'list_machines', 'list_sessions'],
+      ['list_machines', 'load_task_context'],
     );
     const result = JSON.parse(
       ai

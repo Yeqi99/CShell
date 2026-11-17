@@ -63,7 +63,7 @@ export function consoleRecoveryEligible(state: ConsoleRecoveryState) {
     state.sourceUnlocked &&
     !state.consoleOccupied &&
     state.protocol === 2 &&
-    state.sourceState === 0 &&
+    (state.sourceState === 0 || state.sourceState === 4) &&
     state.consoleSessionId > 0 &&
     state.consoleSessionId !== 0xffffffff &&
     state.consoleSessionId !== state.sessionId

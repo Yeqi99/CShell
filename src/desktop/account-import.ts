@@ -4,8 +4,9 @@ import {join} from 'node:path';
 import {randomUUID,createHash} from 'node:crypto';
 import {z} from 'zod';
 import {readAccountSource} from './account-source-reader';
+import {hasAccountSource} from '../core/account-source-discovery';
 import {planAccountImport} from '../core/account-import';
-import {clearGuestCache} from '../core/guest-cache';
+import {clearGuestCache,guestCacheEntries} from '../core/guest-cache';
 import type {CloudSync} from '../core/cloud-sync';
 import type {DesktopAccountProfiles} from '../core/desktop-account-profiles';
 import type {AccountSource,AccountSourcePreview} from '../shared/account-import';
@@ -22,16 +23,37 @@ export function registerAccountImports(handle:(name:string,fn:(...args:any[])=>a
  };
  const digest=(v:unknown)=>createHash('sha256').update(JSON.stringify(v)).digest('hex');
  handle('account:clear-guest',async(confirmation)=>{
-  z.literal('clear-guest-local-only').parse(confirmation);const id=account();assertIdle();
-  await cloud.withAccountWorkspace(id,async()=>{assertIdle();await clearGuestCache(profiles.directory('guest'),app.getPath('userData'));});preview=undefined;
+  z.literal('clear-guest-local-only').parse(confirmation);const id=account();
+  // Active connections belong to the signed-in profile. Only imports and
+  // account switches replace that profile's live data and require idle sessions.
+  await cloud.withAccountWorkspace(id,async()=>{
+   await clearGuestCache(profiles.directory('guest'),app.getPath('userData'));
+  });preview=undefined;
  });
- handle('account:sources',async()=>{
-  account();const result:AccountSource[]=[];
+ handle('account:has-guest-cache',async()=>{
+  account();
+  for(const entry of guestCacheEntries){
+   try{await stat(join(path('guest'),entry));return true;}
+   catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;}
+  }
+  return false;
+ });
+ const scanSources=async()=>{
+  const result:AccountSource[]=[];
   for(const source of ['opensource','guest'] as const){
-   for(const file of ['config.json','desktop-looks.enc','ai.enc','opencode.enc','extensions/opencode/opencode.enc','extensions/tavily/tavily.enc','http.enc','client-controller/devices.enc','machine-browser']){
-    try{await stat(join(path(source),file));result.push(source);break;}catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw Error('无法检查本机配置来源');}
-   }
+   const dir=path(source);
+   try{if(await hasAccountSource(dir,()=>readAccountSource(dir,source==='guest'?'pro':'opensource',true)))result.push(source);}
+   catch{throw Error(source==='guest'?'未能读取 Pro 未登录工作区，请重试。':'未能读取 CShell 开源版的本机配置，请重试。');}
   }return result;
+ };
+ const scanning=new Map<string,Promise<AccountSource[]>>();
+ handle('account:sources',async()=>{
+  const id=account();
+  let pending=scanning.get(id);
+  if(!pending){pending=scanSources().finally(()=>scanning.delete(id));scanning.set(id,pending);}
+  const result=await pending;
+  if(account()!==id)throw Error('账号已改变，请重新检查');
+  return result;
  });
  handle('account:source-preview',async(input)=>{
   const source=kind.parse(input),id=account(),value=await read(source);

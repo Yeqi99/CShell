@@ -47,6 +47,7 @@ test('browser handles self-closing WebContents and restores after disconnect and
             contents: `
    import {EventEmitter} from 'node:events';
    export class BrowserWindow {}
+   export const Menu={},clipboard={},dialog={showMessageBox:async()=>({response:1})};
    export const app={getPath:()=>${JSON.stringify(directory)}};
    export const safeStorage={isEncryptionAvailable:()=>true,encryptString:s=>Buffer.from(s).reverse(),decryptString:b=>Buffer.from(b).reverse().toString()};
    class Contents extends EventEmitter {url='about:blank';zoom=1;dead=false;navigationHistory={canGoBack:()=>false,canGoForward:()=>false};isFocused(){return true}isDestroyed(){return this.dead}getURL(){return this.url}getTitle(){if(this.dead)throw Error('destroyed');return this.url}getZoomFactor(){return this.zoom}setZoomFactor(z){this.zoom=z}isLoading(){return false}setWebRTCIPHandlingPolicy(){}setWindowOpenHandler(handler){this.popupHandler=handler}async loadURL(url){this.url=url;this.emit('did-navigate');this.emit('page-title-updated')}close(){this.dead=true;this.emit('destroyed')} }
@@ -95,6 +96,18 @@ test('browser handles self-closing WebContents and restores after disconnect and
   for (const permission of ['fullscreen', 'clipboard-sanitized-write'])
     assert.equal(firstWorkspace.ses.check(firstContents, permission), true);
   assert.equal(firstWorkspace.ses.check(firstContents, 'clipboard-read'), false);
+  const frame = {url:'https://identity.example/login'};
+  firstContents.mainFrame = {framesInSubtree:[frame]};
+  firstWorkspace.tabs.get(firstWorkspace.selected).view.getVisible = () => true;
+  const permission = 'storage-access';
+  const checkStorage = (origin: string) => firstWorkspace.ses.check(firstContents, permission, origin, {});
+  assert.equal(checkStorage('https://identity.example'), false);
+  assert.equal(await new Promise(resolve => firstWorkspace.ses.request(firstContents, permission, resolve, {requestingUrl:frame.url})), true);
+  assert.equal(checkStorage('https://identity.example'), true);
+  assert.equal(checkStorage('https://other.example'), false);
+  await browser.action(first, 'navigate', 'https://different.example/');
+  assert.equal(checkStorage('https://identity.example'), false);
+  await browser.action(first, 'navigate', 'https://example.org/one');
   firstContents.emit('enter-html-full-screen');
   assert.equal((await browser.action(first, 'status')).tabs[0].fullscreen, true);
   firstContents.emit('leave-html-full-screen');

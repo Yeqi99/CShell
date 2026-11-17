@@ -55,12 +55,15 @@ function fixture() {
     },
   };
 }
-test('recovery requires an active unlocked RDP owner and vacant different console', () => {
+test('recovery requires an unlocked active or disconnected RDP owner and vacant different console', () => {
   assert.equal(consoleRecoveryEligible(ready), true);
+  assert.equal(consoleRecoveryEligible({ ...ready, sourceState: 4 }), true);
   for (const change of [
     { sourceUnlocked: false },
     { consoleOccupied: true },
-    { sourceState: 4 },
+    { sourceState: 4, sourceUnlocked: false },
+    { sourceState: 4, protocol: 0 },
+    { sourceState: 1 },
     { protocol: 0 },
     { consoleSessionId: 2 },
     { consoleSessionId: 0xffffffff },

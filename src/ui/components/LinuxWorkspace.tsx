@@ -11,7 +11,8 @@ import './linux-workspace.css';
 
 export function LinuxWorkspace({
   session,
-  nativeDesktopRequest,
+  request,
+  onInstalled,
   name,
   active,
   closed,
@@ -19,7 +20,8 @@ export function LinuxWorkspace({
   profileId,
   preferences, terminal, files, onRetry,
 }: {
-  nativeDesktopRequest?: number;
+  onInstalled?: (session: string, installed: boolean) => void;
+  request?: { app: 'install-cagent' | 'native-desktop'; revision: number };
   terminal?: (active: boolean, theme: 'light' | 'dark') => ReactNode;
   files?: ReactNode | ((active: boolean) => ReactNode);
   onRetry?: () => void;
@@ -54,6 +56,7 @@ export function LinuxWorkspace({
       setPlan(undefined);
       const p = await window.cshell.linuxWorkspacePlan(session, directory.trim() || undefined);
       setPlan(p);
+      onInstalled?.(session, p.installed);
       setDirectory(p.installDirectory);
       if (p.installed) {
         try {
@@ -99,6 +102,9 @@ export function LinuxWorkspace({
     try {const result=await window.cshell.linuxWorkspaceInstall(session,plan.id);setJob(result);if(result.state==='succeeded')await inspect();}
     catch(e){setError(String(e));}finally{setBusy(false);}
   };
+  const setupVisible = !ready && (!busy || !!plan || !!error || job?.state === 'running');
+  const setupLabel = plan?.installed ? '连接 CAgent' : '安装 CAgent';
+  const setupTitle = preferences.locale === 'zh-CN' ? setupLabel : plan?.installed ? 'Connect to CAgent' : 'Install CAgent';
   const setup = (
     <section className="linux-workspace" aria-label="Linux 可视化工作区" hidden={!active}>
       <header className="linux-topbar">
@@ -138,8 +144,8 @@ export function LinuxWorkspace({
           {!ready ? (
             <div className="linux-setup">
 
-              <h1>安装 CAgent</h1>
-              <p>选择这台机器上的安装位置，检查后开始安装。</p>
+              <h1>{setupTitle}</h1>
+              {!plan?.installed && <p>选择这台机器上的安装位置，检查后开始安装。</p>}
               {!plan?.installed && (
                 <label>
                   安装目录
@@ -201,15 +207,15 @@ export function LinuxWorkspace({
                 </div>
               )}
             </div>
-          ) : null}
+          ) : <p role="status">{preferences.locale === 'zh-CN' ? 'CAgent 已安装并连接' : 'CAgent is installed and connected'}</p>}
         </>
       )}
     </section>
   );
   return <div className="linux-desktop-host" hidden={!active}>
-    <LinuxDesktop initialApp={nativeDesktopRequest ? 'native-desktop' : undefined} initialAppRevision={nativeDesktopRequest} name={name} machine={ready ? {...machine, deviceId: profileId} : {deviceId:profileId, platform:plan?.platform || 'unknown', sshOnly:true}} target={target} call={call} active={active} closed={closed} onRetry={onRetry} onTerminal={onTerminal}
+    <LinuxDesktop initialApp={request?.app === 'install-cagent' && !setupVisible ? undefined : request?.app} initialAppRevision={request?.revision} name={name} machine={ready ? {...machine, deviceId: profileId} : {deviceId:profileId, platform:plan?.platform || 'unknown', sshOnly:true}} target={target} call={call} active={active} closed={closed} onRetry={onRetry} onTerminal={onTerminal}
       files={files} terminal={terminal || ((visible,theme)=><LinuxDesktopTerminal profileId={profileId} preferences={{...preferences,theme}} active={visible}/>)}
-      extraPanels={[...(ready ? [] : [{id:'install-cagent',label:'安装 CAgent',content:setup}]),...(nativeDesktopAvailable(nativeInfo)||nativeDesktopRequest ? [{id:'native-desktop',label:nativeDesktopAvailable(nativeInfo)?'原生桌面':'桌面检测',icon:Monitor,content:(visible:boolean, _options:boolean, _closeOptions:()=>void, windowClosed:boolean)=><NativeDesktop session={session} closed={closed || windowClosed} active={visible} initialInfo={nativeInfo}/>} ] : []) ]}/>
+      extraPanels={[...(setupVisible ? [{id:'install-cagent',label:setupLabel,content:setup}] : []),...(nativeDesktopAvailable(nativeInfo)||request?.app === 'native-desktop' ? [{id:'native-desktop',label:nativeDesktopAvailable(nativeInfo)?'原生桌面':'桌面检测',icon:Monitor,content:(visible:boolean, _options:boolean, _closeOptions:()=>void, windowClosed:boolean)=><NativeDesktop session={session} closed={closed || windowClosed} active={visible} initialInfo={nativeInfo}/>} ] : []) ]}/>
   </div>;
 
 }

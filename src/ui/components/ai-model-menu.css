@@ -135,3 +135,22 @@
   margin-top: 6px;
   padding-top: 4px;
 }
+
+.agent-model-quota {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: 4px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  padding: 3px 5px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.agent-model-quota:hover, .agent-model-quota:focus-visible {
+  color: var(--accent);
+  background: var(--hover);
+}

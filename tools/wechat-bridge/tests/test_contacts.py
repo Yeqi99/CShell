@@ -22,5 +22,14 @@ class ContactsTest(unittest.TestCase):
     def test_partial_query_and_failed_cleanup_rejected(self):
         for raw in ({'state':[0,2,0,100]}, {'state':[0,2,0,101],'cleanup':{'unloaded':False,'codeRestored':True}}):
             with self.assertRaises(Exception):result_page(raw,{})
+    def test_lookup_by_name_remark_alias_or_id(self):
+        self.db.execute("UPDATE contact SET nick_name='西红柿', alias='Canper', remark=? WHERE id=2",("O'Brien%",))
+        self.db.execute("UPDATE contact SET alias='Canper',delete_flag=1 WHERE id=3")
+        for query in ('西红柿','canper',"O'Brien%",'wxid_test2'):
+            self.assertEqual([r['id'] for r in self.page({'query':query})['items']],['wxid_test2'])
+        self.assertFalse(self.page({'query':"' OR 1=1 --"})['items'])
+        page=self.page({'query':'same','limit':1})
+        self.assertTrue(page['hasMore'])
+        with self.assertRaises(Exception):self.page({'query':'canper','cursor':page['nextCursor']})
 
 if __name__=='__main__':unittest.main()

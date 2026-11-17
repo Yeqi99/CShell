@@ -115,6 +115,8 @@ final class AgentConnection implements AutoCloseable {
     try{JSONObject browser=(JSONObject)manage("browser.status",new JSONObject());apps.put("browser",browser.optBoolean("available"));}catch(AgentDenied unavailable){}
     try{JSONObject ide=(JSONObject)manage("ide.status",new JSONObject());apps.put("ide",ide.optBoolean("supported")&&ide.optBoolean("ready"));if(ide.optBoolean("supported"))apps.put("market",true);}catch(AgentDenied unavailable){}
     try{JSONObject coding=(JSONObject)manage("coding.status",new JSONObject());if(coding.optBoolean("supported"))apps.put("market",true);JSONArray engines=coding.optJSONArray("engines");if(engines!=null)for(int i=0;i<engines.length();i++){JSONObject e=engines.getJSONObject(i);apps.put(e.getString("engine"),e.optBoolean("ready"));}}catch(AgentDenied unavailable){}
+    try{apps.put("assistant",manage("assistant.tasks",new JSONObject()) instanceof JSONArray);}catch(AgentDenied unavailable){}
+    if(!apps.optBoolean("market"))try{apps.put("market",manage("applications.list",new JSONObject()) instanceof JSONObject);}catch(AgentDenied unavailable){}
     events.emit("machine-apps",apps.toString());
   }
   private static boolean contains(JSONArray values,String value)throws JSONException{for(int i=0;i<values.length();i++)if(value.equals(values.getString(i)))return true;return false;}

@@ -52,10 +52,14 @@
   },
   "clipboard": "Connection parser smoke uses private test-process copy/read and raw fill. OS Ctrl+V is not covered by that test.",
   "localInstallation": {
-    "status": "pending-minimized-window-activation-failed",
+    "status": "pending-user-active-browser-session",
     "criticalBackupFiles": 5,
     "profiles": 9,
     "groups": 7,
-    "noForcedTermination": true
+    "noForcedTermination": true,
+    "installerExitCode": 1223,
+    "unchangedCriticalFiles": 5,
+    "observedAsarSha256": "8fe1f4100b1cf8312a60fbf084c96c103c236ec2972a1dbe26ad79e3c45458e0",
+    "reason": "Pro is running an active SSH browser authentication flow; application was not closed to interrupt the user."
   }
 }

@@ -29,6 +29,7 @@ export class ClientVault {
     private directory: string,
     private codec: SecretCodec,
   ) {}
+  get storageDirectory() { return this.directory; }
   async read<T>(name: string, schema: z.ZodType<T>): Promise<T | undefined> {
     try {
       return schema.parse(

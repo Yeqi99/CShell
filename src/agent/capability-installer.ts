@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile, realpath } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile, realpath, open } from 'node:fs/promises';
 import { dirname, join, relative, isAbsolute } from 'node:path';
 import { z } from 'zod';
 import { updateRequest } from './update-request';
@@ -32,6 +32,28 @@ export async function stageCapabilityBundle(root:string,entry:CapabilityCatalogE
   }else{
     const url=new URL(entry.url??'');
     if(url.protocol!=='https:'||url.hostname!=='github.com'||url.username||url.password||url.search||url.hash||!/^\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/releases\/download\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(url.pathname))throw new Error('Expected trusted GitHub release asset');
+    // Administrators can pre-stage an immutable release where GitHub is unreachable.
+    // The same manifest, bundle and per-file verification runs for both transports.
+    const cache = join(root,'downloads',entry.bundleSha256+'.bundle');
+    if (!/^[0-9a-f]{64}$/.test(entry.bundleSha256)) throw new Error('Invalid package digest');
+    const handle = await open(cache,'r').catch(error=>{
+      if(error.code==='ENOENT')return undefined;
+      throw error;
+    });
+    if(handle){
+      try{
+        const info=await handle.stat();
+        if(!info.isFile()||info.size!==entry.bundleBytes)throw new Error('Cached package size mismatch');
+        bytes=Buffer.allocUnsafe(entry.bundleBytes);
+        let offset=0;
+        while(offset<bytes.length){
+          signal.throwIfAborted();
+          const {bytesRead}=await handle.read(bytes,offset,Math.min(1048576,bytes.length-offset),offset);
+          if(!bytesRead)throw new Error('Incomplete cached package');
+          offset+=bytesRead;
+        }
+      }finally{await handle.close();}
+    }else{
     // GitHub's signed asset redirect is explicitly constrained; credentials are never forwarded.
     const response=await openCapabilityDownload(entry,download,signal);
     if(!response.ok||!response.body)throw new Error(`Package download failed: ${response.status}`);
@@ -40,6 +62,7 @@ export async function stageCapabilityBundle(root:string,entry:CapabilityCatalogE
     const cancel=()=>{void reader.cancel(signal.reason).catch(()=>{});};signal.addEventListener('abort',cancel,{once:true});
     try{while(true){signal.throwIfAborted();const {done,value}=await reader.read();signal.throwIfAborted();if(done)break;size+=value.byteLength;if(size>entry.bundleBytes)throw new Error('Package download exceeds declared size');chunks.push(value);}bytes=Buffer.concat(chunks);}
     catch(error){await reader.cancel().catch(()=>{});throw error;}finally{signal.removeEventListener('abort',cancel);reader.releaseLock();}
+    }
   }
   if(bytes.byteLength!==entry.bundleBytes||capabilityDigest(bytes)!==entry.bundleSha256)throw new Error('Package bundle digest or size mismatch');
   const bundle=bundleSchema.parse(JSON.parse(bytes.toString('utf8'))),manifest=parseCapabilityManifest(bundle.manifest,entry.manifestSha256);

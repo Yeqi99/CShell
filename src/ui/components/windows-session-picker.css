@@ -1,0 +1,5 @@
+.windows-session-picker { position: relative; z-index: 2; flex: none; padding: .3rem .65rem; background: var(--panel); color: var(--text); }
+.windows-session-picker summary { display: inline-flex; align-items:center; gap:.38rem; cursor:pointer; font-size:.85em; }
+.windows-session-picker > div { display:flex; align-items:flex-end; flex-wrap:wrap; gap:.5rem; margin:.5rem 0; }
+.windows-session-picker label { display:grid; gap:.3rem; min-width:0; max-width:100%; }
+.windows-session-picker select { max-width:100%; }

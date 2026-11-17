@@ -1,113 +1,29 @@
+import {useState} from 'react';
+import {FilePenLine} from 'lucide-react';
+import {useI18n} from '../i18n';
 import {ErrorNotice} from './ErrorNotice';
-import { useEffect, useState } from 'react';
-import { Plus, Trash2, Pencil, Check, X } from 'lucide-react';
-import type { AccountHabit } from '../../shared/account-memory';
+
 export function AccountMemory() {
-  const [items, setItems] = useState<AccountHabit[]>([]),
-    [draft, setDraft] = useState(''),
-    [editing, setEditing] = useState<string>(),
-    [error, setError] = useState(''),
-    [busy, setBusy] = useState(false);
-  useEffect(() => {
-    let alive = true;
-    const read = () =>
-      window.cshell
-        .cloudMemory()
-        .then((v) => {
-          if (alive) setItems(v);
-        })
-        .catch(() => {});
-    void read();
-    const timer = setInterval(read, 5000);
-    return () => {
-      alive = false;
-      clearInterval(timer);
-    };
-  }, []);
-  const save = async () => {
+  const cn = useI18n().locale === 'zh-CN';
+  const [busy,setBusy] = useState(false);
+  const [error,setError] = useState('');
+  async function open() {
     setBusy(true);
     setError('');
     try {
-      setItems(await window.cshell.cloudRemember({ id: editing, text: draft }));
-      setDraft('');
-      setEditing(undefined);
-    } catch (e) {
-      setError('未能保存，请稍后重试。');
+      await window.cshell.cloudOpenMemoryFile();
+    } catch (cause) {
+      setError(String(cause));
     } finally {
       setBusy(false);
     }
-  };
-  return (
-    <section className="account-section account-memory">
-      <h2>
-        用户习惯记忆 <span>{items.length}</span>
-      </h2>
-      <p className="memory-caption">你和智能体共同维护的长期偏好，随账号同步。</p>
-      {items.map((item) => (
-        <div className="memory-item" key={item.id}>
-          <p>{item.text}</p>
-          <button
-            aria-label="编辑记忆"
-            title="编辑记忆"
-            onClick={() => {
-              setEditing(item.id);
-              setDraft(item.text);
-            }}
-          >
-            <Pencil size={14} />
-          </button>
-          <button
-            aria-label="删除记忆"
-            title="删除记忆"
-            disabled={busy}
-            onClick={async () => {
-              setBusy(true);
-              try {
-                setItems(await window.cshell.cloudForget(item.id));
-              } catch {
-                setError('未能删除，请稍后重试。');
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            <Trash2 size={14} />
-          </button>
-        </div>
-      ))}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          void save();
-        }}
-      >
-        <textarea
-          aria-label="习惯内容"
-          placeholder="例如：默认使用中文，代码示例优先使用 TypeScript"
-          maxLength={2000}
-          required
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-        />
-        <div>
-          <button disabled={busy || !draft.trim()} type="submit">
-            {editing ? <Check size={14} /> : <Plus size={14} />} {editing ? '保存修改' : '添加记忆'}
-          </button>
-          {editing && (
-            <button
-              type="button"
-              onClick={() => {
-                setEditing(undefined);
-                setDraft('');
-              }}
-            >
-              <X size={14} />
-              取消
-            </button>
-          )}
-        </div>
-      </form>
-      {error && <ErrorNotice title="操作未完成" error={error}/>}
-    </section>
-  );
+  }
+  return <section className="account-section account-memory">
+    <h2>{cn?'用户记忆':'Personal memory'}</h2>
+    <p>{cn?'智能体将你的长期偏好记在这个 Markdown 文件中。你可以直接编辑，保存后随账号同步。':'Your agent keeps long-term preferences in this Markdown file. You can edit it directly. Saved changes sync with your account.'}</p>
+    <button type="button" disabled={busy} onClick={()=>void open()}>
+      <FilePenLine size={16}/> {cn?'编辑 MEMORY.md':'Edit MEMORY.md'}
+    </button>
+    {error && <ErrorNotice title={cn?'无法打开记忆文件':'Unable to open memory file'} error={error}/>}
+  </section>;
 }

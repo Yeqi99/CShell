@@ -17,6 +17,11 @@ export const activitySchema = z
     provider: z.string().max(80),
     resource: z.string().max(128).optional(),
     duration: z.number().nonnegative().optional(),
+    tokens: z.object({
+      input: z.number().int().nonnegative().optional(),
+      output: z.number().int().nonnegative().optional(),
+      total: z.number().int().nonnegative(),
+    }).optional(),
     bytes: z.number().nonnegative().optional(),
   })
   .strict();

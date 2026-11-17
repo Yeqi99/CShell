@@ -5,6 +5,8 @@ import { homedir } from 'node:os';
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { SecretCodec } from '../core/store';
+import { nativeVaultKey } from './native-vault';
+declare const __CAGENT_NATIVE_VAULT__: boolean;
 
 const exec = promisify(execFile);
 export function agentDirectory() {
@@ -115,6 +117,7 @@ export async function privateDirectory(directory: string) {
   await protectPath(directory, true);
 }
 async function dpapi(input: Buffer, decrypt: boolean): Promise<Buffer> {
+  if (typeof __CAGENT_NATIVE_VAULT__ !== 'undefined' && __CAGENT_NATIVE_VAULT__) return nativeVaultKey(input, decrypt);
   const script = `Add-Type -AssemblyName System.Security; $b=[Convert]::FromBase64String([Console]::In.ReadToEnd()); $r=[Security.Cryptography.ProtectedData]::${decrypt ? 'Unprotect' : 'Protect'}($b,$null,[Security.Cryptography.DataProtectionScope]::CurrentUser); [Console]::Write([Convert]::ToBase64String($r))`;
   return new Promise((resolve, reject) => {
     const child = spawn(

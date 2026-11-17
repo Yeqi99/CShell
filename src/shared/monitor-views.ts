@@ -47,6 +47,7 @@ export interface MonitorViewsBridge {
   viewDisplays(): Promise<ViewDisplay[]>;
   openMonitorView(id: string): Promise<void>;
   openCurrentView(sources: CurrentViewSource[], mode: 'tile' | 'focus' | 'overview'): Promise<void>;
+  openMonitorViewIds(): Promise<string[]>;
   closeMonitorView(id: string): Promise<void>;
   monitorViewInit(): Promise<{ view: MonitorView; displayId: string; borrowed?: Record<string, BorrowedViewTerminal>; profiles?: import('./contracts').Profile[] }>;
 }

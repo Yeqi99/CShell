@@ -268,6 +268,8 @@ test('three active children limit and parent stop also cancel pending child appr
   try {
     await f.ai.mode(f.thread.id, 'restricted');
     await f.ai.send(f.thread.id, 'coordinate');
+    await until(() => allocated === 4 && f.ai.snapshot().threads.filter(t => t.pending).length === 3);
+    await f.ai.stopAndSave(f.thread.id);
     await f.idle();
     await until(() =>
       f.ai.snapshot().threads.every((t) => !['running', 'approval'].includes(t.state)),
@@ -400,4 +402,184 @@ test('goal memory update persists without replay and failed persistence rolls ba
  await assert.rejects(update.invoke({memory:'must roll back'},new AbortController().signal),/disk unavailable/);
  assert.equal(t.goal.memory,'verified observation');
  work.dispose();
+});
+
+test('enumerating tools and saving a turn do not rebuild catalogs per tool or broadcast idle history', async () => {
+  const f = await setup(() => ({ content: 'done' }));
+  try {
+    const idle = await f.ai.create('terminal', f.thread.providerId, 'allow', f.sessionId);
+    const notified = new Set<string>();
+    let catalogs = 0;
+    f.ai.eventTools = () => { catalogs++; return []; };
+    f.ai.onThreadUpdate = t => { notified.add(t.id); };
+    await f.ai.send(f.thread.id, 'respond without tools');
+    await f.idle();
+    await f.ai.flush();
+    assert.equal(catalogs, 1);
+    assert.ok(notified.has(f.thread.id));
+    assert.ok(!notified.has(idle.id));
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test('a child follow-up cannot return a previous turn as its result', async () => {
+  const { AiWork } = await import('../src/core/ai-work');
+  const parent = { id: randomUUID() } as any;
+  const child = { id: randomUUID(), parentId: parent.id, state: 'running', messages: [
+    { role: 'assistant', content: 'previous result' }, { role: 'user', content: 'follow up' },
+  ] } as any;
+  let busy = true;
+  const work = new AiWork({ threads: () => [parent, child], busy: () => busy, allowed: () => true,
+    checkTarget() {}, pin() {}, child: async () => child, async send() {}, stop() {}, async save() {} });
+  const tool = work.tools(parent).find(t => t.name === 'wait_agent')!;
+  const signal = new AbortController().signal;
+  const waiting = tool.invoke({ id: child.id }, signal);
+  busy = false;
+  child.state = 'idle';
+  work.childSettled(child.id);
+  const result = JSON.parse(String(await waiting));
+  assert.equal(result.outcome, 'finished');
+  assert.equal(result.result, undefined);
+  child.messages.push({ role: 'assistant', content: 'current result' });
+  assert.equal(JSON.parse(String(await tool.invoke({ id: child.id }, signal))).result, 'current result');
+});
+
+test('separate progress notices across tool steps do not stop a multi-step task', async () => {
+  const steps = [{ content: '我先检查配置。' }, call('list_agents', {}), { content: '接下来我核查结果。' }, call('list_agents', {}), { content: '已核查。' }];
+  const f = await setup(() => steps.shift());
+  try {
+    await f.ai.send(f.thread.id, '检查配置并验证');
+    await f.idle();
+    const t = f.ai.snapshot().threads.find(t => t.id === f.thread.id)!;
+    assert.equal(t.state, 'idle');
+    assert.equal(t.messages.at(-1)?.content, '已核查。');
+  } finally { await f.cleanup(); }
+});
+
+test('concurrent thread creation during a slow history write persists every new thread', async () => {
+  const f = await setup(() => ({ content: 'ok' }));
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const encrypt = f.store.encryptPrivate.bind(f.store);
+  let writes = 0;
+  try {
+    await f.ai.flush();
+    f.store.encryptPrivate = async data => {
+      if (++writes === 1) await gate;
+      return encrypt(data);
+    };
+    const create = () => f.ai.create('terminal', f.thread.providerId, 'allow', f.sessionId);
+    const first = create();
+    await until(() => writes === 1);
+    const rest = Array.from({ length: 6 }, create);
+    release();
+    const threads = await Promise.all([first, ...rest]);
+    const disk = JSON.parse(await f.store.decryptPrivate(await readFile(join(f.directory, 'ai.enc'), 'utf8')));
+    assert.ok(threads.every(thread => disk.threads.some((saved: any) => saved.id === thread.id)));
+    assert.equal(writes, 2);
+  } finally { release(); await f.cleanup(); }
+});
+
+test('parent waits for a delegated check even when the model prematurely declares completion', async () => {
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  let premature = false;
+  const f = await setup(async req => {
+    const task = req.messages.find((m: any) => m.role === 'user')?.content;
+    const last = req.messages.at(-1);
+    if (task === 'verify game') { await gate; return { content: 'verified game' }; }
+    if (last.role === 'user') return call('spawn_agent', { task: 'verify game' });
+    if (last.role === 'system') return call('list_agents', {});
+    if (last.content.includes('verified game')) return { content: 'tested and verified' };
+    premature = true;
+    return { content: 'premature completion' };
+  });
+  try {
+    await f.ai.send(f.thread.id, 'deploy');
+    await until(() => premature);
+    await new Promise(resolve => setTimeout(resolve, 50));
+    assert.equal(f.ai.snapshot().threads.find(t => t.id === f.thread.id)?.state, 'running');
+    release();
+    await f.idle();
+    const parent = f.ai.snapshot().threads.find(t => t.id === f.thread.id)!;
+    assert.equal(parent.messages.at(-1)?.content, 'tested and verified');
+    assert.ok(!parent.messages.some(m => m.content === 'premature completion'));
+  } finally { release(); await f.cleanup(); }
+});
+test('steering replaces a stale model command before dispatch and preserves the same thread', async () => {
+  let release!: () => void;
+  const barrier = new Promise<void>(resolve => {release = resolve;});
+  const f = await setup(async request => {
+    if (request.messages.some((m: any) => m.content === 'inspect only')) return {content: 'updated'};
+    await barrier;
+    return call('execute_command', {command: 'stale side effect'});
+  });
+  try {
+    await f.ai.send(f.thread.id, 'initial');
+    await until(() => f.requests.length === 1);
+    await f.ai.steer(f.thread.id, 'inspect only');
+    release();
+    await f.idle();
+    assert.equal(f.executions(), 0);
+    assert.equal(f.requests.length, 2);
+    const messages = f.ai.snapshot().threads.find(thread => thread.id === f.thread.id)!.messages;
+    assert.deepEqual(messages.map(m => m.content), ['initial','inspect only','updated']);
+    await assert.rejects(f.ai.steer(f.thread.id, 'late'), /不接受补充/);
+  } finally { release(); await f.cleanup(); }
+});
+
+test('steering can cancel a pending approval without granting it', async () => {
+  const f = await setup(request => request.messages.some((m: any) => m.content === 'change plan')
+    ? {content:'done'} : call('execute_command', {command:'pending'}));
+  try {
+    await f.ai.mode(f.thread.id, 'review');
+    await f.ai.send(f.thread.id, 'start');
+    await until(() => !!f.ai.snapshot().threads[0].pending);
+    await f.ai.steer(f.thread.id, 'change plan');
+    await f.idle();
+    assert.equal(f.executions(), 0);
+    assert.equal(f.requests.length, 2);
+    assert.equal(f.ai.snapshot().threads[0].messages.at(-1)?.content,'done');
+  } finally { await f.cleanup(); }
+});
+
+test('editing an earlier question runs a separate branch with only its preceding context', async () => {
+  const f=await setup(()=>({content:'answer'}));
+  try {
+    await f.ai.send(f.thread.id,'first prompt'); await f.idle();
+    await f.ai.send(f.thread.id,'obsolete question'); await f.idle();
+    const original=structuredClone(f.ai.snapshot().threads[0].messages);
+    const index=original.findIndex(m=>m.content==='obsolete question');
+    await assert.rejects(f.ai.reask(f.thread.id,index,0,'incorrect reference'));
+    const fork=await f.ai.reask(f.thread.id,index,original[index].time,'replacement');
+    await until(()=>f.ai.snapshot().threads.find(t=>t.id===fork)?.state==='idle');
+    const req=JSON.stringify(f.requests.at(-1).messages);
+    assert.match(req,/first prompt/); assert.match(req,/replacement/); assert.doesNotMatch(req,/obsolete question/);
+    assert.deepEqual(f.ai.snapshot().threads.find(t=>t.id===f.thread.id)!.messages,original);
+    assert.equal(f.executions(),0);
+  } finally {await f.cleanup();}
+});
+
+test('a second-level child only receives tools it can use at that depth', async () => {
+  let leafChecked = false;
+  const f = await setup(req => {
+    const task = req.messages.find((m: any) => m.role === 'user')?.content;
+    if (task === 'leaf') {
+      assert.ok(!req.tools.some((t: any) => t.function.name === 'spawn_agent'));
+      leafChecked = true;
+      return { content: 'done' };
+    }
+    const last = req.messages.at(-1);
+    if (last.role !== 'tool') return call('spawn_agent', { task: task === 'branch' ? 'leaf' : 'branch' });
+    const child = JSON.parse(last.content);
+    return child.result ? { content: 'done' } : call('wait_agent', { id: child.id });
+  });
+  try {
+    await f.ai.send(f.thread.id, 'root');
+    await f.idle();
+    assert.ok(leafChecked);
+  } finally {
+    await f.cleanup();
+  }
 });

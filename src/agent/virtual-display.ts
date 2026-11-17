@@ -92,6 +92,13 @@ export class VirtualDisplayBackend {
     catch { return {elevated:false,consoleSession:false,topologyAvailable:false,executable:false,reason:'无法完成显示安装预检，请更新完整 CAgent 后重试'}; }
   }
   probe() { return this.invoke(['probe'], 15_000); }
+  async ensureHeadless(authorized:()=>boolean) {
+    const check=z.object({status:z.string()}).parse(await this.invoke(['headless-check'],15_000));
+    if(check.status!=='NO_DISPLAY')return check;
+    if(!this.plan().compatible)throw new Error('当前 Windows 版本不支持虚拟显示驱动');
+    if(!authorized())throw new Error('桌面控制权限已更改');
+    return this.mutate(['ensure-headless',this.packageDirectory]);
+  }
   status(id: string) { return this.invoke(['status', taskId.parse(id)], 15_000); }
   list() { return this.invoke(['list'], 15_000); }
   private async mutate(args: string[]) {

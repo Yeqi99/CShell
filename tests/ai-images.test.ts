@@ -94,7 +94,7 @@ test('screenshots remain encrypted, bypass text truncation, reach image protocol
         if (reject && JSON.stringify(b.messages).includes('image_url'))
           return new Response('unsupported image', { status: 400 });
         const message =
-          requestCapture && !b.messages.some((m: any) => Array.isArray(m.content))
+          requestCapture && !b.messages.some((m: any) => m.role === 'tool')
             ? {
                 tool_calls: [
                   {
@@ -182,9 +182,15 @@ test('screenshots remain encrypted, bypass text truncation, reach image protocol
     assert.equal(requests.length, 4);
     imageInput = false;
     const textOnly = await ai.create('workspace', provider.id, 'allow', sessionId);
-    await ai.send(textOnly.id, '列出能做的事');
-    await settled(textOnly.id);
-    assert.ok(!requests.at(-1).tools?.some((t: any) => t.function.name === 'browser_screenshot'));
+    requestCapture = true;
+    await ai.send(textOnly.id, '保存页面截图');
+    const result = await settled(textOnly.id);
+    assert.equal(result.state, 'idle');
+    assert.ok(result.messages.some(message => message.tool?.image));
+    const textRequest = requests.at(-1);
+    assert.ok(textRequest.tools.some((tool: any) => tool.function.name === 'browser_screenshot'));
+    assert.ok(textRequest.messages.some((message: any) => message.role === 'tool' && message.content.includes('imageId')));
+    assert.ok(!JSON.stringify(textRequest.messages).includes(image.dataBase64));
   } finally {
     ai.dispose();
     await ai.flush();

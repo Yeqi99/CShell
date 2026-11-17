@@ -15,6 +15,24 @@ function response(parts: string[]) {
 }
 const event = (delta: unknown, finish: unknown = null) =>
   'data: ' + JSON.stringify({ choices: [{ index: 0, delta, finish_reason: finish }] }) + '\r\n\r\n';
+test('token-sized reasoning events with over 2 MB of SSE envelopes preserve the completed tool call', async () => {
+  const fragments = 12000;
+  const packet = 'data: ' + JSON.stringify({
+    id: 'chat-completion-id', model: 'deepseek', object: 'chat.completion.chunk', created: 1,
+    choices: [{ index: 0, delta: { reasoning_content: '想' }, finish_reason: null }],
+    usage: null,
+  }) + '\n\n';
+  const tail = event({tool_calls: [{index:0,id:'only-call',type:'function',function:{name:'check',arguments:'{}'}}]}, 'tool_calls');
+  const stream = packet.repeat(fragments) + tail;
+  assert.ok(stream.length > 2_000_000);
+  const reply = await readAiResponse(new Response(stream, {headers:{'content-type':'text/event-stream'}}), () => {});
+  assert.equal(reply.reasoning_content?.length, fragments);
+  assert.deepEqual(reply.tool_calls?.map(call=>call.id), ['only-call']);
+});
+test('unterminated oversized SSE frame cannot materialize a tool call', async () => {
+  const response = new Response('data: ' + 'x'.repeat(2_000_001), {headers:{'content-type':'text/event-stream'}});
+  await assert.rejects(readAiResponse(response, () => {}), /单次输出过大/);
+});
 test('SSE emits partial Unicode text and assembles fragmented tool arguments', async () => {
   const partial: string[] = [];
   const result = await readAiResponse(
@@ -83,4 +101,19 @@ test('malformed provider JSON identifies its phase without leaking response payl
   await assert.rejects(readAiResponse(new Response('{"choices":[{"message":{"tool_calls":42}}]}'),()=>{}),/AI_RESPONSE_SCHEMA_INVALID/);
   const parsed=await readAiResponse(new Response('{"choices":[{"message":{"content":"OK","tool_calls":null}}]}'),()=>{});
   assert.equal(parsed.content,'OK');assert.equal(parsed.tool_calls,null);
+});
+
+test('records one cumulative usage sample even when delivered after finish_reason', async () => {
+  const encoder = new TextEncoder();
+  const chunks = [
+    'data: {"choices":[{"index":0,"delta":{"content":"ok"},"finish_reason":"stop"}]}\n\n',
+    'data: {"choices":[],"usage":{"prompt_tokens":5,"completion_tokens":3,"total_tokens":8}}\n\n',
+    'data: [DONE]\n\n',
+  ];
+  const response = new Response(new ReadableStream({
+    pull(controller) { const chunk = chunks.shift(); if(chunk) controller.enqueue(encoder.encode(chunk)); else controller.close(); },
+  }), { headers: { 'content-type': 'text/event-stream' } });
+  const samples: unknown[] = [];
+  await readAiResponse(response, () => {}, undefined, usage => samples.push(usage));
+  assert.deepEqual(samples, [{ input:5, output:3, total:8 }]);
 });

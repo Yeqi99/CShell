@@ -552,7 +552,9 @@ export async function openRelayTunnel(options: OpenRelayTunnelOptions): Promise<
     const result = z.object({ ok: z.boolean() }).parse(await reply);
     if (!result.ok) throw new Error('Relay unavailable or unauthorized');
     signal.removeEventListener('abort', cancel);
-    const close = () => socket.destroy(new Error('Relay connection cancelled'));
+    // After handoff the tunnel may already wrap another TLS session. An abort
+    // closes the transport; consumers observe EOF/close on their own socket.
+    const close = () => socket.destroy();
     options.signal.addEventListener('abort', close, { once: true });
     socket.once('close', () => options.signal.removeEventListener('abort', close));
     if (options.signal.aborted) {
