@@ -35,7 +35,7 @@ while(round<=2&&seq<1000){
  if(before.remainingYuan<0.05){
   // Exercise the final reservation boundary with small genuine requests; do not
   // fabricate usage or reset while spendable quota remains.
-  const model=models.find((m:any)=>m.name.startsWith(before.remainingYuan<=0.0002?'mimo-v2.6-flash':before.remainingYuan<0.002?'deepseek-v4-flash':'kimi-k3.1-pro'))??models[0];
+  const model=models.find((m:any)=>m.name.startsWith(before.remainingYuan<=0.0002?'mimo-v2.6-flash':before.remainingYuan<0.005?'deepseek-v4-flash':'kimi-k3.1-pro'))??models[0];
   const item:any={round,before,model:model.name,started:new Date().toISOString()};
   try{const answer=await requestAiReply(base+'/v1/models/chat/completions',{method:'POST',headers,body:JSON.stringify({model:model.id,stream:true,max_tokens:before.remainingYuan<=0.0002?4096:before.remainingYuan<0.002?16:256,messages:[{role:'user',content:'计算 137 + 286，只返回答案。'}]})},AbortSignal.timeout(180000),()=>{},undefined,fetch,usage=>{item.usage=usage;});item.answer=answer.content;item.correct=answer.content?.trim()==='423';}catch(e){item.error=String(e);}
   await new Promise(r=>setTimeout(r,/429/.test(item.error??'')?30000:2000));item.after=await quota();(report.tailChecks??=[]).push(item);await save();console.log(JSON.stringify({tail:true,round,remaining:item.after.remainingYuan,error:item.error}));
@@ -56,7 +56,7 @@ while(round<=2&&seq<1000){
   throw Error('Unknown test tool');
  }},async(url,init,signal,onContent,limits,transport)=>{
   const started=Date.now(),call:any={started:new Date().toISOString(),updates:0};record.calls.push(call);
-  const capture:typeof fetch=async(u,i)=>{const response=await (transport??fetch)(u,i);const copy=response.clone();void copy.text().then(raw=>writeFile(root+'/'+id+'-call-'+record.calls.length+'.sse',raw)).catch(()=>{});return response;};
+  const capture:typeof fetch=async(u,i)=>{const response=await (transport??fetch)(u,i);const copy=response.clone(),index=record.calls.length;void copy.text().then(async raw=>{if(response.status===429){try{call.rejection=JSON.parse(raw).error;}catch{}}await writeFile(root+'/'+id+'-call-'+index+'.sse',raw);}).catch(()=>{});return response;};
   try{return await requestAiReply(url,init,signal,text=>{call.updates++;call.firstTextMs??=Date.now()-started;onContent(text);},limits,capture,usage=>{call.usage=usage;});}
   catch(e){call.error=String(e);throw e;}finally{call.elapsedMs=Date.now()-started;}
  });
@@ -70,7 +70,7 @@ while(round<=2&&seq<1000){
  }catch(e){record.error=String(e);record.pass=false;}finally{await assistant.close();}
  record.after=await quota();record.quotaDeltaYuan=Number((before.remainingYuan-record.after.remainingYuan).toFixed(6));record.finished=new Date().toISOString();report.tasks.push(record);report.round=round;await save();
  console.log(JSON.stringify({id,round,model:model.name,pass:record.pass,calls:record.calls.length,remaining:record.after.remainingYuan,error:record.error}));
- if(/HTTP 429/.test(record.error??'')){record.category='account-concurrency';await save();await new Promise(r=>setTimeout(r,30000));continue;}
+ if(/HTTP 429/.test(record.error??'')){const reason=String(record.calls.at(-1)?.rejection??'');record.category=reason.includes('额度')?'quota-limit':reason.includes('正在处理')?'account-concurrency':'rate-limit';await save();await new Promise(r=>setTimeout(r,30000));continue;}
  if(/长度上限/.test(record.error??''))await new Promise(r=>setTimeout(r,30000));
  failures=record.pass?0:failures+1;
  if(failures>=models.length*2){report.state='blocked-after-two-catalog-cycles';break;}
