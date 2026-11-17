@@ -1,5 +1,5 @@
 import {createRequire} from 'node:module';
-import {mkdir,writeFile,readFile} from 'node:fs/promises';
+import {mkdir,writeFile,readFile,rename} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
 import {CagentAssistant} from '../src/agent/assistant';
 import {ClientVault} from '../src/core/client/identity';
@@ -12,7 +12,7 @@ const output='test-results/member-quota-stress.json',root='.local/member-quota-s
 await mkdir(root,{recursive:true});await mkdir('test-results',{recursive:true});
 async function api(path:string,body?:unknown){const r=await fetch(base+path,{headers,method:body?'POST':'GET',body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(30000)});if(!r.ok)throw Error('Account API '+r.status);return r.json();}
 const report:any=await readFile(output,'utf8').then(JSON.parse).catch(()=>({started:new Date().toISOString(),account:session.email,authorizedPoints:2000,refills:[],tasks:[],state:'running'}));
-const save=()=>writeFile(output,JSON.stringify(report,null,2));
+const save=async()=>{await writeFile(output+'.tmp',JSON.stringify(report,null,2));await rename(output+'.tmp',output);};
 const quota=async()=>(await api('/v1/account/traffic/v2')).modelWeek;
 async function refill(q:any){const request=randomUUID();await api('/v1/account/model-refill',{request,quote:q.quote});report.refills.push({request,price:q.price,before:q,after:await quota()});await save();}
 if(!report.refills.length){report.before=await quota();if(report.before.balance<1176)throw Error('Need the authorized test credit before two fresh cycles');await refill(report.before);}
@@ -20,10 +20,27 @@ const models=(await api('/v1/models')).models.filter((m:any)=>m.id.startsWith('p
 const adapter=knowledgeAdapter(root+'/knowledge');
 const codec={encrypt:async(s:string)=>Buffer.from(s).toString('base64'),decrypt:async(s:string)=>Buffer.from(s,'base64').toString()};
 // The isolated vault contains only synthetic tasks. Credentials stay in memory.
-let round=report.round??1,seq=report.tasks.length,failures=0;
+let round=Math.min(2,report.refills.length||1),seq=report.tasks.length,failures=0;
 while(round<=2&&seq<1000){
  const before=await quota();
- if(before.remainingYuan<=0){report['round'+round]={completed:true,quota:before};if(round===2)break;await refill(before);round++;continue;}
+ if(before.remainingYuan<=0&&!before.quote){await new Promise(r=>setTimeout(r,2000));continue;}
+ if(before.remainingYuan<=0){
+  const rejected=await fetch(base+'/v1/models/chat/completions',{method:'POST',headers,body:JSON.stringify({model:models[0].id,stream:true,max_tokens:1,messages:[{role:'user',content:'额度边界检查'}]}),signal:AbortSignal.timeout(30000)});
+  const detail=await rejected.json();const after=await quota();
+  const boundary={status:rejected.status,error:detail.error,unchanged:after.remainingYuan===before.remainingYuan&&after.balance===before.balance};
+  report['round'+round]={completed:true,quota:before,boundary};await save();
+  if(rejected.status!==429||!boundary.unchanged){report.state='quota-boundary-failed';break;}
+  if(round===2)break;await refill(before);round++;continue;
+ }
+ if(before.remainingYuan<0.05){
+  // Exercise the final reservation boundary with small genuine requests; do not
+  // fabricate usage or reset while spendable quota remains.
+  const model=models.find((m:any)=>m.name.startsWith(before.remainingYuan<=0.0002?'mimo-v2.6-flash':before.remainingYuan<0.002?'deepseek-v4-flash':'kimi-k3.1-pro'))??models[0];
+  const item:any={round,before,model:model.name,started:new Date().toISOString()};
+  try{const answer=await requestAiReply(base+'/v1/models/chat/completions',{method:'POST',headers,body:JSON.stringify({model:model.id,stream:true,max_tokens:before.remainingYuan<=0.0002?4096:before.remainingYuan<0.002?16:256,messages:[{role:'user',content:'计算 137 + 286，只返回答案。'}]})},AbortSignal.timeout(180000),()=>{},undefined,fetch,usage=>{item.usage=usage;});item.answer=answer.content;item.correct=answer.content?.trim()==='423';}catch(e){item.error=String(e);}
+  await new Promise(r=>setTimeout(r,/429/.test(item.error??'')?30000:2000));item.after=await quota();(report.tailChecks??=[]).push(item);await save();console.log(JSON.stringify({tail:true,round,remaining:item.after.remainingYuan,error:item.error}));
+  if(report.tailChecks.filter((x:any)=>x.round===round).length>=100){report.state='quota-boundary-needs-review';break;}continue;
+ }
  const model=models[seq%models.length],id='stress-'+(++seq),rows:any[]=[],expected:Record<string,number>={};
  // Deterministic but varied ledger reconciliation: duplicate IDs and signed refunds.
  for(let n=0;n<(before.remainingYuan<0.05?12:120);n++){const account='customer-'+(n%7),cents=((n*137+seq*53)%997)+1,amount=n%9===0?-cents:cents;const row={id:id+'-'+n,account,cents:amount};rows.push(row);if(n%11===0)rows.push({...row});expected[account]=(expected[account]??0)+amount;}
