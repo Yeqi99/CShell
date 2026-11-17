@@ -12,6 +12,7 @@ const output='test-results/member-quota-stress.json',root='.local/member-quota-s
 await mkdir(root,{recursive:true});await mkdir('test-results',{recursive:true});
 async function api(path:string,body?:unknown){const r=await fetch(base+path,{headers,method:body?'POST':'GET',body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(30000)});if(!r.ok)throw Error('Account API '+r.status);return r.json();}
 const report:any=await readFile(output,'utf8').then(JSON.parse).catch(()=>({started:new Date().toISOString(),account:session.email,authorizedPoints:2000,refills:[],tasks:[],state:'running'}));
+if(report.state==='completed'){console.log('Two quota cycles already completed; no model requests or quota resets sent.');process.exit(0);}
 const save=async()=>{await writeFile(output+'.tmp',JSON.stringify(report,null,2));await rename(output+'.tmp',output);};
 const quota=async()=>(await api('/v1/account/traffic/v2')).modelWeek;
 async function refill(q:any){const request=randomUUID();await api('/v1/account/model-refill',{request,quote:q.quote});report.refills.push({request,price:q.price,before:q,after:await quota()});await save();}
