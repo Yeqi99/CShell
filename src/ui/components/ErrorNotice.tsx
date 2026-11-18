@@ -6,9 +6,9 @@ import './error-notice.css';
 import {FeedbackPanel} from './FeedbackPanel';
 const reported = new Map<string,number>();
 
-export function ErrorNotice({ error, title, retry, busy = false, conversation = false }: {
+export function ErrorNotice({ error, title, retry, busy = false, conversation = false, operation }: {
   error: string; title: string; retry?: () => void; busy?: boolean;
-  conversation?: boolean;
+  operation?: string; conversation?: boolean;
 }) {
   const details = cleanDisplayError(error);
   const cleaned = details === 'CAgent 请求失败：请检查远端权限和服务状态' ? 'CAgent 未返回具体失败原因，请重试。' : details;
@@ -37,17 +37,19 @@ export function ErrorNotice({ error, title, retry, busy = false, conversation = 
     reported.set(key,now);if(reported.size>128)reported.delete(reported.keys().next().value!);
     window.cshell?.reportError?.({message:key});
   },[details,title]);
+  // Only fixed operation labels may leave the client in an automatic report.
+  const feedbackOperation = operation ?? (modelError || conversation ? '智能体回复' : undefined);
   if (!error) return null;
   if (conversation) return <div className="agent-notice-line">
     <span role="status">{title}</span>
     {retry && <button type="button" disabled={busy} onClick={retry}>继续任务</button>}
-    <details><summary>详情</summary><div className="agent-notice-detail"><pre>{details}</pre><CopyButton content={details} /></div></details><FeedbackPanel key={error} error={error}/>
+    <details><summary>详情</summary><div className="agent-notice-detail"><pre>{details}</pre><CopyButton content={details} /></div></details><FeedbackPanel key={error+title} error={error} operation={feedbackOperation}/>
   </div>;
   return <section className={`error-notice${notice ? ' error-notice-warning' : ''}`} role={notice ? 'status' : 'alert'}>
     <AlertCircle size={18} aria-hidden="true" />
     <div className="error-notice-body"><strong>{membership ? '会员功能' : permission ? '需要操作权限' : title}</strong><p>{message}</p>
       <details><summary>诊断详情</summary><div className="error-notice-details"><pre>{details}</pre><CopyButton content={details} /></div></details>
-      {window.cshell?.submitFeedback && <FeedbackPanel key={error} error={error}/>}
+      {window.cshell?.submitFeedback && <FeedbackPanel key={error+title} error={error} operation={feedbackOperation}/>}
     </div>
     {retry && <button disabled={busy} onClick={retry}><RotateCw size={14} />重试</button>}
   </section>;

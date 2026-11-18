@@ -45,13 +45,14 @@ export function FilePanel({
   disableEnvironment?: boolean;
 }) {
   const { t, locale } = useI18n();
+  const [failedDirectory,setFailedDirectory]=useState<string>();
   const [permissionPath,setPermissionPath]=useState<string>();
   const [editors, setEditors] = useState<string[]>([]);
   const [activeEditor, setActiveEditor] = useState('');
   const [closingEditor, setClosingEditor] = useState('');
   const openText = (file: string) => {
     if (!editors.includes(file) && editors.length >= 6) {
-      setError('最多同时打开 6 个文本文件，请先关闭不需要的编辑页。');return;
+      setFailedDirectory(undefined);setError('最多同时打开 6 个文本文件，请先关闭不需要的编辑页。');return;
     }
     setEditors(current => current.includes(file) ? current : [...current, file]);
     setActiveEditor(file);
@@ -78,13 +79,15 @@ export function FilePanel({
   }, [menu]);
   const sequence = useRef(0);
   const selectionAnchor = useRef<string | null>(null);
-  const reportError = (e: unknown) =>
+  const reportError = (e: unknown, directory?:string) => {
+    setFailedDirectory(directory);
     setError(
       (e instanceof Error ? e.message : String(e)).replace(
         /^Error invoking remote method '[^']+': Error: /,
         '',
       ),
     );
+  };
   const load = useCallback(
     async (next: string) => {
       if (closed) return;
@@ -105,7 +108,7 @@ export function FilePanel({
         if (request === sequence.current) {
           setEntries([]);
           setSelected([]);
-          reportError(e);
+          reportError(e,next);
         }
       } finally {
         if (request === sequence.current) setBusy(false);
@@ -324,7 +327,7 @@ export function FilePanel({
         </button>
       </div>
       {error && (
-        <ErrorNotice title="文件操作未完成" error={error} retry={()=>void load(draft)}/>
+        <ErrorNotice title="文件操作未完成" error={error} operation={failedDirectory!==undefined?'读取文件目录':undefined} retry={failedDirectory!==undefined&&!closed?()=>void load(failedDirectory):undefined}/>
       )}
       <div className="file-heading">
         <span>{t('fileName')}</span>

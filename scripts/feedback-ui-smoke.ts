@@ -44,7 +44,7 @@ try{
  assert.equal(await description.inputValue(),'');
  await page.getByRole('button',{name:'AI 总结并反馈'}).click();
  await page.waitForFunction(()=>(window as any).submissions.length===3);
- assert.equal(await page.evaluate(()=>(window as any).submissions[2].message),'模型请求返回 HTTP 503。');
+ assert.equal(await page.evaluate(()=>(window as any).submissions[2].message),'智能体回复 · 模型请求返回 HTTP 503。');
  const text='这是连续输出的中文内容。🙂 '.repeat(40);
  await page.evaluate(text=>(window as any).append(text),text);
  await page.waitForTimeout(50);const partial=await page.locator('#stream').innerText();assert.ok(partial.length>0&&partial.length<text.length,'buffer reveals part of a burst');assert.ok(!/[\uD800-\uDBFF]$/.test(partial));

@@ -107,3 +107,8 @@
 #rewards label:has(input[type=checkbox]) {display:flex; align-items:center; height:38px}
 #rewards form button {grid-column:1/-1; justify-self:start; padding:8px 16px}
 #rewards [hidden], #rewards p:empty {display:none}
+
+.reward-tabs {display:flex; flex-wrap:wrap; gap:6px}
+.reward-tabs [aria-pressed=true] {background:var(--soft); color:var(--blue); border-color:var(--blue)}
+#rewards [data-preview] {grid-column:1/-1; color:var(--muted); font-size:14px}
+#reward-panel-4 > .card {padding:clamp(16px,2vw,28px);overflow-x:auto}

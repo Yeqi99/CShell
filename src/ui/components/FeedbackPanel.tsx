@@ -2,7 +2,7 @@ import {useId,useState} from 'react';
 import {version} from '../../../package.json';
 import {feedbackDiagnostic,redactFeedback} from '../../shared/feedback';
 import './feedback-panel.css';
-export function FeedbackPanel({error='',english=false}:{error?:string;english?:boolean}){
+export function FeedbackPanel({error='',english=false,operation}:{error?:string;english?:boolean;operation?:string}){
  const fieldId=useId();
  const [message,setMessage]=useState(''),[contact,setContact]=useState(''),[include,setInclude]=useState(false),[busy,setBusy]=useState(false),[status,setStatus]=useState(''),[id,setId]=useState(()=>crypto.randomUUID());
  const diagnostic=feedbackDiagnostic(error),cleanMessage=redactFeedback(message.trim()),cleanContact=redactFeedback(contact.trim()),t=(zh:string,en:string)=>english?en:zh;
@@ -26,14 +26,14 @@ export function FeedbackPanel({error='',english=false}:{error?:string;english?:b
    let payload=report;
    if(!payload){
     const category=/timeout|超时/i.test(error)?'请求超时':/denied|权限/i.test(error)?'权限错误':/connect|连接/i.test(error)?'连接失败':'操作失败';
-    const context=[category,diagnostic].filter(Boolean).join(' · ');
+    const context=[operation,category,diagnostic,version,window.cshell.platform].filter(Boolean).join(' · ');
     let summary=context;
     setReportStatus(t('AI 正在总结…','Summarizing…'));
     try{
      const result=await window.cshell.aiText({kind:'compose',text:'用一句话反馈错误类别与错误代码，仅描述已知现象。',context});
      summary=redactFeedback(result.choices[0]?.trim()||context);
     }catch{/* Preserve classified diagnostics if the model is unavailable. */}
-    payload={id:crypto.randomUUID(),message:summary};
+    payload={id:crypto.randomUUID(),message:[operation,summary].filter(Boolean).join(' · ')};
     setReport(payload);
    }
    setReportStatus(t('正在提交…','Sending…'));

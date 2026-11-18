@@ -330,6 +330,7 @@ const bridge: Bridge = {
     ipcRenderer.invoke('file:action', id, action, path, destination),
   upload: (id, path, tokens) => ipcRenderer.invoke('upload', id, path, tokens),
   download: (id, paths) => ipcRenderer.invoke('download', id, paths),
+  retryTransfer: (sessionId, id) => ipcRenderer.invoke('transfer:retry', sessionId, id),
   cancelTransfer: (id) => ipcRenderer.invoke('transfer:cancel', id),
   chooseLocal: () => ipcRenderer.invoke('local:choose'),
   localList: (root, path) => ipcRenderer.invoke('local:list', root, path),

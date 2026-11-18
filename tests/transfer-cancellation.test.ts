@@ -137,3 +137,31 @@ test(
     }
   },
 );
+
+test('retry keeps the original SSH download and permits only its owning session', {timeout:5000}, async()=>{
+  const directoryPath=await mkdtemp(join(tmpdir(),'cshell-retry-'));
+  const failed=deferred<Transfer>(),finished=deferred<Transfer>();
+  let attempts=0;
+  const transfers=new Transfers({
+    get:(session:string)=>assert.equal(session,'first'),
+    sftp:async(session:string)=>{
+      assert.equal(session,'first');
+      if(++attempts===1)throw Error('ETIMEDOUT');
+      return {lstat:(path:string,callback:Function)=>{assert.equal(path,'/folder');callback(null,directory);},
+        readdir:(_path:string,callback:Function)=>callback(null,[])};
+    }
+  } as unknown as SshService,state=>{
+    if(state.retryable)failed.resolve(state);
+    if(state.state==='done')finished.resolve(state);
+  },async()=>false);
+  try{
+    const id=transfers.enqueue('first','download','/folder',directoryPath);
+    assert.equal((await failed.promise).failureStage,'打开文件通道');
+    assert.throws(()=>transfers.retry('other',id));
+    const next=transfers.retry('first',id);
+    assert.throws(()=>transfers.retry('first',id));
+    assert.equal((await finished.promise).id,next);
+    await access(join(directoryPath,'folder'));
+    assert.equal(attempts,2);
+  }finally{transfers.dispose();await rm(directoryPath,{recursive:true,force:true});}
+});

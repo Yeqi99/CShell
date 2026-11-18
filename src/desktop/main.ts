@@ -1175,6 +1175,7 @@ else
           else for (const path of paths) transfers.enqueue(id, 'download', path, result.filePaths[0]);
         }
       });
+      handle('transfer:retry', (sessionId, id) => transfers.retry(idSchema.parse(sessionId), idSchema.parse(id)));
       handle('transfer:cancel', (id) => transfers.cancel(idSchema.parse(id)));
       handle('monitor', (id) => ssh.monitor(idSchema.parse(id)));
       const resources = new ResourceInspection(ssh);

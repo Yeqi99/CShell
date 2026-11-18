@@ -1,3 +1,4 @@
+import {ErrorNotice} from './ErrorNotice';
 import {transferDetail} from '../../shared/transfer-progress';
 import { DockerPanel } from './DockerPanel';
 import { Box } from 'lucide-react';
@@ -111,6 +112,7 @@ export function ToolsPanel({
                       </button>
                     )}
                   </div>
+                  {item.failureStage && item.error && <ErrorNotice title="传输未完成" error={item.error} operation={item.failureStage ? `SSH 文件${item.direction==='upload'?'上传':'下载'} · ${item.failureStage}` : undefined} retry={item.retryable && window.cshell.retryTransfer ? ()=>void window.cshell.retryTransfer!(item.sessionId,item.id).catch(onError) : undefined}/>}
                   <progress
                     max={Math.max(item.total, 1)}
                     value={item.state === 'done' ? Math.max(item.total, 1) : item.totalKnown ? Math.min(item.done,item.total * .99) : undefined}

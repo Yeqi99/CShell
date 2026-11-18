@@ -18,6 +18,21 @@ export class Transfers {
     string,
     { state: Transfer; controller: AbortController; sessions: Set<string> }
   >();
+  private failed = new Map<string, {state: Transfer; restart: () => string}>();
+  private forgetFailure(id: string) {
+    const job = this.failed.get(id);
+    if (!job) return;
+    this.failed.delete(id);
+    job.state.retryable = false;
+    this.publish(job.state);
+  }
+  retry(sessionId: string, id: string) {
+    const job = this.failed.get(id);
+    if (!job || job.state.sessionId !== sessionId) throw new Error('原会话已结束或此任务已重试');
+    this.ssh.get(sessionId);
+    this.forgetFailure(id);
+    return job.restart();
+  }
   private meters = new Map<string, TransferMeter>();
   private publish(state: Transfer) { this.meters.get(state.id)?.update(state); this.emit({ ...state }); }
   private start(state: Transfer) { state.queued = false; this.meters.set(state.id, new TransferMeter()); this.publish(state); }
@@ -31,9 +46,11 @@ export class Transfers {
     this.jobs.get(id)?.controller.abort();
   }
   cancelSession(id: string) {
+    for (const job of this.failed.values()) if (job.state.sessionId === id) this.forgetFailure(job.state.id);
     for (const job of this.jobs.values()) if (job.sessions.has(id)) job.controller.abort();
   }
   dispose() {
+    this.failed.clear();
     for (const job of this.jobs.values()) job.controller.abort();
   }
   enqueueOperation(
@@ -169,10 +186,12 @@ export class Transfers {
     this.tail = this.tail
       .catch(() => {})
       .then(async () => {
+        let stage: Transfer['failureStage'] = '打开文件通道';
         try {
           controller.signal.throwIfAborted();
           this.start(state);
           const sftp = await this.ssh.sftp(sessionId);
+          stage = '传输文件';
           if (direction === 'upload')
             await this.upload(
               sftp,
@@ -195,6 +214,12 @@ export class Transfers {
         } catch (error) {
           state.state = controller.signal.aborted ? 'cancelled' : 'failed';
           state.error = (error as Error).message;
+          if (!controller.signal.aborted) {
+            state.failureStage = stage;
+            state.retryable = true;
+            this.failed.set(state.id, {state, restart: () => this.enqueue(sessionId, direction, source, destination)});
+            if (this.failed.size > 100) this.forgetFailure(this.failed.keys().next().value!);
+          }
         } finally {
           this.publish(state);
           this.jobs.delete(state.id);

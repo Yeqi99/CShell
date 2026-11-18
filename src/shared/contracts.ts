@@ -323,6 +323,8 @@ export interface Transfer {
   direction: 'upload' | 'download' | 'copy';
   done: number;
   total: number;
+  retryable?: boolean;
+  failureStage?: '打开文件通道' | '传输文件';
   totalKnown?: boolean;
   queued?: boolean;
   bytesPerSecond?: number;
@@ -461,6 +463,7 @@ export interface Bridge
   ): Promise<void>;
   upload(sessionId: string, path: string, dropTokens?: string[]): Promise<void>;
   download(sessionId: string, paths: string[]): Promise<void>;
+  retryTransfer?(sessionId: string, id: string): Promise<string>;
   cancelTransfer(id: string): Promise<void>;
   chooseLocal(): Promise<{ root: string; label: string } | null>;
   localList(root: string, path: string): Promise<{ path: string; entries: FileEntry[] }>;
