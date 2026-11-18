@@ -5,7 +5,7 @@ on:
       lane:
         required: true
         type: choice
-        options: [linux, agent, mac, android, core-android]
+        options: [linux, agent, mac, mac-arm, android, core-android]
 permissions:
   actions: read
   contents: write
@@ -27,6 +27,7 @@ jobs:
             linux) run=44326441443; sha=366447f798b543ff5088d9989ad303ccab9d1f85; pattern='^pro-linux-';;
             agent) run=44327326902; sha=e0018ba7862de9843d019cb59f00d15c237376a5; pattern='^pro-cagent-';;
             mac) run=44328999198; sha=f30772356481fe860df6ab056b0452f29cb398de; pattern='^pro-mac-';;
+            mac-arm) run=44332328143; sha=d296a237b7b3a9c5e94d949f5ed68299636b4598; pattern='^pro-mac-arm64$';;
             android) run=44328992293; sha=f30772356481fe860df6ab056b0452f29cb398de; pattern='^pro-android-candidate$';;
             core-android) run=44329028555; sha=91fac6bb735947cd8f412dc8009b1039a1e07ed4; pattern='^core-android-candidate$'; tag=v1.0.11; version=1.0.11;;
           esac
@@ -41,7 +42,7 @@ jobs:
             while IFS= read -r -d '' path; do
               name=$(basename "$path")
               case "$name" in
-                CShell-Pro-"$version"-linux-*.deb|CShell-Pro-"$version"-linux-*.AppImage|CShell-Pro-"$version"-mac-*.zip|CAgent-"$version"-*.tar.gz|CShell-Pro-"$version"-android.apk|CShell-"$version"-android.apk) ;;
+                CShell-Pro-"$version"-linux-*.deb|CShell-Pro-"$version"-linux-*.AppImage|CShell-Pro-"$version"-mac-*.zip|CShell-Pro-"$version"-mac-*.dmg|CAgent-"$version"-*.tar.gz|CShell-Pro-"$version"-android.apk|CShell-"$version"-android.apk) ;;
                 *) continue;;
               esac
               digest=sha256:$(sha256sum "$path" | cut -d' ' -f1)
