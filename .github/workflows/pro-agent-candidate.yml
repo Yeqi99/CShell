@@ -48,6 +48,6 @@ jobs:
         with:
           name: pro-cagent-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
-            release/0.8.18/CAgent-0.8.18-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz
-            release/0.8.18/CAgent-0.8.18-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz.sha256
+            release/*/CAgent-*-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz
+            release/*/CAgent-*-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz.sha256
           if-no-files-found: error
