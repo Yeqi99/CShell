@@ -3,6 +3,6 @@ module.exports = {...base, appId:'org.canpshell.pro', productName:'CShell Pro',
  extraMetadata:{name:'canpshell-pro',productName:'CShell Pro'},
  directories:{output:`release/pro-${version}`}, artifactName:'CShell-Pro-${version}-${os}-${arch}.${ext}',
  files:[...base.files,'assets/brand/cshell-pro.png'],
- win:{...base.win,extraResources:[...base.win.extraResources,{from:`release/${version}/CAgent-Setup-${version}-win-x64.exe`,to:'cagent/CAgent-Setup.exe'}],icon:'assets/brand/cshell-pro.ico'},
+ win:{...base.win,extraResources:[...base.win.extraResources,{from:`release/1.1.4/CAgent-Setup-1.1.4-win-x64.exe`,to:'cagent/CAgent-Setup.exe'}],icon:'assets/brand/cshell-pro.ico'},
  mac:{...base.mac,icon:'assets/brand/cshell-pro-512.png'},
  linux:{...base.linux,icon:'assets/brand/cshell-pro.png'}};

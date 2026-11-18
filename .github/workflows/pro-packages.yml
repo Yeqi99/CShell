@@ -4,6 +4,11 @@ on:
     tags: ['pro-v*']
     branches: ['codex/candidate-pro-0.8.18']
   workflow_dispatch:
+    inputs:
+      mac_zip:
+        description: Build the ad-hoc signed, unnotarized macOS ZIP distribution
+        type: boolean
+        default: false
 permissions:
   contents: write
 jobs:
@@ -38,7 +43,7 @@ jobs:
       - name: Verify hosting startup deadline and real worker cleanup
         run: pnpm exec tsx --test --test-concurrency=1 tests/hosting-startup-deadline.test.ts tests/agent-hosting.test.ts
       - run: pnpm exec vite build && node scripts/build.mjs
-      - if: matrix.platform == 'mac'
+      - if: matrix.platform == 'mac' && !inputs.mac_zip
         name: Sign, notarize and verify the Pro disk image
         shell: bash
         env:
@@ -48,15 +53,41 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: bash scripts/package-pro-mac.sh "${{ matrix.arch }}"
+      - if: matrix.platform == 'mac' && inputs.mac_zip
+        name: Build and verify ad-hoc macOS ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(node -p 'require("./package.json").version')
+          arch="${{ matrix.arch }}"
+          pnpm exec electron-builder --config electron-builder.pro.cjs --mac dir "--$arch" --publish never
+          root="release/pro-$version"
+          app=$(find "$root" -maxdepth 2 -name 'CShell Pro.app' -print -quit)
+          test -n "$app"
+          actual=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$app/Contents/Info.plist")
+          test "$actual" = "$version"
+          target="$arch"
+          if [ "$target" = x64 ]; then target=x86_64; fi
+          lipo "$app/Contents/MacOS/CShell Pro" -verify_arch "$target"
+          codesign --force --deep --sign - "$app"
+          codesign --verify --deep --strict "$app"
+          ditto -c -k --keepParent "$app" "$root/CShell-Pro-$version-mac-$arch.zip"
+          unzip -tq "$root/CShell-Pro-$version-mac-$arch.zip"
+          stage=$(mktemp -d)
+          ditto "$app" "$stage/CShell Pro.app"
+          dmg="$root/CShell-Pro-$version-mac-$arch.dmg"
+          hdiutil create -quiet -format UDZO -srcfolder "$stage" -volname 'CShell Pro' "$dmg"
+          hdiutil verify "$dmg"
       - if: matrix.platform != 'mac'
         run: pnpm exec electron-builder --config electron-builder.pro.cjs --${{ matrix.platform }} --${{ matrix.arch }} --publish never
-      - if: matrix.platform == 'mac'
+      - if: matrix.platform == 'mac' && !inputs.mac_zip
         name: Verify in-place DMG update
         run: pnpm exec tsx scripts/mac-update-smoke.ts
       - uses: actions/upload-artifact@v4
         with:
           name: pro-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
+            release/pro-*/*.zip
             release/pro-*/*.dmg
             release/pro-*/*.AppImage
             release/pro-*/*.deb
