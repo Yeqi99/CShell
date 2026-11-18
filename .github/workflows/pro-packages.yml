@@ -68,7 +68,7 @@ jobs:
           test "$actual" = "$version"
           target="$arch"
           if [ "$target" = x64 ]; then target=x86_64; fi
-          lipo -verify_arch "$target" "$app/Contents/MacOS/CShell Pro"
+          lipo "$app/Contents/MacOS/CShell Pro" -verify_arch "$target"
           codesign --force --deep --sign - "$app"
           codesign --verify --deep --strict "$app"
           ditto -c -k --keepParent "$app" "$root/CShell-Pro-$version-mac-$arch.zip"
