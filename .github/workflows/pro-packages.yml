@@ -1,30 +1,15 @@
-name: Pro desktop packages
-on:
-  push:
-    tags: ['pro-v*']
-    branches: ['codex/candidate-pro-0.8.18']
-  workflow_dispatch:
-    inputs:
-      mac_zip:
-        description: Build the ad-hoc signed, unnotarized macOS ZIP distribution
-        type: boolean
-        default: false
+name: Verify macOS update disk images
+on: workflow_dispatch
 permissions:
+  actions: read
   contents: write
 jobs:
-  package:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - {os: macos-latest, platform: mac, arch: arm64}
-          - {os: macos-15-intel, platform: mac, arch: x64}
-          - {os: ubuntu-24.04, platform: linux, arch: x64}
-          - {os: ubuntu-24.04-arm, platform: linux, arch: arm64}
-    runs-on: ${{ matrix.os }}
+  dmg:
+    runs-on: macos-15-intel
+    timeout-minutes: 55
     env:
+      GH_TOKEN: ${{ github.token }}
       CSHELL_EDITION: pro
-      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -33,71 +18,49 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24.19.0
-          cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: node scripts/prepare-pty.mjs
-      - run: pnpm exec tsc --noEmit
-      - run: pnpm exec tsx --test tests/cloud-merge.test.ts tests/cloud-sync.test.ts tests/agent-relay.test.ts tests/updates.test.ts tests/portable-update.test.ts tests/posix-agent-update.test.ts
-      - name: Verify preference persistence, classroom merges and extension cleanup
-        run: pnpm exec tsx --test --test-concurrency=1 tests/cagent-update-settings.test.ts tests/managed-environment-save.test.ts tests/classroom-proxy.test.ts tests/process-extension-close.test.ts tests/process-extensions.test.ts
-      - name: Verify hosting startup deadline and real worker cleanup
-        run: pnpm exec tsx --test --test-concurrency=1 tests/hosting-startup-deadline.test.ts tests/agent-hosting.test.ts
-      - run: pnpm exec vite build && node scripts/build.mjs
-      - if: matrix.platform == 'mac' && !inputs.mac_zip
-        name: Sign, notarize and verify the Pro disk image
-        shell: bash
-        env:
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: bash scripts/package-pro-mac.sh "${{ matrix.arch }}"
-      - if: matrix.platform == 'mac' && inputs.mac_zip
-        name: Build and verify ad-hoc macOS ZIP
+      - name: Package verified ZIP applications for the installed update client
         shell: bash
         run: |
           set -euo pipefail
-          version=$(node -p 'require("./package.json").version')
-          arch="${{ matrix.arch }}"
-          pnpm exec electron-builder --config electron-builder.pro.cjs --mac dir "--$arch" --publish never
-          root="release/pro-$version"
-          app=$(find "$root" -maxdepth 2 -name 'CShell Pro.app' -print -quit)
-          test -n "$app"
-          actual=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$app/Contents/Info.plist")
-          test "$actual" = "$version"
-          target="$arch"
-          if [ "$target" = x64 ]; then target=x86_64; fi
-          lipo "$app/Contents/MacOS/CShell Pro" -verify_arch "$target"
-          codesign --force --deep --sign - "$app"
-          codesign --verify --deep --strict "$app"
-          ditto -c -k --keepParent "$app" "$root/CShell-Pro-$version-mac-$arch.zip"
-          unzip -tq "$root/CShell-Pro-$version-mac-$arch.zip"
-      - if: matrix.platform != 'mac'
-        run: pnpm exec electron-builder --config electron-builder.pro.cjs --${{ matrix.platform }} --${{ matrix.arch }} --publish never
-      - if: matrix.platform == 'mac' && !inputs.mac_zip
-        name: Verify in-place DMG update
-        run: pnpm exec tsx scripts/mac-update-smoke.ts
-      - uses: actions/upload-artifact@v4
-        with:
-          name: pro-${{ matrix.platform }}-${{ matrix.arch }}
-          path: |
-            release/pro-*/*.zip
-            release/pro-*/*.dmg
-            release/pro-*/*.AppImage
-            release/pro-*/*.deb
-          if-no-files-found: error
-      - name: Upload verified build artifacts to the existing prerelease
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/pro-v')
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
-          files=(release/pro-*/*.dmg release/pro-*/*.AppImage release/pro-*/*.deb)
-          test ${#files[@]} -gt 0
-          for file in "${files[@]}"; do
-            if command -v sha256sum >/dev/null; then sha256sum "$file" > "$file.sha256"; else shasum -a 256 "$file" > "$file.sha256"; fi
+          repo="$GITHUB_REPOSITORY"
+          tag=cshell-pro-v1.1.4
+          out=release/pro-1.1.4
+          mkdir -p "$out"
+          test "$(gh api repos/$repo/actions/runs/44328999198 --jq .head_sha)" = f30772356481fe860df6ab056b0452f29cb398de
+          for arch in x64 arm64; do
+            name="CShell-Pro-1.1.4-mac-$arch.zip"
+            for i in {1..75}; do
+              meta=$(gh api repos/$repo/actions/runs/44328999198/artifacts | jq -r --arg n "pro-mac-$arch" '.artifacts[]|select(.name==$n and .expired==false)|[.id,.digest]|@tsv')
+              [ -n "$meta" ] && break
+              sleep 30
+            done
+            test -n "$meta"
+            read -r id digest <<< "$meta"
+            gh api repos/$repo/actions/artifacts/$id/zip > "$arch-artifact.zip"
+            echo "${digest#sha256:}  $arch-artifact.zip" | shasum -a 256 -c -
+            unzip -q "$arch-artifact.zip" -d "$arch"
+            zip=$(find "$arch" -name "$name" -type f)
+            test -f "$zip"
+            dir="$out/mac-$arch"; if [ "$arch" = x64 ]; then dir="$out/mac"; fi
+            mkdir -p "$dir"
+            ditto -x -k "$zip" "$dir"
+            app="$dir/CShell Pro.app"
+            codesign --verify --deep --strict "$app"
+            cpu="$arch"; if [ "$arch" = x64 ]; then cpu=x86_64; fi
+            lipo "$app/Contents/MacOS/CShell Pro" -verify_arch "$cpu"
+            dmg="$out/CShell-Pro-1.1.4-mac-$arch.dmg"
+            hdiutil create -quiet -format UDZO -srcfolder "$dir" -volname 'CShell Pro' "$dmg"
+            hdiutil verify "$dmg"
+            mount=$(mktemp -d); hdiutil attach -nobrowse -readonly -mountpoint "$mount" "$dmg"
+            test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$mount/CShell Pro.app/Contents/Info.plist")" = 1.1.4
+            codesign --verify --deep --strict "$mount/CShell Pro.app"
+            hdiutil detach "$mount"; rmdir "$mount"
+            if [ "$arch" = x64 ]; then pnpm exec tsx scripts/mac-update-smoke.ts; fi
+            for file in "$zip" "$dmg"; do
+              fname=$(basename "$file"); digest=sha256:$(shasum -a 256 "$file" | cut -d' ' -f1)
+              old=$(gh release view "$tag" --json assets|jq -r --arg n "$fname" '.assets[]|select(.name==$n)|.digest')
+              if [ -z "$old" ]; then gh release upload "$tag" "$file"; fi
+              test "$(gh release view "$tag" --json assets|jq -r --arg n "$fname" '.assets[]|select(.name==$n)|.digest')" = "$digest"
+            done
           done
-          gh release upload "$GITHUB_REF_NAME" "${files[@]}" release/pro-*/*.sha256
