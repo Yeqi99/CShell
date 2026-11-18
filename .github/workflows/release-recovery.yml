@@ -1,85 +1,39 @@
-name: Verify and publish uploaded draft
-on:
-  workflow_dispatch:
-    inputs:
-      run_id:
-        description: Completed Release workflow containing verified packages
-        required: true
-        type: string
-      source_sha:
-        description: Exact source commit of those packages
-        required: true
-        type: string
+name: Promote verified Pro desktop artifacts
+on: workflow_dispatch
 permissions:
-  contents: write
   actions: read
+  contents: write
 jobs:
-  recover:
+  promote:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.source_sha }}
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.25.0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24.19.0
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Require all original platform gates
-        env:
-          GH_TOKEN: ${{ github.token }}
-          SOURCE_RUN: ${{ inputs.run_id }}
-          SOURCE_SHA: ${{ inputs.source_sha }}
+      - name: Verify workflow source and upload to draft by release ID
+        shell: bash
         run: |
-          node --input-type=module <<'JS'
-          import assert from 'node:assert/strict';
-          const runId = process.env.SOURCE_RUN;
-          const sha = process.env.SOURCE_SHA;
-          assert.match(runId, /^\d+$/);
-          assert.match(sha, /^[a-f0-9]{40}$/);
-          const get = async (path) => {
-            const r = await fetch(`https://api.github.com/repos/${process.env.GITHUB_REPOSITORY}/${path}`, {
-              headers: {Authorization: `Bearer ${process.env.GH_TOKEN}`, 'User-Agent':'CShell-release-recovery'},
-              signal: AbortSignal.timeout(30000),
-            });
-            assert.equal(r.status, 200);
-            return r.json();
-          };
-          const run = await get(`actions/runs/${runId}`);
-          assert.equal(run.path, '.github/workflows/release.yml');
-          assert.equal(run.status, 'completed');
-          assert.equal(run.head_sha, sha);
-          const {jobs} = await get(`actions/runs/${runId}/jobs?per_page=100`);
-          for (const name of ['android', 'android-native (29)', 'android-native (35)',
-            'desktop (windows-latest, win, x64)', 'desktop (macos-latest, mac, arm64)',
-            'desktop (macos-15-intel, mac, x64)', 'desktop (ubuntu-latest, linux, x64)',
-            'desktop (ubuntu-24.04-arm, linux, arm64)']) {
-            assert.equal(jobs.filter(j => j.name === name && j.conclusion === 'success').length, 1, name);
-          }
-          console.log(`All original platform gates passed for ${sha}`);
-          JS
-      - uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-          pattern: desktop-*
-          merge-multiple: false
-          run-id: ${{ inputs.run_id }}
-          github-token: ${{ github.token }}
-      - name: Verify original packages and uploaded draft
-        env:
-          GH_TOKEN: ${{ github.token }}
-          CSHELL_RELEASE_SHA: ${{ inputs.source_sha }}
-        run: |
-          pnpm exec tsx scripts/release-assets.ts artifacts packages
-          node scripts/verify-release-upload.mjs packages
-      - name: Publish verified draft
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          VERSION="v$(node -p 'require("./package.json").version')"
-          ID="$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq ".[] | select(.tag_name == \"$VERSION\" and .draft == true) | .id")"
-          test -n "$ID"
-          gh api --method PATCH "repos/$GITHUB_REPOSITORY/releases/$ID" -F draft=false
+          set -euo pipefail
+          run=44369813086
+          test "$(gh api repos/$GH_REPO/actions/runs/$run --jq .head_sha)" = 918efebcef4aa1d0fffb77e985fc6356fe483568
+          test "$(gh api repos/$GH_REPO/actions/runs/$run --jq .conclusion)" = success
+          r=450391232
+          test "$(gh api repos/$GH_REPO/releases/$r --jq .draft)" = true
+          for lane in pro-mac-{arm64,x64} pro-linux-{arm64,x64}; do
+            read -r id digest < <(gh api repos/$GH_REPO/actions/runs/$run/artifacts | jq -r --arg n "$lane" '.artifacts[]|select(.name==$n and .expired==false)|[.id,.digest]|@tsv')
+            gh api repos/$GH_REPO/actions/artifacts/$id/zip > "$lane.zip"
+            echo "${digest#sha256:}  $lane.zip" | sha256sum -c -
+            unzip -q "$lane.zip" -d "$lane"
+            mapfile -t files < <(find "$lane" -type f -name 'CShell-Pro-1.1.5-*')
+            test "${#files[@]}" = 2
+            for file in "${files[@]}"; do
+              n=$(basename "$file")
+              case "$n" in *.zip|*.dmg|*.deb|*.AppImage) ;; *) exit 1;; esac
+              want=sha256:$(sha256sum "$file"|cut -d' ' -f1)
+              old=$(gh api repos/$GH_REPO/releases/$r | jq -r --arg n "$n" '.assets[]|select(.name==$n)|.digest')
+              if [ -z "$old" ]; then
+                old=$(curl --fail-with-body -sS -H "Authorization: Bearer $GH_TOKEN" -H 'Content-Type: application/octet-stream' --data-binary "@$file" "https://uploads.github.com/repos/$GH_REPO/releases/$r/assets?name=$n" | jq -r .digest)
+              fi
+              test "$old" = "$want"
+            done
+          done
