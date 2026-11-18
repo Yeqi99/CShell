@@ -146,8 +146,8 @@ final class CloudSync {
         StringBuilder json=new StringBuilder();
         try(BufferedReader reader=new BufferedReader(new InputStreamReader(c.getInputStream(),StandardCharsets.UTF_8))){String line;while((line=reader.readLine())!=null){json.append(line);if(json.length()>1000000)throw new IOException("回复超过上限");}}
         answer.append(new JSONObject(json.toString()).getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content"));complete=true;
-      }else
-      try(BufferedReader reader=new BufferedReader(new InputStreamReader(c.getInputStream(),StandardCharsets.UTF_8))){
+      }else{
+        try(BufferedReader reader=new BufferedReader(new InputStreamReader(c.getInputStream(),StandardCharsets.UTF_8))){
         String line;while((line=reader.readLine())!=null){if(!line.startsWith("data:"))continue;String data=line.substring(5).trim();if(data.equals("[DONE]")){complete=true;break;}
           JSONObject chunk=new JSONObject(data);if(chunk.has("error"))throw new IOException("模型响应中断");
           JSONArray choices=chunk.optJSONArray("choices");if(choices==null||choices.length()==0)continue;
@@ -156,6 +156,7 @@ final class CloudSync {
           if(answer.length()>200000)throw new IOException("单条回复超过上限");
           if(System.currentTimeMillis()-last>=100){partial.accept(answer.toString());last=System.currentTimeMillis();}
         }}
+      }
       if(!complete||answer.length()==0)throw new IOException("模型响应未完成");
       messages.put(new JSONObject().put("role","assistant").put("text",answer.toString()));
       JSONArray history=state.optJSONArray("phoneChats");if(history==null)history=new JSONArray();
