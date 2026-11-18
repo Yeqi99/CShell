@@ -28,10 +28,19 @@ jobs:
           gradle-version: '8.13'
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec tsc --noEmit -p android/web/tsconfig.json
-      - name: Build pinned TCP VPN engine
+      - name: Restore verified native VPN libraries from the previous signed APK
         run: |
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;27.3.13750724"
-          ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.3.13750724" node scripts/prepare-android-vpn.mjs
+          set -euo pipefail
+          curl -fsSL --retry 3 'https://shell.canp.ai/downloads/opensource/v1.0.10/CShell-1.0.10-android.apk' -o "$RUNNER_TEMP/previous.apk"
+          echo '63ac0c6976f22b3183050693f171a59b223b84042b743f7d62b53e63a2c94e40  PLACEHOLDER' | sed "s|PLACEHOLDER|$RUNNER_TEMP/previous.apk|" | sha256sum -c -
+          for abi in armeabi-v7a arm64-v8a x86 x86_64; do
+            target="android/app/src/main/jniLibs/$abi"
+            mkdir -p "$target"
+            unzip -p "$RUNNER_TEMP/previous.apk" "lib/$abi/libhev-socks5-tunnel.so" > "$target/libhev-socks5-tunnel.so"
+            readelf -h "$target/libhev-socks5-tunnel.so" >/dev/null
+          done
+          mkdir -p android/app/src/main/assets
+          unzip -p "$RUNNER_TEMP/previous.apk" assets/VPN_THIRD_PARTY_NOTICES.txt > android/app/src/main/assets/VPN_THIRD_PARTY_NOTICES.txt
       - run: node scripts/build-android.mjs
       - name: Restore persistent signing key
         env:
