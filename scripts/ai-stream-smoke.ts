@@ -62,6 +62,11 @@ try {
   finish!();
   await panel.getByText('正在逐字回复，已完成。', { exact: true }).waitFor();
   await panel.getByRole('button', { name: '停止 AI' }).waitFor({ state: 'hidden' });
+  const log=panel.locator('.agent-messages');
+  await log.locator('.agent-message-body').evaluate(el=>{const late=document.createElement('div');late.style.height='1800px';el.append(late);});
+  await page.waitForFunction(()=>{const el=document.querySelector('.agent-messages')!;return el.scrollHeight-el.clientHeight-el.scrollTop < 3;});
+  await log.evaluate(el=>{el.scrollTop=0;});
+  await panel.getByRole('button',{name:'回到最新消息'}).waitFor();
   await panel.getByLabel('发送给智能体').fill('测试停止');
   await panel.getByRole('button', {name:'发送',exact:true}).click();
   await panel.getByText('正在逐字回复', { exact: true }).waitFor();
@@ -70,10 +75,42 @@ try {
   assert.notEqual((await page.evaluate(()=>window.cshell.aiSnapshot())).threads[0].state, 'running');
   finish!();
   assert.equal(calls, 2);
+  assert(await log.evaluate(el=>el.scrollHeight-el.clientHeight-el.scrollTop<60));
+  await panel.getByRole('button',{name:'继续任务',exact:true}).click();
+  await panel.getByRole('button',{name:'停止 AI'}).waitFor();
+  await page.waitForFunction(()=>document.querySelector('.agent-running')!==null);
+  await untilRequest();
+  finish!();
+  await panel.getByRole('button',{name:'停止 AI'}).waitFor({state:'hidden'});
+  async function untilRequest(){for(let i=0;i<100 && calls<3;i++)await new Promise(r=>setTimeout(r,20));assert.equal(calls,3);}
+  const alternate = {...provider,id:crypto.randomUUID(),name:'Second fixture',model:'second'};
+  await page.evaluate(p=>window.cshell.aiProviderSave(p,'fixture-only'),alternate);
+  await panel.getByRole('button',{name:'新建 AI 会话'}).click();
+  await panel.getByRole('button',{name:'AI 基座与模型'}).click();
+  await page.getByRole('button',{name:/Second fixture/}).click();
+  await panel.getByLabel('发送给智能体').fill('并行任务 A');
+  await panel.getByRole('button',{name:'发送',exact:true}).click();
+  await panel.getByText('正在逐字回复',{exact:true}).waitFor();
+  const finishA = finish!;
+  await panel.getByRole('button',{name:'新建 AI 会话'}).click();
+  assert.match(await panel.getByRole('button',{name:'AI 基座与模型'}).innerText(),/Second fixture/);
+  await panel.getByLabel('发送给智能体').fill('并行任务 B');
+  await panel.getByRole('button',{name:'发送',exact:true}).click();
+  await panel.getByText('正在逐字回复',{exact:true}).waitFor();
+  await panel.getByRole('button',{name:'会话记录',exact:true}).click();
+  await panel.locator('.agent-history-state[data-state="running"]').nth(1).waitFor();
+  const tasks = (await page.evaluate(()=>window.cshell.aiSnapshot())).threads.filter(t=>t.state==='running');
+  assert.equal(tasks.length,2);
+  assert(tasks.every(t=>t.providerId===alternate.id));
+  await panel.getByRole('button',{name:/并行任务 B.*正在执行/}).click();
+  await panel.getByRole('button',{name:'停止 AI'}).click();
+  await panel.getByRole('button',{name:'停止 AI'}).waitFor({state:'hidden'});
+  assert.equal((await page.evaluate(()=>window.cshell.aiSnapshot())).threads.find(t=>t.title==='并行任务 A')?.state,'running');
+  finishA();
   await page.evaluate((id) => window.cshell.aiProviderDelete(id), provider.id);
   assert.equal((await page.evaluate(()=>window.cshell.aiSnapshot())).providers.some(p=>p.id===provider.id),false);
   console.log(
-    'PASS: partial reply visible before stream closes; thinking hidden; stop settles task; provider removal verified',
+    'PASS: partial reply visible before stream closes; thinking hidden; resume verified; two parallel streams visible in history; selected model retained; stopping one leaves the other running',
   );
 } catch(error) {
  await mkdir('test-results',{recursive:true});

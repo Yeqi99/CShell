@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { ConnectionTool } from './connections/contracts';
 import type { ConnectionRegistry } from './connections/registry';
@@ -8,8 +9,26 @@ export function applicationTools(
   store: Store,
   connections: ConnectionRegistry,
   connect?: (profileId: string, signal: AbortSignal) => Promise<string>,
+  profileSaved?: () => void,
 ): readonly ConnectionTool[] {
   return [
+    {
+      name: 'create_ssh_connection',
+      capability: 'connections.manage',
+      description: 'Save an SSH connection for the host, port and username the user specified. Returns the profileId for connect_machine. Credentials and host identity confirmation are handled by CShell. Never request a password or private key in chat.',
+      input: z.object({host:z.string().trim().min(1).max(255),port:z.number().int().min(1).max(65535).default(22),username:z.string().trim().min(1).max(255),name:z.string().trim().min(1).max(100).optional()}).strict(),
+      needsReview: () => false,
+      invoke: async (input,signal) => {
+        signal.throwIfAborted();
+        const {host,port,username,name}=input as {host:string;port:number;username:string;name?:string};
+        const existing=store.snapshot().profiles.find(p=>(p.protocol??'ssh')==='ssh' && p.host===host && p.port===port && p.username===username && !p.jumpProfileId);
+        if(existing)return JSON.stringify({profileId:existing.id,created:false,host,port,username});
+        const id=randomUUID();
+        await store.saveProfile({id,protocol:'ssh',name:name??host,host,port,username,group:'',auth:'password',favorite:false});
+        profileSaved?.();
+        return JSON.stringify({profileId:id,created:true,host,port,username});
+      }
+    },
     ...(connect
       ? [
           {

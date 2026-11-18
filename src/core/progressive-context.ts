@@ -50,16 +50,21 @@ export class ProgressiveContext {
     if(last?.role==='user' && typeof last.content==='string' && !standalone.test(last.content.trim())){
       const routes: [string,RegExp][]=[
         ['WeChat',/微信|wechat|朋友圈/i], ['Android',/安卓|android/i], ['browser',/浏览器|网页|browser/i],
-        ['machines',/主机|服务器|机器|内存|磁盘|终端|docker|cpu|ssh/i], ['files',/文件|目录|file|folder/i],
+        ['machines',/主机|服务器|机器|内存|磁盘|终端|创建连接|新建连接|创建链接|连接到|docker|cpu|ssh/i], ['files',/文件|目录|file|folder/i],
         ['HTTP and sites',/域名|https?|dns|网站部署/i], ['settings and accounts',/授权|权限|permission|账号|基座/i],
+        ['knowledge',/知识库|经验|上次|以前|之前|排查|故障|如何修复|长期记忆|knowledge|previously|troubleshoot|runbook/i],
         ['tasks and memory',/定时|子智能体|后台任务|记忆|automation/i],
       ];
-      const request=last.content.toLowerCase();
+      let request=last.content.toLowerCase();
+      if (/^(继续(?:任务)?|再试(?:一)?下|重试|continue|retry)[。！.!\s]*$/i.test(request.trim())) {
+        const prior=messages.slice(0,-1).reverse().find(m=>m.role==='user' && typeof m.content==='string' && !/^(继续(?:任务)?|再试(?:一)?下|重试|continue|retry)[。！.!\s]*$/i.test(m.content.trim()));
+        if(prior)request=prior.content.toLowerCase();
+      }
       for(const tool of catalog){
         const detail=descriptions.get(tool);
         if(detail && request.includes(detail.category.toLowerCase()))this.selected.add(detail.category);
       }
-      for(const [label,regex] of routes)if(labels.includes(label)&&regex.test(last.content))this.selected.add(label);
+      for(const [label,regex] of routes)if(labels.includes(label)&&regex.test(request))this.selected.add(label);
     }
     const hasLog=messages.slice(-3).some(m=>m.role==='tool' && typeof m.content==='string' && m.content.includes('task_log_read'));
     const selected=catalog.filter(tool=>this.selected.has(groupOf(tool)) || (hasLog && tool.function.name==='task_log_read'));
@@ -129,7 +134,7 @@ export class ProgressiveContext {
     }
     this.feedback=changed?'':'Choose a listed category or use an already supplied tool. Available categories: '+this.labels.join(', ')+'.';
     this.redundantLoads=changed?0:this.redundantLoads+1;
-    if(this.redundantLoads>2)throw Error('模型反复请求无效或已加载的工具类别，未执行操作。');
+    if(this.redundantLoads>=2)this.restore();
     return true;
   }
 }

@@ -217,7 +217,7 @@ export class AgentTerminalProvider implements ManagedProvider {
         : request.shell === 'cmd'
           ? ['/d', '/s', '/c', request.command]
           : request.shell === 'powershell'
-            ? ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', request.command]
+            ? ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', '[Console]::OutputEncoding=[Text.UTF8Encoding]::new();\n' + request.command]
             : ['-lc', request.command];
     const environment=await this.processEnvironment(shell.environment==='host'?this.networkEnvironment?.():undefined);
     if(combined.aborted)throw new Error(signal.aborted?'操作已取消':'命令执行超时');

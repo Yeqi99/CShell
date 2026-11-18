@@ -2,7 +2,7 @@ import {createHash} from 'node:crypto';
 import {mkdir,readFile,writeFile,stat,readdir,rm} from 'node:fs/promises';
 import {join,resolve,sep} from 'node:path';
 import type {CloudEnvelope,CloudRevision} from '../shared/cloud-sync';
-const CHUNK=1024*1024,MAX=256*1024*1024;
+const CHUNK=1024*1024,MAX=320*1024*1024;
 const hash=(value:string)=>createHash('sha256').update(value).digest('hex');
 type Request=(body?:unknown)=>Promise<any>;
 /** Wire buffers are <=1MiB. Ciphertext download parts are resumable on disk. */

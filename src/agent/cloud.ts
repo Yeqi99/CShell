@@ -250,7 +250,7 @@ export class CagentCloud {
       this.paused=true;
       try {
         await this.pending;
-        const result=await this.sync.acceptDeviceLogin(q.session,q.key);
+        const result=await this.sync.acceptDeviceLogin(q.session,q.key,false);
         this.lastEnroll=0;
         return result;
       } finally {this.paused=false;void this.tick();}

@@ -273,11 +273,22 @@ export async function registerCloudHandlers(
     if(cmd.action==='list')for(const m of catalog.machines??[]){if(m.state==='ready'&&m.deviceId&&!client.list().some(d=>d.deviceId===m.deviceId))await pair(m.id);}
     return {...catalog,...(cmd.action==='change'&&cmd.quote?{quote}:{})};
   });
+  handle('cloud:membership-market',async(email)=>{
+    if(cloud.status().email!==email)throw Error('账号已切换');
+    return cloud.accountRequest('/v1/account/plan-offers');
+  });
+  handle('cloud:buy-plan',async(email,input)=>{
+    if(cloud.status().email!==email)throw Error('账号已切换');
+    const offer=z.object({plan:z.string().min(1).max(60),price:z.number().int().positive(),days:z.number().int().positive(),request:z.string().uuid()}).parse(input);
+    return cloud.accountRequest('/v1/account/plan-offers',offer);
+  });
   handle('cloud:pro-purchase',(email,requestId)=>cloud.purchasePro(z.string().email().parse(email),z.string().uuid().parse(requestId)));
-  handle('cloud:invite-poster',async()=>{
+  handle('cloud:invite-poster',async(email)=>{
+    if(cloud.status().email!==email)throw Error('账号已切换，请重新打开账号页');
     const result=await cloud.accountRequest('/v1/account/rewards');
     const invite=z.string().regex(/^[a-f0-9]{24}$/).parse(result.invite);
-    await (await import('electron')).shell.openExternal('https://shell.canp.ai/rewards/#invite='+invite+'&preview=1');
+    if(cloud.status().email!==email)throw Error('账号已切换，请重新打开账号页');
+    return invite;
   });
   handle('cloud:redeem-gift',(email,code)=>{
     if(cloud.status().email!==email)throw Error('账号已切换，请重新打开账号页');
@@ -314,7 +325,7 @@ export async function registerCloudHandlers(
   const accountService=spendingTool((input,signal)=>cloud.accountRequest('/v1/account/agent-services',input,signal));
   const domainTools=[...createMemberDomainTools({accountId:()=>cloud.accountId(),domains:(input,signal)=>cloud.domains(input,signal)}),accountTrafficTool({accountId:()=>cloud.accountId(),traffic:()=>cloud.traffic()})];
   const previousExtensionTools=ai.extensionTools;
-  ai.extensionTools=()=>[...(previousExtensionTools?.()??[]),...domainTools,accountService];
+  ai.extensionTools=thread=>[...(previousExtensionTools?.(thread)??[]),...domainTools,accountService];
   handle('cloud:lending',async(input:any)=>{
     const action=z.enum(['list','create','redeem','revoke']).parse(input?.action);
     const result=await cloud.accountRequest(action==='list'?'/v1/lending':'/v1/lending/'+action,action==='list'?undefined:input.body);

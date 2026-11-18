@@ -88,9 +88,10 @@ export function AiPermissionTree({
             })
           }
         >{tr("全选")}</button>
-        <button type="button" disabled={busy} onClick={() => edit(emptyAiPolicy())}>{tr("全取消")}</button>
+        <button type="button" disabled={busy} onClick={() => edit({...emptyAiPolicy(),localDesktop:false})}>{tr("全取消")}</button>
         <small>{tr("全选包含当前已保存的目标和全部能力，不包含以后新增的机器；保存后生效。")}</small>
       </div>
+      <label><input type="checkbox" checked={p.localDesktop!==false} onChange={e=>edit({...p,localDesktop:e.target.checked})}/>允许已启用的 cagent 提供本机桌面工具</label>
       <fieldset disabled={busy} className="permission-tree-nodes">
         <section className="permission-global-section">
           <h4>

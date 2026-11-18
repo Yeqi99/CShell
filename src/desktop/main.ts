@@ -736,6 +736,7 @@ else
         !accountProfiles || accountProfiles.current() === undefined || accountProfiles.current() === 'guest',
         (model, tokens) => activity.record({ kind: 'ai', action: 'model.usage', provider: model.slice(0, 80), status: 'success', tokens }),
         () => new MachineNetworkRoute(store, clientProvider),
+        ssh,
       );
       registerPresetHandlers(handle, window, app.getPath('userData'), store, text);
       registerConnectionImport(handle, window, store);

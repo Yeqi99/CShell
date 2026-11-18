@@ -158,7 +158,10 @@ class Service:
                     raise Failure(409, '可用点数不足，购买 30 天 Pro 会员需要 3990 点')
                 now = time.time()
                 current = db.execute('SELECT expires FROM memberships WHERE account=?', (account,)).fetchone()
-                expires = max(now, current[0] if current else 0) + PRO_TERM_DAYS * 86400
+                if db.execute("SELECT 1 FROM member_assignments WHERE account=? AND expires>? AND plan<>'Pro'",(account,now)).fetchone():raise Failure(409,'当前会员有效期内可续费同一套餐')
+                start=max(now,current[0] if current else 0)
+                expires = start + PRO_TERM_DAYS * 86400
+                db.execute('INSERT INTO benefit_terms VALUES(?,?,?,?,?)',(account,start,expires,'sale','pro-purchase:'+request))
                 receipt = (PRO_PRICE_POINTS, PRO_TERM_DAYS, expires, balance - PRO_PRICE_POINTS)
                 db.execute('INSERT INTO rental_points(account,reference,delta) VALUES(?,?,?)',
                            (account, 'pro-purchase:' + request, -PRO_PRICE_POINTS))
@@ -174,7 +177,7 @@ class Service:
             audit = db.execute('SELECT at,account,action,detail FROM admin_audit ORDER BY id DESC LIMIT 50').fetchall()
             plans=[dict(name=n,weeklyCents=w if w is not None else 500,storageMiB=s if s is not None else MEMBER_BYTES//1048576,machine=m) for n,w,s,m in db.execute('SELECT * FROM member_plans ORDER BY name')]
             machines=[json.loads(r[0]) for r in db.execute('SELECT details FROM rental_plans')]
-            machines=[dict(id=m['id'],name=m['name'],cpu=m['cpu'],memory=m['memory'],disk=m['disk']) for m in machines if m['enabled'] and m['included']]
+            machines=[dict(id=m['id'],name=m['name'],cpu=m['cpu'],memory=m['memory'],disk=m['disk']) for m in machines if m.get('specOnly') or ('specId' not in m and m['enabled'] and m['included'])]
             assigned=dict(db.execute('SELECT account,plan FROM member_assignments WHERE expires>?',(time.time(),)))
             allowances={r[0]:self.quotas.allowance(db,r[0],MEMBER_BYTES if r[3]>time.time() else FREE_BYTES) for r in rows}
         return {'plans':plans,'machines':machines,'accounts': [{'plan':assigned.get(r[0]),'id': r[0], 'email': r[1], 'revision': r[2], 'storage':{'usedBytes':r[4],'limitBytes':allowances[r[0]]}, 'membership': {'active': r[3] > time.time(), 'expiresAt': r[3] or None}} for r in rows], 'audit': [{'at': r[0], 'account': r[1], 'action': r[2], 'detail': r[3]} for r in audit]}
@@ -190,11 +193,12 @@ class Service:
                 db.execute('BEGIN IMMEDIATE')
                 if action=='savePlan':
                     cents,space,machine=(body.get(k) for k in ('weeklyCents','storageMiB','machine'))
-                    if type(cents) is not int or not 1<=cents<=10000000 or type(space) is not int or not 1<=space<=256:
+                    if type(cents) is not int or not 1<=cents<=10000000 or type(space) not in (int,float) or not 1<=space<=320:
                         raise Failure(400,'请核对周额度和云空间')
                     if machine and (machine!='*' or name!='Pro'):
                         row=db.execute('SELECT details FROM rental_plans WHERE id=?',(machine,)).fetchone()
-                        if not row or not all(json.loads(row[0])[k] for k in ('enabled','included')):
+                        machine_data=json.loads(row[0]) if row else {}
+                        if not (machine_data.get('specOnly') or (not machine_data.get('specId') and machine_data.get('enabled') and machine_data.get('included'))):
                             raise Failure(400,'请选择已启用的会员机器规格')
                     db.execute('INSERT OR REPLACE INTO member_plans VALUES(?,?,?,?)',(name,cents,space,machine or ''))
                 else:
@@ -653,6 +657,8 @@ def handler(service):
                     value=service.rentals.plan(body)
                 elif admin and self.path == '/v1/admin/points-trace' and self.command == 'POST':
                     value=service.rewards.trace(body.get('account'),body.get('reference'))
+                elif admin and self.path == '/v1/admin/expenses' and self.command in ('GET','POST'):
+                    value=service.rewards.expenses(body if self.command=='POST' else None)
                 elif admin and self.path == '/v1/admin/points-ledger' and self.command == 'GET':
                     with service.db() as db:
                         value=dict(entries=[dict(account=a,email=e,reference=r,points=n) for a,e,r,n in db.execute('SELECT p.account,a.email,p.reference,p.delta FROM rental_points p LEFT JOIN accounts a ON a.id=p.account ORDER BY p.rowid DESC LIMIT 500')])
@@ -698,7 +704,7 @@ def handler(service):
                     elif self.path == '/v1/account/points-trace' and self.command == 'POST':
                         value=service.rewards.trace(account,body.get('reference'))
                     elif self.path == '/v1/account/plan-offers' and self.command in ('GET','POST'):
-                        value=service.rewards.buy_plan(account,body) if self.command=='POST' else dict(offers=[o for o in service.rewards.offers()['offers'] if o['enabled']])
+                        value=service.rewards.buy_plan(account,body) if self.command=='POST' else service.rewards.catalog()
                     elif self.path == '/v1/account/redeem' and self.command == 'POST':
                         value=service.rewards.redeem(account,body)
                     elif self.path == '/v1/mcp/clients' and self.command in ('GET','POST'):
@@ -858,12 +864,12 @@ def handler(service):
 
 class BoundedServer(ThreadingHTTPServer):
     daemon_threads = True
+    request_queue_size = 64
     slots = threading.BoundedSemaphore(16)
 
     def process_request(self, request, address):
-        if not self.slots.acquire(blocking=False):
-            request.close()
-            return
+        # Apply backpressure at accept instead of resetting an admitted client's connection.
+        self.slots.acquire()
         try:
             super().process_request(request, address)
         except Exception:

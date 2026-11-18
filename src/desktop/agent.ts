@@ -318,7 +318,18 @@ export async function registerAgent(
     if(prepared.deviceId!==active.resourceId)throw Error('目标机器身份已改变');
     return provider.cloudAccountLogin(async login=>{
       if(activeTarget(key)?.resourceId!==active.resourceId)throw Error('目标连接已改变，请重新操作');
-      return provider.call(active.resourceId,{method:'assistant.account.connect',params:{nonce:prepared.nonce,deviceId:prepared.deviceId,login}});
+      try {
+        return await provider.call(active.resourceId,{method:'assistant.account.connect',params:{nonce:prepared.nonce,deviceId:prepared.deviceId,login}});
+      } catch(error) {
+        if(!/disconnected|timed out|socket|断开/i.test(String(error)))throw error;
+        if(activeTarget(key)?.resourceId!==active.resourceId)throw Error('目标连接已断开，请重新连接原机器核对账号状态');
+        const email=z.object({session:z.object({email:z.email()})}).parse(login).session.email;
+        // A lost response can follow a committed login. Read back over a fresh authenticated channel.
+        const current=await provider.call(active.resourceId,{method:'assistant.settings'}).catch(()=>undefined);
+        const status=z.object({account:z.object({email:z.string(),unlocked:z.boolean()})}).safeParse(current);
+        if(status.success && status.data.account.email===email && status.data.account.unlocked)return status.data.account;
+        throw Error('连接中断，尚未确认远端账号已登录。请重新连接原机器后核对同步状态。');
+      }
     });
   });
   handle('agent:call', async (target, raw) => {

@@ -1,6 +1,6 @@
 import './settings-surfaces.css';
 import { ErrorNotice } from './ErrorNotice';
-import {isOfficialModel} from '../../shared/official-models';
+import {isOfficialModel, isPooledProvider} from '../../shared/official-models';
 import {CloudConversationHistory} from './CloudConversationHistory';
 import type {ChatDocument} from '../../shared/cloud-conversations';
 import { conversationHistory, conversationStatus } from '../ai-history';
@@ -91,8 +91,21 @@ export function AiPanel({
     };
   }, [visible, page]);
   const [location] = useState<AiLocation>('terminal');
-  const [providerId, setProviderId] = useState(''),
-    [threadId, setThreadId] = useState('');
+  const [preferred, setPreferred] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('cshell.agent.lastModel') ?? 'null') as {id:string;model?:string}|null; }
+    catch { return null; }
+  });
+  function rememberModel(id:string, model?:string) {
+    const value = {id,model};
+    setPreferred(value);
+    localStorage.setItem('cshell.agent.lastModel', JSON.stringify(value));
+  }
+  const recent = !preferred && snapshot.threads.filter(t => !t.parentId && !t.goal && t.messages.length && snapshot.providers.some(p=>p.id===t.providerId))
+    .reduce<AiSnapshot['threads'][number] | undefined>((last,t) => !last || t.messages.at(-1)!.time > last.messages.at(-1)!.time ? t : last, undefined);
+  const selection = preferred ?? (recent ? {id:recent.providerId,model:recent.extensionModel} : undefined);
+  const providerId = snapshot.providers.find(p => p.id === selection?.id)?.id ?? snapshot.providers[0]?.id ?? '';
+  const preferredModel = selection?.id === providerId ? selection?.model : undefined;
+  const [threadId, setThreadId] = useState('');
   const [mode, setMode] = useState<AiMode>('review');
   const [settingsTab, setSettingsTab] = useState<'models' | 'permissions' | 'execution'>('models');
   const permissionRequest = usePermissionNavigation();
@@ -160,9 +173,6 @@ export function AiPanel({
       clearInterval(timer);
     };
   }, [visible]);
-  useEffect(() => {
-    setProviderId(snapshot.providers[0]?.id ?? '');
-  }, [location, snapshot.providers.map((p) => p.id).join(',')]);
   const thread = snapshot.threads.find((t) => t.id === threadId);
   const backgroundCount = snapshot.threads.filter(t => t.id !== threadId &&
     (t.state === 'running' || t.state === 'approval')).length;
@@ -170,8 +180,8 @@ export function AiPanel({
     null,
   );
   const insertQueue = useRef(Promise.resolve());
-  const currentConversation = useRef({ threadId, providerId, mode, sessionId });
-  currentConversation.current = { threadId, providerId, mode, sessionId };
+  const currentConversation = useRef({ threadId, providerId, preferredModel, mode, sessionId });
+  currentConversation.current = { threadId, providerId, preferredModel, mode, sessionId };
   useEffect(() => {
     const handler = (event: Event) => {
       const detail = (event as CustomEvent<string | AnalysisRequest>).detail;
@@ -199,6 +209,7 @@ export function AiPanel({
                 provider.id,
                 current.mode,
                 requestedSession ?? current.sessionId,
+                current.preferredModel,
               );
               targetId = created.id;
               currentConversation.current.threadId = targetId;
@@ -214,7 +225,8 @@ export function AiPanel({
     return () => window.removeEventListener('cshell:analyze-selection', handler);
   }, []);
   const create = async (extensionModel?: string, cloudHistory?:ChatDocument) => {
-    const t = await window.cshell.aiThreadCreate(location, providerId, mode, sessionId, extensionModel, cloudHistory);
+    const t = await window.cshell.aiThreadCreate(location, providerId, mode, sessionId, extensionModel ?? preferredModel, cloudHistory);
+    setSnapshot(s => s.threads.some(item => item.id === t.id) ? s : {...s,threads:[t,...s.threads]});
     setThreadId(t.id);
     return t;
   };
@@ -305,7 +317,8 @@ export function AiPanel({
           mode={mode}
           sessionId={sessionId}
           busy={busy}
-          setProviderId={setProviderId}
+          setProviderId={rememberModel}
+          preferredModel={preferredModel}
           setMode={setMode}
           create={create}
           run={run}
@@ -379,9 +392,10 @@ export function AiPanel({
                   }}
                 >
                   <strong>{t.title}</strong>
+                  {(t.state === 'running' || t.state === 'approval') && <span className="agent-history-state" data-state={t.state}>{conversationStatus(t)}</span>}
                   <small>
                     {t.target ?? 'CShell'}
-                    {' · ' + conversationStatus(t)}
+                    {t.state !== 'running' && t.state !== 'approval' && ' · ' + conversationStatus(t)}
                   </small>
                 </button>
                 <button
@@ -510,7 +524,7 @@ export function AiPanel({
           {snapshot.providers.map((p) => (
             <div className="ai-provider" key={p.id}>
               <button
-                disabled={testing || busy}
+                disabled={testing || busy || isOfficialModel(p.url, p.model)}
                 onClick={() => {
                   setEditing(p);
                   setKey('');
@@ -520,11 +534,11 @@ export function AiPanel({
               >
                 <strong>{p.name}</strong>
                 <small>
-                  {p.model} · {isOfficialModel(p.url,p.model)?'账号免费模型':p.extension ? '由扩展提供' : p.hasKey ? '已保存 Key' : '无 Key'}
+                  {isPooledProvider(p) ? '会员模型 · 随账号同步' : isOfficialModel(p.url, p.model) ? '账号免费模型' : `${p.model} · ${p.extension ? '由扩展提供' : p.hasKey ? '已保存 Key' : '无 Key'}`}
                 </small>
                 {p.extension && <AiExtensionProviderStatus extension={p.extension} />}
               </button>
-              <button
+              {!isOfficialModel(p.url, p.model) && <button
                 className="icon"
                 title="删除基座"
                 disabled={testing || busy}
@@ -532,8 +546,8 @@ export function AiPanel({
                 onClick={() => setConfirmDelete(p.id)}
               >
                 <Trash2 size={14} />
-              </button>
-              {confirmDelete === p.id && (
+              </button>}
+              {!isOfficialModel(p.url, p.model) && confirmDelete === p.id && (
                 <div>
                   删除该基座？
                   <button

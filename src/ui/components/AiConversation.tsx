@@ -5,7 +5,7 @@ import { AiTaskTree } from './AiWork';
 import { AiModelMenu } from './AiModelMenu';
 import { useAiDrafts } from '../ai-drafts';
 import { useExtensionCatalog } from '../use-extension-catalog';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   ArrowDown,
   ArrowUp,
@@ -35,6 +35,7 @@ export function AiConversation({
   sessionId,
   busy,
   setProviderId,
+  preferredModel,
   setMode,
   create,
   run,
@@ -50,7 +51,8 @@ export function AiConversation({
   mode: AiMode;
   sessionId?: string;
   busy: boolean;
-  setProviderId: (value: string) => void;
+  preferredModel?: string;
+  setProviderId: (value: string, model?: string) => void;
   setMode: (value: AiMode) => void;
   create: (model?: string) => Promise<AiThread>;
   run: (fn: () => Promise<unknown>) => Promise<void>;
@@ -156,35 +158,38 @@ export function AiConversation({
   const modelChoices = catalog?.choices ?? [];
   const selectedModel = modelChoices.find(c => c.ref === chosenModel);
   const requiresModel = !thread && !!provider?.extension && !selectedModel?.available;
-  useEffect(() => {
+  const messageBody = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const list = viewport.current;
+    const body = messageBody.current;
+    if (!list || !body) return;
     follow.current = true;
     setAway(false);
+    const bottom = () => { if (follow.current) list.scrollTop = list.scrollHeight; };
+    bottom();
+    const observer = new ResizeObserver(bottom);
+    observer.observe(list);
+    observer.observe(body);
+    return () => observer.disconnect();
   }, [thread?.id]);
-  useEffect(() => {
-    if (follow.current && viewport.current)
-      viewport.current.scrollTop = viewport.current.scrollHeight;
-  }, [
-    thread?.id,
-    thread?.messages.length,
-    thread?.messages.at(-1)?.content,
-    thread?.pending?.id,
-    thread?.state,
-  ]);
   useEffect(() => { setChosenModel(''); initializedModel.current = false; }, [provider?.id, provider?.extension?.model, thread?.id]);
   useEffect(() => {
     if (!thread && catalog) {
       const initial = !initializedModel.current;
       initializedModel.current = true;
-      setChosenModel(previous => initial ? (catalog.current.available ? catalog.current.ref : '')
+      setChosenModel(previous => initial ? (catalog.choices.find(c => c.ref === preferredModel && c.available)?.ref ?? (catalog.current.available ? catalog.current.ref : ''))
         : catalog.choices.some(c => c.ref === previous && c.available) ? previous : '');
     }
-  }, [catalog, thread?.id]);
-  const send = (message = text, attachments = files) => {
+  }, [catalog, thread?.id, preferredModel]);
+  const send = (message = text, attachments = files, resume = false) => {
     if (active && attachments.length) {
       setSendErrors(previous => ({...previous, [draftId]: '运行中可以补充文字。附件可在本轮结束后发送。'}));
       return;
     }
-    if (busy || sending.current.has(draftId) || (resumeInMain && sending.current.has(resumeTarget!.id)) || modelsLoading || requiresModel || (!message.trim() && !attachments.length) || !provider) return;
+    if (busy || sending.current.has(draftId) || (resumeInMain && sending.current.has(resumeTarget!.id)) || modelsLoading || requiresModel || (!resume && !message.trim() && !attachments.length) || !provider) return;
+    follow.current = true;
+    setAway(false);
+    if (viewport.current) viewport.current.scrollTop = viewport.current.scrollHeight;
     sending.current.add(draftId);
     setPendingSends([...sending.current]);
     setSendErrors(previous => ({ ...previous, [draftId]: '' }));
@@ -197,7 +202,7 @@ export function AiConversation({
       setSendErrors(previous => ({ ...previous, [targetId]: '' }));
       sending.current.add(targetId);
       setPendingSends([...sending.current]);
-      await window.cshell.aiSend(targetId, message, payload, active);
+      await window.cshell.aiSend(targetId, message, payload, active, resume, resume && !thread?.resumeIdentity && !thread?.boundIdentity ? sessionId : undefined);
       if (attachments.length) setAttachmentDrafts(previous => ({
         ...previous, [draftId]: (previous[draftId] ?? []).filter(file => !attachments.includes(file)),
       }));
@@ -249,6 +254,7 @@ export function AiConversation({
           aria-live="polite"
           aria-relevant="additions text"
         >
+          <div ref={messageBody} className="agent-message-body">
           {!thread?.messages.length && (
             <div className="agent-welcome">
               <div className="agent-emblem">
@@ -340,19 +346,20 @@ export function AiConversation({
             </section>
           )}
           {thread?.checkpoint && <details className="agent-checkpoint"><summary>任务检查点 · {thread.checkpoint.phase}</summary>{thread.checkpoint.memory&&<><p>{thread.checkpoint.memory.objective}</p><p>待完成：{thread.checkpoint.memory.remaining.join('；')||'未记录'}</p><p>验证：{thread.checkpoint.memory.verification.join('；')||'尚未记录验收证据'}</p></>}{thread.checkpoint.pending&&<p>结果待核查：{thread.checkpoint.pending.tool}。继续前检查实际状态，勿直接重跑。</p>}<small>{new Date(thread.checkpoint.updatedAt).toLocaleString()}</small></details>}
-          {thread?.error && /^(This operation was aborted|已停止 \/ Stopped)$/.test(thread.error) ? <small role="status">本轮已停止，检查点已保留。</small> : thread?.error && /无法连接模型服务|模型服务暂时无法响应|模型响应中断|AI 响应中断|Responses 连接中断|模型基座连续|ERR_HTTP2_PROTOCOL_ERROR/.test(thread.error) ? (
-            <ErrorNotice conversation title="回复暂时中断了。" error={thread.error} busy={busy || active || !provider} retry={() => send('从检查点继续，先核对结果未明的操作。', [])} />
-          ) : thread?.error && (
-            <ErrorNotice conversation title="这次回复没有完成。" error={thread.error} />
-          )}
+          {thread?.error && <>
+            <ErrorNotice conversation title={/任务已停止|已中断|应用已重启|已停止|等待授权/.test(thread.error) ? '任务已暂停。' : '这次回复没有完成。'} error={thread.error} />
+            {!thread.parentId && !thread.goal && <button className="secondary" disabled={busy || active || !provider}
+              onClick={() => send('', [], true)}>{!thread.boundIdentity && !thread.resumeIdentity && thread.sessionId && sessionId && thread.sessionId !== sessionId ? '在当前连接继续' : '继续任务'}</button>}
+          </>}
           {draftError && <ErrorNotice conversation title="草稿暂未保存。" error={draftError} />}
-          {sendErrors[draftId] && <ErrorNotice conversation title="消息没有发出。" error={sendErrors[draftId]} />}
+          {sendErrors[draftId] && <ErrorNotice title="操作未完成" error={sendErrors[draftId]} />}
           {thread?.state === 'running' && (
             <div className="agent-running" role="status">
               <span className="agent-wait-dots" aria-hidden="true"><i/><i/><i/></span>
               {thread.modelRetry ? `正在重新连接模型（${thread.modelRetry}/2）` : thread.messages.at(-1)?.role === 'assistant' && thread.messages.at(-1)?.content ? '正在生成回复' : '正在思考与处理'}
             </div>
           )}
+          </div>
         </div>
         {away && (
           <button
@@ -417,10 +424,10 @@ export function AiConversation({
             <Cpu size={13} />
             <AiModelMenu providers={snapshot.providers} providerId={thread?.providerId??providerId} model={thread?.extensionModel??chosenModel} disabled={busy || active} configure={configure} onSelect={async(next,reference)=>{
               await run(async()=>{
-                if(thread){await window.cshell.aiThreadProvider(thread.id,next,reference);setProviderId(next);return;}
+                if(thread){await window.cshell.aiThreadProvider(thread.id,next,reference);setProviderId(next,reference);return;}
                 const created=await window.cshell.aiThreadCreate(location,next,mode,sessionId,reference);
                 setAttachmentDrafts(previous=>({...previous,[created.id]:previous[draftId] ?? [],[draftId]:[]}));
-                setDrafts(previous=>({...previous,[created.id]:text}));setProviderId(next);openThread(created.id);
+                setDrafts(previous=>({...previous,[created.id]:text}));setProviderId(next,reference);openThread(created.id);
               });
             }}/>
           </div>

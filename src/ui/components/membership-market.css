@@ -1,0 +1,5 @@
+.membership-market article{border:1px solid #92a1b266;border-radius:10px;overflow:hidden;padding-bottom:10px;margin:10px 0;background:var(--panel,#fff);color:var(--text,#172635)}
+.membership-market article header{display:flex;align-items:center;min-height:58px;padding:10px 14px;background:#112339 url('../../../services/portal/rewards/art/membership.webp') center center/100% 300% no-repeat;color:white;font-size:22px}
+.membership-market article header[data-tier=Study]{background-position:top}.membership-market article header[data-tier=Ultra]{background-position:bottom}
+.membership-market article p,.membership-market article>span,.membership-market article button{margin:8px 12px}.membership-market article p{font-size:13px}
+

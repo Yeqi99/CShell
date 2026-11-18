@@ -1,3 +1,4 @@
+import {MembershipMarket} from './MembershipMarket';
 import {ProPurchase} from './ProPurchase';
 import {useEffect,useState} from 'react';
 import {Activity,ArrowDown,ArrowUp,Coins,RefreshCw} from 'lucide-react';
@@ -21,22 +22,38 @@ function MemberWallet({week,cn,refresh,email,active}:{email?:string;active:boole
  const t=(zh:string,en:string)=>cn?zh:en;
  const [offer,setOffer]=useState<{quote:string;request:string}>(),[sending,setSending]=useState(false),[notice,setNotice]=useState('');
  const minutes=Math.max(0,Math.ceil(((week.resetAt||0)*1000-Date.now())/60000));
+ async function saveInvite(){
+   if(!email||sending)return;
+   setSending(true);
+   try{
+     const code=await window.cshell.cloudInvitePoster(email);
+     await import('../../../services/portal/rewards/qrcode.js');
+     const {drawPoster}=await import('../../../services/portal/rewards/poster.js');
+     const canvas=document.createElement('canvas');
+     await drawPoster(canvas,{type:'invite',code,origin:'https://shell.canp.ai',path:'/rewards/'});
+     const blob=await new Promise<Blob>((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(Error('PNG 导出失败'))));
+     const link=document.createElement('a');
+     link.href=URL.createObjectURL(blob);link.download='CShell-好友邀请.png';link.click();
+     setTimeout(()=>URL.revokeObjectURL(link.href),30000);
+   }catch(e){setNotice(String(e));}finally{setSending(false);}
+ }
  async function pay(){if(!offer||sending)return;setSending(true);try{await window.cshell.cloudRefill(offer.quote,offer.request);setNotice(t('周额度已重置','Weekly allowance restored'));setOffer(undefined)}catch(e){setNotice(String(e))}finally{setSending(false);refresh()}}
  return <section className="member-wallet">
    <div className="wallet-balance">
      <span className="wallet-label"><Coins size={15}/>{t('点数余额','Points balance')}</span>
      <div className="wallet-figure"><strong>{week.balance?.toLocaleString()??'—'}</strong><span>{t('点','pts')}</span></div>
      {email&&<details className="wallet-rewards"><summary>{t('邀请好友与礼品卡','Invitations and gift cards')}</summary>
-       <button type="button" onClick={()=>void window.cshell.cloudInvitePoster().catch(e=>setNotice(String(e)))}>{t('生成邀请海报','Create invitation poster')}</button>
+       <button type="button" disabled={sending} onClick={()=>void saveInvite()}>{t('保存邀请海报','Save invitation image')}</button>
        <form onSubmit={async event=>{event.preventDefault();const form=event.currentTarget;if(sending)return;setSending(true);try{const r=await window.cshell.cloudRedeemGift(email,String(new FormData(form).get('code')).trim());form.reset();setNotice(r.kind==='points'?t('已领取 ','Received ')+r.quantity+t(' 点',' points'):r.kind==='membership'?r.plan+' · '+r.quantity+t(' 天',' days'):t('本周额度已重置','Weekly allowance restored'));refresh()}catch(e){setNotice(String(e))}finally{setSending(false)}}}>
        <input name="code" aria-label={t('礼品卡兑换码','Gift code')} placeholder={t('礼品卡兑换码','Gift code')} maxLength={32} pattern="[A-Fa-f0-9]{32}" required/><button disabled={sending}>{t('兑换','Redeem')}</button></form></details>}
+     {email&&<MembershipMarket key={'plans-'+email} email={email} refresh={refresh}/>}
      {email&&<WalletSpending key={email} cn={cn}/>}
      {email&&<ProPurchase email={email} active={active} balance={week.balance} cn={cn} refresh={refresh}/>}
    </div>
    {week.percent!==undefined && <div className="wallet-week">
-     <div className="wallet-week-title"><strong>{t('Pro 周额度','Pro weekly allowance')}</strong><span>{t('剩余','Remaining')} <b>{Math.floor(week.percent*100)/100}%</b></span></div>
+     <div className="wallet-week-title"><strong>{t('会员周额度','Weekly allowance')}</strong><span>{t('剩余','Remaining')} <b>{Math.floor(week.percent*100)/100}%</b></span></div>
      <progress aria-label={t('周额度剩余','Weekly allowance remaining')} max={100} value={week.percent}/>
-     <small title={t('每周一北京时间 00:00 刷新','Resets Monday at 00:00 Beijing time')}>{t('距下次刷新','Resets in')} {Math.floor(minutes/1440)}{t('天','d')} {Math.floor(minutes%1440/60)}{t('小时','h')} {minutes%60}{t('分钟','m')}</small>
+     {week.resetAt ? <small>{t('距下次刷新','Resets in')} {Math.floor(minutes/1440)}{t('天','d')} {Math.floor(minutes%1440/60)}{t('小时','h')} {minutes%60}{t('分钟','m')}</small> : <small>{t('首次使用后开始计算 7 天','Seven days from first use')}</small>}
      <div className="wallet-actions">
        {offer ? <><span>{t('确认扣除','Spend')} {week.price} {t('点恢复至 100%？','points to restore 100%?')}</span>
          <button type="button" disabled={sending||offer.quote!==week.quote} onClick={()=>void pay()}>{t('确认重置','Confirm')}</button>

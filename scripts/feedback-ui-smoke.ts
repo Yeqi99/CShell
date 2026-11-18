@@ -10,7 +10,7 @@ await build({stdin:{resolveDir:process.cwd(),loader:'tsx',contents:`
 import React,{useState} from 'react';import{createRoot}from'react-dom/client';
 import{ErrorNotice}from'./src/ui/components/ErrorNotice';import{AiStreamingMarkdown}from'./src/ui/components/AiStreamingMarkdown';
 import './src/ui/theme.css';
-window.cshell={platform:'win32',copyText:async text=>{window.copied=text},submitFeedback:async data=>{window.submissions??=[];window.submissions.push(data);if(window.submissions.length===1)throw Error('offline');return {ok:true,id:data.id}}};
+window.cshell={platform:'win32',aiText:async()=>({choices:['模型请求返回 HTTP 503。']}),copyText:async text=>{window.copied=text},submitFeedback:async data=>{window.submissions??=[];window.submissions.push(data);if(window.submissions.length===1)throw Error('offline');return {ok:true,id:data.id}}};
 function Fixture(){const[text,setText]=useState('');const[running,setRunning]=useState(true);window.append=text=>setText(text);window.stop=()=>setRunning(false);return <main style={{maxWidth:680,margin:'32px auto',padding:8}}><h2>智能体</h2><ErrorNotice title="这次回复未完成" error="Error: Error invoking remote method 'agent:call': AI API HTTP 503" retry={()=>window.retried=true}/><div id="stream"><AiStreamingMarkdown text={text} streaming={running} onReveal={()=>{}}/></div></main>};createRoot(document.getElementById('root')).render(<Fixture/>);`},bundle:true,jsx:'automatic',outfile:join(dir,'fixture.js')});
 const server=createServer(async(req,res)=>{const file=req.url==='/fixture.js'?'fixture.js':req.url==='/fixture.css'?'fixture.css':null;res.setHeader('content-type',file?.endsWith('.js')?'application/javascript':file?'text/css':'text/html');res.end(file?await readFile(join(dir,file)):'<!doctype html><html><meta charset="utf-8"><link rel="stylesheet" href="/fixture.css"><div id="root"></div><script src="/fixture.js"></script></html>');});
 await new Promise<void>(r=>server.listen(0,'127.0.0.1',r));
@@ -42,6 +42,9 @@ try{
  assert.equal(submissions.length,2);assert.equal(submissions[0].id,submissions[1].id);
  assert.ok(!JSON.stringify(submissions).includes('private-test'));assert.equal(submissions[0].diagnostic,'HTTP 503');
  assert.equal(await description.inputValue(),'');
+ await page.getByRole('button',{name:'AI 总结并反馈'}).click();
+ await page.waitForFunction(()=>(window as any).submissions.length===3);
+ assert.equal(await page.evaluate(()=>(window as any).submissions[2].message),'模型请求返回 HTTP 503。');
  const text='这是连续输出的中文内容。🙂 '.repeat(40);
  await page.evaluate(text=>(window as any).append(text),text);
  await page.waitForTimeout(50);const partial=await page.locator('#stream').innerText();assert.ok(partial.length>0&&partial.length<text.length,'buffer reveals part of a burst');assert.ok(!/[\uD800-\uDBFF]$/.test(partial));

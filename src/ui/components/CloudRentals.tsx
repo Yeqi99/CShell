@@ -15,7 +15,7 @@ function configurations(plans: Plan[]) {
   return [...groups.values()];
 }
 function period(days:number) { return days === 30 ? '月付' : days === 1 ? '日付' : days+' 天'; }
-const labels:Record<string,string>={queued:'等待分配',installing:'安装中',ready:'可连接',resuming:'恢复中',expired:'已到期',failed:'开通失败'};
+const labels:Record<string,string>={queued:'等待分配',installing:'安装中',ready:'可连接',resuming:'恢复中',released:'已释放',expired:'已到期',failed:'开通失败'};
 export function CloudRentals({member,storefront=false}:{member:boolean;storefront?:boolean}){
   const [data,setData]=useState<RentalCatalog>();
   const [error,setError]=useState('');
@@ -38,7 +38,7 @@ export function CloudRentals({member,storefront=false}:{member:boolean;storefron
     if(pending.current?.key!==key)pending.current={key,request:crypto.randomUUID()};
     setBusy(true);setError('');
     try{
-      setData(await window.cshell.cloudRentals({action:'order',plan,included,points:data?.plans.find(p=>p.id===plan)?.points,days:data?.plans.find(p=>p.id===plan)?.days,request:pending.current.request}));
+      setData(await window.cshell.cloudRentals({action:'order',plan,included,points:data?.plans.find(p=>p.id===plan)?.points??0,days:data?.plans.find(p=>p.id===plan)?.days??1,request:pending.current.request}));
       pending.current=undefined;setNotice('已提交开通请求');
     }catch(e){setError(String(e));}finally{setBusy(false);}
   }
@@ -107,16 +107,17 @@ export function CloudRentals({member,storefront=false}:{member:boolean;storefron
       {data?.machines.some(m=>m.state==='ready') && <p>已就绪的机器可从左侧“云端主机”打开。</p>}
     </section>;
   }
-  const isCurrentMemberMachine=(m:RentalCatalog['machines'][number])=>m.included && !['failed','expired'].includes(m.state);
+  const isCurrentMemberMachine=(m:RentalCatalog['machines'][number])=>m.included && !['failed','expired','released'].includes(m.state);
   const claimed=data?.machines.find(isCurrentMemberMachine);
   const machines=claimed ? [claimed,...data!.machines.filter(m=>m.id!==claimed.id)] : data?.machines;
   const memberRate=active?.rates.find(p=>p.included);
   const plans=selected && data && <>{options}
-    {memberRate && member && !claimed && <button disabled={busy} onClick={()=>void order(memberRate.id,true)}>领取会员机器</button>}
+    {!data.memberPlans?.length && memberRate && member && !claimed && <button disabled={busy} onClick={()=>void order(memberRate.id,true)}>领取会员机器 · 随会员到期</button>}
     <button disabled={busy||data.balance<selected.points} onClick={()=>void order(selected.id,false)}>支付 {selected.points.toLocaleString()} 点租用 {selected.days} 天</button>
   </>;
   return <details className="account-section account-rentals">
     <summary>云机器租赁{claimed && <span className="rental-claimed"><CircleCheck size={14}/>会员机已领取</span>}</summary>
+    {member && !claimed && data?.memberPlans?.map(p=><button key={p.id} disabled={busy} onClick={()=>void order(p.id,true)}>领取 {p.name} · 随会员到期</button>)}
     {machines?.map(m=><article className={isCurrentMemberMachine(m)?'rental-owned':''} key={m.id}>
       <header className="rental-machine-heading"><Server size={17}/><strong>{m.included?'会员机器':'点数租用'} · {m.name}</strong><span>{labels[m.state]??(m.state==='paused'?'已暂停':m.state)}</span></header>
       <p>{m.disk/1024} GiB 磁盘{m.updating?'（扩容中）':''}{m.expires?' · 到期 '+new Date(m.expires*1000).toLocaleDateString():''} · {m.id.slice(0,8)}</p>

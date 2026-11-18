@@ -20,6 +20,8 @@ START = ("/bin/bash -c 'cd /home/container && "
 
 
 BUSINESS_PORTS = 3
+SPEC_FIELDS = ('name','system','cpu','memory','disk','node','egg','owner')
+ADDON_FIELDS = ('expansionPoints','cpuPoints','memoryPoints','expansionDays')
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -57,6 +59,32 @@ class Rentals:
                 db.execute('UPDATE rentals SET created=? WHERE created IS NULL',(time.time(),))
             for col in ('port_extra','extra','applied','cpu_extra','cpu_applied','memory_extra','memory_applied'):
                 if col not in cols:db.execute('ALTER TABLE rentals ADD COLUMN '+col+' INTEGER NOT NULL DEFAULT 0')
+
+            if 'retain_until' not in cols:
+                db.execute('ALTER TABLE rentals ADD COLUMN retain_until REAL')
+            self.migrate_specs(db)
+
+    def migrate_specs(self, db):
+        if not db.in_transaction:db.execute('BEGIN IMMEDIATE')
+        records=[json.loads(row[0]) for row in db.execute('SELECT details FROM rental_plans ORDER BY id')]
+        for rate in records:
+            if rate.get('specOnly') or rate.get('specId'):continue
+            base={key:rate[key] for key in SPEC_FIELDS}
+            base['name']=re.sub(r'\s*(?:[·・—-]\s*)?(日租|月租|日付|月付)$','',base['name']).strip() or base['name']
+            signature=json.dumps(base,sort_keys=True,ensure_ascii=False)
+            spec_id='spec-'+uuid.uuid5(uuid.NAMESPACE_URL,signature).hex
+            row=db.execute('SELECT details FROM rental_plans WHERE id=?',(spec_id,)).fetchone()
+            spec=json.loads(row[0]) if row else dict(rate,**base)
+            if row and not spec.get('specOnly'):raise ValueError('机型标识冲突')
+            spec.update(id=spec_id,specOnly=True,enabled=True,included=bool((row and spec['included']) or (rate['enabled'] and rate['included'])))
+            self.write_plan(db,spec)
+            rate['specId']=spec_id
+            self.write_plan(db,rate)
+            db.execute('UPDATE member_plans SET machine=? WHERE machine=?',(spec_id,rate['id']))
+
+    @staticmethod
+    def write_plan(db,record):
+        db.execute('INSERT OR REPLACE INTO rental_plans VALUES(?,?)',(record['id'],json.dumps(record)))
 
     def operators(self, body=None):
         with self.service.db() as db:
@@ -100,8 +128,10 @@ class Rentals:
                 if p is None:self.error(403,'套餐不在授权范围')
                 for k,limit in [('cpu',12800),('memory',1048576),('disk',10485760)]:
                     if type(body.get(k)) is not int or not 1<=body[k]<=limit:self.error(400,'资源配置无效')
+                    if (p.get('specOnly') or p.get('specId')) and body[k]!=p[k]:self.error(409,'请由管理员在基础规格中修改资源')
                     p[k]=body[k]
                 if type(body.get('enabled')) is not bool:self.error(400,'请选择上架状态')
+                if p.get('specOnly'):self.error(409,'基础规格由管理员管理')
                 p['enabled']=body['enabled']
                 db.execute('UPDATE rental_plans SET details=? WHERE id=?',(json.dumps(p),p['id']))
             machines=[dict(id=r[0],plan=json.loads(r[1])['name'],state=r[2],disk=json.loads(r[1])['disk']+r[3]*10240) for r in db.execute('SELECT id,plan,state,extra FROM rentals') if json.loads(r[1])['id'] in allowed]
@@ -134,7 +164,7 @@ class Rentals:
             if state not in ('ready','expired','paused') or not expires:self.error(409,'实例状态不允许变更')
             member_end=(db.execute('SELECT expires FROM memberships WHERE account=?',(account,)).fetchone() or [0])[0]
             if member and member_end<=now:self.error(403,'会员已到期')
-            if member and state=='expired' and db.execute("SELECT 1 FROM rentals WHERE account=? AND id<>? AND included=1 AND state NOT IN ('expired','failed')",(account,machine)).fetchone():
+            if member and state=='expired' and db.execute("SELECT 1 FROM rentals WHERE account=? AND id<>? AND included=1 AND state NOT IN ('released','expired','failed')",(account,machine)).fetchone():
                 self.error(409,'已有其他会员机器')
             if member and not expanded and state=='ready':expires=member_end
             period=p['days']*86400
@@ -186,7 +216,7 @@ class Rentals:
             db.execute('INSERT OR REPLACE INTO rental_provider VALUES(1,?,?)',(host,self.cipher().encrypt(key.encode()).decode()))
         return self.settings()
 
-    def plan(self, body):
+    def validate_plan(self, body):
         fields = ('id','name','system','cpu','memory','disk','points','days','expansionPoints','egg','node','owner','included','enabled')
         p = {k:body.get(k) for k in fields}
         p['cpuPoints']=body.get('cpuPoints',500)
@@ -202,8 +232,38 @@ class Rentals:
                 self.error(400,'套餐数值无效 '+k)
         if any(type(p[k]) is not bool for k in ('included','enabled')):
             self.error(400,'套餐状态无效')
+        return p
+
+    def plan(self,body):
         with self.service.db() as db:
-            db.execute('INSERT OR REPLACE INTO rental_plans VALUES(?,?)',(p['id'],json.dumps(p)))
+            db.execute('BEGIN IMMEDIATE')
+            records={p['id']:p for (raw,) in db.execute('SELECT details FROM rental_plans') for p in [json.loads(raw)]}
+            kind=body.get('kind')
+            old=records.get(body.get('id'))
+            if kind=='spec':
+                if old and not old.get('specOnly'):self.error(409,'该标识已用于租价')
+                defaults=dict(points=1,days=30,enabled=True,included=False)
+                source={**defaults,**(old or {}),**{k:body.get(k) for k in (*SPEC_FIELDS,'id')}}
+                spec=dict(self.validate_plan(source),specOnly=True)
+                self.write_plan(db,spec)
+                for rate in records.values():
+                    if rate.get('specId')==spec['id']:
+                        rate.update({key:spec[key] for key in SPEC_FIELDS})
+                        self.write_plan(db,rate)
+            elif kind=='rate':
+                spec=records.get(body.get('specId'))
+                if not spec or not spec.get('specOnly'):self.error(400,'请选择基础规格')
+                if old and old.get('specId')!=spec['id']:self.error(409,'租价不能移动到其他机型')
+                if any(r.get('specId')==spec['id'] and r['days']==body.get('days') and r['id']!=body.get('id') for r in records.values()):self.error(409,'该规格已有这个租期的定价')
+                price=self.validate_plan({**spec,**{k:body.get(k) for k in ('id','days','points','enabled',*ADDON_FIELDS)}})
+                self.write_plan(db,dict(price,specId=spec['id']))
+                # Membership expansions follow the monthly rate where configured.
+                if price['days']==30 or not any(r.get('specId')==spec['id'] and r['days']==30 for r in records.values()):
+                    spec.update({k:price[k] for k in ADDON_FIELDS})
+                    self.write_plan(db,spec)
+            else:
+                if old and (old.get('specOnly') or old.get('specId')):self.error(409,'请分别编辑基础规格和上架价格')
+                self.write_plan(db,self.validate_plan(body))
         return {'ok':True}
 
     def credit(self, body):
@@ -227,9 +287,10 @@ class Rentals:
             plans=[json.loads(r[0]) for r in db.execute('SELECT details FROM rental_plans ORDER BY id')]
             entitlement=db.execute("SELECT machine FROM member_plans WHERE name=COALESCE((SELECT plan FROM member_assignments WHERE account=? AND expires>?),'Pro')",(account,time.time())).fetchone()
             for p in plans:
-                if entitlement and entitlement[0] not in ("*",p["id"]):p["included"]=False
+                if entitlement and entitlement[0]!='*':p['included']=entitlement[0] in (p['id'],p.get('specId'))
             rows=db.execute('SELECT id,plan,included,state,expires,extra,applied,identity,ports,cpu_extra,cpu_applied,memory_extra,memory_applied,port_extra FROM rentals WHERE account=? ORDER BY rowid DESC',(account,)).fetchall()
-            return {'balance':self.balance(db,account),'plans':[dict({k:p[k] for k in ('id','name','system','cpu','memory','disk','points','days','included','expansionPoints')}, dedicatedIp=False, portCount=BUSINESS_PORTS) for p in plans if p['enabled'] and self.settings()['configured']],
+            configured=bool(db.execute('SELECT 1 FROM rental_provider WHERE id=1').fetchone() or os.getenv('RENTAL_PANEL_KEY'))
+            return {'balance':self.balance(db,account),'memberPlans':[dict(id=p['id'],name=p['name']) for p in plans if p.get('specOnly') and p['included'] and configured], 'plans':[dict({k:p[k] for k in ('id','name','system','cpu','memory','disk','points','days','included','expansionPoints')}, dedicatedIp=False, portCount=BUSINESS_PORTS) for p in plans if not p.get('specOnly') and p['enabled'] and configured],
                     'machines':[dict(id=r[0],name=json.loads(r[1])['name'],included=bool(r[2]),state=r[3],expires=r[4],deviceId=json.loads(r[7])['deviceId'] if r[7] else None,disk=json.loads(r[1])['disk']+r[5]*10240,appliedDisk=json.loads(r[1])['disk']+r[6]*10240,cores=json.loads(r[1])['cpu']/100+r[9],memory=json.loads(r[1])['memory']+1024*r[11],updating=r[5]!=r[6] or r[9]!=r[10] or r[11]!=r[12],ports=json.loads(r[8]) if r[8] else [],portCount=json.loads(r[1]).get('basePorts',10)+r[13]) for r in rows]}
 
     def order(self, account, body):
@@ -245,14 +306,15 @@ class Rentals:
             row=db.execute('SELECT details FROM rental_plans WHERE id=?',(body.get('plan'),)).fetchone()
             if not row or not self.settings()['configured']:self.error(503,'套餐尚未开放')
             p=json.loads(row[0])
+            if p.get('specOnly') and not included:self.error(409,'基础规格尚未选择租价')
             if not p['enabled']:self.error(409,'套餐已停用')
             machine=str(uuid.uuid4())
             if included:
                 entitlement=db.execute("SELECT machine FROM member_plans WHERE name=COALESCE((SELECT plan FROM member_assignments WHERE account=? AND expires>?),'Pro')",(account,time.time())).fetchone()
-                if entitlement and entitlement[0] not in ('*',p['id']):self.error(403,'会员套餐未分配该机器规格')
+                if entitlement and entitlement[0] not in ('*',p['id'],p.get('specId')):self.error(403,'会员套餐未分配该机器规格')
                 member=db.execute('SELECT expires FROM memberships WHERE account=?',(account,)).fetchone()
-                if not p['included'] or not member or member[0]<=time.time():self.error(403,'需要有效的会员机器权益')
-                if db.execute("SELECT 1 FROM rentals WHERE account=? AND included=1 AND state NOT IN ('expired','failed')",(account,)).fetchone():self.error(409,'已有会员机器')
+                if not (p['included'] or (entitlement and entitlement[0] and entitlement[0] in (p['id'],p.get('specId')))) or not member or member[0]<=time.time():self.error(403,'需要有效的会员机器权益')
+                if db.execute("SELECT 1 FROM rentals WHERE account=? AND included=1 AND state NOT IN ('released','expired','failed')",(account,)).fetchone():self.error(409,'已有会员机器')
             elif body.get('points')!=p['points'] or body.get('days')!=p['days']:self.error(409,'套餐已更新，请刷新后重试')
             elif self.balance(db,account)<p['points']:self.error(409,'可用点数不足')
             else:db.execute('INSERT INTO rental_points VALUES(?,?,?)',(account,'rent:'+machine,-p['points']))
@@ -387,8 +449,48 @@ class Rentals:
                 if not row[2]:
                     db.execute('INSERT OR IGNORE INTO rental_points VALUES(?,?,?)',(row[0],'refund:'+machine,json.loads(row[1])['points']))
 
+    def retained_machines(self):
+        now=time.time()
+        with self.service.db() as db:
+            db.execute("""UPDATE rentals SET state='expired',retain_until=? WHERE included=1 AND state='paused'
+                AND NOT EXISTS(SELECT 1 FROM memberships m WHERE m.account=rentals.account AND m.expires>?)""",(now+604800,now))
+            # Existing suspended machines get a full notice period on migration.
+            db.execute("""UPDATE rentals SET retain_until=? WHERE included=1 AND state='expired' AND retain_until IS NULL
+                AND NOT EXISTS(SELECT 1 FROM memberships m WHERE m.account=rentals.account AND m.expires>?)""",(now+604800,now))
+            ids=db.execute("SELECT id FROM rentals WHERE included=1 AND state='expired' AND retain_until IS NOT NULL").fetchall()
+        for (machine,) in ids:
+            try:
+                with self.service.db() as db:
+                    db.execute('BEGIN IMMEDIATE')
+                    row=db.execute("""SELECT remote,retain_until,account,plan,extra+cpu_extra+memory_extra+port_extra
+                        FROM rentals WHERE id=? AND included=1 AND state='expired'""",(machine,)).fetchone()
+                    if not row or not row[0] or row[1] is None:continue
+                    remote,until,account,plan,addons=row
+                    member=db.execute('SELECT expires FROM memberships WHERE account=? AND expires>?',(account,now)).fetchone()
+                    if until>now:
+                        if not member:continue
+                        p=json.loads(plan)
+                        assigned=db.execute("SELECT machine FROM member_plans WHERE name=COALESCE((SELECT plan FROM member_assignments WHERE account=? AND expires>?),'Pro')",(account,now)).fetchone()
+                        eligible=assigned and (assigned[0] in (p['id'],p.get('specId')) or (assigned[0]=='*' and p.get('included')))
+                        if eligible and not db.execute("SELECT 1 FROM rentals WHERE id<>? AND account=? AND included=1 AND state NOT IN ('released','expired','failed')",(machine,account)).fetchone():
+                            if addons:
+                                # Preserve the disk while the member confirms paid add-ons.
+                                db.execute("UPDATE rentals SET retain_until=? WHERE id=?",(member[0]+604800,machine))
+                            else:
+                                db.execute("UPDATE rentals SET state='resuming',expires=?,retain_until=NULL WHERE id=?",(member[0],machine))
+                        continue
+                    try:
+                        obj=self.panel('servers/%d'%remote)['attributes']
+                        if obj.get('external_id')!='cshell-'+machine or not obj.get('suspended'):continue
+                        self.panel('servers/%d'%remote,method='DELETE')
+                    except urllib.error.HTTPError as error:
+                        if error.code!=404:raise
+                    db.execute("UPDATE rentals SET state='released',remote=NULL,identity=NULL,endpoint=NULL,ports=NULL WHERE id=?",(machine,))
+            except (OSError,KeyError,ValueError):continue
+
     def tick(self):
         if not self.settings()['configured']:return
+        self.retained_machines()
         with self.service.db() as db:
             rows=db.execute("SELECT r.id,r.plan,r.state,r.remote FROM rentals r LEFT JOIN memberships m ON m.account=r.account WHERE r.state='queued' OR (r.state IN ('ready','installing') AND ((r.included=1 AND COALESCE(m.expires,0)<=?) OR (r.included=0 AND r.expires<=?)))",(time.time(),time.time())).fetchall()
             changes=db.execute("SELECT id,plan,remote,extra,state,cpu_extra,memory_extra FROM rentals WHERE (state='ready' AND (applied<>extra OR cpu_extra<>cpu_applied OR memory_extra<>memory_applied)) OR state='resuming'").fetchall()
@@ -440,7 +542,7 @@ class Rentals:
                         due=member_until if included and not extra else min(member_until,paid_until or member_until) if included else paid_until
                         if due is None or due>time.time():continue
                         self.panel('servers/%d/suspend'%remote,{})
-                        db.execute("UPDATE rentals SET state='expired' WHERE id=?",(machine,))
+                        db.execute("UPDATE rentals SET state='expired',retain_until=? WHERE id=?",(time.time()+604800 if included and member_until<=time.time() else None,machine))
             except urllib.error.HTTPError as e:
                 if state=='queued' and e.code==422:
                     try:

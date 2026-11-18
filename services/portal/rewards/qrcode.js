@@ -2286,6 +2286,7 @@ var qrcode = function() {
 
 }();
 
+globalThis.qrcode = qrcode;
 (function (factory) {
   if (typeof define === 'function' && define.amd) {
       define([], factory);

@@ -565,6 +565,11 @@ test('CShell inventory tools work without a bound machine, obey global grants an
     assert.equal(loaded.snapshot().extractionProviderId, provider.id);
     assert.deepEqual(loaded.snapshot().policy.application, []);
     await assert.rejects(ai.setExtractionProvider(randomUUID()), /Unknown AI provider/);
+    const memberId = randomUUID();
+    await ai.ensureOfficialModels([{id: 'pool-' + memberId, name: '会员测试模型'}]);
+    await assert.rejects(ai.deleteProvider(memberId), /服务端管理/);
+    await assert.rejects(ai.saveProvider({...provider, id: memberId}), /服务端管理/);
+    assert.ok(ai.snapshot().providers.some(p => p.id === memberId));
     await ai.deleteProvider(provider.id);
     assert.equal(ai.snapshot().extractionProviderId, null);
   } finally {
@@ -623,4 +628,33 @@ test('connection extraction uses its saved model independently of chat providers
     await new Promise<void>((r) => api.close(() => r()));
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+test('same chat can save an SSH profile after granting connection management', async () => {
+  const dir=await mkdtemp(join(tmpdir(),'grant-ssh-'));
+  const store=new Store(dir,{encrypt:async s=>Buffer.from(s).toString('base64'),decrypt:async s=>Buffer.from(s,'base64').toString()});
+  const ai=new AiService(dir,store,new ConnectionRegistry(()=>undefined));
+  const api=createServer(async(req,res)=>{
+    let raw='';for await(const part of req)raw+=part;
+    const {tools,messages}=JSON.parse(raw);
+    const available=tools?.some((t:any)=>t.function.name==='create_ssh_connection');
+    const message=available && messages.at(-1).role!=='tool'
+      ? {content:null,tool_calls:[{id:randomUUID(),type:'function',function:{name:'create_ssh_connection',arguments:JSON.stringify({host:'example.test',username:'tester'})}}]}
+      : {content:'完成本轮'};
+    res.setHeader('Content-Type','application/json');res.end(JSON.stringify({choices:[{message}]}));
+  });
+  await new Promise<void>(r=>api.listen(0,'127.0.0.1',r));
+  try{
+    const id=randomUUID();
+    await ai.saveProvider({id,name:'local',model:'fixture',url:'http://127.0.0.1:'+(api.address() as any).port},'test');
+    const t=await ai.create('workspace',id,'allow');
+    await ai.send(t.id,'新建 SSH 连接 tester@example.test');await until(()=>ai.snapshot().threads[0].state==='idle');
+    assert.equal(store.snapshot().profiles.length,0);
+    await ai.savePolicy({...ai.snapshot().policy,application:['connections.manage']});
+    for(const msg of ['继续','再试一下']){
+      await ai.send(t.id,msg);await until(()=>ai.snapshot().threads[0].state==='idle');
+      assert.equal(store.snapshot().profiles.length,1);
+    }
+    assert.equal(store.snapshot().profiles[0].port,22);
+  }finally{await new Promise<void>(r=>api.close(()=>r()));await rm(dir,{recursive:true,force:true});}
 });

@@ -1,5 +1,8 @@
 import {WindowsSystemProxy} from './system-proxy';
 import {CloudflareExtension} from '../extensions/cloudflare/service';
+import { cagentDesktopTools } from './cagent-desktop-tools';
+import {LocalBrowserTests} from './local-browser-tests';
+import {localSshTransfers} from '../core/local-ssh-transfer';
 import {OfficialOpenCode} from '../extensions/opencode/official-runtime';
 import {TavilyExtension} from '../extensions/tavily/service';
 import {ApplicationNetworkRoute} from './network-route';
@@ -35,8 +38,9 @@ export async function registerAiHandlers(
   initializeNewAi = false,
   onUsage?: AiService['onUsage'],
   createSystemRoute?: () => import('./machine-network-route').MachineNetworkRoute,
+  ssh?:import('../core/ssh').SshService,
 ) {
-  const ai = new AiService(directory, store, connections, connectHost, { http, wechat });
+  const ai = new AiService(directory, store, connections, connectHost, { http, wechat, profileSaved:()=>publish?.('cloud:changed') });
   ai.onUsage = onUsage;
   const drafts = new AiDrafts(directory, store);
   // A damaged draft file must not prevent opening existing conversations.
@@ -140,7 +144,16 @@ export async function registerAiHandlers(
     authorized: async () => { const policy = ai.snapshot().policy; if (!policy.application.includes('cloudflare.manage')) await ai.savePolicy({...policy, application:[...policy.application, 'cloudflare.manage']}); },
   }, ai.requestTransport);
   await cloudflare.load();
-  await tavily.load();ai.extensionTools=()=>[...tavily.tools(),...cloudflare.tools(),...(customTools?.()??[])];
+  await tavily.load();
+  const desktop=cagentDesktopTools(()=>pluginEnabled(store.plugins(),'agent')), browsers=new LocalBrowserTests();
+  ai.extensionTools=thread=>{
+    const local=desktop.tools(),tools=[...tavily.tools(),...cloudflare.tools(),...(customTools?.()??[]),...local];
+    if(!local.length)return tools;
+    tools.push(browsers.tool(thread.id));
+    const id=thread.sessionId;
+    if(id&&ssh){try{if(connections.describe(id).providerId==='cshell.ssh')tools.push(...localSshTransfers(()=>ssh.sftp(id)));}catch{}}
+    return tools;
+  };
   await setupCloud?.(ai, openCode, network, tavily);
   handle('ai:extension-call',(id,action,input)=>id==='cshell.cloudflare'?cloudflare.call(z.enum(['status','authorize','restart','refresh','disconnect']).parse(action)):id==='cshell.tavily'?tavily.call(z.string().max(80).parse(action),input):ai.providerExtensions.call(z.string().max(100).parse(id),z.string().max(80).parse(action),input));
   const bindingKey=(id:string)=>{
@@ -218,7 +231,7 @@ export async function registerAiHandlers(
     ai.create(location, provider, mode, session, model, history),
   );
   handle('ai:delete', async (id) => { await ai.remove(id); if (!draftLoadError) await drafts.save(id, ''); });
-  handle('ai:send', (id, text, attachments, steer) => steer === true ? ai.steer(id, text) : ai.send(id, text, undefined, attachments));
+  handle('ai:send', (id, text, attachments, steer, resume, session) => resume === true ? ai.resume(id, session) : steer === true ? ai.steer(id, text) : ai.send(id, text, undefined, attachments));
   handle('ai:reask',(id,index,time,text)=>ai.reask(id,index,time,text));
   handle('ai:approve', (id, request, allow) => ai.approve(id, request, allow));
   handle('ai:stop', (id) => ai.stopAndSave(id));
@@ -230,7 +243,7 @@ export async function registerAiHandlers(
     ai.onThreadUpdate = undefined;
     clearInterval(revalidate);listenerAbort.abort();const remoteClose=remoteEvents.close();
     if(wechat)wechat.subscriptions.onMessage=undefined;
-    ai.dispose();
+    browsers.dispose();void desktop.dispose();ai.dispose();
     clearTimeout(timer);
     pending.clear();
     disposal = Promise.all([events.close(),ai.flush(),officialOpenCode.dispose(),remoteClose,switching.then(()=>systemProxy.close()).finally(async()=>{await exit?.route.close();await network.close();}),drafts.snapshot()]).then(()=>{});

@@ -1042,3 +1042,9 @@
 .agent-reask textarea{width:100%;min-height:5em;resize:vertical;color:inherit;font:inherit}
 .agent-reask small{color:var(--muted)}
 .agent-reask > div{justify-content:flex-end}
+
+.agent-history-state { display:inline-flex; align-items:center; gap:.4em; width:fit-content; font-size:.8em; color:var(--accent); }
+.agent-history-state::before { content:""; width:.55em; height:.55em; border-radius:50%; background:currentColor; }
+.agent-history-state[data-state="approval"] { color:var(--text); }
+.agent-message-body { min-height: 100%; display: flow-root; }
+.agent-message-body:has(> .agent-welcome:only-child) { display: grid; }

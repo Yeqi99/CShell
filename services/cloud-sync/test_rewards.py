@@ -28,6 +28,29 @@ class RewardsTest(unittest.TestCase):
     def card(self,kind,n,plan=''):
         return self.r.issue(dict(request=str(uuid.uuid4()),kind=kind,quantity=n,plan=plan))
 
+    def test_promotion_limit_and_replay(self):
+        body=dict(request=str(uuid.uuid4()),kind='membership',plan='Pro',quantity=7,purpose='promotion',maxClaims=20)
+        card=self.r.issue(body)
+        def claim(i):
+            try:self.r.redeem('guest'+str(i),card);return i
+            except Failure:return None
+        with concurrent.futures.ThreadPoolExecutor(6) as pool:results=list(pool.map(claim,range(24)))
+        winners=[i for i in results if i is not None]
+        self.assertEqual(len(winners),20)
+        claim(winners[0])
+        with self.s.db() as db:
+            self.assertEqual(db.execute('SELECT count(*) FROM gift_claims').fetchone()[0],20)
+            self.assertEqual(db.execute("SELECT count(*) FROM benefit_terms WHERE category='promotion'").fetchone()[0],20)
+        with self.assertRaises(Failure):self.r.issue(dict(body,maxClaims=21))
+
+    def test_cost_receipt_replay_and_promotional_allocation(self):
+        invoice=dict(reference='invoice-line-1',destination='hosting',amountFen=500,source='campaign-1',category='promotion')
+        self.r.expenses(invoice)
+        report=self.r.expenses(invoice)
+        self.assertEqual(report['totalFen'],500)
+        self.assertEqual(report['groups'],[dict(category='promotion',destination='hosting',amountFen=500)])
+        with self.assertRaises(Failure):self.r.expenses(dict(invoice,category='sale'))
+
     def test_single_use(self):
         card=self.card('points',50)
         def redeem(who):

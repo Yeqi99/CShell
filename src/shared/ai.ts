@@ -74,6 +74,7 @@ export const aiPolicySchema = z
         'wechat.contacts.manage',
       ]),
     ),
+    localDesktop:z.boolean().optional(),
     allMachines: z.boolean(),
     profiles: z.array(z.string().uuid()).max(1000),
     groups: z.array(z.string().max(100)).max(1000),
@@ -138,6 +139,7 @@ export type AiThread = {
   parentId?: string;
   permissionCeiling?: AiPolicy;
   boundIdentity?: string;
+  resumeIdentity?: string;
   goal?: import('./ai-work').AiGoal;
   messages: AiMessage[];
   state: 'idle' | 'running' | 'approval' | 'error';
@@ -195,7 +197,7 @@ export interface AiBridge {
     extensionModel?: string, history?:import('./cloud-conversations').ChatDocument,
   ): Promise<AiThread>;
   aiThreadDelete(id: string): Promise<void>;
-  aiSend(id: string, text: string, attachments?: AiAttachment[], steer?: boolean): Promise<void>;
+  aiSend(id: string, text: string, attachments?: AiAttachment[], steer?: boolean, resume?: boolean, selectedSession?: string): Promise<void>;
   aiReask(id:string, index:number, time:number, text:string):Promise<string>;
   aiApprove(id: string, requestId: string, allow: boolean): Promise<void>;
   aiStop(id: string): Promise<void>;

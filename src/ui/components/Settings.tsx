@@ -1,7 +1,6 @@
 import {ErrorNotice} from './ErrorNotice';
 import {UsageConsent} from './UsageStats';
 import { LocalEnvironmentSettings } from './LocalEnvironmentSettings';
-import { CloudSettings } from './CloudSettings';
 import { NetworkSettings } from './NetworkSettings';
 import { Search, Globe } from 'lucide-react';
 import { Palette, Terminal, PanelsTopLeft, Blocks, ShieldCheck, Download } from 'lucide-react';
@@ -33,7 +32,6 @@ export function Settings({
   const { t, locale } = useI18n();
   const cn = locale === 'zh-CN';
   const categories = [
-    ['cloud', ShieldCheck, cn ? '账号与云同步' : 'Account & sync'],
     ['appearance', Palette, cn ? '外观' : 'Appearance'],
     ['terminal', Terminal, cn ? '终端' : 'Terminal'],
     ...(navigator.platform.startsWith('Win')
@@ -47,7 +45,6 @@ export function Settings({
   ] as const;
   const [query, setQuery] = useState('');
   const categoryHelp: Record<string, [string, string, string]> = {
-    cloud: ['账号、同步与本机数据', 'Account, sync and local data', '登录 邮箱 导入 缓存 会员 sync import account'],
     appearance: ['调整界面、字体与背景，修改即时预览', 'Preview interface, typography and background changes', '主题 字号 侧边栏 字体 背景 theme font sidebar'],
     terminal: ['字体、行距与键盘操作', 'Typography, spacing and keyboard behavior', '复制 粘贴 配色 快捷键 font clipboard keyboard'],
     local: ['管理新建本机终端的环境变量', 'Environment variables for new local terminals', '环境变量 CMD PowerShell environment'],
@@ -59,6 +56,8 @@ export function Settings({
   };
   const visibleCategories = categories.filter(([id, , label]) => !query.trim() || `${label} ${categoryHelp[id].join(' ')}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
   const [category, setCategory] = useState<string>('appearance');
+  const contentRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => { contentRef.current?.scrollTo(0, 0); }, [category]);
   const [draft, setDraft] = useState(value),
     [error, setError] = useState('');
   const [fonts, setFonts] = useState<string[]>([]),
@@ -136,6 +135,12 @@ export function Settings({
         if (event.target instanceof HTMLButtonElement) event.target.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
       }}>
         <h2>{t('settingsTitle')}</h2>
+        <label className="settings-category-picker">
+          <span>{cn ? '设置分类' : 'Settings category'}</span>
+          <select value={category} onChange={event => setCategory(event.target.value)}>
+            {categories.map(([id, , label]) => <option key={id} value={id}>{label}</option>)}
+          </select>
+        </label>
         <label className="settings-search"><Search size={15} aria-hidden="true"/><input type="search" aria-label={cn ? '查找设置分类' : 'Find settings categories'} placeholder={cn ? '查找设置' : 'Find settings'} value={query} onChange={event => setQuery(event.target.value)}/></label>
         {visibleCategories.length === 0 && <p className="settings-search-empty" role="status">{cn ? '未找到分类，试试其他关键词' : 'No categories found. Try another keyword.'}</p>}
         {visibleCategories.map(([id, Icon, label]) => (
@@ -149,7 +154,7 @@ export function Settings({
           </button>
         ))}
       </nav>
-      <div className="settings-content">
+      <div className="settings-content" ref={contentRef}>
         {error && <ErrorNotice title="设置未保存" error={error}/>}
         <header className="settings-category-heading">
           <h1>{categories.find(([id]) => id === category)?.[2]}</h1>
@@ -160,7 +165,6 @@ export function Settings({
           <FeedbackPanel english={!cn}/>
           <UsageConsent english={!cn} active={category === 'updates'} />
         </div>
-        <div hidden={category !== 'cloud'}><CloudSettings /></div>
         {window.cshell.networkStatus && <div hidden={category !== 'network'}><NetworkSettings/></div>}
         <div hidden={category !== 'workspace'}>
           <section className="settings-section">
@@ -431,7 +435,7 @@ export function Settings({
           {t('cancel')}
         </button>
         <button
-          hidden={category === 'local' || category === 'cloud' || category === 'network'}
+          hidden={category === 'local' || category === 'network'}
           className="primary"
           form="workspace-preferences-form"
           disabled={busy || mcp.busy || (category === 'security' && !mcp.draft)}

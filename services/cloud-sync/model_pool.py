@@ -60,6 +60,9 @@ class Pool:
             CREATE TABLE IF NOT EXISTS pool_keys(id TEXT PRIMARY KEY,provider TEXT,label TEXT,secret BLOB,digest TEXT UNIQUE,capacity INTEGER,enabled INTEGER,cooldown REAL DEFAULT 0);
             CREATE TABLE IF NOT EXISTS pool_models(id TEXT PRIMARY KEY,provider TEXT,model TEXT,weight INTEGER,enabled INTEGER,UNIQUE(provider,model));
             CREATE TABLE IF NOT EXISTS pool_calls(id INTEGER PRIMARY KEY,week TEXT,account TEXT,keyid TEXT,provider TEXT,model TEXT,charge INTEGER,state TEXT);
+            CREATE TABLE IF NOT EXISTS account_quota_windows(account TEXT PRIMARY KEY,started REAL,cutoff INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS call_attributions(id INTEGER PRIMARY KEY,at REAL,category TEXT,source TEXT);
+            CREATE INDEX IF NOT EXISTS pool_calls_account ON pool_calls(account,id);
             CREATE INDEX IF NOT EXISTS pool_week ON pool_calls(week,provider,account);
             CREATE INDEX IF NOT EXISTS pool_key ON pool_calls(week,keyid);
             CREATE TABLE IF NOT EXISTS pool_plans(id TEXT PRIMARY KEY,provider TEXT,label TEXT,total TEXT,remaining TEXT,unit TEXT,checked REAL,UNIQUE(provider,label));
@@ -164,6 +167,14 @@ class Pool:
             db.execute('INSERT INTO admin_audit(at,account,action,detail) VALUES(?,?,?,?)',(time.time(),provider,'model-pool:'+action,'配置已更新'))
         return {'ok':True}
     def allowance(self,db,account,period):
+        window=db.execute('SELECT started,cutoff FROM account_quota_windows WHERE account=?',(account,)).fetchone()
+        if window:
+            started,cutoff=window
+            if started is None or started+604800<=time.time():
+                last=db.execute('SELECT coalesce(max(id),0) FROM pool_calls WHERE account=?',(account,)).fetchone()[0]
+                return last,0,last,0
+            used,last,pending=db.execute("SELECT coalesce(sum(charge),0),coalesce(max(id),0),sum(CASE WHEN state='pending' THEN 1 ELSE 0 END) FROM pool_calls WHERE account=? AND id>?",(account,cutoff)).fetchone()
+            return cutoff,used,last,pending or 0
         cutoff=db.execute('SELECT coalesce(max(cutoff),0) FROM pool_refills WHERE account=? AND week=?',(account,period)).fetchone()[0]
         used,last,pending=db.execute("SELECT coalesce(sum(charge),0),coalesce(max(id),0),count(CASE WHEN state='pending' THEN 1 END) FROM pool_calls WHERE account=? AND week=? AND id>?",(account,period,cutoff)).fetchone()
         return cutoff,used,last,pending
@@ -182,6 +193,7 @@ class Pool:
             if self.s.rentals.balance(db,account)<REFILL_PRICE:raise self.F(409,'可用点数不足')
             db.execute('INSERT INTO rental_points VALUES(?,?,?)',(account,'model-refill:'+request,-REFILL_PRICE))
             db.execute('INSERT INTO pool_refills VALUES(?,?,?,?,?)',(account,request,period,last,time.time()))
+            db.execute('INSERT OR REPLACE INTO account_quota_windows VALUES(?,NULL,?)',(account,last))
         return {'ok':True}
 
     def inventory(self,db):
@@ -214,7 +226,8 @@ class Pool:
         if account is not None:
             cutoff,spent,last,pending=self.allowance(db,account,period)
             end=datetime.datetime.fromisoformat(period+'T00:00:00+08:00')+datetime.timedelta(days=7)
-            result.update(remainingYuan=max(0,budget-spent)/10000,occupiedYuan=spent/10000,percent=max(0,budget-spent)*100/budget,resetAt=int(end.timestamp()),price=REFILL_PRICE,quote=f'{period}:{cutoff}:{last}:{spent}' if spent and not pending else None)
+            window=db.execute('SELECT started FROM account_quota_windows WHERE account=?',(account,)).fetchone()
+            result.update(remainingYuan=max(0,budget-spent)/10000,occupiedYuan=spent/10000,percent=max(0,budget-spent)*100/budget,resetAt=int(window[0]+604800) if window and window[0] and window[0]+604800>time.time() else int(end.timestamp()) if not window and spent else 0,price=REFILL_PRICE,quote=f'{period}:{cutoff}:{last}:{spent}' if spent and not pending else None)
         for p in URL:
             keys=db.execute("""SELECT id,label,capacity,enabled,cooldown,coalesce((SELECT sum(charge) FROM pool_calls WHERE week=? AND keyid=k.id),0) FROM pool_keys k WHERE provider=?""",(period,p)).fetchall()
             capacity=sum(k[2] for k in keys if k[3])
@@ -297,7 +310,7 @@ class Pool:
                 if unit:return ((input_estimate+output)*rate+unit-1)//unit
                 return rate
             period=week()
-            _,spent,_,_=self.allowance(db,account,period)
+            cutoff,spent,_,_=self.allowance(db,account,period)
             minimum=reservation(1 if fit_output else max_output)
             balance=self.weekly_value(db,account)-spent
             if minimum>balance:raise self.F(429,"本周 Pro 额度不足")
@@ -314,7 +327,18 @@ class Pool:
                 max_output=low
             weight=reservation(max_output)
             credential=self.cipher().decrypt(key[1]).decode()
+            current=db.execute('SELECT started FROM account_quota_windows WHERE account=?',(account,)).fetchone()
+            if not current or current[0] is None or current[0]+604800<=time.time():
+                now=time.time()
+                if not current and spent:
+                    # Legacy calls have no timestamps. Preserve their existing reset date.
+                    now=datetime.datetime.fromisoformat(period+'T00:00:00+08:00').timestamp()
+                    cutoff=max(cutoff,db.execute('SELECT coalesce(max(id),0) FROM pool_calls WHERE account=? AND week<?',(account,period)).fetchone()[0])
+                elif not current:cutoff=db.execute('SELECT coalesce(max(id),0) FROM pool_calls WHERE account=?',(account,)).fetchone()[0]
+                db.execute('INSERT OR REPLACE INTO account_quota_windows VALUES(?,?,?)',(account,now,cutoff))
             lease=db.execute('INSERT INTO pool_calls(week,account,keyid,provider,model,charge,state) VALUES(?,?,?,?,?,?,?)',(period,account,key[0],p,model,weight,'pending')).lastrowid
+            term=db.execute('SELECT category,source FROM benefit_terms WHERE account=? AND start<=? AND end>? ORDER BY start DESC LIMIT 1',(account,time.time(),time.time())).fetchone()
+            db.execute('INSERT INTO call_attributions VALUES(?,?,?,?)',(lease,time.time(),*(term or ('unclassified',''))))
             db.execute('INSERT INTO pool_meter(id,unit,rate,held) VALUES(?,?,?,?)',(lease,unit,rate,weight))
             if divisor!=100000000:db.execute('INSERT INTO pool_price_divisors VALUES(?,?)',(lease,divisor))
             if p=='opencode-go':
@@ -377,6 +401,8 @@ class Pool:
             if status in (401,402,403,429):
                 db.execute('UPDATE pool_keys SET cooldown=? WHERE id=(SELECT keyid FROM pool_calls WHERE id=?)',(time.time()+(60 if status==429 else 3600),lease))
             db.execute('UPDATE pool_calls SET state=?,charge=? WHERE id=?',(state,charge,lease))
+            if charge==0 and not db.execute("SELECT 1 FROM pool_calls c JOIN account_quota_windows w ON w.account=c.account WHERE c.account=? AND c.id>w.cutoff AND (c.charge>0 OR c.state='pending') LIMIT 1",(account,)).fetchone():
+                db.execute('UPDATE account_quota_windows SET started=NULL WHERE account=?',(account,))
     def refresh_balances(self):
         while True:
             try:

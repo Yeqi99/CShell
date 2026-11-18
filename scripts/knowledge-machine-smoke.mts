@@ -16,8 +16,18 @@ await page.getByText('机器知识库',{exact:true}).first().click();
 await page.getByRole('button',{name:'安装并核验能力包'}).click();
 await page.getByRole('button',{name:'打开知识库'}).click();
 const kb=page.locator('.machine-knowledge:visible');
-await kb.getByLabel('标题').fill('人工输入验收');await kb.getByLabel('正文').fill('检索内容');await kb.getByText('保存知识',{exact:true}).click();await kb.getByText('已保存',{exact:true}).waitFor();await kb.getByText('查询记录',{exact:true}).click();await kb.getByRole('button',{name:/人工输入验收/}).click();await kb.locator('pre').getByText('检索内容').waitFor();
-const box=kb.getByLabel(/为智能体提供知识支持/);await box.click();await kb.getByText('智能体权限已保存').waitFor();
+for(const [type,titleLabel,bodyLabel] of [['article','标题','正文'],['qa','问题','答案'],['procedure','解决的问题','解决思路'],['kv','键名','值']]){
+ await kb.getByRole('button',{name:'添加知识'}).click();
+ await kb.getByLabel('知识类型').selectOption(type);
+ await kb.getByLabel(titleLabel,{exact:true}).fill('验收-'+type);
+ await kb.getByLabel(bodyLabel,{exact:true}).fill('检索内容-'+type);
+ if(type==='procedure'){await kb.getByLabel('操作步骤（每行一步）').fill('核对环境\n运行检查');await kb.getByLabel('验证结果').fill('已确认');}
+ await kb.getByRole('button',{name:'保存知识'}).click();await kb.getByText('已保存',{exact:true}).waitFor();
+ await kb.getByRole('button',{name:new RegExp('验收-'+type)}).click();await kb.locator('pre').getByText('检索内容-'+type,{exact:true}).waitFor();
+ await kb.getByRole('button',{name:'返回列表'}).click();
+}
+await kb.getByRole('button',{name:'智能体访问权限'}).click();
+const box=kb.getByLabel(/允许智能体读取与检索/);await box.click();await kb.getByText('智能体权限已保存').waitFor();
 const tools=await runtime.dispatch('packages.tools',{}) as any[];if(!tools.some(t=>t.id==='knowledge_search')||tools.some(t=>t.id==='knowledge_put'))throw Error('grant mismatch');
 await box.click();await kb.getByText('智能体权限已保存').waitFor();if((await runtime.dispatch('packages.tools',{}) as any[]).some(t=>t.packageId==='cagent.knowledge'))throw Error('revoke failed');
 console.log('PASS connected desktop install/manual/grant/revoke');

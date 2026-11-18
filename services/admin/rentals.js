@@ -3,9 +3,10 @@ export async function mountRentals(root,api){
     const css=document.createElement('link');css.rel='stylesheet';css.href=new URL('./rentals.css',import.meta.url).href;css.dataset.rentalStyle='';document.head.append(css);
   }
   root.innerHTML=`<div class="rental-admin"><header><h1>云机器租赁</h1><span data-provider-state></span></header>
-    <nav aria-label="租赁管理视图"><button type="button" data-view="inventory" aria-pressed="true">实例管理</button><button type="button" data-view="plans">租赁套餐</button><button type="button" data-view="credits">点数入账</button><button type="button" data-view="providers">服务商与授权</button></nav>
+    <nav aria-label="租赁管理视图"><button type="button" data-view="inventory" aria-pressed="true">实例管理</button><button type="button" data-view="specs">基础规格</button><button type="button" data-view="plans">上架定价</button><button type="button" data-view="credits">点数入账</button><button type="button" data-view="providers">服务商与授权</button></nav>
     <section data-page="inventory"><h2>云机器实例</h2><div data-instances></div></section>
-    <section data-page="plans" hidden><header><h2>套餐配置</h2><select aria-label="选择套餐" data-selector></select></header><form data-plan></form></section>
+    <section data-page="specs" hidden><header><h2>基础规格</h2><select aria-label="选择基础规格" data-spec-selector></select></header><form data-spec></form></section>
+    <section data-page="plans" hidden><header><h2>租赁上架</h2><select aria-label="选择套餐" data-selector></select></header><form data-plan></form></section>
     <section data-page="credits" hidden><h2>账号点数入账</h2><form data-credit><label>账号 ID<input name="account" required></label><label>入账流水号<input name="reference" required></label><label>点数<input name="points" type="number" min="1" required></label><footer><button>确认入账</button></footer></form></section>
     <section data-page="providers" hidden><h2>翼龙后台连接</h2><form data-provider><label>后台地址<input name="host" value="pl.deviy.cn" readonly></label><label>Application API 密钥<input name="key" type="password" autocomplete="new-password" required></label><footer><button>验证并保存</button></footer></form></section>
     <section data-page="providers" hidden><h2>服务商授权</h2><form data-grant><label>服务商名称<input name="name" required></label><label>管理套餐<select name="plan" required></select></label><footer><button>生成访问码</button></footer></form><output data-access></output><div data-operators></div></section><p role="status" aria-live="polite"></p></div>`;
@@ -15,28 +16,38 @@ export async function mountRentals(root,api){
     root.querySelector('[data-access]').textContent='';root.querySelector('[role=status]').textContent='';
   };
   const form=root.querySelector('[data-plan]'), status=root.querySelector('[role=status]');
-  const names={id:'套餐标识',name:'名称',system:'Linux 容器环境',cpu:'CPU 配额（100 为一核）',memory:'内存 MiB',disk:'磁盘 MiB',days:'租期（天）',points:'每期点数',expansionDays:'扩容计价周期（天）',cpuPoints:'每核每周期点数',memoryPoints:'每 GiB 内存每周期点数',expansionPoints:'每 10 GiB 磁盘每周期点数',node:'节点 ID',egg:'CAgent Egg ID',owner:'托管账号 ID',included:'会员可领取',enabled:'开放领取和租赁'};
-  const numeric=['cpu','memory','disk','days','points','expansionPoints','cpuPoints','memoryPoints','expansionDays','node','egg','owner'];
-  for(const [key,label] of Object.entries(names)){
-    const field=document.createElement('label'), input=document.createElement('input');
-    if(['id','cpu','days','node','included'].includes(key)){const h=document.createElement('h3');h.textContent=({id:'基本信息',cpu:'机器规格',days:'租期与定价',node:'部署设置',included:'开放范围'})[key];form.append(h);}
-    field.textContent=label;input.name=key;
-    input.type=['included','enabled'].includes(key)?'checkbox':numeric.includes(key)?'number':'text';
-    if(input.type==='number')input.min='1';
-    input.required=input.type!=='checkbox';if(input.type==='checkbox'){field.className='check';field.prepend(input);}else field.append(input);form.append(field);
+  const specForm=root.querySelector('[data-spec]');
+  const specSelect=root.querySelector('[data-spec-selector]'),select=root.querySelector('[data-selector]');
+  const specFields={name:'规格名称',system:'系统环境',cpu:'CPU 配额（100 为一核）',memory:'内存 MiB',disk:'磁盘 MiB',node:'节点 ID',egg:'CAgent Egg ID',owner:'托管账号 ID'};
+  const priceFields={specId:'基础规格',days:'付款周期',points:'每期点数',expansionDays:'扩容计价周期（天）',cpuPoints:'每核点数',memoryPoints:'每 GiB 内存点数',expansionPoints:'每 10 GiB 磁盘点数',enabled:'开放租赁'};
+  function fields(target,labels){
+    for(const [key,title] of Object.entries(labels)){
+      const label=document.createElement('label');label.textContent=title;
+      const input=document.createElement(['days','specId'].includes(key)?'select':'input');
+      input.name=key;
+      if(input.tagName==='INPUT'){input.type=key==='enabled'?'checkbox':['name','system'].includes(key)?'text':'number';if(input.type==='number')input.min=1;}
+      if(key==='enabled'){label.className='check';label.prepend(input);}else{input.required=true;label.append(input);}
+      target.append(label);
+    }
+    const footer=document.createElement('footer'),button=document.createElement('button');
+    button.textContent=target===specForm?'保存基础规格':'保存租价';footer.append(button);target.append(footer);
   }
-  const submit=document.createElement('button');submit.textContent='保存套餐';const foot=document.createElement('footer');foot.append(submit);form.append(foot);
-  const select=root.querySelector('[data-selector]');
-  let plans=[];
-  function fill(){
-    const p=plans.find(x=>x.id===select.value)??{egg:42,node:2,system:'Linux x64 · CAgent'};
-    for(const key of Object.keys(names)){const field=form.elements[key];
-      if(field.type==='checkbox')field.checked=!!p[key];else field.value=p[key]??({cpuPoints:500,memoryPoints:500,expansionPoints:200,expansionDays:p.days??30})[key]??'';}
+  fields(specForm,specFields);fields(form,priceFields);
+  let plans=[],specs=[];
+  function fillSpec(){const row=specs.find(p=>p.id===specSelect.value)||{system:'Linux x64 · CAgent',cpu:200,memory:4096,disk:30720};
+    for(const k of Object.keys(specFields))specForm.elements[k].value=row[k]??'';
+  }
+  function fill(){const row=plans.find(p=>p.id===select.value)||{days:30,expansionDays:30,cpuPoints:500,memoryPoints:500,expansionPoints:200,enabled:false};
+    const periods=[...new Set([1,30,row.days])];form.elements.days.replaceChildren(...periods.map(d=>new Option(d===1?'日租':d===30?'月租':d+' 天',d)));
+    for(const k of Object.keys(priceFields)){const input=form.elements[k];if(k==='enabled')input.checked=row.enabled;else input.value=row[k]??(k==='specId'?specs[0]?.id:'')??'';}
+    form.elements.specId.disabled=!!select.value;
   }
   async function refresh(){
-    const state=await api('rentals/settings');plans=state.plans;
-    const previous=select.value,initial=select.options.length===0;select.replaceChildren(new Option('新建套餐',''),...plans.map(p=>new Option(p.name,p.id)));
-        select.value=initial?(plans[0]?.id??''):(plans.some(p=>p.id===previous)?previous:'');
+    const state=await api('rentals/settings');specs=state.plans.filter(p=>p.specOnly);plans=state.plans.filter(p=>!p.specOnly);
+    const lastSpec=specSelect.value,lastPrice=select.value;
+    specSelect.replaceChildren(new Option('新建基础规格',''),...specs.map(p=>new Option(p.name,p.id)));specSelect.value=lastSpec;
+    select.replaceChildren(new Option('新增上架价格',''),...plans.map(p=>new Option(p.name+' · '+p.days+' 天 · '+p.points+' 点'+(p.enabled?'':' · 已下架'),p.id)));select.value=lastPrice;
+    form.elements.specId.replaceChildren(...specs.map(p=>new Option(p.name,p.id)));fillSpec();
     const grant=root.querySelector('[data-grant]');
     grant.elements.plan.replaceChildren(...plans.map(p=>new Option(p.name,p.id)));
     const list=root.querySelector('[data-operators]');list.replaceChildren();
@@ -79,8 +90,11 @@ export async function mountRentals(root,api){
   const provider=root.querySelector('[data-provider]'),credit=root.querySelector('[data-credit]');
   bind(provider,'settings',()=>Object.fromEntries(new FormData(provider)));
   bind(credit,'credit',()=>({...Object.fromEntries(new FormData(credit)),points:Number(credit.elements.points.value)}));
-  bind(form,'plan',()=>{const data=Object.fromEntries(new FormData(form));
-    for(const key of numeric)data[key]=Number(data[key]);
-    return {...data,included:form.elements.included.checked,enabled:form.elements.enabled.checked};});
+  specSelect.onchange=fillSpec;
+  function payload(target,keys){
+    return Object.fromEntries(Object.keys(keys).map(k=>{const input=target.elements[k];return [k,input.type==='checkbox'?input.checked:input.type==='number'||k==='days'?Number(input.value):input.value];}));
+  }
+  bind(specForm,'plan',()=>({kind:'spec',id:specSelect.value||crypto.randomUUID(),...payload(specForm,specFields)}));
+  bind(form,'plan',()=>({kind:'rate',id:select.value||crypto.randomUUID(),...payload(form,priceFields)}));
   try{await refresh();}catch(e){status.textContent=e.message;}
 }

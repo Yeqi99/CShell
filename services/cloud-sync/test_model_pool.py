@@ -50,7 +50,7 @@ class ModelPoolTest(unittest.TestCase):
   self.edit('limit',ceiling=2)
   self.pool.reserve('0',self.model)
   self.assertEqual(self.pool.view('0')['pools'][0]['remaining'],496)
-  with patch('model_pool.week',return_value='2099-11-02'):self.assertEqual(self.pool.view('0')['pools'][0]['remaining'],500)
+  with patch('model_pool.week',return_value='2099-11-02'):self.assertLess(self.pool.view('0')['pools'][0]['remaining'],500)
  def test_aiopen_key_quota_and_routing(self):
   pool=self.pool
   def edit(action,**fields):return pool.change(dict(action=action,provider='aiopen',**fields))
@@ -123,7 +123,9 @@ class ModelPoolTest(unittest.TestCase):
   with self.assertRaises(Failure):p.refill('0',dict(request='another-request-12345',quote=p.view('0')['quote']))
   self.assertEqual(p.view('0')['balance'],412)
   with patch('model_pool.week',return_value='2099-11-02'):
-   self.assertEqual((p.view('0')['percent'],p.view('0')['balance']),(100,412))
+   self.assertLess(p.view('0')['percent'],100)
+  with self.s.db() as db:db.execute("UPDATE account_quota_windows SET started=started-604801 WHERE account='0'")
+  self.assertEqual((p.view('0')['percent'],p.view('0')['balance'],p.view('0')['resetAt']),(100,412,0))
 
  def test_member_output_fits_shared_balance_and_inventory(self):
   self.edit('model',model='deepseek-v4-flash',weight=1,inputPrice=1,cachePrice=1,outputPrice=100)

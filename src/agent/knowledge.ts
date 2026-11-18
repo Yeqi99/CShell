@@ -4,6 +4,8 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import type { TrustedCapabilityAdapter } from './capability-runtime';
 
+import {assemble, backfill, fuse, hitFields, indexDocument, initPassages, sparse, subqueries, type Hit} from './knowledge-retrieval';
+
 const label = z.string().trim().min(1).max(160);
 const address = z.object({ library: label, key: label }).strict();
 export const knowledgeInputs = {
@@ -56,6 +58,7 @@ export function knowledgeAdapter(directory: string): TrustedCapabilityAdapter {
     const db = new DatabaseSync(join(root, 'records.sqlite'));
     try {
       db.exec('PRAGMA busy_timeout=3000; CREATE TABLE IF NOT EXISTS records(id TEXT PRIMARY KEY, library TEXT, key TEXT, kind TEXT, title TEXT, content TEXT, source TEXT, created INTEGER); CREATE INDEX IF NOT EXISTS records_scope ON records(library,key)');
+      initPassages(db);
       return db;
     } catch (error) { db.close(); throw error; }
   }
@@ -67,9 +70,11 @@ export function knowledgeAdapter(directory: string): TrustedCapabilityAdapter {
       try {
         signal.throwIfAborted();
         if (tool === 'knowledge_search') {
-          const { library, key, query, offset } = knowledgeInputs.knowledge_search.parse(args);
-          return { records: db.prepare('SELECT id,library,key,kind,title,source,created,substr(content,1,240) AS excerpt FROM records WHERE (? IS NULL OR library=?) AND (? IS NULL OR key=?) AND (instr(lower(title),lower(?)) OR instr(lower(content),lower(?))) ORDER BY created DESC,id LIMIT 30 OFFSET ?')
-            .all(library ?? null,library ?? null,key ?? null,key ?? null,query ?? '',query ?? '',offset ?? 0) };
+          const {query,library,key,offset=0}=knowledgeInputs.knowledge_search.parse(args);
+          if(!query?.trim())return {records:db.prepare('SELECT id,library,key,kind,title,source,created,substr(content,1,240) AS excerpt FROM records WHERE (? IS NULL OR library=?) AND (? IS NULL OR key=?) ORDER BY created DESC,id LIMIT 30 OFFSET ?').all(library??null,library??null,key??null,key??null,offset)};
+          await backfill(db,signal);
+          const queries=subqueries(query);
+          return {queries,records:assemble(queries,queries.map(q=>sparse(db,q,library,key,offset+30)),offset,30)};
         }
         if (tool === 'knowledge_get') {
           const {library,key,id} = knowledgeInputs.knowledge_get.parse(args);
@@ -78,9 +83,28 @@ export function knowledgeAdapter(directory: string): TrustedCapabilityAdapter {
         if (tool === 'knowledge_similar') {
           const { library,key,query } = knowledgeInputs.knowledge_similar.parse(args);
           const scope = createHash('sha256').update(JSON.stringify([library,key])).digest('hex');
-          const hits = await vectorRequest('search',{data:[await embed(query,signal)], annsField:'vector', filter:'scope == "' + scope + '"',limit:10},signal);
-          const lookup = db.prepare('SELECT id,title,substr(content,1,480) AS excerpt FROM records WHERE id=? AND library=? AND key=?');
-          return {records:z.array(z.object({id:z.string()})).parse(hits).map(hit=>lookup.get(hit.id,library,key)).filter(Boolean)};
+          await backfill(db,signal);
+          const lookup=db.prepare(`SELECT ${hitFields} FROM passages p JOIN records r ON r.id=p.doc
+            WHERE p.cid=? AND r.library=? AND r.key=?`);
+          // Earlier Milvus collections used document IDs. Keep them readable until reindexed.
+          const legacy=db.prepare(`SELECT ${hitFields} FROM records r JOIN passages p ON p.doc=r.id
+            WHERE r.id=? AND r.library=? AND r.key=? AND p.part=0`);
+          const queries=subqueries(query),lists:Hit[][]=[],fallbackQueries:string[]=[];
+          for(const q of queries){
+            const lexical=sparse(db,q,library,key,24);
+            try{
+              const hits=await vectorRequest('search',{data:[await embed(q,signal)],annsField:'vector',filter:'scope == "'+scope+'"',limit:24},signal);
+              const dense=z.array(z.object({id:z.string()})).parse(hits).flatMap(hit=>{
+                const row=lookup.get(hit.id,library,key)??legacy.get(hit.id,library,key);
+                return row?[row as Hit]:[];
+              });
+              lists.push(fuse([lexical,dense]));
+            }catch(error){
+              signal.throwIfAborted();
+              fallbackQueries.push(q);lists.push(lexical);
+            }
+          }
+          return {queries,fallbackQueries,records:assemble(queries,lists,0,10)};
         }
         if (tool !== 'knowledge_put') throw Error('未知知识库操作');
         const record = knowledgeInputs.knowledge_put.parse(args);
@@ -93,12 +117,23 @@ export function knowledgeAdapter(directory: string): TrustedCapabilityAdapter {
           return {stored:false,error:kind==='procedure'?'content 必须是 JSON 字符串，包含非空 steps 字符串数组和非空 outcome 字符串。请修正参数后重试；本次未写入记录。':'content 必须是有效 JSON 字符串。请修正后重试；本次未写入记录。'};
         }
         const id = createHash('sha256').update(JSON.stringify(record)).digest('hex');
-        db.prepare('INSERT OR IGNORE INTO records VALUES (?,?,?,?,?,?,?,?)').run(id,library,key,kind,title,content,source ?? '',Date.now());
+        db.exec('BEGIN IMMEDIATE');
+        try{
+          db.prepare('INSERT OR IGNORE INTO records VALUES (?,?,?,?,?,?,?,?)').run(id,library,key,kind,title,content,source ?? '',Date.now());
+          indexDocument(db,{id,kind,title,content});
+          db.exec('COMMIT');
+        }catch(error){db.exec('ROLLBACK');throw error;}
         const result = { id, stored:true, vector:'disabled', backup:'disabled' };
         if (process.env.CAGENT_MILVUS_URL) {
           try {
             const scope = createHash('sha256').update(JSON.stringify([library,key])).digest('hex');
-            await vectorRequest('upsert',{data:[{id,scope,vector:await embed(title+'\n'+content,signal)}]},signal);
+            const parts=db.prepare('SELECT cid,body FROM passages WHERE doc=? ORDER BY part').all(id);
+            for(let i=0;i<parts.length;i+=8){
+              const batch=await Promise.all(parts.slice(i,i+8).map(async part=>({
+                id:part.cid,scope,vector:await embed(title+'\n'+String(part.body),signal)
+              })));
+              await vectorRequest('upsert',{data:batch},signal);
+            }
             result.vector='indexed';
           } catch (error) {result.vector=String(error);}
         }

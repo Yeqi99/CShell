@@ -41,13 +41,13 @@ export function ErrorNotice({ error, title, retry, busy = false, conversation = 
   if (conversation) return <div className="agent-notice-line">
     <span role="status">{title}</span>
     {retry && <button type="button" disabled={busy} onClick={retry}>继续任务</button>}
-    <details><summary>详情</summary><div className="agent-notice-detail"><pre>{details}</pre><CopyButton content={details} /><FeedbackPanel error={error}/></div></details>
+    <details><summary>详情</summary><div className="agent-notice-detail"><pre>{details}</pre><CopyButton content={details} /></div></details><FeedbackPanel key={error} error={error}/>
   </div>;
   return <section className={`error-notice${notice ? ' error-notice-warning' : ''}`} role={notice ? 'status' : 'alert'}>
     <AlertCircle size={18} aria-hidden="true" />
     <div className="error-notice-body"><strong>{membership ? '会员功能' : permission ? '需要操作权限' : title}</strong><p>{message}</p>
       <details><summary>诊断详情</summary><div className="error-notice-details"><pre>{details}</pre><CopyButton content={details} /></div></details>
-      {window.cshell?.submitFeedback && <FeedbackPanel error={error}/>}
+      {window.cshell?.submitFeedback && <FeedbackPanel key={error} error={error}/>}
     </div>
     {retry && <button disabled={busy} onClick={retry}><RotateCw size={14} />重试</button>}
   </section>;

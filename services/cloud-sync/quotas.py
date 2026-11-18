@@ -2,7 +2,7 @@
 import json
 import time
 
-MAX_STORAGE = 256 * 1024 * 1024
+MAX_STORAGE = 320 * 1024 * 1024
 
 
 class Quotas:
@@ -13,7 +13,7 @@ class Quotas:
 
     def allowance(self, db, account, base):
         plan=db.execute("SELECT storage_mib FROM member_plans WHERE name=COALESCE((SELECT plan FROM member_assignments WHERE account=? AND expires>?),'Pro') AND EXISTS(SELECT 1 FROM memberships WHERE account=? AND expires>?)",(account,time.time(),account,time.time())).fetchone()
-        if plan and plan[0] is not None:base=plan[0]*1024*1024
+        if plan and plan[0] is not None:base=int(plan[0]*1024*1024)
         extra = db.execute('SELECT COALESCE(SUM(bytes),0) FROM storage_grants WHERE account=? AND expires>?', (account,time.time())).fetchone()[0]
         return min(MAX_STORAGE, base + extra)
 

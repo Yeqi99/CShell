@@ -1,8 +1,10 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { Bridge, SessionEvent } from '../shared/contracts';
 const bridge: Bridge = {
+  cloudMembershipMarket:email=>ipcRenderer.invoke('cloud:membership-market',email),
+  cloudBuyPlan:(email,offer)=>ipcRenderer.invoke('cloud:buy-plan',email,offer),
   cloudPurchasePro:(email,requestId)=>ipcRenderer.invoke('cloud:pro-purchase',email,requestId),
-  cloudInvitePoster:()=>ipcRenderer.invoke('cloud:invite-poster'),
+  cloudInvitePoster:(email)=>ipcRenderer.invoke('cloud:invite-poster',email),
   cloudRedeemGift:(email,code)=>ipcRenderer.invoke('cloud:redeem-gift',email,code),
   cloudRefill:(quote,request)=>ipcRenderer.invoke('cloud:model-refill',quote,request),
   cloudTraffic:()=>ipcRenderer.invoke('cloud:traffic'),
@@ -247,7 +249,7 @@ const bridge: Bridge = {
   aiThreadCreate: (location, provider, mode, session, model, history) =>
     ipcRenderer.invoke('ai:create', location, provider, mode, session, model, history),
   aiThreadDelete: (id) => ipcRenderer.invoke('ai:delete', id),
-  aiSend: (id, text, attachments, steer) => ipcRenderer.invoke('ai:send', id, text, attachments, steer),
+  aiSend: (id, text, attachments, steer, resume, session) => ipcRenderer.invoke('ai:send', id, text, attachments, steer, resume, session),
   aiReask:(id,index,time,text)=>ipcRenderer.invoke('ai:reask',id,index,time,text),
   aiApprove: (id, request, allow) => ipcRenderer.invoke('ai:approve', id, request, allow),
   aiStop: (id) => ipcRenderer.invoke('ai:stop', id),

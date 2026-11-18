@@ -16,7 +16,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.agent-model-menu-trigger svg {
+.agent-model-menu-trigger > svg {
   flex: none;
   transform: rotate(90deg);
 }
@@ -154,3 +154,6 @@
   color: var(--accent);
   background: var(--hover);
 }
+
+.member-model-metrics, .member-model-metrics > i { display: inline-flex; align-items: center; gap: 2px; flex: none; font-style: normal; font-size: 11px; }
+.member-model-metrics { gap: 5px; }

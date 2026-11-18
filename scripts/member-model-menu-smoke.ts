@@ -18,10 +18,11 @@ await build({stdin: {loader: 'tsx', resolveDir: process.cwd(), contents: `
   window.cshell = {
     cloudStatus:async()=>({email:'user@example.org',membership:{active:true}}),
     cloudTraffic:async()=>({modelWeek:{percent:72,resetAt:1800000000,pools:[{models:[{id:pooled.model,name:'会员测试模型',tier:'high',costTier:'elevated',speed:{level:'slow',first:3.4,cps:24,samples:3,measured:1800000000}}]}]}}),
-    onAiProvidersChanged:()=>()=>{}, aiExtensionCall:async()=>({accounts:[]})
+    plugins:async()=>[], onAiProvidersChanged:()=>()=>{}, aiExtensionCall:async()=>{document.body.dataset.unexpectedOpenCode='1';throw Error('未启用 OpenCode');}
   };
-  createRoot(document.querySelector('main')).render(<AiModelMenu providers={[pooled,privateModel]} providerId="mine" disabled={false}
-    configure={()=>{}} onSelect={async id=>document.querySelector('output').textContent=id}/>);
+  function TestMenu(){ const [id,setId]=React.useState('mine'); return <AiModelMenu providers={[pooled,privateModel]} providerId={id} disabled={false}
+    configure={()=>{}} onSelect={async id=>{setId(id);document.querySelector('output').textContent=id}}/>; }
+  createRoot(document.querySelector('main')).render(<TestMenu/>);
   `}, outfile:join(dir,'app.js'),bundle:true,jsx:'automatic'});
 const server = createServer(async (request, response) => {
   if (request.url === '/app.js' || request.url === '/app.css') {
@@ -46,12 +47,20 @@ try {
   const menu = page.getByRole('dialog');
   await menu.getByRole('button',{name:/个人模型/}).waitFor();
   assert.equal(await menu.getByText('会员测试模型').count(),0);
+  assert.equal(await menu.getByText('OpenCode',{exact:true}).count(),0);
+  await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+  assert.equal(await page.getByText('操作未完成').count(),0);
   await menu.getByRole('button',{name:/会员模型/}).click();
   await menu.getByRole('button',{name:'会员测试模型 较高消耗 · 速度较慢'}).click();
   assert.equal(await page.locator('output').textContent(),poolId);
+  const trigger = page.getByRole('button',{name:'AI 基座与模型'});
+  assert.equal(await trigger.locator('span').textContent(),'会员测试模型');
+  assert.equal(await trigger.locator('.member-model-metrics svg').count(),2);
   await quota.click();
   await menu.getByText(/下次刷新/).waitFor();
   assert.equal(await menu.getByRole('button',{name:/个人模型/}).count(),0);
+  assert.equal(await menu.getByText('OpenCode',{exact:true}).count(),0);
+  assert.equal(await page.locator('body').getAttribute('data-unexpected-open-code'),null);
   const rect = await menu.boundingBox();
   assert(rect && rect.x>=0 && rect.x+rect.width<=360);
   console.log('Member model selection, cost tier, wallet gauge, reset and narrow menu passed.');

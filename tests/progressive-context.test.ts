@@ -35,3 +35,14 @@ test('log pruning preserves recoverability, avoids an unnecessary summary and is
  await compactContext(history,async()=>assert.fail('unnecessary summary'),async()=>{},1200);
  assert.deepEqual(JSON.parse(history[1].content).task_log_read,{id:'00000000-0000-4000-8000-000000000001',offset:0});
 });
+
+test('repeated requests for a loaded tool group expose the current authorized catalog',()=>{
+ const context=new ProgressiveContext('fixture');
+ const history=[{role:'user',content:'SSH 连接'}];
+ const catalog=[{function:{name:'create_ssh_connection'}},file];
+ const prepare=()=>context.prepare(history,catalog,true);
+ for(let n=0;n<2;n++)assert.equal(context.expand(calls('load_task_context',{group:'machines'}),prepare().tools),true);
+ const result=prepare();
+ assert.equal(result.discover,false);
+ assert.deepEqual(result.tools,catalog);
+});

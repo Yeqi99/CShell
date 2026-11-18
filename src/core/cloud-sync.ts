@@ -262,7 +262,7 @@ export class CloudSync {
       return send({session,key:this.data.key});
     });
   }
-  async acceptDeviceLogin(session:CloudSession,key:string) {
+  async acceptDeviceLogin(session:CloudSession,key:string, syncNow=true) {
     if(!/^[a-f0-9]{32}$/.test(session.accountId)||! /^[A-Za-z0-9_-]{43}$/.test(session.token)||! /^[A-Za-z0-9_-]{43}$/.test(key))throw Error('设备登录信息无效');
     await this.exclusive(async()=>{
       if(this.data.session&&this.data.session.accountId!==session.accountId)throw Error('目标机器已登录其他账号，请在目标机器退出后再同步');
@@ -280,7 +280,7 @@ export class CloudSync {
       this.profileChecked=0;
       this.error=undefined;
     });
-    await this.autoSync();
+    if(syncNow)await this.autoSync();
     return this.status();
   }
   async requestCode(email: string) {

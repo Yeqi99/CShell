@@ -28,6 +28,7 @@ export interface CloudStatus {
 export interface AccountDiscoveryStatus {enabled:boolean;devices:{id:string;online:boolean|null}[];pending:number}
 export interface RentalCatalog {
   balance:number;
+  memberPlans?:{id:string;name:string}[];
   quote?:{points:number;expires:number};
   plans:{id:string;name:string;system:string;cpu:number;memory:number;disk:number;points:number;days:number;included:boolean;dedicatedIp?:boolean;portCount?:number}[];
   machines:{id:string;name:string;included:boolean;state:string;expires:number|null;disk:number;updating:boolean;ports?:{host:string;port:number}[];portCount?:number}[];
@@ -38,8 +39,10 @@ export interface CloudBridge extends importAccountBridge {
   cloudRentalSample(id:string,container:boolean):Promise<import('../desktop/rental-sample').RentalSample|null>;
   cloudRentalDeviceIds():Promise<string[]>;
   cloudRentals(input:{action:'list'|'order'|'connect'|'change'|'ports';id?:string;plan?:string;included?:boolean;request?:string;points?:number;days?:number;kind?:'expand'|'cpu'|'memory'|'port'|'renew';quote?:boolean;maxPoints?:number;units?:number}):Promise<RentalCatalog>;
+  cloudMembershipMarket(email:string):Promise<{plans:{plan:string;relativeQuota:number;storageMiB:number;machine:string|null;price:number|null;days:number|null}[]}>;
+  cloudBuyPlan(email:string,offer:{plan:string;price:number;days:number;request:string}):Promise<{expires:number}>;
   cloudPurchasePro(email:string,requestId:string):Promise<{expiresAt:number;balancePoints:number}>;
-  cloudInvitePoster():Promise<void>;
+  cloudInvitePoster(email:string):Promise<string>;
   cloudRedeemGift(email:string,code:string):Promise<{kind:string;quantity:number;plan:string}>;
   cloudRefill(quote:string,request:string):Promise<unknown>;
   cloudTraffic():Promise<import('./account-traffic').AccountTraffic>;

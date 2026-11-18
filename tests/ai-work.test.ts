@@ -81,7 +81,7 @@ async function setup(reply: (request: any) => any | Promise<any>, runTimeoutMs?:
     }
   });
   await new Promise<void>((r) => api.listen(0, '127.0.0.1', r));
-  const ai = new AiService(directory, store, registry, undefined, { runTimeoutMs });
+  const ai = new AiService(directory, store, registry, undefined, { runTimeoutMs, fullToolContext: true });
   const provider = {
     id: randomUUID(),
     name: 'Test',
@@ -582,4 +582,38 @@ test('a second-level child only receives tools it can use at that depth', async 
   } finally {
     await f.cleanup();
   }
+});
+
+test('an approval interrupted by restart continues in the original thread with a fresh approval', async () => {
+  const f = await setup(req => req.messages.at(-1)?.role === 'tool'
+    ? {content:'checked'}
+    : call('execute_command',{command:'inspect'}));
+  const restored = new AiService(f.directory, f.store, f.registry);
+  try {
+    await f.ai.mode(f.thread.id,'review');
+    await f.ai.send(f.thread.id,'inspect');
+    await until(()=>!!f.ai.snapshot().threads[0].pending);
+    const oldId=f.ai.snapshot().threads[0].pending!.id;
+    f.ai.dispose();
+    await f.ai.flush();
+    await restored.load();
+    const prior=restored.snapshot().threads[0];
+    assert.equal(prior.id,f.thread.id);
+    assert.equal(prior.pending,undefined);
+    assert.equal(prior.checkpoint?.pending?.tool,'execute_command');
+    f.registry.unbind(prior.sessionId!);
+    await assert.rejects(restored.resume(prior.id), /重新连接/);
+    const reconnected = randomUUID();
+    f.registry.bind(reconnected,'test.work');
+    await restored.resume(prior.id);
+    assert.equal(restored.snapshot().threads[0].sessionId,reconnected);
+    assert.equal(restored.snapshot().threads[0].messages.filter(m=>m.role==='user').length,prior.messages.filter(m=>m.role==='user').length);
+    await until(()=>!!restored.snapshot().threads[0].pending);
+    const newId=restored.snapshot().threads[0].pending!.id;
+    assert.notEqual(newId,oldId);
+    assert.equal(f.executions(),0);
+    restored.approve(prior.id,newId,true);
+    await until(()=>restored.snapshot().threads[0].state==='idle');
+    assert.equal(f.executions(),1);
+  } finally {restored.dispose();await restored.flush();await f.cleanup();}
 });

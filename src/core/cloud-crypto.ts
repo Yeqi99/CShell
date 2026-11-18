@@ -1,6 +1,6 @@
 import { createCipheriv, createDecipheriv, randomBytes, createHash, pbkdf2Sync } from 'node:crypto';
 import {freemem} from 'node:os';
-export const MAX_VAULT_BYTES=Math.max(2*1024*1024,Math.min(256*1024*1024,Math.floor(freemem()/24)));
+export const MAX_VAULT_BYTES=Math.max(2*1024*1024,Math.min(320*1024*1024,Math.floor(freemem()/24)));
 import type { CloudEnvelope } from '../shared/cloud-sync';
 
 export function newRecoveryKey() {
