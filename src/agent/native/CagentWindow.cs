@@ -289,6 +289,12 @@ public class CagentWindow : Window {
     bool free=false;foreach(var element in AccountElements(overlay)){var text=element as TextBlock;if(text!=null&&text.Text=="免费账号")free=true;}if(!free)throw new Exception("Free account was mislabeled");
     UpdateAccount(Obj());RenderAccountForm(false,"example@example.com");bool masked=false;Button register=null;
     foreach(var element in AccountElements(overlay)){if(element is PasswordBox)masked=true;var b=element as Button;if(b!=null&&Convert.ToString(b.Content)=="还没有账号？创建账号")register=b;}
+    Button login=null;PasswordBox credential=null;
+    foreach(var element in AccountElements(overlay)){var b=element as Button;if(b!=null&&Convert.ToString(b.Content)=="登录")login=b;if(element is PasswordBox)credential=(PasswordBox)element;}
+    if(login==null||credential==null)throw new Exception("Login form missing");
+    login.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
+    bool validation=false;foreach(var element in AccountElements(overlay)){var message=element as TextBlock;if(message!=null&&message.Text=="请输入邮箱和密码。")validation=true;}
+    if(!validation)throw new Exception("Empty login produced no inline feedback");
     if(!masked||register==null)throw new Exception("Login controls missing");register.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));Button back=null;
     foreach(var element in AccountElements(overlay)){var b=element as Button;if(b!=null&&Convert.ToString(b.Content)=="‹ 返回登录")back=b;}
     if(back==null)throw new Exception("Registration return missing");back.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));

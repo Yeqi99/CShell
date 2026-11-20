@@ -261,7 +261,7 @@ export class CagentCloud {
       return { ...(await this.sync.accountStatus()), transportError: this.transportError,capabilityRestore:this.capabilityRestore };
     if (method === 'account.login') {
       const q = z
-        .object({ email: z.email(), password: z.string().min(8).max(128) })
+        .object({ email: z.email(), password: z.string().min(1).max(128) })
         .strict()
         .parse(input);
       this.paused = true;
