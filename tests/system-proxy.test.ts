@@ -16,7 +16,8 @@ test('explicit system proxy saves/restores old settings without touching user ch
  try{
   await proxy.recover();assert.equal(writes,0);
   await proxy.set(true);assert.equal(captured,true);assert.equal(proxy.status().enabled,true);assert.match(current.ProxyServer,/http=127\.0\.0\.1:/);
-  await proxy.set(false);assert.deepEqual(current,previous);assert.equal(released,1);
+  await proxy.set(false);assert.deepEqual(current,previous);assert.equal(released,1);proxy.beforeEnable=undefined;
+  await proxy.set(true);current.ProxyOverride='vpn.internal';await proxy.set(false);assert.deepEqual(current,{...previous,ProxyOverride:'vpn.internal'});
   await proxy.set(true);current={...previous,ProxyServer:'user-new-proxy:8080'};
   await proxy.set(false);assert.equal(current.ProxyServer,'user-new-proxy:8080');
  }finally{await proxy.close();await rm(dir,{recursive:true,force:true});}

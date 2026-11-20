@@ -26,7 +26,14 @@ export class WindowsSystemProxy{
    const endpoint='127.0.0.1:'+this.listener.port;
    return state.ProxyEnable===1 && !state.AutoConfigURL && state.ProxyServer==='http='+endpoint+';https='+endpoint;
  }
- async recover(){if(this.platform!=='win32')return;try{const saved=z.object({previous:stateSchema,applied:stateSchema}).strict().parse(JSON.parse(await this.store.decryptPrivate(await readFile(this.file(),'utf8'))));const current=await this.read();if(JSON.stringify(current)===JSON.stringify(saved.applied))await this.write(saved.previous);await unlink(this.file());this.error='';}catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT'){this.error='系统代理恢复未完成，请在 Windows 网络设置检查原代理';throw error;}}}
+ async recover(){if(this.platform!=='win32')return;try{const saved=z.object({previous:stateSchema,applied:stateSchema}).strict().parse(JSON.parse(await this.store.decryptPrivate(await readFile(this.file(),'utf8'))));const current=await this.read();if(current.ProxyServer===saved.applied.ProxyServer){
+     // A browser or VPN can change a bypass rule while our listener is running.
+     const restored={...saved.previous};
+     for(const field of ['ProxyEnable','ProxyOverride','AutoConfigURL','AutoDetect'] as const){
+       if(current[field]!==saved.applied[field])Object.assign(restored,{[field]:current[field]});
+     }
+     await this.write(restored);
+   }await unlink(this.file());this.error='';}catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT'){this.error='系统代理恢复未完成，请在 Windows 网络设置检查原代理';throw error;}}}
  status(){return {supported:this.platform==='win32',enabled:!!this.listener,error:this.error};}
  async set(enabled:boolean){const task=this.queue.catch(()=>{}).then(async()=>{if(this.platform!=='win32')throw Error('此平台暂不支持系统代理接管');if(enabled===!!this.listener)return this.status();
   if(!enabled){await this.recover();this.listener?.close();this.listener=undefined;await this.afterDisable?.();return this.status();}

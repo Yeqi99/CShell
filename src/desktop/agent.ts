@@ -50,7 +50,7 @@ export async function registerAgent(
 ) {
   const directory = process.env.CSHELL_AGENT_DATA;
   const localLauncher=process.platform==='win32'&&process.env.LOCALAPPDATA?join(process.env.LOCALAPPDATA,'Programs','CAgent','Open CAgent.vbs'):undefined;
-  const bundledAvailable=!!localLauncher&&await fileStat(localLauncher).then(s=>s.isFile(),()=>false);
+  const launcherAvailable=async()=>!!localLauncher&&await fileStat(localLauncher).then(s=>s.isFile(),()=>false);
   const guard = () => {
     if (!pluginEnabled(store.plugins(), 'agent')) throw new Error('请先启用 cagent 扩展');
   };
@@ -179,7 +179,7 @@ export async function registerAgent(
       name: '本机 cagent',
       local: true,
       available: false,
-      bundledApp: bundledAvailable,
+      bundledApp: await launcherAvailable(),
       reason: 'Agent 未运行',
     };
     try {
@@ -200,7 +200,7 @@ export async function registerAgent(
   });
   handle('agent:launch', async () => {
     guard();
-    if(!localLauncher||!bundledAvailable)throw Error('请先安装本机 CAgent');
+    if(!localLauncher||!await launcherAvailable())throw Error('请先安装本机 CAgent');
     const error=await shell.openPath(localLauncher);if(error)throw Error(error);
   });
   handle('agent:machine-open',async(raw)=>{

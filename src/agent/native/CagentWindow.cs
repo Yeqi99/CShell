@@ -317,7 +317,8 @@ public class CagentWindow : Window {
     var email=Field(p,"邮箱地址",address);TextBox code=null;
     if(register){code=Field(p,"邮箱验证码","");code.MaxLength=6;ActionButton(p,"发送验证码",async()=>{await Api("account.code",Obj("email",email.Text.Trim()));panelStatus.Text="验证码已发送，请查收邮件。";await Task.Delay(60000);});}
     p.Children.Add(Text(register?"设置密码 · 至少 8 位":"密码",12));var password=new PasswordBox{Padding=new Thickness(10),Margin=new Thickness(0,0,0,8),MinHeight=38,BorderBrush=Brush("#E1E6EA"),BorderThickness=new Thickness(1)};AutomationProperties.SetName(password,"账号密码");p.Children.Add(password);
-    var submit=ActionButton(p,register?"创建账号":"登录",async()=>{if(password.Password.Length<8)throw new Exception("密码至少需要 8 个字符。");var args=Obj("email",email.Text.Trim(),"password",password.Password);if(register)args["code"]=code.Text.Trim();await Api(register?"account.register":"account.login",args);password.Clear();await Account();});submit.Background=Brush("#276E60");submit.Foreground=Brushes.White;submit.MinHeight=40;
+    var feedback=Text("",12);feedback.TextWrapping=TextWrapping.Wrap;p.Children.Add(feedback);
+    var submit=ActionButton(p,register?"创建账号":"登录",async()=>{if(String.IsNullOrWhiteSpace(email.Text)||password.Password.Length==0){feedback.Text="请输入邮箱和密码。";return;}if(register&&password.Password.Length<8){feedback.Text="密码至少需要 8 个字符。";return;}feedback.Text=register?"正在创建账号…":"正在登录…";try{var args=Obj("email",email.Text.Trim(),"password",password.Password);if(register)args["code"]=code.Text.Trim();await Api(register?"account.register":"account.login",args);password.Clear();await Account();}catch{feedback.Text=register?"账号创建未完成，请查看错误详情。":"登录未完成，请查看错误详情。";throw;}});submit.IsDefault=true;submit.Background=Brush("#276E60");submit.Foreground=Brushes.White;submit.MinHeight=40;
     if(!register)ActionButton(p,"还没有账号？创建账号",async()=>{RenderAccountForm(true,email.Text);await Task.Yield();});
   }
 

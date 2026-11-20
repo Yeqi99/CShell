@@ -1,3 +1,4 @@
+import {isPro} from '../../shared/edition';
 import {ErrorNotice} from './ErrorNotice';
 import {AgentAccountNetwork} from './AgentAccountNetwork';
 import { AgentAssistantSettings } from './AgentAssistantSettings';
@@ -46,6 +47,13 @@ export function AgentWorkbench() {
           </select>
         </label>
         <button onClick={() => void refresh()}>刷新</button>
+        {current?.local && !current.available && !current.bundledApp && isPro && window.cshell.platform==='win32' && (
+          <button disabled={launching} onClick={async()=>{
+            setLaunching(true);setError('');setLaunchMessage('');
+            try{await window.cshell.agentInstallLocal();setLaunchMessage('已打开本机安装程序。安装并启动后，这里会自动发现 cagent。');}
+            catch(e){setError(String(e));}finally{setLaunching(false);}
+          }}>安装内置 cagent</button>
+        )}
         {current?.local && current.bundledApp && (
           <button disabled={launching} onClick={async () => {
             setLaunching(true); setError(''); setLaunchMessage('');
