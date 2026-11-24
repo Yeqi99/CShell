@@ -1,3 +1,4 @@
+import {verifyPasswordView} from './password-consent';
 import { chooseConversationLink } from './conversation-link';
 import {preferencesTool} from '../core/preferences-tool';
 import {providerFileCall} from '../core/provider-file-call';
@@ -982,6 +983,23 @@ else
       handle('clipboard:files-begin',files=>localClipboard.begin(files as any));
       handle('clipboard:files-chunk',(id,index,offset,data)=>localClipboard.chunk(String(id),Number(index),Number(offset),String(data)));
       handle('clipboard:files-commit',id=>localClipboard.commit(String(id)));
+      let verifyingPassword = false;
+      ipcMain.handle('profile:view-saved-password', async (event, value) => {
+        validateSender(event);
+        if (process.platform !== 'win32' || event.sender !== window.webContents || !window.isFocused() || verifyingPassword)
+          throw Error('请在 CShell 主窗口查看密码。');
+        const id = idSchema.parse(value);
+        const profile = store.profile(id);
+        if ((profile.protocol ?? 'ssh') !== 'ssh' || profile.auth !== 'password') throw Error('此连接没有保存的 SSH 密码。');
+        verifyingPassword = true;
+        try {
+          await verifyPasswordView(window.getNativeWindowHandle());
+          if (JSON.stringify(store.profile(id)) !== JSON.stringify(profile) || window.isDestroyed() || event.sender !== window.webContents) throw Error('连接已变更。');
+          const secret = await store.secret(id);
+          if (!secret?.password) throw Error('此连接没有保存的 SSH 密码。');
+          return secret.password;
+        } finally { verifyingPassword = false; }
+      });
       handle('profile:save', async (value) => {
         const profile = profileSchema.parse(value);
         const old = store.snapshot().profiles.find((p) => p.id === profile.id);

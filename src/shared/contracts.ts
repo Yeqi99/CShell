@@ -430,6 +430,7 @@ export interface Bridge
   mcpRotateToken(clientId?: string): Promise<void>;
   importAppearance(kind: 'font' | 'background', token?: string): Promise<AppearanceAsset | null>;
   appearanceData(id: string): Promise<string>;
+  viewSavedSshPassword(id: string): Promise<string>;
   saveProfile(profile: Profile): Promise<void>;
   moveProfile?(id: string, group: string, before?: string): Promise<void>;
   aiDrafts?(): Promise<Record<string, string>>;

@@ -309,6 +309,7 @@ const bridge: Bridge = {
   systemFonts: () => ipcRenderer.invoke('appearance:fonts'),
   importAppearance: (kind, token) => ipcRenderer.invoke('appearance:import', kind, token),
   appearanceData: (id) => ipcRenderer.invoke('appearance:data', id),
+  viewSavedSshPassword: (id) => ipcRenderer.invoke('profile:view-saved-password', id),
   saveProfile: (profile) => ipcRenderer.invoke('profile:save', profile),
   moveProfile: (id, group, before) => ipcRenderer.invoke('profile:move', { id, group, before }),
   deleteProfile: (id) => ipcRenderer.invoke('profile:delete', id),

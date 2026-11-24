@@ -18,6 +18,33 @@ import { connectionErrorMessage, isConnectionCancelled } from '../../shared/conn
 
 type Field = 'name' | 'host' | 'port' | 'username';
 
+function SavedPassword({id, chinese}: {id:string; chinese:boolean}) {
+  const button = useRef<HTMLButtonElement>(null);
+  const [secret,setSecret] = useState('');
+  const [pending,setPending] = useState(false);
+  const [error,setError] = useState('');
+  useEffect(() => {
+    if (!secret) return;
+    const hide = () => setSecret('');
+    const timeout = window.setTimeout(hide,15000);
+    window.addEventListener('blur',hide);
+    document.addEventListener('visibilitychange',hide);
+    const observer = new IntersectionObserver(entries => {if (!entries[0]?.isIntersecting) hide();});
+    if(button.current) observer.observe(button.current);
+    return () => {clearTimeout(timeout);observer.disconnect();window.removeEventListener('blur',hide);document.removeEventListener('visibilitychange',hide);};
+  },[secret]);
+  return <span><button type="button" ref={button} disabled={pending} onClick={async()=>{
+    if(secret){setSecret('');return;}
+    setPending(true);setError('');
+    try {
+      const result=await window.cshell.viewSavedSshPassword(id);
+      if(button.current?.getClientRects().length && document.hasFocus()) setSecret(result);
+    } catch {setError(chinese?'未能查看密码，请检查已保存的密码和 Windows 身份验证。':'Unable to show password. Check the saved credential and Windows verification.');}
+    finally {setPending(false);}
+  }}>{pending?(chinese?'正在验证…':'Verifying…'):secret?(chinese?'隐藏已保存密码':'Hide saved password'):(chinese?'查看已保存密码':'View saved password')}</button>
+  {secret && <code dir="auto">{secret}</code>}{error && <span role="alert">{error}</span>}</span>;
+}
+
 export function ConnectionForm({
   profile,
   protocol = 'ssh',
@@ -340,7 +367,7 @@ export function ConnectionForm({
           )}
           {canReuse && (
             <p id={id + '-saved'} className="connection-saved">
-              {t('savedSecret')}
+              {t('savedSecret')} {profile && profile.auth==='password' && window.cshell.platform==='win32' && <SavedPassword key={profile.id} id={profile.id} chinese={locale==='zh-CN'}/>}
             </p>
           )}
           <div className="connection-save-options">
