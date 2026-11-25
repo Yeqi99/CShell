@@ -16,7 +16,7 @@ try{
  await page.route('**/admin-api/**',async route=>{
  const path=route.request().url().split('/').at(-1),post=route.request().method()==='POST';
  if(post)writes.push(route.request().postDataJSON());
- const values={'accounts':{accounts:[],audit:[]},'model-usage':{usage:[],recent:[]},lending:{loans:[]},'model-pool':{members:100,weeklyYuan:5,inventory:{byProvider:{deepseek:'48.92','opencode-go':'70'},knownRemainingYuan:'48.92',knownTotalYuan:null,units:[{provider:'deepseek',unit:'CNY',remaining:'48.92',total:null}],excluded:{}},pools:['qwen','mimo','deepseek','qwen-plan','opencode-go'].map(provider=>({provider,capacity:1000,weekly:10,keys:[],plans:[],models:[],calls:{}}))}};
+ const values={'accounts':{accounts:[],audit:[]},'model-usage':{usage:[],recent:[]},lending:{loans:[]},'model-pool':{trial:{models:[],globalLimit:10000000,deviceLimit:1000000,used:321},members:100,weeklyYuan:5,inventory:{byProvider:{deepseek:'48.92','opencode-go':'70'},knownRemainingYuan:'48.92',knownTotalYuan:null,units:[{provider:'deepseek',unit:'CNY',remaining:'48.92',total:null}],excluded:{}},pools:['qwen','mimo','deepseek','qwen-plan','opencode-go'].map(provider=>({provider,capacity:1000,weekly:10,keys:[],plans:[],models:[],calls:{}}))}};
  return route.fulfill({json:post?{ok:true}:values[path]||{}});
  });
  await page.goto('http://127.0.0.1:'+server.address().port);
@@ -33,5 +33,11 @@ try{
  await page.getByRole('button',{name:'DeepSeek',exact:true}).click();
  await page.locator('input[name=tokens]').fill('100');await page.getByRole('button',{name:'保存计量设置'}).click();
  await page.getByText('已保存',{exact:true}).waitFor();
- assert.equal(writes[0].provider,'deepseek');assert.equal(writes[0].tokens,'100');assert.deepEqual(errors,[]);
+ assert.equal(writes[0].provider,'deepseek');assert.equal(writes[0].tokens,'100');await page.getByRole('heading',{name:'CAgent 免登录体验'}).waitFor();
+ const daily=page.getByLabel('全局每日 Token');assert.equal(await daily.inputValue(),'10000000');
+ await page.getByLabel('每台电脑每日 Token').fill('900000');
+ await page.getByRole('button',{name:'保存体验设置'}).click();
+ await page.locator('output').getByText('已保存').waitFor();
+ assert.deepEqual(writes.at(-1),{action:'trial',globalLimit:10000000,deviceLimit:900000,models:[]});
+ assert.deepEqual(errors,[]);
 }finally{await browser.close();server.close();}

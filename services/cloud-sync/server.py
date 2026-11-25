@@ -605,6 +605,8 @@ def handler(service):
                     value=service.mcp_clients.authorize(body.get('token'))
                 elif admin and self.path == '/v1/admin/mcp/invoke' and self.command == 'POST':
                     value=service.mcp_clients.invoke(body)
+                elif not admin and self.path == '/v1/cagent/trial/chat/completions' and self.command == 'POST':
+                    value=service.models.trial.complete(self.headers.get('X-CAgent-Device'),body)
                 elif self.path == '/v1/feedback' and self.command == 'POST':
                     value=service.feedback.submit(body)
                 elif admin and self.path == '/v1/admin/feedback' and self.command == 'GET':
@@ -642,7 +644,9 @@ def handler(service):
                     try:value=service.metering.admin_change(body)
                     except ValueError:raise Failure(400,'流量配置或对账数据无效')
                 elif admin and self.path == '/v1/admin/model-pool' and self.command in ('GET','POST'):
-                    value=service.models.pool.view() if self.command=='GET' else service.models.pool.change(body)
+                    if self.command=='GET':value=dict(service.models.pool.view(),trial=service.models.trial.settings())
+                    elif body.get('action')=='trial':value=service.models.trial.settings(body)
+                    else:value=service.models.pool.change(body)
                 elif admin and self.path == '/v1/admin/model-usage' and self.command == 'GET':
                     value=service.models.usage()
                 elif admin and self.path == '/v1/admin/rentals/settings' and self.command in ('GET','POST'):

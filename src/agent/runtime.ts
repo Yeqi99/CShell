@@ -1,3 +1,4 @@
+import {trialDeviceId} from './trial-device';
 import {WindowsRdpTunnel} from './windows-rdp-tunnel';
 import {DirectFileTransfer} from './file-transfer';
 import {executeHttp} from '../core/http-transport';
@@ -228,6 +229,7 @@ export async function createAgentRuntime(
     }
     return terminal.execute(input,signal,output);
   },automation:async(action,input,owner)=>{if(action==='list')return {...automation.list(owner),sources:packages.events()};if(action==='create')return automation.create(input,owner);return automation.change({...z.record(z.string(),z.unknown()).parse(input),action},owner);},allowed:owner=>server.managementAllowed(owner),capabilityTools:()=>packages.tools(),capabilityInvoke:(input,signal,owner)=>packages.invoke(input,owner,signal)});
+  assistant.trialIdentity=async()=>trialDeviceId((await vault.identity()).id);
   await assistant.load();
   const account=new CagentCloud(directory,codec,vault,assistant);account.setCapabilities(packages);assistant.accountServices=(input,signal)=>account.sync.accountRequest('/v1/account/agent-services',input,signal);
   automation=new CagentAutomation(vault,assistant);await automation.load();

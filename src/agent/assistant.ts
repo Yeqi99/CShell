@@ -1,3 +1,4 @@
+import {trialEndpoint} from './trial-device';
 import {logPreview} from '../core/tool-log-context';
 import {ProgressiveContext,requireAdvertisedTools,describeTool,withToolVariants} from '../core/progressive-context';
 import {spendingInput,spendingDescription} from '../core/account-spending';
@@ -66,11 +67,18 @@ function capabilityDefinition(tools:RuntimeCapabilityTool[]){return {type:'funct
 
 /** Standalone engine: encrypted configuration/history, bounded tasks and live authorization checks. */
 export class CagentAssistant {
+  trialIdentity?:()=>Promise<string>;
+  private trialDevice?:Promise<string>;
   officialCredential?:()=>string;
   resolveExtension?: (ref:AiExtensionRef,session:string)=>Promise<AiRuntimeProvider>;
   accountServices?:(input:unknown,signal:AbortSignal)=>Promise<unknown>;
   networkTransport?:typeof fetch;
   private async modelRequest(url:string, init:RequestInit, signal:AbortSignal,onContent:(text:string)=>void){
+    if(!this.settings.model && this.trialIdentity){
+      this.trialDevice??=this.trialIdentity();
+      const body=JSON.parse(String(init.body));
+      return this.request(trialEndpoint,{...init,redirect:'error',headers:{'Content-Type':'application/json','X-CAgent-Device':await this.trialDevice},body:JSON.stringify({...body,model:'cagent-default',stream:false})},signal,onContent,undefined,this.networkTransport);
+    }
     const provider=this.shared.providers.find(p=>p.id===this.settings.providerId);
     if(!provider?.extension){const endpoint=new URL(url);endpoint.pathname=endpoint.pathname.replace(/\/+$/,'');if(!/\/(?:chat\/completions|responses)$/.test(endpoint.pathname))endpoint.pathname+='/chat/completions';return this.request(endpoint.href,init,signal,onContent,undefined,this.networkTransport);}
     if(!this.resolveExtension)throw Error("模型扩展尚未就绪");
@@ -78,7 +86,7 @@ export class CagentAssistant {
     const body=JSON.parse(String(init.body));body.model=resolved.model;
     return this.request(resolved.url,{...init,body:JSON.stringify(body),headers:{"Content-Type":"application/json",Authorization:"Bearer "+resolved.key}},signal,onContent,undefined,resolved.transport);
   }
-  private modelKey(){if(this.shared.providers.some(p=>p.id===this.settings.providerId&&p.extension))return 'extension-managed';if(isOfficialModel(this.settings.endpoint,this.settings.model)){const key=this.officialCredential?.();if(!key)throw Error('请先登录 CShell 账号');return key;}return this.settings.key;}
+  private modelKey(){if(!this.settings.model&&this.trialIdentity)return 'cagent-trial';if(this.shared.providers.some(p=>p.id===this.settings.providerId&&p.extension))return 'extension-managed';if(isOfficialModel(this.settings.endpoint,this.settings.model)){const key=this.officialCredential?.();if(!key)throw Error('请先登录 CShell 账号');return key;}return this.settings.key;}
   async ensureOfficialModels(available:CatalogItem[]){
     if(!Array.isArray(available))return false;
     const catalog=catalogProviders(available), current=this.shared.providers;
@@ -189,7 +197,7 @@ export class CagentAssistant {
     const previous=this.tasks.find(t=>t.owner===owner&&t.requestId===requestId);
     if(previous){if(previous.prompt!==prompt)throw new Error('同一请求 ID 不能用于不同任务');return {id:previous.id};}
     if(this.active)throw new Error('已有任务运行，请先完成或停止');
-    if(!this.settings.model)throw new Error('请先填写模型名称');
+    if(!this.settings.model && !this.trialIdentity)throw new Error('请先填写模型名称');
     if(!this.modelKey())throw new Error('请先配置模型基座');
     if(history&&resumeId)throw Error('请选择一个续聊来源');
     const prior=resumeId?this.get({id:resumeId},owner):undefined;

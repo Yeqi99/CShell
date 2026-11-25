@@ -1,6 +1,7 @@
 """Authenticated, bounded model gateway. Upstream credentials never leave this process."""
 import json, os, threading, time, urllib.request, urllib.error
 
+from cagent_trial import Trial
 from model_pool import COST_LABELS, Pool, upstream
 
 def inference_schema(value):
@@ -25,6 +26,7 @@ class Models:
         self.s, self.F = service, failure
         self.entries = {}
         self.pool = Pool(service,failure)
+        self.trial = Trial(self)
         self.slots = threading.BoundedSemaphore(2)
         self.member_slots = threading.BoundedSemaphore(24)
         self.active = set()
@@ -42,7 +44,7 @@ class Models:
     def catalog(self, account=None):
         return {'models': [{'id': e['id'], 'name': e['name'], 'vision': bool(e.get('vision')), 'free': True} for e in self.entries.values()] + ([dict(id=m['id'],name=m['name']+(' · Kimi 直连' if p['provider']=='kimi' else '')+' · '+COST_LABELS[m['costTier']],providerId=m['id'][5:],vision=False,free=False) for p in self.pool.view(account)['pools'] if p['weekly']>0 for m in p['models']] if account else [])}
 
-    def complete(self, account, body, emit=None):
+    def complete(self, account, body, emit=None, *, sponsored=False):
         if not isinstance(body.get('model'),str):raise self.F(400,'模型 ID 无效')
         entry = self.entries.get(body['model'])
         pooled=isinstance(body.get('model'),str) and body['model'].startswith('pool-')
@@ -80,7 +82,7 @@ class Models:
             streaming = body.get('stream') is True and emit is not None
             if pooled:
                 input_bound=len(json.dumps(payload, ensure_ascii=False).encode())+128+8*len(messages)
-                entry,lease=self.pool.reserve(account,body['model'],input_bound+maximum,maximum,fit_output=True)
+                entry,lease=self.pool.reserve(account,body['model'],input_bound+maximum,maximum,fit_output=True,sponsored=sponsored)
                 maximum=entry['maxOutputTokens']
             else:
                 maximum=min(maximum,4096)

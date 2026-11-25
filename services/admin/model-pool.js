@@ -20,7 +20,23 @@ export function mountPool(root){
  root.innerHTML='<div class="page-head"><div><h1>会员模型号池</h1><p>周一 00:00（北京时间）重置 · 每位 Pro 会员每周共享一份模型额度</p></div><button class="btn" data-refresh>刷新用量</button></div><p role="status"></p><div data-view></div>';
  const status=root.querySelector('[role=status]'),view=root.querySelector('[data-view]');
  const field=(label,input)=>'<label class="field">'+label+input+'</label>';
- function render(){const p=data.pools.find(x=>x.provider===provider);
+ const trialPanel=document.createElement('section');
+ root.append(trialPanel);
+ function drawTrial(){
+  const t=data.trial;if(!t)return;
+  trialPanel.innerHTML='<h2>CAgent 免登录体验</h2><p>每日北京时间零点重置。今日已用及预留 '+Number(t.used).toLocaleString()+' Token。</p><form><label>全局每日 Token <input name="globalLimit" type="number" min="0" required></label><label>每台电脑每日 Token <input name="deviceLimit" type="number" min="0" required></label><fieldset><legend>可用模型</legend></fieldset><button class="btn">保存体验设置</button><output></output></form>';
+  const form=trialPanel.querySelector('form');
+  for(const key of ['globalLimit','deviceLimit'])form.elements[key].value=t[key];
+  for(const p of data.pools)for(const m of p.models.filter(row=>row.enabled!==false)){
+   const label=document.createElement('label'),box=document.createElement('input');
+   box.type='checkbox';box.name='models';box.value=m.id;box.checked=t.models.includes(m.id);
+   label.append(box,document.createTextNode(' '+p.provider+' / '+m.name));form.querySelector('fieldset').append(label);
+  }
+  form.onsubmit=async e=>{e.preventDefault();const btn=form.querySelector('button');btn.disabled=true;
+   try{data.trial=await api({action:'trial',globalLimit:Number(form.elements.globalLimit.value),deviceLimit:Number(form.elements.deviceLimit.value),models:new FormData(form).getAll('models')});form.querySelector('output').textContent='已保存';}
+   catch(err){form.querySelector('output').textContent=err.message;}finally{btn.disabled=false;}};
+ }
+ function render(){drawTrial();const p=data.pools.find(x=>x.provider===provider);
  view.innerHTML='<div class="actions">'+data.pools.map(p=>[p.provider,names[p.provider]??p.provider]).map(([id,n])=>'<button class="btn '+(provider===id?'primary':'')+'" data-provider="'+id+'">'+n+'</button>').join(' ')+'</div>'+
  '<section class="card"><h2>'+names[provider]+' · 运营库存</h2><p>本周号池预算 <b>'+p.capacity+'</b> 点　有效会员 <b>'+data.members+'</b> 人</p><p>默认 Pro 会员所有模型合计 <b>'+data.weeklyYuan+'</b> 元成本 / 周。</p><form data-mode="limit" class="field-row">'+field('每点 Token 数（0 按次）','<input name="tokens" type="number" min="0" max="99999999" step="1" required value="'+(p.tokensPerPoint??0)+'">')+'<button class="btn">保存计量设置</button></form></section>'+
  '<section class="card"><h2>本周调用</h2><p>成功 '+(p.calls.ok||0)+'　拒绝（不扣点） '+(p.calls.rejected||0)+'　处理中 '+(p.calls.pending||0)+'　待核对 '+(p.calls.unknown||0)+'</p></section>'+

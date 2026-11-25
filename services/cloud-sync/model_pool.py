@@ -276,10 +276,10 @@ class Pool:
         return result
     def view(self,account=None):
         with self.s.db() as db:return self.snapshot(db,account)
-    def reserve(self,account,model,estimate=1,max_output=0,fit_output=False):
+    def reserve(self,account,model,estimate=1,max_output=0,fit_output=False,*,sponsored=False):
         with self.s.db() as db:
             db.execute('BEGIN IMMEDIATE')
-            if not db.execute('SELECT 1 FROM memberships WHERE account=? AND expires>?',(account,time.time())).fetchone():raise self.F(403,'会员模型需要有效 Pro 会员')
+            if not sponsored and not db.execute('SELECT 1 FROM memberships WHERE account=? AND expires>?',(account,time.time())).fetchone():raise self.F(403,'会员模型需要有效 Pro 会员')
             row=db.execute('SELECT provider,model,weight FROM pool_models WHERE id=? AND enabled=1',(model,)).fetchone()
             if not row:raise self.F(404,'会员模型未开放')
             p,name,weight=row
@@ -312,7 +312,7 @@ class Pool:
             period=week()
             cutoff,spent,_,_=self.allowance(db,account,period)
             minimum=reservation(1 if fit_output else max_output)
-            balance=self.weekly_value(db,account)-spent
+            balance=10**18 if sponsored else self.weekly_value(db,account)-spent
             if minimum>balance:raise self.F(429,"本周 Pro 额度不足")
             key=db.execute("""SELECT id,secret,capacity-coalesce((SELECT sum(charge) FROM pool_calls WHERE week=? AND keyid=k.id),0) AS available FROM pool_keys k WHERE enabled=1 AND provider=? AND cooldown<=? AND available>=? ORDER BY available DESC,id LIMIT 1""",(period,p,time.time(),minimum)).fetchone()
             if not key:raise self.F(503,'当前号池暂无可用账号')

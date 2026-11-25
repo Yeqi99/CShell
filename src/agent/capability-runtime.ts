@@ -99,7 +99,16 @@ export class CapabilityRuntime {
   }
   private manifestFor(id:string){const entry=this.entries.find(item=>item.id===id);if(!entry)return undefined;const raw=entry.bundle?JSON.parse(entry.bundle).manifest:entry.manifestJson;return raw?parseCapabilityManifest(raw,entry.manifestSha256):undefined;}
   private mutate<T>(action:()=>Promise<T>):Promise<T>{const operation=this.mutation.then(()=>{if(this.closing)throw new Error('Capability runtime closing');return action();});this.mutation=operation.catch(()=>{});return operation;}
-  async load(){await this.manager.init();for(const item of this.manager.list())await this.manager.refresh(item.id);}
+  async load(){
+    await this.manager.init();
+    for(const item of this.manager.list()){
+      const bundled=['cagent.system-apps','cagent.knowledge'].includes(item.id);
+      const entry=this.entries.find(candidate=>candidate.id===item.id);
+      if(bundled && entry?.bundle && this.installedManifestDigests.get(item.id)!==entry.manifestSha256){
+        await this.installCatalogEntry({id:item.id,confirm:true},new AbortController().signal,false);
+      }else await this.manager.refresh(item.id);
+    }
+  }
   list(){return this.manager.list();}
   cloudExport(){return this.manager.list().map(item=>{const manifest=this.manifestFor(item.id),config=manifest?this.adapters.get(manifest.adapterId)?.portableConfiguration:undefined;return portableCapabilitiesSchema.element.parse({id:item.id,version:item.version,manifestSha256:this.installedManifestDigests.get(item.id)!,...(config?{configuration:config.validate(config.export())}:{})});});}
   async cloudImport(input:unknown){
