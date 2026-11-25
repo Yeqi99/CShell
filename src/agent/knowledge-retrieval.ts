@@ -78,6 +78,14 @@ export type Hit={id:string;cid:string;part:number;title:string;body:string;sourc
 export const hitFields='r.id,p.cid,p.part,r.title,p.body,r.source,r.library,r.key,r.kind,r.created';
 export function sparse(db:DatabaseSync,query:string,library:string|undefined,key:string|undefined,limit:number):Hit[]{
   const tokens=[...new Set(words(query))].slice(0,24);
+  // Expand common classroom terminology on query, so existing indexes remain usable.
+  const aliases: Array<[RegExp, string]> = [
+    [/全表|扫描整张表/u, '执行计划 EXPLAIN 扫描'],
+    [/(对象|字符串).*(相等|一样|相同)/u, 'equals 字符串 引用'],
+  ];
+  for(const [pattern, synonyms] of aliases){
+    if(pattern.test(query))tokens.push(...words(synonyms));
+  }
   if(!tokens.length)return [];
   const match=tokens.map(w=>'"'+w.replaceAll('"','""')+'"').join(' OR ');
   // Pick the best passage of each document before applying the page limit.

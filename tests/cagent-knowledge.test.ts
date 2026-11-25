@@ -185,3 +185,27 @@ test('a rejected argument can be corrected once without replaying a completed si
   } finally {await assistant.close();await rm(directory,{recursive:true,force:true});}
  }
 });
+
+test('course questions retrieve the original lesson ahead of a distractor', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'course-recall-'));
+  const adapter = knowledgeAdapter(directory);
+  const signal = new AbortController().signal;
+  const cases = [
+    ['MySQL','执行计划','EXPLAIN 显示访问类型与预计扫描行数。','怎样确认数据库查找时把全表读了一遍？','事务隔离级别'],
+    ['Linux','磁盘占用','df -h 显示文件系统剩余空间。','机器提示装不下新文件了，怎么确认分区还有多大？','进程信号'],
+    ['Python','可变默认参数','默认列表在函数定义时创建，后续调用共享。','为什么第二次运行函数会带上第一次追加的元素？','生成器表达式'],
+    ['Java','字符串比较','equals 比较字符串内容，双等号比较引用。','两个对象打印出来一样，为什么判断相等却失败？','异常处理'],
+  ];
+  try {
+    for (const [key,title,content,query,other] of cases) {
+      const scope = {library:'备课',key};
+      for (const [name,body] of [[title,content],[other,'参阅本节练习。']]) {
+        await adapter.invoke('knowledge_put',{...scope,title:name,content:body,kind:'text'},'local',signal);
+      }
+      const result = await adapter.invoke('knowledge_search',{...scope,query},'local',signal) as {records:{title:string}[]};
+      assert.equal(result.records[0]?.title,title,key);
+    }
+  } finally {
+    await rm(directory,{recursive:true,force:true});
+  }
+});
