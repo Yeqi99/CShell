@@ -42,7 +42,6 @@
   const scenes = {
     windows: ['windows-workspace.png', 'CShell 机器桌面与智能体窗口', '机器桌面与智能体，在同一个工作空间。', 'desktop'],
     linux: ['linux-workspace.png', 'Linux 文件管理窗口', '查看目录、上传下载，保留当前机器上下文。', 'linux'],
-    extensions: ['extensions.png', 'CShell 扩展市场', '按需启用工具，或导入自己的扩展。', 'extensions'],
   };
   function activate(tab) {
     const scene = scenes[tab.dataset.scene];
@@ -54,10 +53,10 @@
     document.getElementById('scene-image-link').href = img.src;
     document.getElementById('scene-description').textContent = scene[2];
     document.getElementById('scene-guide').href = '/docs/' + scene[3] + '.html';
-    const titles = {windows: '桌面与智能体', linux: '终端与文件', extensions: '扩展与应用'};
+    const titles = {windows: '桌面与智能体', linux: '终端与文件'};
     document.getElementById('scene-title').textContent = titles[tab.dataset.scene];
     const index = tabs.indexOf(tab) + 1;
-    document.querySelector('.scene-index').replaceChildren(document.createTextNode('0' + index + ' '), Object.assign(document.createElement('span'), {textContent: '/ 03'}));
+    document.querySelector('.scene-index').replaceChildren(document.createTextNode('0' + index + ' '), Object.assign(document.createElement('span'), {textContent: '/ ' + String(tabs.length).padStart(2, '0')}));
   }
   tabs.forEach((tab, index) => {
     tab.addEventListener('click', () => activate(tab));
