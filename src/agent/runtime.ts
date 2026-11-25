@@ -495,6 +495,7 @@ export async function createAgentRuntime(
         if(!challenge||challenge.nonce!==q.nonce||challenge.expires<Date.now()||q.deviceId!==server.status().deviceId)throw Error('设备登录确认已失效，请重试');
         return account.call('account.deviceLogin',q.login);
       }
+      if(method==='assistant.model.status')return assistant.modelStatus();
       if(method==='assistant.settings')return {...assistant.snapshot(),account:await account.sync.accountStatus()};
       if(method==='assistant.provider.select')return serialized(()=>assistant.selectProvider(params));
       if(method==='assistant.model.configure')return serialized(()=>assistant.configureModel(params));

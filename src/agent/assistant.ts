@@ -144,6 +144,12 @@ export class CagentAssistant {
     await this.persist();
   }
   private persist(){return this.vault.write('assistant-tasks',this.tasks);}
+  modelStatus(){
+    const settings=this.snapshot();
+    if(!settings.model && this.trialIdentity)return {source:'trial',displayName:'体验基座',configured:true};
+    const selected=settings.providers.find(p=>p.id===settings.providerId);
+    return {source:settings.model?'configured':'none',displayName:selected?.name||settings.model||'未配置基座',configured:settings.keyConfigured};
+  }
   snapshot() {
     const {key,...settings}=this.settings;
     const official=isOfficialModel(settings.endpoint,settings.model);

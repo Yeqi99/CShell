@@ -31,6 +31,7 @@ export class CagentCloud {
   setCapabilities(value:NonNullable<CagentCloud['capabilities']>){this.capabilities=value;}
   private capabilityRestore:unknown=[];
   setCapabilitySelection(id:string,installed:boolean):Promise<unknown>{
+    if(this.unreadableBundle)return Promise.resolve();
     const next=this.accountWrites.catch(()=>{}).then(async()=>{
       const wasPaused=this.paused;this.paused=true;
       try { await this.pending;
@@ -57,6 +58,7 @@ export class CagentCloud {
   deviceId() {
     return this.hooks?.deviceId();
   }
+  private unreadableBundle = false;
   private cached: any;
   private workspaces: AccountWorkspaces<{bundle: any; assistant: ReturnType<CagentAssistant['localWorkspace']>}>;
   private emptyBundle(){return {format:1,store:{profiles:[],groups:[],preferences:defaults,presets:[],monitorViews:[],hosts:{},secrets:{}},ai:emptySharedAi(),devices:[],http:[],assets:{}};}
@@ -204,7 +206,16 @@ export class CagentCloud {
   }
   async load() {
     this.assistant.officialCredential = () => this.sync.accountId()?this.sync.sessionCredential():'';
-    this.cached = (await this.vault.read('cloud-bundle', bundle)) ?? {
+    let stored;
+    try { stored=await this.vault.read('cloud-bundle',bundle); }
+    catch(error){
+      // Preserve the encrypted original and keep all cloud exports paused until it is restored.
+      this.unreadableBundle=true;
+      this.transportError='本机云配置无法读取，原文件已保留。恢复 cloud-bundle.enc 和配套密钥后重新启动即可恢复同步。';
+      this.cached=this.emptyBundle();
+      return;
+    }
+    this.cached = stored ?? {
       format: 1,
       store: {
         profiles: [],
@@ -244,6 +255,7 @@ export class CagentCloud {
     this.accountWrites=next;return next;
   }
   private async performCall(method: string, input: unknown) {
+    if(this.unreadableBundle && method!=='account.status')throw Error(this.transportError);
     if(method==='account.deviceLogin') {
       const q=z.object({session:z.object({accountId:z.string(),email:z.email(),token:z.string()}).strict(),key:z.string()}).strict().parse(input);
       this.assistant.assertAccountIdle();

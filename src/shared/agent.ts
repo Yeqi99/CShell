@@ -21,6 +21,7 @@ export const agentMethods = [
   'connection.save',
   'assistant.account.prepare','assistant.account.connect',
   'assistant.settings',
+  'assistant.model.status',
   'assistant.provider.select',
   'assistant.configure',
   'assistant.start',

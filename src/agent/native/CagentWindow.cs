@@ -80,7 +80,7 @@ public class CagentWindow : Window {
     var actions=new DockPanel{Margin=new Thickness(0,6,0,0),LastChildFill=false};composerBody.Children.Add(actions);
     send.Content=Glyph("M12,18 L12,6 M6,12 L12,6 L18,12",1.8);StyleButton(send);send.Width=34;send.Height=34;send.Padding=new Thickness(6);send.Background=Brush("#1E3337");send.Foreground=Brushes.White;send.ToolTip="发送 · Enter（Shift+Enter 换行）";AutomationProperties.SetName(send,"发送任务");DockPanel.SetDock(send,Dock.Right);actions.Children.Add(send);
     stop.Content=Glyph("M7,7 L17,7 L17,17 L7,17 Z",2);StyleButton(stop);stop.Width=34;stop.Height=34;stop.Padding=new Thickness(6);stop.IsEnabled=false;stop.Visibility=Visibility.Collapsed;stop.ToolTip="停止当前任务";AutomationProperties.SetName(stop,"停止当前任务");DockPanel.SetDock(stop,Dock.Right);actions.Children.Add(stop);
-    modelChip.Content="选择模型  ⌄";StyleButton(modelChip);modelChip.Foreground=Brush("#71818A");modelChip.FontSize=11;modelChip.Padding=new Thickness(5,4,5,4);modelChip.ToolTip="模型与权限";AutomationProperties.SetName(modelChip,"选择模型与权限");modelChip.Click+=async(s,e)=>await Guard(Models);actions.Children.Add(modelChip);
+    modelChip.Content="体验基座  ⌄";StyleButton(modelChip);modelChip.Foreground=Brush("#71818A");modelChip.FontSize=11;modelChip.Padding=new Thickness(5,4,5,4);modelChip.ToolTip="模型与权限";AutomationProperties.SetName(modelChip,"当前基座与权限");modelChip.Click+=async(s,e)=>await Guard(Models);actions.Children.Add(modelChip);
     status.FontSize=10;status.Foreground=Brush("#8C98A2");status.Text="正在连接本机运行时…";status.Margin=new Thickness(6,10,6,0);status.TextAlignment=TextAlignment.Center;status.TextWrapping=TextWrapping.Wrap;composer.Children.Add(status);
     send.Click+=async(s,e)=>await Guard(Send);stop.Click+=async(s,e)=>await Guard(async()=>{if(selected!=null)await Api("assistant.cancel",Obj("id",selected));await Poll();});
     Grid.SetRow(overlay,1);overlay.Visibility=Visibility.Collapsed;root.Children.Add(overlay);
@@ -128,7 +128,7 @@ public class CagentWindow : Window {
   void ShowWelcome(){welcome.Children.Clear();welcome.Children.Add(Mark(46));welcome.Children.Add(new TextBlock{Text="今天，想做点什么？",FontSize=21,FontWeight=FontWeights.SemiBold,Foreground=Brush("#34494D"),TextAlignment=TextAlignment.Center,Margin=new Thickness(0,20,0,0)});welcome.Visibility=Visibility.Visible;Reveal(welcome);}
   void SelectTask(string id){drafts[selected??"new"]=input.Text;selected=id;string draft;input.Text=drafts.TryGetValue(id??"new",out draft)?draft:"";initialTaskLoaded=true;lastRender="";}
   void NewTask(){SelectTask(null);current=null;messages.Children.Clear();status.Text="准备就绪";send.IsEnabled=true;send.Visibility=Visibility.Visible;stop.IsEnabled=false;stop.Visibility=Visibility.Collapsed;ShowWelcome();ShowChat();}
-  void ModelLabel(string model){modelChip.Content=new TextBlock{Text=(model==""?"选择模型":model)+"  ⌄",TextTrimming=TextTrimming.CharacterEllipsis,MaxWidth=180};}
+  async Task RefreshModelLabel(){var model=S(D(await Api("assistant.model.status")),"displayName");modelChip.Content=new TextBlock{Text=model+"  ⌄",TextTrimming=TextTrimming.CharacterEllipsis,MaxWidth=180};}
   void VerifyInteractions(){
     input.Text="未发送的草稿";Panel("测试设置");ShowChat();if(input.Text!="未发送的草稿")throw new Exception("Panel lost draft");
     SelectTask("fixture-two");input.Text="另一会话的草稿";SelectTask(null);if(input.Text!="未发送的草稿")throw new Exception("Session draft lost");
@@ -176,7 +176,7 @@ public class CagentWindow : Window {
   }
   async Task Start(string hostMode="app-host"){
     await LaunchHost(hostMode);
-    await Poll();var settings=D(await Api("assistant.settings"));ModelLabel(S(settings,"model"));connected=true;if(current==null)status.Text="本机 · 准备就绪";timer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(1000)};timer.Tick+=async(s,e)=>{if(polling)return;polling=true;try{await Poll();}catch(Exception ex){status.Text=ex.Message;}finally{ApplyTheme();polling=false;}};timer.Start();
+    await Poll();await RefreshModelLabel();connected=true;if(current==null)status.Text="本机 · 准备就绪";timer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(1000)};timer.Tick+=async(s,e)=>{if(polling)return;polling=true;try{await Poll();}catch(Exception ex){status.Text=ex.Message;}finally{ApplyTheme();polling=false;}};timer.Start();
   }
   async Task VerifyHostReconnect(string report){
     try{
@@ -345,7 +345,7 @@ public class CagentWindow : Window {
     var menu=ModelMenu(A(await Api("account.models")));menu.PlacementTarget=modelChip;menu.IsOpen=true;
   }
   ContextMenu ModelMenu(IEnumerable models){var menu=new ContextMenu();int count=0;
-    foreach(var raw in models){var model=D(raw);string id=S(model,"id");var item=new MenuItem{Header=S(model,"name")+" · "+S(model,"model"),IsEnabled=B(model,"hasKey")&&!busy&&S(current,"state")!="running"&&S(current,"state")!="approval"};item.Click+=async(sender,e)=>await Guard(async()=>{await Api("account.model.select",Obj("id",id));ModelLabel(S(model,"model"));});menu.Items.Add(item);count++;}
+    foreach(var raw in models){var model=D(raw);string id=S(model,"id");var item=new MenuItem{Header=S(model,"name")+" · "+S(model,"model"),IsEnabled=B(model,"hasKey")&&!busy&&S(current,"state")!="running"&&S(current,"state")!="approval"};item.Click+=async(sender,e)=>await Guard(async()=>{await Api("account.model.select",Obj("id",id));await RefreshModelLabel();});menu.Items.Add(item);count++;}
     if(count==0)menu.Items.Add(new MenuItem{Header="暂无已同步的基座",IsEnabled=false});
     menu.Items.Add(new Separator());AddAsyncMenu(menu,"模型与权限设置",Settings);return menu;
   }
@@ -417,7 +417,7 @@ public class CagentWindow : Window {
     var p=Panel("模型与权限");var models=MarketCard(p,"模型连接","首次提问自动使用 CAgent 体验基座。也可以填写自己的模型接口和密钥。");var endpoint=Field(models,"基座完整接口地址",S(s,"endpoint"));var model=Field(models,"模型",S(s,"model"));models.Children.Add(Text(B(s,"keyConfigured")?"API Key（已保存，留空保留）":"API Key"));var key=new PasswordBox{Padding=new Thickness(8),Margin=new Thickness(0,0,0,10)};AutomationProperties.SetName(key,"模型 API Key，留空保留已保存密钥");models.Children.Add(key);
     var permissions=MarketCard(p,"执行与委派","明确选择允许的操作与控制端。");var commands=Check(permissions,"允许本机命令",B(s,"commands"));var review=Check(permissions,"执行前逐次确认",B(s,"review"));var automation=Check(permissions,"允许智能体管理目标与事件订阅",B(s,"automation"));permissions.Children.Add(Text("命令以当前用户权限运行，不是权限沙箱。",11));var ds=new List<string>();foreach(var d in A(V(s,"delegates")))ds.Add(Convert.ToString(d));var delegates=Field(permissions,"允许委派的控制端指纹（每行一个）",string.Join("\n",ds.ToArray()),true);
     var budgets=MarketCard(p,"运行预算","限定任务时间、上下文与无进展重试。");var minutes=Field(budgets,"每轮时间上限（分钟，0 表示不限）",S(s,"runMinutes"));var bytes=Field(budgets,"累计上下文上限（0 不限，或 10000–20000000 字节）",S(s,"contextBytes"));var repeated=Field(budgets,"重复无进展停止次数（2–20）",S(s,"noProgress"));
-    ActionButton(p,"保存",async()=>{var value=Obj("runMinutes",int.Parse(minutes.Text),"contextBytes",int.Parse(bytes.Text),"noProgress",int.Parse(repeated.Text),"endpoint",endpoint.Text,"model",model.Text,"commands",commands.IsChecked==true,"automation",automation.IsChecked==true,"review",review.IsChecked==true,"delegates",delegates.Text.Split(new[]{'\r','\n'},StringSplitOptions.RemoveEmptyEntries));if(key.Password.Length>0)value["key"]=key.Password;await Api("assistant.configure",value);key.Clear();ModelLabel(model.Text);ShowChat();status.Text="设置已保存";});
+    ActionButton(p,"保存",async()=>{var value=Obj("runMinutes",int.Parse(minutes.Text),"contextBytes",int.Parse(bytes.Text),"noProgress",int.Parse(repeated.Text),"endpoint",endpoint.Text,"model",model.Text,"commands",commands.IsChecked==true,"automation",automation.IsChecked==true,"review",review.IsChecked==true,"delegates",delegates.Text.Split(new[]{'\r','\n'},StringSplitOptions.RemoveEmptyEntries));if(key.Password.Length>0)value["key"]=key.Password;await Api("assistant.configure",value);key.Clear();await RefreshModelLabel();ShowChat();status.Text="设置已保存";});
     ActionButton(p,"删除已保存密钥",async()=>{s.Remove("keyConfigured");s["key"]="";await Api("assistant.configure",s);await Settings();});
     var feedback=Button("问题与建议","主动反馈问题");feedback.Click+=(sender,args)=>Feedback();p.Children.Add(feedback);
   }
